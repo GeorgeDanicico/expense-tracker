@@ -21,7 +21,7 @@ function parseCredentials(formData: FormData) {
 
 function getSiteOrigin(requestHeaders: Headers) {
   const requestOrigin = requestHeaders.get("origin");
-  const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL;
+  const configuredOrigin = process.env.SITE_URL;
   const candidate =
     process.env.NODE_ENV === "production"
       ? configuredOrigin || requestOrigin

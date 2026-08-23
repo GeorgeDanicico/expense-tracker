@@ -16,7 +16,7 @@ A private, deliberately simple expense tracker built with Next.js 16, React 19, 
 
 ## Run locally
 
-The connected Supabase URL and publishable key are already present in the ignored `.env.local` file. For another project, copy `.env.example` to `.env.local` and replace the values.
+The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. For another project, copy `.env.example` to `.env.local` and replace the values. Do not add a `NEXT_PUBLIC_` prefix to either variable.
 
 ```bash
 npm install
@@ -34,7 +34,7 @@ The hosted Supabase project has Email/password authentication enabled. Confirm t
 1. Open Supabase Dashboard → Authentication → Sign In / Providers → Email and enable email/password sign-ins.
 2. Under Authentication → URL Configuration, set the local Site URL to `http://localhost:3000` and allow `http://localhost:3000/auth/confirm` as a redirect URL.
 3. Use the standard PKCE confirmation template below. It uses the callback URL supplied by signup, so local and deployed environments do not get mixed up. The app also supports this project's existing six-digit OTP link at `/confirm-email`.
-4. For production, replace those URLs with the final HTTPS origin and update `NEXT_PUBLIC_SITE_URL`.
+4. For production, replace those URLs with the final HTTPS origin and update the server-only `SITE_URL`.
 
 Recommended confirmation-template link:
 
