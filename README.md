@@ -1,6 +1,6 @@
 # Simple Ledger
 
-A private, deliberately simple expense tracker built with Next.js 16, React 19, Chakra UI 3, and Supabase. It uses CSS files and Chakra styling—there is no Tailwind configuration or dependency.
+A private, mobile-first expense tracker built with Next.js 16, React 19, Chakra UI 3, and Supabase. It uses CSS files and Chakra styling—there is no Tailwind configuration or dependency.
 
 ## Included
 
@@ -12,7 +12,10 @@ A private, deliberately simple expense tracker built with Next.js 16, React 19, 
 - Per-account currency setting applied to every amount and export
 - Secured `.xlsx` export for any selected month
 - Installable PWA manifest, icons, and an offline shell
+- Responsive desktop sidebar and safe-area-aware mobile navigation
+- Searchable, category-filtered expense table with dedicated phone cards
 - Owner-only Supabase RLS policies, explicit grants, input constraints, and query indexes
+- Database-side dashboard aggregation so historical rows are not transferred to the app server
 
 ## Run locally
 
@@ -52,7 +55,8 @@ Migrations live in `supabase/migrations`. They add or upgrade the expense ledger
 
 - positive amount, category, description, and note constraints;
 - a validated per-account currency preference, defaulting existing accounts to `EUR`;
-- indexes on `(user_id, expense_date)` and `(user_id, category, expense_date)`;
+- indexes aligned with the ledger's owner, date, and creation-time filters;
+- an owner-scoped dashboard aggregation function that runs under RLS;
 - authenticated-only SELECT, INSERT, UPDATE, and DELETE policies scoped to `auth.uid()`;
 - anonymous privilege revocation and hardened legacy tracker policies/functions.
 

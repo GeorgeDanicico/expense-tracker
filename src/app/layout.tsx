@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     default: "Simple Ledger",
     template: "%s · Simple Ledger",
   },
-  description: "A private, straightforward monthly expense tracker.",
+  description: "A private, modern expense tracker that makes spending easy to understand.",
   applicationName: "Simple Ledger",
   appleWebApp: {
     capable: true,
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#f7f6f2",
+  themeColor: "#f5f6fa",
   colorScheme: "light",
 };
 
@@ -40,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >

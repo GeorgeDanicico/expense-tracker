@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getAuthenticatedUser } from "@/lib/auth";
-import { getAccountCurrency } from "@/lib/data/account";
-import { getMonthlyExpenses } from "@/lib/data/expenses";
+import { getAccountCurrencyForUser } from "@/lib/data/account";
+import { getMonthlyExpensesForUser } from "@/lib/data/expenses";
 import { buildExpenseWorkbook } from "@/lib/export/xlsx";
 import { isValidMonth } from "@/lib/utils/dates";
 
@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
   }
 
   const [expenses, currency] = await Promise.all([
-    getMonthlyExpenses(month),
-    getAccountCurrency(),
+    getMonthlyExpensesForUser(user.id, month),
+    getAccountCurrencyForUser(user.id),
   ]);
   const workbook = buildExpenseWorkbook(expenses, currency);
   return new NextResponse(workbook, {

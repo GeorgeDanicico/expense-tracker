@@ -84,7 +84,17 @@ export type Database = {
       };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      get_expense_dashboard: {
+        Args: {
+          p_analytics_end_exclusive: string;
+          p_analytics_start: string;
+          p_current_end_exclusive: string;
+          p_current_start: string;
+        };
+        Returns: Json;
+      };
+    };
     Enums: { Role: "USER" | "ADMIN" };
     CompositeTypes: { [_ in never]: never };
   };

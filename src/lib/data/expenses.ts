@@ -1,11 +1,12 @@
 import "server-only";
 
-import { redirect } from "next/navigation";
-
-import { getAuthenticatedUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   CATEGORY_LABELS,
+  type Analytics,
+  type AnalyticsFilters,
+  type AnalyticsPeriod,
+  type DashboardData,
   type Expense,
   type ExpenseCategory,
 } from "@/lib/types";
@@ -28,33 +29,14 @@ type ExpenseRow = {
   notes: string | null;
 };
 
-export type AnalyticsPeriod = "3m" | "6m" | "1y" | "2y" | "custom";
-export type CustomGranularity = "month" | "day";
-
-export type AnalyticsFilters = {
-  period: AnalyticsPeriod;
-  granularity: CustomGranularity;
-  customDate: string;
-};
-
-export type Analytics = {
-  label: string;
-  total: number;
-  count: number;
-  monthlyAverage: number;
-  topCategory: string;
-  categoryTotals: { category: ExpenseCategory; label: string; total: number }[];
-  series: { key: string; label: string; total: number }[];
-};
-
-export type DashboardData = {
-  currentMonth: string;
-  currentExpenses: Expense[];
-  currentTotal: number;
+type DashboardSummary = {
+  currentTotal: number | string;
   currentCount: number;
-  currentAverage: number;
-  currentLargest: number;
-  analytics: Analytics;
+  currentLargest: number | string;
+  analyticsTotal: number | string;
+  analyticsCount: number;
+  categoryTotals: { category: ExpenseCategory; total: number | string }[];
+  monthlyTotals: { key: string; total: number | string }[];
 };
 
 const PERIOD_MONTHS: Record<Exclude<AnalyticsPeriod, "custom">, number> = {
@@ -131,30 +113,19 @@ function buildMonthKeys(start: string, endExclusive: string) {
   return keys;
 }
 
-function calculateAnalytics(
-  expenses: Expense[],
+function analyticsFromSummary(
+  summary: DashboardSummary,
   range: ReturnType<typeof getAnalyticsRange>,
 ): Analytics {
-  const categoryMap = new Map<ExpenseCategory, number>();
-  const monthMap = new Map<string, number>();
-  let total = 0;
-
-  for (const expense of expenses) {
-    total += expense.amount;
-    categoryMap.set(
-      expense.category,
-      (categoryMap.get(expense.category) ?? 0) + expense.amount,
-    );
-    const month = expense.expenseDate.slice(0, 7);
-    monthMap.set(month, (monthMap.get(month) ?? 0) + expense.amount);
-  }
-
-  const categoryTotals = Array.from(categoryMap, ([category, categoryTotal]) => ({
-    category,
-    label: CATEGORY_LABELS[category],
-    total: categoryTotal,
-  })).sort((a, b) => b.total - a.total);
-
+  const total = Number(summary.analyticsTotal);
+  const categoryTotals = summary.categoryTotals.map((item) => ({
+    category: item.category,
+    label: CATEGORY_LABELS[item.category],
+    total: Number(item.total),
+  }));
+  const monthMap = new Map(
+    summary.monthlyTotals.map((item) => [item.key, Number(item.total)]),
+  );
   const series =
     range.granularity === "day"
       ? [{ key: range.start, label: formatDate(range.start), total }]
@@ -170,7 +141,7 @@ function calculateAnalytics(
   return {
     label: range.label,
     total,
-    count: expenses.length,
+    count: Number(summary.analyticsCount),
     monthlyAverage: total / range.monthCount,
     topCategory: categoryTotals[0]?.label ?? "No data",
     categoryTotals,
@@ -178,15 +149,12 @@ function calculateAnalytics(
   };
 }
 
-async function queryExpenses(start: string, endExclusive: string) {
-  const user = await getAuthenticatedUser();
-  if (!user) redirect("/login");
-
+async function queryExpensesForUser(userId: string, start: string, endExclusive: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("expenses")
     .select("id, description, amount, category, expense_date, notes")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .gte("expense_date", start)
     .lt("expense_date", endExclusive)
     .order("expense_date", { ascending: false })
@@ -196,35 +164,55 @@ async function queryExpenses(start: string, endExclusive: string) {
   return (data as ExpenseRow[]).map(toExpense);
 }
 
-export async function getMonthlyExpenses(month: string) {
+export async function getMonthlyExpensesForUser(userId: string, month: string) {
   const range = getMonthRange(month);
-  return queryExpenses(range.start, range.endExclusive);
+  return queryExpensesForUser(userId, range.start, range.endExclusive);
 }
 
-export async function getDashboardData(filters: AnalyticsFilters): Promise<DashboardData> {
+export async function getDashboardDataForUser(
+  userId: string,
+  filters: AnalyticsFilters,
+): Promise<DashboardData> {
   const currentMonth = getCurrentMonth();
   const currentRange = getMonthRange(currentMonth);
   const analyticsRange = getAnalyticsRange(filters);
 
-  const [currentExpenses, analyticsExpenses] = await Promise.all([
-    queryExpenses(currentRange.start, currentRange.endExclusive),
-    queryExpenses(analyticsRange.start, analyticsRange.endExclusive),
+  const supabase = await createClient();
+  const [recentResult, summaryResult] = await Promise.all([
+    supabase
+      .from("expenses")
+      .select("id, description, amount, category, expense_date, notes")
+      .eq("user_id", userId)
+      .gte("expense_date", currentRange.start)
+      .lt("expense_date", currentRange.endExclusive)
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase.rpc("get_expense_dashboard", {
+      p_current_start: currentRange.start,
+      p_current_end_exclusive: currentRange.endExclusive,
+      p_analytics_start: analyticsRange.start,
+      p_analytics_end_exclusive: analyticsRange.endExclusive,
+    }),
   ]);
 
-  let currentTotal = 0;
-  let currentLargest = 0;
-  for (const expense of currentExpenses) {
-    currentTotal += expense.amount;
-    currentLargest = Math.max(currentLargest, expense.amount);
+  if (recentResult.error || summaryResult.error) {
+    throw new Error("Unable to load dashboard data.");
   }
+
+  const currentExpenses = (recentResult.data as ExpenseRow[]).map(toExpense);
+  const summary = summaryResult.data as unknown as DashboardSummary;
+  const currentTotal = Number(summary.currentTotal);
+  const currentCount = Number(summary.currentCount);
+  const currentLargest = Number(summary.currentLargest);
 
   return {
     currentMonth,
     currentExpenses,
     currentTotal,
-    currentCount: currentExpenses.length,
-    currentAverage: currentExpenses.length ? currentTotal / currentExpenses.length : 0,
+    currentCount,
+    currentAverage: currentCount ? currentTotal / currentCount : 0,
     currentLargest,
-    analytics: calculateAnalytics(analyticsExpenses, analyticsRange),
+    analytics: analyticsFromSummary(summary, analyticsRange),
   };
 }

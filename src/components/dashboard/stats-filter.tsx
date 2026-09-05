@@ -1,13 +1,11 @@
 "use client";
 
 import { Button, Field, Flex, Input, NativeSelect, Stack } from "@chakra-ui/react";
+import { SlidersHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
 
-import type {
-  AnalyticsPeriod,
-  CustomGranularity,
-} from "@/lib/data/expenses";
+import type { AnalyticsPeriod, CustomGranularity } from "@/lib/types";
 
 export function StatsFilter({
   initialPeriod,
@@ -47,10 +45,10 @@ export function StatsFilter({
 
   return (
     <form onSubmit={submit}>
-      <Flex gap="3" align="end" wrap="wrap">
-        <Field.Root maxW="220px">
+      <Flex gap="3" align="end" wrap="wrap" width={{ base: "full", lg: "auto" }}>
+        <Field.Root flex={{ base: "1", sm: "initial" }} minW={{ base: "10rem", sm: "12rem" }}>
           <Field.Label>Analysis period</Field.Label>
-          <NativeSelect.Root>
+          <NativeSelect.Root size="sm">
             <NativeSelect.Field
               value={period}
               onChange={(event) => setPeriod(event.target.value as AnalyticsPeriod)}
@@ -67,9 +65,9 @@ export function StatsFilter({
 
         {period === "custom" ? (
           <Stack direction={{ base: "column", sm: "row" }} gap="3" align="end">
-            <Field.Root maxW="180px">
+            <Field.Root minW="160px">
               <Field.Label>Custom unit</Field.Label>
-              <NativeSelect.Root>
+              <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={granularity}
                   onChange={(event) =>
@@ -83,9 +81,10 @@ export function StatsFilter({
               </NativeSelect.Root>
             </Field.Root>
 
-            <Field.Root maxW="190px">
+            <Field.Root minW="170px">
               <Field.Label>{granularity === "day" ? "Day" : "Month"}</Field.Label>
               <Input
+                size="sm"
                 type={granularity === "day" ? "date" : "month"}
                 value={customDate}
                 onChange={(event) => setCustomDate(event.target.value)}
@@ -95,7 +94,16 @@ export function StatsFilter({
           </Stack>
         ) : null}
 
-        <Button type="submit" variant="outline" loading={pending}>Apply</Button>
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          borderRadius="lg"
+          borderColor="gray.300"
+          loading={pending}
+        >
+          <SlidersHorizontal size={15} aria-hidden="true" /> Apply
+        </Button>
       </Flex>
     </form>
   );

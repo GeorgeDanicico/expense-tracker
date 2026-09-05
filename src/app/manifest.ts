@@ -4,12 +4,14 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Simple Ledger Expense Tracker",
     short_name: "Simple Ledger",
-    description: "A private, straightforward monthly expense tracker.",
+    description: "A private, modern expense tracker that makes spending easy to understand.",
     start_url: "/dashboard",
+    scope: "/",
     display: "standalone",
-    background_color: "#f7f6f2",
-    theme_color: "#f7f6f2",
+    background_color: "#f5f6fa",
+    theme_color: "#f5f6fa",
     orientation: "any",
+    categories: ["finance", "productivity"],
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
       {

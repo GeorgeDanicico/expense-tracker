@@ -10,29 +10,58 @@ export function MonthlyBarChart({
   currency: string;
 }) {
   const max = Math.max(...series.map((item) => item.total), 1);
+  const total = series.reduce((sum, item) => sum + item.total, 0);
+  const average = total / Math.max(series.length, 1);
 
   if (!series.length) {
-    return <Text color="gray.500">No months are available for this range.</Text>;
+    return (
+      <Flex minH="18rem" align="center" justify="center" textAlign="center">
+        <Stack gap="1">
+          <Text fontWeight="700">No spending history yet</Text>
+          <Text color="gray.500" fontSize="sm">Your monthly trend will appear here.</Text>
+        </Stack>
+      </Flex>
+    );
   }
 
   return (
-    <Box overflowX="auto" pb="2">
-      <Flex minW={series.length > 12 ? "900px" : "560px"} height="260px" align="end" gap="3" role="img" aria-label="Expense totals by month">
+    <Box overflowX="auto" pb="1">
+      <Flex
+        minW={series.length > 12 ? "860px" : series.length > 6 ? "620px" : "100%"}
+        height={{ base: "230px", md: "270px" }}
+        align="end"
+        gap={{ base: "2", md: "3" }}
+        px="1"
+        pt="6"
+        role="img"
+        aria-label={`Expense totals by month. Average ${formatCurrency(average, currency)}.`}
+      >
         {series.map((item) => {
-          const height = item.total ? Math.max((item.total / max) * 190, 4) : 2;
+          const height = item.total ? Math.max((item.total / max) * 178, 8) : 3;
+          const aboveAverage = item.total >= average && item.total > 0;
+
           return (
-            <Stack key={item.key} flex="1" minW="38px" height="full" justify="end" align="center" gap="2">
-              <Text fontSize="xs" color="gray.600" whiteSpace="nowrap">
+            <Stack key={item.key} flex="1" minW="42px" height="full" justify="end" align="center" gap="2">
+              <Text
+                color="gray.500"
+                fontSize="10px"
+                fontWeight="650"
+                whiteSpace="nowrap"
+                opacity={item.total ? 1 : 0}
+              >
                 {item.total ? formatCurrency(item.total, currency) : "—"}
               </Text>
               <Box
                 width="full"
-                maxW="54px"
+                maxW="52px"
                 height={`${height}px`}
-                bg={item.total ? "blue.600" : "gray.200"}
-                transition="height 160ms ease"
+                borderRadius="lg lg sm sm"
+                bg={item.total ? (aboveAverage ? "purple.600" : "purple.300") : "gray.200"}
+                boxShadow={aboveAverage ? "0 7px 15px rgb(124 58 237 / 16%)" : "none"}
+                transition="height 180ms ease, background 180ms ease"
+                title={`${item.label}: ${formatCurrency(item.total, currency)}`}
               />
-              <Text fontSize="xs" color="gray.500" whiteSpace="nowrap">{item.label}</Text>
+              <Text color="gray.500" fontSize="xs" fontWeight="600" whiteSpace="nowrap">{item.label}</Text>
             </Stack>
           );
         })}
