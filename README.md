@@ -60,6 +60,41 @@ Migrations live in `supabase/migrations`. They add or upgrade the expense ledger
 - authenticated-only SELECT, INSERT, UPDATE, and DELETE policies scoped to `auth.uid()`;
 - anonymous privilege revocation and hardened legacy tracker policies/functions.
 
+## Docker on a VPS
+
+Build the production image on the VPS or a Linux CI runner matching its architecture:
+
+```bash
+docker build -t expense-tracker:latest .
+```
+
+The multi-stage build uses a pinned Node.js 24 Debian slim image, caches npm downloads
+and Next.js build work, and copies only the standalone server and static assets into
+the runtime image. It runs as the unprivileged `node` user. The build needs internet
+access for npm packages and Google fonts, but no Supabase credentials.
+
+Create `.env.production` on the VPS with `SUPABASE_URL`,
+`SUPABASE_PUBLISHABLE_KEY`, and `SITE_URL` (your public HTTPS origin).
+Environment files are excluded from the build context and supplied at runtime:
+
+```bash
+docker run -d --name expense-tracker \
+  --restart unless-stopped \
+  --env-file .env.production \
+  --publish 127.0.0.1:3000:3000 \
+  --log-opt max-size=10m --log-opt max-file=3 \
+  expense-tracker:latest
+```
+
+Point a host-based HTTPS reverse proxy at `127.0.0.1:3000`. Preserve Next.js cache
+headers, avoid shared caching of authenticated pages and API responses, and disable
+response buffering for streaming. Update the Supabase Auth redirect URLs to your
+production origin as described above. Expense data stays in hosted Supabase.
+
+When building on a different architecture, use Docker Buildx with the VPS platform
+(for example, `--platform linux/amd64 --load` for an x86 VPS). Refresh the base-image
+digest periodically and rebuild to receive security fixes.
+
 ## Verification
 
 ```bash

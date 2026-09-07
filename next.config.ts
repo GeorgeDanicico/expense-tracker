@@ -9,6 +9,7 @@ const allowedDevOrigins = Object.values(networkInterfaces())
 const nextConfig: NextConfig = {
   allowedDevOrigins,
   poweredByHeader: false,
+  output: "standalone",
   outputFileTracingRoot: process.cwd(),
   experimental: {
     optimizePackageImports: ["@chakra-ui/react", "lucide-react"],
