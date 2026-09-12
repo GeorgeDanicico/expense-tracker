@@ -1,13 +1,14 @@
 "use client";
 
 import { Box, Flex, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
-import { ChartNoAxesCombined, CreditCard, Settings2 } from "lucide-react";
+import { ChartNoAxesCombined, CreditCard, Settings2, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/dashboard", label: "Overview", icon: ChartNoAxesCombined },
   { href: "/expenses", label: "Expenses", icon: CreditCard },
+  { href: "/investments", label: "Investments", icon: TrendingUp },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 

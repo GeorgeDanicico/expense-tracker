@@ -58,3 +58,25 @@ export function formatCurrency(
     maximumFractionDigits: 2,
   }).format(amount);
 }
+
+export function formatInvestmentAmount(
+  amount: string | null,
+  currency: string,
+  locale = "en-US",
+) {
+  if (amount === null) return "Unavailable";
+
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) return `${amount} ${currency}`;
+
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      currencyDisplay: "code",
+      maximumFractionDigits: 2,
+    }).format(numericAmount);
+  } catch {
+    return `${amount} ${currency}`;
+  }
+}
