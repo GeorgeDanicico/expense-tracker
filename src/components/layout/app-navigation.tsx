@@ -93,6 +93,9 @@ export function MobileNavigation() {
             flex="1"
             maxW="7rem"
             minH="14"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
             borderRadius="xl"
             color={active ? "purple.700" : "gray.500"}
             bg={active ? "purple.50" : "transparent"}
@@ -101,7 +104,7 @@ export function MobileNavigation() {
             _hover={{ textDecoration: "none" }}
           >
             <Link href={href} aria-current={active ? "page" : undefined}>
-              <Stack height="full" align="center" justify="center" gap="1">
+              <Stack width="full" align="center" justify="center" gap="1">
                 <Box position="relative">
                   <Icon size={20} strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
                   {active ? (
