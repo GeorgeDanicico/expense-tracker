@@ -20,7 +20,7 @@ jobs:
     env:
       DEPLOY_ENV_FILE: ${{ vars.DEPLOY_ENV_FILE || '/etc/expense-tracker/.env.production' }}
       IMAGE_NAME: expense-tracker
-      CONTAINER_NAME: expense-tracker
+      CONTAINER_NAME: expense-tracker-web
     steps:
       - name: Check out latest commit
         uses: actions/checkout@v4
