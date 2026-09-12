@@ -7,7 +7,7 @@ import { Surface } from "@/components/ui/surface";
 
 export function DataLoading({ label = "Loading your ledger…" }: { label?: string }) {
   return (
-    <Flex minH="50dvh" align="center" justify="center" aria-busy="true" aria-live="polite">
+    <Flex minH="50dvh" align="center" justify="center" aria-busy="true" aria-live="polite" role="status">
       <Stack align="center" gap="3" color="gray.500">
         <Spinner size="lg" color="purple.500" borderWidth="3px" />
         <Text fontSize="sm" fontWeight="650">{label}</Text>
@@ -34,7 +34,7 @@ export function DataError({
             <Heading as="h1" size="xl" letterSpacing="-0.03em">We couldn’t load your data</Heading>
             <Text color="gray.500">{message}</Text>
           </Stack>
-          <Button onClick={retry} colorPalette="purple" borderRadius="xl">
+          <Button onClick={retry} minH="11" colorPalette="purple" borderRadius="xl">
             <RefreshCw size={17} aria-hidden="true" /> Try again
           </Button>
         </Stack>
@@ -45,7 +45,7 @@ export function DataError({
 
 export function DataUpdating() {
   return (
-    <Flex align="center" gap="2" color="gray.400" fontSize="xs" aria-live="polite">
+    <Flex align="center" gap="2" color="gray.400" fontSize="xs" aria-live="polite" role="status">
       <Spinner size="xs" /> Updating…
     </Flex>
   );

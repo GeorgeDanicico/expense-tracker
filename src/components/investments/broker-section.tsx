@@ -27,14 +27,14 @@ export function BrokerSection({
   );
 
   return (
-    <Surface p={{ base: "5", md: "6" }}>
+    <Surface as="section" aria-labelledby={`investment-broker-${broker.accountId}`} p={{ base: "5", md: "6" }}>
       <Stack gap="6">
-        <Flex align={{ base: "flex-start", sm: "center" }} justify="space-between" gap="4">
+        <Flex align={{ base: "flex-start", sm: "center" }} justify="space-between" gap="4" direction={{ base: "column", sm: "row" }}>
           <Stack gap="1">
             <Text color="purple.600" fontSize="xs" fontWeight="800" letterSpacing="0.1em">
               BROKER ACCOUNT
             </Text>
-            <Heading as="h2" size={{ base: "lg", md: "xl" }} letterSpacing="-0.03em">
+            <Heading as="h2" id={`investment-broker-${broker.accountId}`} size={{ base: "lg", md: "xl" }} letterSpacing="-0.03em">
               {INVESTMENT_BROKER_LABELS[broker.brokerId]}
             </Heading>
             <Text color="gray.500" fontSize="sm">
@@ -83,6 +83,7 @@ export function BrokerSection({
           <AssetDetail
             asset={selectedAsset}
             accountId={broker.accountId}
+            brokerId={broker.brokerId}
             detailId={detailId}
             onClose={onClose}
           />

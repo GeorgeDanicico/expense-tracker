@@ -1,8 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getAuthenticatedUser } from "@/lib/auth";
-import { getInvestmentTransactionsForUser } from "@/lib/data/investments";
-import { investmentTransactionQuerySchema } from "@/lib/validation/investment";
+import {
+  createInvestmentTransactionForUser,
+  getInvestmentTransactionsForUser,
+  InvestmentMutationError,
+} from "@/lib/data/investments";
+import {
+  investmentTransactionQuerySchema,
+  investmentTransactionSchema,
+} from "@/lib/validation/investment";
 
 const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 
@@ -44,6 +51,46 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "Unable to load investment transactions." },
+      { status: 500, headers: PRIVATE_HEADERS },
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: PRIVATE_HEADERS },
+    );
+  }
+
+  const payload = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const parsed = investmentTransactionSchema.safeParse(payload);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: "Check the highlighted order details and try again.",
+        fieldErrors: parsed.error.flatten().fieldErrors,
+      },
+      { status: 422, headers: PRIVATE_HEADERS },
+    );
+  }
+
+  try {
+    const result = await createInvestmentTransactionForUser(user.id, parsed.data);
+    return NextResponse.json(result, { status: 201, headers: PRIVATE_HEADERS });
+  } catch (error) {
+    if (error instanceof InvestmentMutationError) {
+      return NextResponse.json(
+        { error: error.message, fieldErrors: error.fieldErrors },
+        { status: error.status, headers: PRIVATE_HEADERS },
+      );
+    }
+
+    return NextResponse.json(
+      { error: "The investment order could not be saved." },
       { status: 500, headers: PRIVATE_HEADERS },
     );
   }

@@ -26,26 +26,26 @@ export type Database = {
       };
       investment_transactions: {
         Row: {
-          amount: number;
+          amount: number | string;
           currency: string;
           executed_at: string;
           id: string;
           instrument: string;
           investment_account_id: string;
-          quantity: number;
+          quantity: number | string;
           side: string;
-          unit_price: number;
+          unit_price: number | string;
         };
         Insert: {
-          amount: number;
+          amount: number | string;
           currency: string;
           executed_at: string;
           id?: string;
           instrument: string;
           investment_account_id: string;
-          quantity: number;
+          quantity: number | string;
           side: string;
-          unit_price: number;
+          unit_price: number | string;
         };
         Update: Partial<Database["public"]["Tables"]["investment_transactions"]["Insert"]>;
         Relationships: [];

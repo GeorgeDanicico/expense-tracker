@@ -6,6 +6,7 @@ import { useState } from "react";
 import useSWR from "swr";
 
 import { BrokerSection } from "@/components/investments/broker-section";
+import { AddInvestmentDialog } from "@/components/investments/add-investment-dialog";
 import { DataError, DataLoading, DataUpdating } from "@/components/ui/data-state";
 import { Surface } from "@/components/ui/surface";
 import { apiFetcher } from "@/lib/api/client";
@@ -66,6 +67,18 @@ export function InvestmentsPanel() {
     setSelectedKey((current) => current === nextKey ? null : nextKey);
   }
 
+  function closeSelectedAsset() {
+    const keyToRestore = selectedKey;
+    setSelectedKey(null);
+
+    if (!keyToRestore) return;
+    requestAnimationFrame(() => {
+      const assetButton = [...document.querySelectorAll<HTMLButtonElement>("[data-investment-asset-key]")]
+        .find((button) => button.dataset.investmentAssetKey === keyToRestore);
+      assetButton?.focus();
+    });
+  }
+
   return (
     <Stack gap={{ base: "6", md: "7" }}>
       <Stack gap="1">
@@ -73,11 +86,14 @@ export function InvestmentsPanel() {
           <Text color="purple.600" fontSize="sm" fontWeight="750">INVESTMENTS</Text>
           {isValidating ? <DataUpdating /> : null}
         </Flex>
-        <Flex align={{ base: "flex-start", sm: "center" }} gap="3" wrap="wrap">
-          <TrendingUp size={26} color="#7c3aed" aria-hidden="true" />
-          <Heading as="h1" size={{ base: "2xl", md: "3xl" }} color="gray.900" letterSpacing="-0.045em">
-            Investments, kept clear
-          </Heading>
+        <Flex align={{ base: "flex-start", lg: "center" }} justify="space-between" gap="4" direction={{ base: "column", lg: "row" }}>
+          <Flex align="center" gap="3">
+            <TrendingUp size={26} color="#7c3aed" aria-hidden="true" />
+            <Heading as="h1" size={{ base: "2xl", md: "3xl" }} color="gray.900" letterSpacing="-0.045em">
+              Investments, kept clear
+            </Heading>
+          </Flex>
+          <AddInvestmentDialog />
         </Flex>
         <Text color="gray.500">Track holdings by broker and native currency. Values marked “Mock price” are simulated development quotes.</Text>
       </Stack>
@@ -92,13 +108,13 @@ export function InvestmentsPanel() {
               broker={broker}
               selectedKey={selectedKey}
               onSelect={(asset) => selectAsset(broker.accountId, asset)}
-              onClose={() => setSelectedKey(null)}
+              onClose={closeSelectedAsset}
             />
           ))}
         </Stack>
       )}
 
-      {data.brokers.length && !data.calculationIssues?.length ? (
+      {data.brokers.length > 0 && !data.calculationIssues?.length ? (
         <Flex align="center" gap="2" color="gray.400" fontSize="xs">
           <TriangleAlert size={14} aria-hidden="true" />
           Values are shown separately by currency; no currencies are combined.

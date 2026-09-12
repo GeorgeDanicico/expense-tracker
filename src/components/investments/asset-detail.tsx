@@ -4,11 +4,16 @@ import { Alert, Badge, Box, Button, Flex, Heading, SimpleGrid, Skeleton, Stack, 
 import { RefreshCw, X } from "lucide-react";
 import useSWR from "swr";
 
+import { AddOrderDialog } from "@/components/investments/add-order-dialog";
 import { TransactionList } from "@/components/investments/transaction-list";
 import { DataUpdating } from "@/components/ui/data-state";
 import { apiFetcher } from "@/lib/api/client";
 import { investmentTransactionsApiKey } from "@/lib/api/keys";
-import type { InvestmentOverviewAsset, InvestmentTransactionsResponse } from "@/lib/investments/types";
+import type {
+  InvestmentBrokerId,
+  InvestmentOverviewAsset,
+  InvestmentTransactionsResponse,
+} from "@/lib/investments/types";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
 import { formatDateTime } from "@/lib/utils/dates";
 
@@ -70,11 +75,13 @@ function DetailLoading() {
 export function AssetDetail({
   asset,
   accountId,
+  brokerId,
   detailId,
   onClose,
 }: {
   asset: InvestmentOverviewAsset;
   accountId: string;
+  brokerId: InvestmentBrokerId;
   detailId: string;
   onClose: () => void;
 }) {
@@ -93,7 +100,7 @@ export function AssetDetail({
       aria-labelledby={`${detailId}-title`}
       aria-live="polite"
     >
-      <Flex align="flex-start" justify="space-between" gap="4" mb="5">
+      <Flex align="flex-start" justify="space-between" gap="4" mb="5" wrap="wrap">
         <Stack minW="0" gap="1">
           <Flex align="center" gap="2" wrap="wrap">
             <Heading as="h3" id={`${detailId}-title`} size={{ base: "lg", md: "xl" }} letterSpacing="-0.03em" truncate>
@@ -109,17 +116,20 @@ export function AssetDetail({
             {asset.instrument} · {asset.currency} · {quoteStatus(asset)}
           </Text>
         </Stack>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          flexShrink="0"
-          borderRadius="lg"
-          aria-label={`Close ${asset.instrument} details`}
-          onClick={onClose}
-        >
-          <X size={17} aria-hidden="true" />
-        </Button>
+        <Flex align="center" gap="2" flexShrink="0" ml="auto">
+          <AddOrderDialog accountId={accountId} brokerId={brokerId} asset={asset} />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            borderRadius="lg"
+            minH="11"
+            aria-label={`Close ${asset.instrument} details`}
+            onClick={onClose}
+          >
+            <X size={17} aria-hidden="true" />
+          </Button>
+        </Flex>
       </Flex>
 
       <SimpleGrid columns={{ base: 2, md: 4 }} gap="3">
@@ -141,7 +151,12 @@ export function AssetDetail({
           {isValidating && data ? <DataUpdating /> : null}
         </Flex>
 
-        {isLoading && !data ? <DetailLoading /> : null}
+        {isLoading && !data ? (
+          <>
+            <Text className="sr-only" role="status">Loading transaction history…</Text>
+            <DetailLoading />
+          </>
+        ) : null}
         {error && !data ? (
           <Alert.Root status="error" m="4" borderRadius="xl">
             <Alert.Indicator />
@@ -153,7 +168,17 @@ export function AssetDetail({
             </Stack>
           </Alert.Root>
         ) : null}
-        {data ? <TransactionList transactions={data.transactions} currency={asset.currency} /> : null}
+        {data ? (
+          <TransactionList
+            accountId={accountId}
+            instrument={asset.instrument}
+            transactions={data.transactions}
+            currency={asset.currency}
+            onDeleted={() => {
+              if (data.transactions.length === 1) onClose();
+            }}
+          />
+        ) : null}
       </Box>
     </Box>
   );
