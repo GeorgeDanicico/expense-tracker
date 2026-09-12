@@ -73,7 +73,7 @@ and Next.js build work, and copies only the standalone server and static assets 
 the runtime image. It runs as the unprivileged `node` user. The build needs internet
 access for npm packages and Google fonts, but no Supabase credentials.
 
-Create `/etc/expense-tracker/production.env` on the VPS with `SUPABASE_URL`,
+Create `/etc/expense-tracker/.env.production` on the VPS with `SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, and `SITE_URL` (your public HTTPS origin). The
 self-hosted GitHub Actions runner must be able to read this file.
 Environment files are excluded from the build context and supplied at runtime:
@@ -81,7 +81,7 @@ Environment files are excluded from the build context and supplied at runtime:
 ```bash
 docker run -d --name expense-tracker \
   --restart unless-stopped \
-  --env-file /etc/expense-tracker/production.env \
+  --env-file /etc/expense-tracker/.env.production \
   --publish 127.0.0.1:3000:3000 \
   --log-opt max-size=10m --log-opt max-file=3 \
   expense-tracker:latest
@@ -101,7 +101,7 @@ the app responds before removing the previous container. If startup fails, the
 script attempts to restore the previous container.
 
 Register a Linux self-hosted runner with Docker access, create the production
-environment file at `/etc/expense-tracker/production.env`, and ensure the runner
+environment file at `/etc/expense-tracker/.env.production`, and ensure the runner
 user can read it and use Docker. To use a different environment-file path, add a
 repository variable named `DEPLOY_ENV_FILE`. The workflow publishes the container
 on `127.0.0.1:3000` by default, matching the Docker command above.
