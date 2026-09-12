@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run build"
   },
   "dependencies": {
@@ -16,6 +17,7 @@
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.3",
     "buffer": "6.0.3",
+    "decimal.js": "10.6.0",
     "fflate": "0.8.3",
     "lucide-react": "1.33.0",
     "next": "16.3.2",
@@ -32,6 +34,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "3.2.7"
   }
 }

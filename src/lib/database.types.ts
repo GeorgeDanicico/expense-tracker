@@ -10,6 +10,46 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: "12.2.3 (519615d)" };
   public: {
     Tables: {
+      investment_accounts: {
+        Row: {
+          broker_id: string;
+          id: string;
+          user_id: string;
+        };
+        Insert: {
+          broker_id: string;
+          id?: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["investment_accounts"]["Insert"]>;
+        Relationships: [];
+      };
+      investment_transactions: {
+        Row: {
+          amount: number;
+          currency: string;
+          executed_at: string;
+          id: string;
+          instrument: string;
+          investment_account_id: string;
+          quantity: number;
+          side: string;
+          unit_price: number;
+        };
+        Insert: {
+          amount: number;
+          currency: string;
+          executed_at: string;
+          id?: string;
+          instrument: string;
+          investment_account_id: string;
+          quantity: number;
+          side: string;
+          unit_price: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["investment_transactions"]["Insert"]>;
+        Relationships: [];
+      };
       expenses: {
         Row: {
           amount: number;

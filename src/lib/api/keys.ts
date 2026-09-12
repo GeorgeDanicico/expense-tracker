@@ -1,6 +1,7 @@
 import type { AnalyticsFilters } from "@/lib/types";
 
 export const ACCOUNT_API_KEY = "/api/account";
+export const INVESTMENTS_API_KEY = "/api/investments";
 
 export function dashboardApiKey(filters: AnalyticsFilters) {
   const params = new URLSearchParams({
@@ -13,4 +14,17 @@ export function dashboardApiKey(filters: AnalyticsFilters) {
 
 export function expensesApiKey(month: string) {
   return `/api/expenses?month=${encodeURIComponent(month)}`;
+}
+
+export function investmentTransactionsApiKey({
+  accountId,
+  instrument,
+  currency,
+}: {
+  accountId: string;
+  instrument: string;
+  currency: string;
+}) {
+  const params = new URLSearchParams({ accountId, instrument, currency });
+  return `/api/investment-transactions?${params}`;
 }

@@ -54,3 +54,10 @@ export function formatDate(date: string, locale = "en-US") {
     year: "numeric",
   }).format(new Date(`${date}T12:00:00`));
 }
+
+export function formatDateTime(date: string, locale = "en-US") {
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(date));
+}

@@ -1,0 +1,33 @@
+name: Deploy production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 30
+    env:
+      DEPLOY_ENV_FILE: ${{ vars.DEPLOY_ENV_FILE || '/etc/expense-tracker/production.env' }}
+      IMAGE_NAME: expense-tracker
+      CONTAINER_NAME: expense-tracker
+    steps:
+      - name: Check out latest commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Build and deploy Docker image
+        run: bash scripts/deploy.sh
+        env:
+          IMAGE_TAG: ${{ github.sha }}
