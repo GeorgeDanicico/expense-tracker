@@ -18,7 +18,7 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 30
     env:
-      DEPLOY_ENV_FILE: ${{ vars.DEPLOY_ENV_FILE || '/etc/expense-tracker/production.env' }}
+      DEPLOY_ENV_FILE: ${{ vars.DEPLOY_ENV_FILE || '/etc/expense-tracker/.env.production' }}
       IMAGE_NAME: expense-tracker
       CONTAINER_NAME: expense-tracker
     steps:
