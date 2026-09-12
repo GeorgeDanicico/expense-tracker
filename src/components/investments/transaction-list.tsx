@@ -1,5 +1,6 @@
 import { Badge, Box, Flex, Stack, Table, Text } from "@chakra-ui/react";
 
+import { RemoveOrderDialog } from "@/components/investments/remove-order-dialog";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
 import { formatDateTime } from "@/lib/utils/dates";
@@ -9,11 +10,17 @@ function sideColor(side: InvestmentTransactionDto["side"]) {
 }
 
 export function TransactionList({
+  accountId,
+  instrument,
   transactions,
   currency,
+  onDeleted,
 }: {
+  accountId: string;
+  instrument: string;
   transactions: InvestmentTransactionDto[];
   currency: string;
+  onDeleted: () => void;
 }) {
   return (
     <>
@@ -27,6 +34,7 @@ export function TransactionList({
               <Table.ColumnHeader py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em" textAlign="end">QUANTITY</Table.ColumnHeader>
               <Table.ColumnHeader py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em" textAlign="end">UNIT PRICE</Table.ColumnHeader>
               <Table.ColumnHeader pr="5" py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em" textAlign="end">ORDER VALUE</Table.ColumnHeader>
+              <Table.ColumnHeader width="7rem" pr="5"><span className="sr-only">Actions</span></Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -47,6 +55,15 @@ export function TransactionList({
                 <Table.Cell pr="5" textAlign="end" color="gray.900" fontWeight="800" whiteSpace="nowrap">
                   {formatInvestmentAmount(transaction.amount, currency)}
                 </Table.Cell>
+                <Table.Cell pr="5" textAlign="end">
+                  <RemoveOrderDialog
+                    accountId={accountId}
+                    instrument={instrument}
+                    currency={currency}
+                    transaction={transaction}
+                    onDeleted={onDeleted}
+                  />
+                </Table.Cell>
               </Table.Row>
             ))}
           </Table.Body>
@@ -65,9 +82,18 @@ export function TransactionList({
               </Flex>
               <Text color="gray.600" fontSize="xs">{transaction.quantity} units at {formatInvestmentAmount(transaction.unitPrice, currency)}</Text>
             </Stack>
-            <Text flexShrink="0" color="gray.900" fontSize="sm" fontWeight="800" whiteSpace="nowrap">
-              {formatInvestmentAmount(transaction.amount, currency)}
-            </Text>
+            <Stack flexShrink="0" align="flex-end" gap="1">
+              <Text color="gray.900" fontSize="sm" fontWeight="800" whiteSpace="nowrap">
+                {formatInvestmentAmount(transaction.amount, currency)}
+              </Text>
+              <RemoveOrderDialog
+                accountId={accountId}
+                instrument={instrument}
+                currency={currency}
+                transaction={transaction}
+                onDeleted={onDeleted}
+              />
+            </Stack>
           </Flex>
         ))}
       </Stack>

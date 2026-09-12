@@ -42,6 +42,7 @@ export function AssetSelector({
             <Button
               key={`${asset.instrument}-${asset.currency}`}
               type="button"
+              data-investment-asset-key={investmentAssetKey(accountId, asset.instrument, asset.currency)}
               variant="outline"
               flex={{ base: "1 1 auto", md: "0 0 18rem" }}
               minW={{ base: "0", md: "18rem" }}

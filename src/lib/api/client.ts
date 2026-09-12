@@ -19,11 +19,11 @@ async function fetchWithTimeout(url: string, init: RequestInit) {
 
   try {
     return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error) {
+  } catch {
     if (controller.signal.aborted) {
       throw new ApiError("The request took too long. Check your connection and try again.", 504);
     }
-    throw error;
+    throw new ApiError("Unable to reach the server. Check your connection and try again.", 503);
   } finally {
     clearTimeout(timeout);
   }

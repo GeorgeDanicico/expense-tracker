@@ -170,6 +170,7 @@ export function AppShell({ children, email }: { children: React.ReactNode; email
           <Container
             as="main"
             maxW="1280px"
+            overflowX="hidden"
             px={{ base: "4", sm: "6", md: "8", xl: "10" }}
             pt={{ base: "6", md: "9", xl: "11" }}
             pb={{ base: "28", md: "12" }}

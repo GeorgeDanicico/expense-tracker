@@ -140,3 +140,7 @@ export type InvestmentTransactionsResponse = {
   currency: InvestmentCurrency;
   transactions: InvestmentTransactionDto[];
 };
+
+export type InvestmentTransactionMutationResponse = {
+  transaction: InvestmentTransactionDto;
+};
