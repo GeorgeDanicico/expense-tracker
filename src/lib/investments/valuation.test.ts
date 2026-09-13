@@ -30,7 +30,7 @@ const euroQuote: Quote = {
   currency: "EUR",
   asOf: "2026-09-12T12:00:00Z",
   displayName: "Vanguard FTSE All-World UCITS ETF",
-  source: "mock",
+  source: "YAHOO_FINANCE",
 };
 
 describe("investment quote valuation", () => {
@@ -42,7 +42,7 @@ describe("investment quote valuation", () => {
     expect(asset.currentValue).toBe("180");
     expect(asset.unrealizedGain).toBe("30");
     expect(asset.priceStatus).toBe("current");
-    expect(asset.priceSource).toBe("mock");
+    expect(asset.priceSource).toBe("YAHOO_FINANCE");
     expect(overview.brokers[0].totalsByCurrency[0]).toEqual({
       currency: "EUR",
       remainingCost: "150",
@@ -73,7 +73,7 @@ describe("investment quote valuation", () => {
     expect(asset.currentValue).toBeNull();
     expect(asset.unrealizedGain).toBeNull();
     expect(asset.priceStatus).toBe("currency_mismatch");
-    expect(asset.priceSource).toBe("mock");
+    expect(asset.priceSource).toBe("YAHOO_FINANCE");
     expect(overview.brokers[0].totalsByCurrency[0].currentValue).toBeNull();
   });
 });

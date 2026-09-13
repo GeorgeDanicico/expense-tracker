@@ -52,7 +52,8 @@ function gainPresentation(value: string | null, currency: string) {
 
 function quoteStatus(asset: InvestmentOverviewAsset) {
   if (asset.priceStatus === "current" && asset.priceAsOf) {
-    return `Mock price · as of ${formatDateTime(asset.priceAsOf)}`;
+    const source = asset.priceSource === "ZF" ? "ZF" : "Yahoo Finance";
+    return `${source} · as of ${formatDateTime(asset.priceAsOf)}`;
   }
   if (asset.priceStatus === "currency_mismatch") {
     return "Currency mismatch · valuation withheld";
@@ -106,9 +107,9 @@ export function AssetDetail({
             <Heading as="h3" id={`${detailId}-title`} size={{ base: "lg", md: "xl" }} letterSpacing="-0.03em" truncate>
               {asset.displayName}
             </Heading>
-            {asset.priceSource === "mock" ? (
+            {asset.priceSource ? (
               <Badge colorPalette="purple" variant="subtle" borderRadius="full" px="2.5" py="1">
-                Mock price
+                {asset.priceSource === "ZF" ? "ZF" : "Yahoo Finance"}
               </Badge>
             ) : null}
           </Flex>
@@ -135,9 +136,9 @@ export function AssetDetail({
       <SimpleGrid columns={{ base: 2, md: 4 }} gap="3">
         <DetailMetric label="QUANTITY" value={`${asset.quantity} units`} helper={asset.currency} />
         <DetailMetric label="AVERAGE ACQUISITION" value={formatInvestmentAmount(asset.averageCost, asset.currency)} helper="Per unit" />
-        <DetailMetric label="CURRENT PRICE" value={formatInvestmentAmount(asset.currentPrice, asset.currency)} helper={asset.priceStatus === "current" ? "Mock price" : quoteStatus(asset)} />
+        <DetailMetric label="CURRENT PRICE" value={formatInvestmentAmount(asset.currentPrice, asset.currency)} helper={quoteStatus(asset)} />
         <DetailMetric label="REMAINING COST" value={formatInvestmentAmount(asset.remainingCost, asset.currency)} helper="Native currency" />
-        <DetailMetric label="CURRENT VALUE" value={formatInvestmentAmount(asset.currentValue, asset.currency)} helper={asset.priceStatus === "current" ? "Mock price" : quoteStatus(asset)} />
+        <DetailMetric label="CURRENT VALUE" value={formatInvestmentAmount(asset.currentValue, asset.currency)} helper={quoteStatus(asset)} />
         <DetailMetric label="UNREALIZED" value={unrealized.value} valueColor={unrealized.color} helper={unrealized.label} />
         <DetailMetric label="REALIZED" value={realized.value} valueColor={realized.color} helper={realized.label} />
       </SimpleGrid>

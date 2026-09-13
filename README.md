@@ -19,7 +19,7 @@ A private, mobile-first expense tracker built with Next.js 16, React 19, Chakra 
 
 ## Run locally
 
-The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. For another project, copy `.env.example` to `.env.local` and replace the values. Do not add a `NEXT_PUBLIC_` prefix to either variable.
+The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. Set `PRICE_SERVICE_URL` to the base URL of the investment price service. For another project, copy `.env.example` to `.env.local` and replace the values. Keep these variables server-only; do not add a `NEXT_PUBLIC_` prefix.
 
 ```bash
 npm install
@@ -74,7 +74,7 @@ the runtime image. It runs as the unprivileged `node` user. The build needs inte
 access for npm packages and Google fonts, but no Supabase credentials.
 
 Create `/etc/expense-tracker/.env.production` on the VPS with `SUPABASE_URL`,
-`SUPABASE_PUBLISHABLE_KEY`, and `SITE_URL` (your public HTTPS origin). The
+`SUPABASE_PUBLISHABLE_KEY`, `PRICE_SERVICE_URL`, and `SITE_URL` (your public HTTPS origin). The
 self-hosted GitHub Actions runner must be able to read this file.
 Environment files are excluded from the build context and supplied at runtime:
 

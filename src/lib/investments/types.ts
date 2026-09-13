@@ -112,7 +112,7 @@ export type InvestmentOverviewAsset = {
   unrealizedGain: string | null;
   priceAsOf: string | null;
   priceStatus: "current" | "unavailable" | "currency_mismatch";
-  priceSource: "mock" | null;
+  priceSource: "YAHOO_FINANCE" | "ZF" | null;
 };
 
 export type InvestmentsOverview = {

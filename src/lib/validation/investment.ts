@@ -5,8 +5,7 @@ import { INVESTMENT_BROKER_IDS } from "@/lib/investments/types";
 const instrumentQuerySchema = z
   .string()
   .trim()
-  .min(1, "Enter an instrument symbol.")
-  .max(80, "Instrument symbols must be 80 characters or fewer.")
+  .regex(/^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/, "Use a valid instrument symbol (up to 20 letters, numbers, dots or hyphens).")
   .transform((value) => value.toUpperCase());
 
 const currencyQuerySchema = z
