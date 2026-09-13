@@ -1,12 +1,15 @@
 import type { InvestmentCurrency } from "@/lib/investments/types";
 
+export const PRICE_SOURCES = ["YAHOO_FINANCE", "ZF"] as const;
+export type PriceSource = (typeof PRICE_SOURCES)[number];
+
 export type Quote = {
   instrument: string;
   price: string;
   currency: InvestmentCurrency;
   asOf: string;
   displayName?: string;
-  source: "mock";
+  source: PriceSource;
 };
 
 export interface ThirdPartyQuoteAdapter {

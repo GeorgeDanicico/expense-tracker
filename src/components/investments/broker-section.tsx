@@ -63,7 +63,7 @@ export function BrokerSection({
                 </Text>
                 {subtotal.currentValue !== null ? (
                   <Badge colorPalette="purple" variant="subtle" borderRadius="full" fontSize="2xs">
-                    Mock price
+                    Latest price
                   </Badge>
                 ) : null}
               </Flex>

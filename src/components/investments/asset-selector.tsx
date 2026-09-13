@@ -85,9 +85,9 @@ export function AssetSelector({
                     <Text color="gray.400" fontSize="xs" whiteSpace="nowrap">
                       {asset.priceStatus === "current" ? "Current value" : asset.priceStatus === "currency_mismatch" ? "Currency mismatch" : "No quote"}
                     </Text>
-                    {asset.priceSource === "mock" ? (
+                    {asset.priceSource ? (
                       <Badge colorPalette="purple" variant="subtle" borderRadius="full" fontSize="2xs">
-                        Mock price
+                        {asset.priceSource === "ZF" ? "ZF" : "Yahoo Finance"}
                       </Badge>
                     ) : null}
                   </Flex>

@@ -1,10 +1,11 @@
 import "server-only";
 
-import { MockThirdPartyQuoteAdapter } from "@/lib/investments/quotes/mock-third-party";
+import { PriceApiQuoteAdapter } from "@/lib/investments/quotes/price-api";
 import type { ThirdPartyQuoteAdapter } from "@/lib/investments/quotes/types";
 
-const quoteAdapter = new MockThirdPartyQuoteAdapter();
+let quoteAdapter: ThirdPartyQuoteAdapter | undefined;
 
 export function getInvestmentQuoteAdapter(): ThirdPartyQuoteAdapter {
+  quoteAdapter ??= new PriceApiQuoteAdapter();
   return quoteAdapter;
 }

@@ -25,8 +25,6 @@ import {
 } from "@/lib/investments/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
 
-const MOCK_INSTRUMENTS = new Set(["VWCE.DE", "AAPL.US", "TLV.BX"]);
-
 function localDateTimeValue() {
   const now = new Date();
   const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
@@ -80,10 +78,8 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
 
   const instrumentCode = instrument.trim().toUpperCase();
   const instrumentHint = instrumentCode
-    ? MOCK_INSTRUMENTS.has(instrumentCode)
-      ? "A mock quote is available for this symbol."
-      : "No mock quote is available yet, but this valid symbol can still be saved."
-    : "Use a stable listing code such as VWCE.DE or AAPL.US.";
+    ? "The latest price will be requested from the configured price service."
+    : "Use a listing code such as VWCE.DE or AAPL.US.";
 
   function fieldError(name: string) {
     return fieldErrors?.[name]?.[0];
@@ -111,7 +107,7 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
             name="instrument"
             value={instrument}
             onChange={(event) => setInstrument(event.target.value)}
-            maxLength={80}
+            maxLength={20}
             placeholder="e.g. VWCE.DE"
             autoFocus
             required

@@ -95,7 +95,7 @@ export function InvestmentsPanel() {
           </Flex>
           <AddInvestmentDialog />
         </Flex>
-        <Text color="gray.500">Track holdings by broker and native currency. Values marked “Mock price” are simulated development quotes.</Text>
+        <Text color="gray.500">Track holdings by broker and native currency. Current values come from the configured price service.</Text>
       </Stack>
 
       <CalculationIssues overview={data} />
