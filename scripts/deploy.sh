@@ -137,6 +137,7 @@ docker run \
   --detach \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
+  --network expense-network \
   --env-file "$ENV_FILE" \
   --publish "${BIND_ADDRESS}:${HOST_PORT}:${CONTAINER_PORT}" \
   --log-opt "max-size=${LOG_MAX_SIZE}" \

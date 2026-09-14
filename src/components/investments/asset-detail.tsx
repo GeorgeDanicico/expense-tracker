@@ -2,9 +2,11 @@
 
 import { Alert, Badge, Box, Button, Flex, Heading, SimpleGrid, Skeleton, Stack, Text } from "@chakra-ui/react";
 import { RefreshCw, X } from "lucide-react";
+import type { ReactNode } from "react";
 import useSWR from "swr";
 
 import { AddOrderDialog } from "@/components/investments/add-order-dialog";
+import { InvestmentValue } from "@/components/investments/investment-value";
 import { TransactionList } from "@/components/investments/transaction-list";
 import { DataUpdating } from "@/components/ui/data-state";
 import { apiFetcher } from "@/lib/api/client";
@@ -14,6 +16,7 @@ import type {
   InvestmentOverviewAsset,
   InvestmentTransactionsResponse,
 } from "@/lib/investments/types";
+import { getInvestmentGainPresentation } from "@/lib/investments/presentation";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
 import { formatDateTime } from "@/lib/utils/dates";
 
@@ -24,7 +27,7 @@ function DetailMetric({
   valueColor = "gray.900",
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   helper?: string;
   valueColor?: string;
 }) {
@@ -39,15 +42,6 @@ function DetailMetric({
       {helper ? <Text mt="1" color="gray.500" fontSize="xs">{helper}</Text> : null}
     </Box>
   );
-}
-
-function gainPresentation(value: string | null, currency: string) {
-  if (value === null) return { value: "Unavailable", color: "gray.500", label: "No quote" };
-
-  const numericValue = Number(value);
-  if (numericValue > 0) return { value: `+${formatInvestmentAmount(value, currency)}`, color: "green.700", label: "Gain" };
-  if (numericValue < 0) return { value: formatInvestmentAmount(value, currency), color: "red.700", label: "Loss" };
-  return { value: formatInvestmentAmount(value, currency), color: "gray.700", label: "No change" };
 }
 
 function quoteStatus(asset: InvestmentOverviewAsset) {
@@ -88,8 +82,8 @@ export function AssetDetail({
 }) {
   const key = investmentTransactionsApiKey({ accountId, instrument: asset.instrument, currency: asset.currency });
   const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentTransactionsResponse>(key, apiFetcher);
-  const unrealized = gainPresentation(asset.unrealizedGain, asset.currency);
-  const realized = gainPresentation(asset.realizedGain, asset.currency);
+  const unrealized = getInvestmentGainPresentation(asset.unrealizedGain, asset.currency);
+  const realized = getInvestmentGainPresentation(asset.realizedGain, asset.currency);
 
   return (
     <Box
@@ -138,7 +132,17 @@ export function AssetDetail({
         <DetailMetric label="AVERAGE ACQUISITION" value={formatInvestmentAmount(asset.averageCost, asset.currency)} helper="Per unit" />
         <DetailMetric label="CURRENT PRICE" value={formatInvestmentAmount(asset.currentPrice, asset.currency)} helper={quoteStatus(asset)} />
         <DetailMetric label="REMAINING COST" value={formatInvestmentAmount(asset.remainingCost, asset.currency)} helper="Native currency" />
-        <DetailMetric label="CURRENT VALUE" value={formatInvestmentAmount(asset.currentValue, asset.currency)} helper={quoteStatus(asset)} />
+        <DetailMetric
+          label="CURRENT VALUE"
+          value={
+            <InvestmentValue
+              currentValue={asset.currentValue}
+              unrealizedGain={asset.unrealizedGain}
+              currency={asset.currency}
+            />
+          }
+          helper={quoteStatus(asset)}
+        />
         <DetailMetric label="UNREALIZED" value={unrealized.value} valueColor={unrealized.color} helper={unrealized.label} />
         <DetailMetric label="REALIZED" value={realized.value} valueColor={realized.color} helper={realized.label} />
       </SimpleGrid>

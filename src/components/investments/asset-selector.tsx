@@ -2,9 +2,9 @@
 
 import { Badge, Button, Flex, Stack, Text } from "@chakra-ui/react";
 
+import { InvestmentValue } from "@/components/investments/investment-value";
 import type { InvestmentOverviewAsset } from "@/lib/investments/types";
 import { investmentAssetKey } from "@/lib/investments/identity";
-import { formatInvestmentAmount } from "@/lib/utils/currency";
 
 export function AssetSelector({
   accountId,
@@ -77,9 +77,11 @@ export function AssetSelector({
                 </Stack>
                 <Stack flexShrink="0" align="flex-end" gap="1">
                   <Text color="gray.900" fontSize="sm" fontWeight="800" whiteSpace="nowrap">
-                    {asset.currentValue === null
-                      ? "Value unavailable"
-                      : formatInvestmentAmount(asset.currentValue, asset.currency)}
+                    <InvestmentValue
+                      currentValue={asset.currentValue}
+                      unrealizedGain={asset.unrealizedGain}
+                      currency={asset.currency}
+                    />
                   </Text>
                   <Flex align="center" gap="1.5">
                     <Text color="gray.400" fontSize="xs" whiteSpace="nowrap">

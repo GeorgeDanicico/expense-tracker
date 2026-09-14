@@ -4,6 +4,7 @@ import { Badge, Box, Flex, Heading, SimpleGrid, Stack, Text } from "@chakra-ui/r
 
 import { AssetDetail } from "@/components/investments/asset-detail";
 import { AssetSelector } from "@/components/investments/asset-selector";
+import { InvestmentValue } from "@/components/investments/investment-value";
 import { Surface } from "@/components/ui/surface";
 import { investmentAssetKey, investmentDetailId } from "@/lib/investments/identity";
 import type { InvestmentsOverview } from "@/lib/investments/types";
@@ -53,9 +54,11 @@ export function BrokerSection({
                 {subtotal.currency} TOTAL
               </Text>
               <Text mt="1" color="gray.900" fontSize={{ base: "lg", md: "xl" }} fontWeight="800" letterSpacing="-0.03em">
-                {subtotal.currentValue === null
-                  ? "Value unavailable"
-                  : formatInvestmentAmount(subtotal.currentValue, subtotal.currency)}
+                <InvestmentValue
+                  currentValue={subtotal.currentValue}
+                  unrealizedGain={subtotal.unrealizedGain}
+                  currency={subtotal.currency}
+                />
               </Text>
               <Flex align="center" gap="2" mt="1.5">
                 <Text color="gray.500" fontSize="xs">
