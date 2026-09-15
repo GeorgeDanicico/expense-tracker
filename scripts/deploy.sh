@@ -78,7 +78,7 @@ wait_for_app() {
     running="$(docker container inspect --format '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)"
 
     if [[ "$running" == true ]] && docker exec "$CONTAINER_NAME" node -e \
-      "fetch('http://127.0.0.1:${CONTAINER_PORT}/').then((response) => process.exit(response.status < 500 ? 0 : 1)).catch(() => process.exit(1))" \
+      "fetch('http://127.0.0.1:${CONTAINER_PORT}/health').then((response) => process.exit(response.status < 500 ? 0 : 1)).catch(() => process.exit(1))" \
       >/dev/null 2>&1; then
       echo "Container is healthy."
       return 0
