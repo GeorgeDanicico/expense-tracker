@@ -6,7 +6,7 @@ import { FormEvent, useState } from "react";
 import { useSWRConfig } from "swr";
 
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { INVESTMENTS_API_KEY, investmentTransactionsApiKey } from "@/lib/api/keys";
+import { INVESTMENTS_API_KEY, investmentTransactionsApiKey, NET_WORTH_API_KEY } from "@/lib/api/keys";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
 import { formatDateTime } from "@/lib/utils/dates";
@@ -41,7 +41,7 @@ export function RemoveOrderDialog({
       });
 
       const detailKey = investmentTransactionsApiKey({ accountId, instrument, currency });
-      await Promise.allSettled([mutate(INVESTMENTS_API_KEY), mutate(detailKey)]);
+      await Promise.allSettled([mutate(INVESTMENTS_API_KEY), mutate(NET_WORTH_API_KEY), mutate(detailKey)]);
       setOpen(false);
       onDeleted();
     } catch (caught) {

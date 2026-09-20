@@ -2,6 +2,7 @@ import type { AnalyticsFilters } from "@/lib/types";
 
 export const ACCOUNT_API_KEY = "/api/account";
 export const INVESTMENTS_API_KEY = "/api/investments";
+export const NET_WORTH_API_KEY = "/api/net-worth";
 
 export function dashboardApiKey(filters: AnalyticsFilters) {
   const params = new URLSearchParams({

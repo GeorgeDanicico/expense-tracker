@@ -18,7 +18,7 @@ import { FormEvent, useState } from "react";
 import { useSWRConfig } from "swr";
 
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { INVESTMENTS_API_KEY, investmentTransactionsApiKey } from "@/lib/api/keys";
+import { INVESTMENTS_API_KEY, investmentTransactionsApiKey, NET_WORTH_API_KEY } from "@/lib/api/keys";
 import {
   INVESTMENT_BROKER_LABELS,
   type InvestmentBrokerId,
@@ -81,7 +81,7 @@ export function AddOrderDialog({
         instrument: asset.instrument,
         currency: asset.currency,
       });
-      await Promise.allSettled([mutate(INVESTMENTS_API_KEY), mutate(detailKey)]);
+      await Promise.allSettled([mutate(INVESTMENTS_API_KEY), mutate(NET_WORTH_API_KEY), mutate(detailKey)]);
       setOpen(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The order could not be saved.");

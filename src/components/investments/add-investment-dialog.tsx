@@ -17,7 +17,7 @@ import { FormEvent, useState } from "react";
 import { useSWRConfig } from "swr";
 
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { INVESTMENTS_API_KEY } from "@/lib/api/keys";
+import { INVESTMENTS_API_KEY, NET_WORTH_API_KEY } from "@/lib/api/keys";
 import {
   INVESTMENT_BROKER_IDS,
   INVESTMENT_BROKER_LABELS,
@@ -66,7 +66,7 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
           executedAt: formTimestamp(formData.get("executedAt")),
         }),
       });
-      await mutate(INVESTMENTS_API_KEY);
+      await Promise.allSettled([mutate(INVESTMENTS_API_KEY), mutate(NET_WORTH_API_KEY)]);
       onSuccess();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The investment could not be saved.");
