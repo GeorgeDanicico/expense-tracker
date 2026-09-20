@@ -9,6 +9,7 @@ A private, mobile-first expense tracker built with Next.js 16, React 19, Chakra 
 - Historical statistics for 3 months, 6 months, 1 year, 2 years, or one custom day/month
 - Monthly expense ledger with month/year navigation
 - Add and delete expense entries
+- Native-currency Net Worth view with manual assets, liabilities, dated valuations, and read-only investment holdings
 - Per-account currency setting applied to every amount and export
 - Secured `.xlsx` export for any selected month
 - Installable PWA manifest, icons, and an offline shell
@@ -58,6 +59,7 @@ Migrations live in `supabase/migrations`. They add or upgrade the expense ledger
 - indexes aligned with the ledger's owner, date, and creation-time filters;
 - an owner-scoped dashboard aggregation function that runs under RLS;
 - authenticated-only SELECT, INSERT, UPDATE, and DELETE policies scoped to `auth.uid()`;
+- RLS-protected `net_worth_items` and `net_worth_valuations` with atomic first-value creation;
 - anonymous privilege revocation and hardened legacy tracker policies/functions.
 
 ## Docker on a VPS

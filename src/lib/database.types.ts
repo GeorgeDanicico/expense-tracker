@@ -10,6 +10,46 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: "12.2.3 (519615d)" };
   public: {
     Tables: {
+      net_worth_items: {
+        Row: {
+          archived_at: string | null;
+          category: string;
+          currency: string;
+          id: string;
+          kind: string;
+          name: string;
+          purchase_amount: number | string | null;
+          user_id: string;
+        };
+        Insert: {
+          archived_at?: string | null;
+          category: string;
+          currency: string;
+          id?: string;
+          kind: string;
+          name: string;
+          purchase_amount?: number | string | null;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["net_worth_items"]["Insert"]>;
+        Relationships: [];
+      };
+      net_worth_valuations: {
+        Row: {
+          id: string;
+          item_id: string;
+          value: number | string;
+          valued_on: string;
+        };
+        Insert: {
+          id?: string;
+          item_id: string;
+          value: number | string;
+          valued_on: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["net_worth_valuations"]["Insert"]>;
+        Relationships: [];
+      };
       investment_accounts: {
         Row: {
           broker_id: string;
@@ -125,6 +165,18 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      create_net_worth_item_with_valuation: {
+        Args: {
+          p_category: string;
+          p_currency: string;
+          p_kind: string;
+          p_name: string;
+          p_purchase_amount: number | string | null;
+          p_value: number | string;
+          p_valued_on: string;
+        };
+        Returns: string;
+      };
       get_expense_dashboard: {
         Args: {
           p_analytics_end_exclusive: string;

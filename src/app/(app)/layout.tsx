@@ -31,6 +31,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       router.prefetch("/dashboard");
       router.prefetch("/expenses");
       router.prefetch("/investments");
+      router.prefetch("/net-worth");
       router.prefetch("/settings");
       void preload(defaultDashboardKey, apiFetcher);
       void preload(expensesApiKey(getCurrentMonth()), apiFetcher);

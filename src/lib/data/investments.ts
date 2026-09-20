@@ -7,6 +7,7 @@ import {
 } from "@/lib/investments/aggregate";
 import { getInvestmentQuoteAdapter } from "@/lib/investments/quotes/get-adapter";
 import { mergeInvestmentQuotes } from "@/lib/investments/valuation";
+import type { Quote } from "@/lib/investments/quotes/types";
 import {
   isInvestmentBrokerId,
   type InvestmentAccount,
@@ -120,7 +121,15 @@ export async function getInvestmentsOverviewForUser(userId: string): Promise<Inv
   const instruments = [...new Set(
     aggregate.brokers.flatMap((broker) => broker.assets.map((asset) => asset.instrument)),
   )];
-  const quotes = await getInvestmentQuoteAdapter().getQuotes(instruments);
+  let quotes = new Map<string, Quote>();
+
+  try {
+    quotes = await getInvestmentQuoteAdapter().getQuotes(instruments);
+  } catch {
+    // A missing or unavailable quote service should degrade valuations to
+    // "unavailable" so manual net-worth items and investment history remain
+    // usable on both pages.
+  }
 
   return mergeInvestmentQuotes(aggregate, quotes);
 }

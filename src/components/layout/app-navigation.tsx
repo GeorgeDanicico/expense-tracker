@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Flex, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
-import { ChartNoAxesCombined, CreditCard, Settings2, TrendingUp } from "lucide-react";
+import { ChartNoAxesCombined, CreditCard, Scale, Settings2, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +9,7 @@ const links = [
   { href: "/dashboard", label: "Overview", icon: ChartNoAxesCombined },
   { href: "/expenses", label: "Expenses", icon: CreditCard },
   { href: "/investments", label: "Investments", icon: TrendingUp },
+  { href: "/net-worth", label: "Net Worth", mobileLabel: "Net worth", icon: Scale },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
@@ -84,7 +85,7 @@ export function MobileNavigation() {
         },
       }}
     >
-      {links.map(({ href, label, icon: Icon }) => {
+      {links.map(({ href, label, mobileLabel, icon: Icon }) => {
         const active = pathname.startsWith(href);
 
         return (
@@ -120,7 +121,7 @@ export function MobileNavigation() {
                     />
                   ) : null}
                 </Box>
-                <Text>{label}</Text>
+                <Text whiteSpace="nowrap">{mobileLabel ?? (label === "Investments" ? "Invest." : label === "Settings" ? "More" : label)}</Text>
               </Stack>
             </Link>
           </ChakraLink>

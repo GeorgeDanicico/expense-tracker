@@ -1,5 +1,4 @@
-import { Text } from "@chakra-ui/react";
-
+import { ValueWithChange } from "@/components/ui/value-with-change";
 import { getInvestmentValuePresentation } from "@/lib/investments/presentation";
 
 export function InvestmentValue({
@@ -13,14 +12,19 @@ export function InvestmentValue({
 }) {
   const presentation = getInvestmentValuePresentation(currentValue, unrealizedGain, currency);
 
+  const changeTone = presentation.changeColor === "green.700"
+    ? "positive"
+    : presentation.changeColor === "red.700"
+      ? "negative"
+      : "neutral";
+
   return (
-    <>
-      {presentation.value}
-      {presentation.change ? (
-        <Text as="span" ml="2" color={presentation.changeColor} fontSize="0.85em" fontWeight="750" whiteSpace="nowrap">
-          {presentation.change}
-        </Text>
-      ) : null}
-    </>
+    <ValueWithChange
+      value={currentValue}
+      currency={currency}
+      change={presentation.change && unrealizedGain !== null ? unrealizedGain : null}
+      changeLabel={presentation.change ? presentation.changeLabel : null}
+      changeTone={changeTone}
+    />
   );
 }
