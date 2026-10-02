@@ -81,13 +81,13 @@ export function AddNetWorthValuationDialog({
         </Button>
       </Dialog.Trigger>
       <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" backdropFilter="blur(4px)" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p={{ base: "0", sm: "4" }} pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
-          <Dialog.Content borderRadius={{ base: "2xl 2xl 0 0", sm: "3xl" }} boxShadow="2xl">
+        <Dialog.Backdrop bg="blackAlpha.500" />
+        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
+          <Dialog.Content borderRadius="2xl">
             <Dialog.Header>
               <Stack gap="1">
                 <Dialog.Title>Add a dated value</Dialog.Title>
-                <Dialog.Description color="gray.500" fontSize="sm">
+                <Dialog.Description color="muted" fontSize="sm">
                   Correcting the same date replaces its observation instead of creating a duplicate.
                 </Dialog.Description>
               </Stack>
@@ -96,12 +96,12 @@ export function AddNetWorthValuationDialog({
               {open ? (
                 <form onSubmit={submit} aria-busy={pending}>
                   <Stack gap="4.5">
-                    <Flex align="center" justify="space-between" gap="3" p="4" borderRadius="xl" bg="gray.50">
+                    <Flex align="center" justify="space-between" gap="3" p="4" borderRadius="xl" bg="canvas">
                       <Stack minW="0" gap="1">
-                        <Text color="gray.900" fontWeight="750" truncate>{entry.name}</Text>
-                        <Text color="gray.500" fontSize="sm">{entry.currency} · {entry.kind === "liability" ? "amount owed" : "owned value"}</Text>
+                        <Text color="fg" fontWeight="600" truncate>{entry.name}</Text>
+                        <Text color="muted" fontSize="sm">{entry.currency} · {entry.kind === "liability" ? "amount owed" : "owned value"}</Text>
                       </Stack>
-                      <Text color="gray.900" fontWeight="800" whiteSpace="nowrap">
+                      <Text color="fg" fontWeight="600" whiteSpace="nowrap">
                         {entry.currentValue === null ? "No value" : formatInvestmentAmount(entry.currentValue, entry.currency)}
                       </Text>
                     </Flex>

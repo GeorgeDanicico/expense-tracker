@@ -61,18 +61,18 @@ export function RemoveOrderDialog({
           size="sm"
           minH="11"
           variant="ghost"
-          color="gray.400"
+          color="muted"
           borderRadius="lg"
           aria-label={`Remove ${side.toLowerCase()} order for ${instrument}`}
-          _hover={{ color: "red.600", bg: "red.50" }}
+          _hover={{ color: "error", bg: "red.50" }}
         >
           <Trash2 size={15} aria-hidden="true" /> Remove
         </Button>
       </Dialog.Trigger>
       <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" backdropFilter="blur(3px)" />
+        <Dialog.Backdrop bg="blackAlpha.500" />
         <Dialog.Positioner p="4" pb={{ base: "calc(1rem + env(safe-area-inset-bottom))", sm: "4" }}>
-          <Dialog.Content borderRadius="2xl" boxShadow="2xl">
+          <Dialog.Content borderRadius="2xl">
             <Dialog.Header pt="6">
               <Stack gap="3">
                 <Button
@@ -80,7 +80,7 @@ export function RemoveOrderDialog({
                   width="11"
                   height="11"
                   p="0"
-                  color="red.600"
+                  color="error"
                   bg="red.50"
                   borderRadius="xl"
                   pointerEvents="none"
@@ -91,13 +91,13 @@ export function RemoveOrderDialog({
               </Stack>
             </Dialog.Header>
             <Dialog.Body>
-              <Dialog.Description color="gray.600">
+              <Dialog.Description color="muted">
                 This permanently removes the recorded order. Totals and cost basis will be recalculated from the remaining history.
               </Dialog.Description>
-              <Stack mt="4" gap="1" p="4" borderRadius="xl" bg="gray.50">
-                <Text color="gray.900" fontWeight="800">{side} · {instrument}</Text>
-                <Text color="gray.600" fontSize="sm">{transaction.quantity} units · {formatInvestmentAmount(transaction.amount, currency)}</Text>
-                <Text color="gray.500" fontSize="sm">Executed {formatDateTime(transaction.executedAt)}</Text>
+              <Stack mt="4" gap="1" p="4" borderRadius="xl" bg="canvas">
+                <Text color="fg" fontWeight="600">{side} · {instrument}</Text>
+                <Text color="muted" fontSize="sm">{transaction.quantity} units · {formatInvestmentAmount(transaction.amount, currency)}</Text>
+                <Text color="muted" fontSize="sm">Executed {formatDateTime(transaction.executedAt)}</Text>
               </Stack>
               {error ? (
                 <Alert.Root mt="4" status="error" borderRadius="xl">

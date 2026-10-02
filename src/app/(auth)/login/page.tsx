@@ -24,7 +24,7 @@ export default function LoginPage() {
       minH="100dvh"
       px={{ base: "4", md: "6" }}
       py={{ base: "6", md: "10" }}
-      bg="linear-gradient(145deg, #f5f3ff 0%, #f8fafc 48%, #eef2ff 100%)"
+      bg="canvas"
     >
       <AuthForm />
     </Center>

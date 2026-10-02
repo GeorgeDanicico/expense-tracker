@@ -119,23 +119,22 @@ export function AddNetWorthItemDialog({
       size="md"
     >
       <Dialog.Trigger asChild>
-        <Button width={{ base: "full", sm: "auto" }} minH="11" colorPalette="purple" borderRadius="xl" boxShadow="0 8px 18px rgb(124 58 237 / 16%)">
+        <Button width={{ base: "full", sm: "auto" }} minH="11" colorPalette="purple" borderRadius="xl">
           <Plus size={17} aria-hidden="true" /> Add item
         </Button>
       </Dialog.Trigger>
       <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" backdropFilter="blur(4px)" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p={{ base: "0", sm: "4" }} pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
+        <Dialog.Backdrop bg="blackAlpha.500" />
+        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
           <Dialog.Content
-            maxH={{ base: "calc(100dvh - env(safe-area-inset-top) - 1rem)", sm: "90dvh" }}
-            borderRadius={{ base: "2xl 2xl 0 0", sm: "3xl" }}
-            boxShadow="2xl"
+            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
+            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
               <Stack gap="1">
                 <Dialog.Title>Add a net-worth item</Dialog.Title>
-                <Dialog.Description color="gray.500" fontSize="sm">
+                <Dialog.Description color="muted" fontSize="sm">
                   Record one native-currency balance, estimate or debt. You can add another dated value later.
                 </Dialog.Description>
               </Stack>

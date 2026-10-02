@@ -1,66 +1,95 @@
 "use client";
 
-import { Box, Flex, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
-import { ChartNoAxesCombined, CreditCard, Scale, Settings2, TrendingUp } from "lucide-react";
+import {
+  Box,
+  Button,
+  Dialog,
+  Flex,
+  Link as ChakraLink,
+  Portal,
+  Separator,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
+import {
+  CreditCard,
+  House,
+  MoreHorizontal,
+  Scale,
+  Settings2,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { SignOutButton } from "@/components/layout/sign-out-button";
+import { InstallInstructions } from "@/components/pwa/install-instructions";
 
 const links = [
-  { href: "/dashboard", label: "Overview", icon: ChartNoAxesCombined },
+  { href: "/dashboard", label: "Home", icon: House },
   { href: "/expenses", label: "Expenses", icon: CreditCard },
   { href: "/investments", label: "Investments", icon: TrendingUp },
-  { href: "/net-worth", label: "Net Worth", mobileLabel: "Net worth", icon: Scale },
+  { href: "/net-worth", label: "Net worth", icon: Scale },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
-export function DesktopNavigation() {
+export function NavigationLink({
+  href,
+  onNavigate,
+}: {
+  href: string;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
-
+  const item = links.find((link) => link.href === href)!;
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+  const Icon = item.icon;
   return (
-    <Stack as="nav" aria-label="Primary navigation" gap="1.5">
-      {links.map(({ href, label, icon: Icon }) => {
-        const active = pathname.startsWith(href);
+    <ChakraLink
+      asChild
+      display="flex"
+      alignItems="center"
+      gap="3"
+      minH="11"
+      px="3"
+      borderRadius="lg"
+      color={active ? "accent" : "muted"}
+      bg={active ? "selected" : "transparent"}
+      fontSize="sm"
+      fontWeight="500"
+      _hover={{ bg: "selected", textDecoration: "none" }}
+    >
+      <Link
+        href={href}
+        aria-current={active ? "page" : undefined}
+        onClick={onNavigate}
+      >
+        <Icon size={18} aria-hidden="true" />
+        {item.label}
+      </Link>
+    </ChakraLink>
+  );
+}
 
-        return (
-          <ChakraLink
-            key={href}
-            asChild
-            display="flex"
-            alignItems="center"
-            gap="3"
-            minH="11"
-            px="3.5"
-            borderRadius="xl"
-            color={active ? "purple.700" : "gray.600"}
-            bg={active ? "purple.50" : "transparent"}
-            fontSize="sm"
-            fontWeight={active ? "700" : "600"}
-            _hover={{ color: "purple.700", bg: active ? "purple.50" : "gray.50", textDecoration: "none" }}
-            transition="background 160ms ease, color 160ms ease"
-          >
-            <Link href={href} aria-current={active ? "page" : undefined}>
-              <Flex
-                width="8"
-                height="8"
-                align="center"
-                justify="center"
-                borderRadius="lg"
-                bg={active ? "purple.100" : "transparent"}
-              >
-                <Icon size={18} strokeWidth={active ? 2.3 : 2} aria-hidden="true" />
-              </Flex>
-              {label}
-            </Link>
-          </ChakraLink>
-        );
-      })}
+export function DesktopNavigation() {
+  return (
+    <Stack as="nav" aria-label="Primary navigation" gap="1">
+      <NavigationLink href="/dashboard" />
+      <NavigationLink href="/expenses" />
+      <Separator my="3" borderColor="border" />
+      <NavigationLink href="/investments" />
+      <NavigationLink href="/net-worth" />
     </Stack>
   );
 }
 
-export function MobileNavigation() {
+export function MobileNavigation({ email }: { email: string }) {
   const pathname = usePathname();
-
+  const [open, setOpen] = useState(false);
+  const moreActive = links
+    .slice(2)
+    .some(({ href }) => pathname === href || pathname.startsWith(`${href}/`));
   return (
     <Flex
       as="nav"
@@ -70,63 +99,117 @@ export function MobileNavigation() {
       insetX="0"
       zIndex="docked"
       display={{ base: "flex", md: "none" }}
-      justify="space-around"
-      gap="1"
-      px="3"
-      pt="2"
-      bg="whiteAlpha.950"
+      bg="surface"
       borderTopWidth="1px"
-      borderColor="gray.200"
-      boxShadow="0 -10px 30px rgb(30 27 75 / 7%)"
-      backdropFilter="blur(18px)"
-      css={{
-        "@supports (padding-bottom: env(safe-area-inset-bottom))": {
-          paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))",
-        },
-      }}
+      borderColor="border"
+      px="4"
+      pt="1"
+      pb="calc(0.25rem + env(safe-area-inset-bottom))"
+      gap="2"
     >
-      {links.map(({ href, label, mobileLabel, icon: Icon }) => {
-        const active = pathname.startsWith(href);
-
+      {links.slice(0, 2).map(({ href, label, icon: Icon }) => {
+        const active = pathname === href;
         return (
           <ChakraLink
             key={href}
             asChild
             flex="1"
-            maxW="7rem"
+            minW="0"
             minH="14"
-            display="flex"
-            alignItems="center"
             justifyContent="center"
-            borderRadius="xl"
-            color={active ? "purple.700" : "gray.500"}
-            bg={active ? "purple.50" : "transparent"}
-            fontSize="xs"
-            fontWeight="700"
+            borderRadius="lg"
+            color={active ? "accent" : "muted"}
+            bg={active ? "selected" : "transparent"}
             _hover={{ textDecoration: "none" }}
           >
             <Link href={href} aria-current={active ? "page" : undefined}>
-              <Stack width="full" align="center" justify="center" gap="1">
-                <Box position="relative">
-                  <Icon size={20} strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
-                  {active ? (
-                    <Box
-                      position="absolute"
-                      top="-1"
-                      right="-2"
-                      width="1.5"
-                      height="1.5"
-                      borderRadius="full"
-                      bg="purple.500"
-                    />
-                  ) : null}
-                </Box>
-                <Text whiteSpace="nowrap">{mobileLabel ?? (label === "Investments" ? "Invest." : label === "Settings" ? "More" : label)}</Text>
+              <Stack align="center" gap="1">
+                <Icon size={20} aria-hidden="true" />
+                <Text
+                  fontSize="xs"
+                  fontWeight="500"
+                  overflowWrap="anywhere"
+                  textAlign="center"
+                >
+                  {label}
+                </Text>
               </Stack>
             </Link>
           </ChakraLink>
         );
       })}
+      <Dialog.Root
+        open={open}
+        onOpenChange={({ open }) => setOpen(open)}
+        placement="bottom"
+        size="sm"
+      >
+        <Dialog.Trigger asChild>
+          <Button
+            flex="1"
+            px="0"
+            minH="14"
+            variant="ghost"
+            color={moreActive ? "accent" : "muted"}
+            bg={moreActive ? "selected" : "transparent"}
+            aria-current={moreActive ? "page" : undefined}
+          >
+            <Stack align="center" gap="1">
+              <MoreHorizontal size={20} aria-hidden="true" />
+              <Text fontSize="xs" fontWeight="500">
+                More
+              </Text>
+            </Stack>
+          </Button>
+        </Dialog.Trigger>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner
+            p="4"
+            pb="calc(1rem + env(safe-area-inset-bottom))"
+          >
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title>More</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <Stack gap="2">
+                  <NavigationLink
+                    href="/investments"
+                    onNavigate={() => setOpen(false)}
+                  />
+                  <NavigationLink
+                    href="/net-worth"
+                    onNavigate={() => setOpen(false)}
+                  />
+                  <NavigationLink
+                    href="/settings"
+                    onNavigate={() => setOpen(false)}
+                  />
+                  <Separator borderColor="border" />
+                  <Text
+                    px="3"
+                    color="muted"
+                    fontSize="xs"
+                    overflowWrap="anywhere"
+                  >
+                    {email}
+                  </Text>
+                  <SignOutButton />
+                  <Box>
+                    <InstallInstructions />
+                  </Box>
+                </Stack>
+              </Dialog.Body>
+              <Dialog.CloseTrigger asChild>
+                <Button variant="ghost" aria-label="Close More">
+                  <X size={18} aria-hidden="true" />
+                </Button>
+              </Dialog.CloseTrigger>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
     </Flex>
   );
 }

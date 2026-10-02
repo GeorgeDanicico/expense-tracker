@@ -28,31 +28,31 @@ export function TransactionList({
         <Table.Root size="sm" variant="line">
           <Table.Caption className="sr-only">Investment transaction history</Table.Caption>
           <Table.Header>
-            <Table.Row bg="gray.50">
-              <Table.ColumnHeader pl="5" py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em">SIDE</Table.ColumnHeader>
-              <Table.ColumnHeader py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em">EXECUTED</Table.ColumnHeader>
-              <Table.ColumnHeader py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em" textAlign="end">QUANTITY</Table.ColumnHeader>
-              <Table.ColumnHeader py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em" textAlign="end">UNIT PRICE</Table.ColumnHeader>
-              <Table.ColumnHeader pr="5" py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em" textAlign="end">ORDER VALUE</Table.ColumnHeader>
+            <Table.Row bg="canvas">
+              <Table.ColumnHeader pl="5" py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">SIDE</Table.ColumnHeader>
+              <Table.ColumnHeader py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">EXECUTED</Table.ColumnHeader>
+              <Table.ColumnHeader py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em" textAlign="end">QUANTITY</Table.ColumnHeader>
+              <Table.ColumnHeader py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em" textAlign="end">UNIT PRICE</Table.ColumnHeader>
+              <Table.ColumnHeader pr="5" py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em" textAlign="end">ORDER VALUE</Table.ColumnHeader>
               <Table.ColumnHeader width="7rem" pr="5"><span className="sr-only">Actions</span></Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
             {transactions.map((transaction) => (
-              <Table.Row key={transaction.id} _hover={{ bg: "purple.50/40" }}>
+              <Table.Row key={transaction.id} _hover={{ bg: "selected" }}>
                 <Table.Cell pl="5" py="3.5">
                   <Badge colorPalette={sideColor(transaction.side)} variant="subtle" borderRadius="full" px="2.5" py="1">
                     {transaction.side === "buy" ? "Buy" : "Sell"}
                   </Badge>
                 </Table.Cell>
-                <Table.Cell color="gray.600" whiteSpace="nowrap">{formatDateTime(transaction.executedAt)}</Table.Cell>
-                <Table.Cell textAlign="end" color="gray.900" fontWeight="700" whiteSpace="nowrap">
+                <Table.Cell color="muted" whiteSpace="nowrap">{formatDateTime(transaction.executedAt)}</Table.Cell>
+                <Table.Cell textAlign="end" color="fg" fontWeight="600" whiteSpace="nowrap">
                   {transaction.quantity} units
                 </Table.Cell>
-                <Table.Cell textAlign="end" color="gray.600" whiteSpace="nowrap">
+                <Table.Cell textAlign="end" color="muted" whiteSpace="nowrap">
                   {formatInvestmentAmount(transaction.unitPrice, currency)}
                 </Table.Cell>
-                <Table.Cell pr="5" textAlign="end" color="gray.900" fontWeight="800" whiteSpace="nowrap">
+                <Table.Cell pr="5" textAlign="end" color="fg" fontWeight="600" whiteSpace="nowrap">
                   {formatInvestmentAmount(transaction.amount, currency)}
                 </Table.Cell>
                 <Table.Cell pr="5" textAlign="end">
@@ -72,18 +72,18 @@ export function TransactionList({
 
       <Stack display={{ base: "flex", md: "none" }} gap="0" px="3" pb="2">
         {transactions.map((transaction) => (
-          <Flex key={transaction.id} align="flex-start" justify="space-between" gap="4" px="2" py="3.5" borderBottomWidth="1px" borderColor="gray.100" _last={{ borderBottomWidth: "0" }}>
+          <Flex key={transaction.id} align="flex-start" justify="space-between" gap="4" px="2" py="3.5" borderBottomWidth="1px" borderColor="canvas" _last={{ borderBottomWidth: "0" }}>
             <Stack minW="0" gap="1.5">
               <Flex align="center" gap="2">
                 <Badge colorPalette={sideColor(transaction.side)} variant="subtle" borderRadius="full" px="2.5" py="1">
                   {transaction.side === "buy" ? "Buy" : "Sell"}
                 </Badge>
-                <Text color="gray.500" fontSize="xs" truncate>{formatDateTime(transaction.executedAt)}</Text>
+                <Text color="muted" fontSize="xs" truncate>{formatDateTime(transaction.executedAt)}</Text>
               </Flex>
-              <Text color="gray.600" fontSize="xs">{transaction.quantity} units at {formatInvestmentAmount(transaction.unitPrice, currency)}</Text>
+              <Text color="muted" fontSize="xs">{transaction.quantity} units at {formatInvestmentAmount(transaction.unitPrice, currency)}</Text>
             </Stack>
             <Stack flexShrink="0" align="flex-end" gap="1">
-              <Text color="gray.900" fontSize="sm" fontWeight="800" whiteSpace="nowrap">
+              <Text color="fg" fontSize="sm" fontWeight="600" whiteSpace="nowrap">
                 {formatInvestmentAmount(transaction.amount, currency)}
               </Text>
               <RemoveOrderDialog

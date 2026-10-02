@@ -5,9 +5,9 @@ import { formatInvestmentAmount } from "@/lib/utils/currency";
 export type ValueChangeTone = "positive" | "negative" | "neutral";
 
 function changeColor(tone: ValueChangeTone) {
-  if (tone === "positive") return "green.700";
-  if (tone === "negative") return "red.700";
-  return "gray.600";
+  if (tone === "positive") return "positive";
+  if (tone === "negative") return "error";
+  return "muted";
 }
 
 function formatSignedAmount(amount: string, currency: string) {
@@ -40,7 +40,7 @@ export function ValueWithChange({
           ml="2"
           color={changeColor(changeTone)}
           fontSize="0.85em"
-          fontWeight="750"
+          fontWeight="600"
           whiteSpace="normal"
         >
           {changeLabel} {formatSignedAmount(change, currency)}

@@ -132,7 +132,7 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
         </Field.Root>
 
         <Stack gap="3">
-          <Text color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em">FIRST BUY ORDER</Text>
+          <Text color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">First buy order</Text>
           <Flex gap="4" direction={{ base: "column", sm: "row" }}>
             <Field.Root flex="1" invalid={Boolean(fieldError("quantity"))}>
               <Field.Label>Quantity</Field.Label>
@@ -184,23 +184,22 @@ export function AddInvestmentDialog() {
   return (
     <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
       <Dialog.Trigger asChild>
-        <Button width={{ base: "full", sm: "auto" }} minH="11" colorPalette="purple" borderRadius="xl" boxShadow="0 8px 18px rgb(124 58 237 / 16%)">
+        <Button width={{ base: "full", sm: "auto" }} minH="11" colorPalette="purple" borderRadius="xl">
           <Plus size={17} aria-hidden="true" /> Add investment
         </Button>
       </Dialog.Trigger>
       <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" backdropFilter="blur(4px)" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p={{ base: "0", sm: "4" }} pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
+        <Dialog.Backdrop bg="blackAlpha.500" />
+        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
           <Dialog.Content
-            maxH={{ base: "calc(100dvh - env(safe-area-inset-top) - 1rem)", sm: "90dvh" }}
-            borderRadius={{ base: "2xl 2xl 0 0", sm: "3xl" }}
-            boxShadow="2xl"
+            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
+            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
               <Stack gap="1">
-                <Dialog.Title>Add an investment</Dialog.Title>
-                <Dialog.Description color="gray.500" fontSize="sm">
+                <Dialog.Title>Add investment</Dialog.Title>
+                <Dialog.Description color="muted" fontSize="sm">
                   The first recorded order creates the investment under its broker.
                 </Dialog.Description>
               </Stack>

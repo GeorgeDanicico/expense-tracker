@@ -8,7 +8,7 @@ import useSWR from "swr";
 import { AddOrderDialog } from "@/components/investments/add-order-dialog";
 import { InvestmentValue } from "@/components/investments/investment-value";
 import { TransactionList } from "@/components/investments/transaction-list";
-import { DataUpdating } from "@/components/ui/data-state";
+import { DataRefresh } from "@/components/ui/data-state";
 import { apiFetcher } from "@/lib/api/client";
 import { investmentTransactionsApiKey } from "@/lib/api/keys";
 import type {
@@ -24,7 +24,7 @@ function DetailMetric({
   label,
   value,
   helper,
-  valueColor = "gray.900",
+  valueColor = "fg",
 }: {
   label: string;
   value: ReactNode;
@@ -32,14 +32,14 @@ function DetailMetric({
   valueColor?: string;
 }) {
   return (
-    <Box p="4" borderRadius="2xl" bg="gray.50">
-      <Text color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.05em">
+    <Box>
+      <Text color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.05em">
         {label}
       </Text>
-      <Text mt="1" color={valueColor} fontSize={{ base: "lg", md: "xl" }} fontWeight="800" letterSpacing="-0.03em">
+      <Text mt="1" color={valueColor} fontSize="1.5rem" fontWeight="600" overflowWrap="anywhere" letterSpacing="-0.03em">
         {value}
       </Text>
-      {helper ? <Text mt="1" color="gray.500" fontSize="xs">{helper}</Text> : null}
+      {helper ? <Text mt="1" color="muted" fontSize="xs">{helper}</Text> : null}
     </Box>
   );
 }
@@ -59,7 +59,7 @@ function DetailLoading() {
   return (
     <Stack gap="4" p={{ base: "4", md: "5" }} aria-busy="true" aria-live="polite">
       <Skeleton height="5" width="12rem" />
-      <SimpleGrid columns={{ base: 2, md: 4 }} gap="3">
+      <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} gap="3">
         {["one", "two", "three", "four"].map((item) => <Skeleton key={item} height="6rem" borderRadius="2xl" />)}
       </SimpleGrid>
       <Skeleton height="11rem" borderRadius="2xl" />
@@ -90,7 +90,7 @@ export function AssetDetail({
       id={detailId}
       tabIndex={-1}
       borderTopWidth="1px"
-      borderColor="gray.200"
+      borderColor="border"
       pt="5"
       aria-labelledby={`${detailId}-title`}
       aria-live="polite"
@@ -107,7 +107,7 @@ export function AssetDetail({
               </Badge>
             ) : null}
           </Flex>
-          <Text color="gray.500" fontSize="sm" fontWeight="650">
+          <Text color="muted" fontSize="sm" fontWeight="600">
             {asset.instrument} · {asset.currency} · {quoteStatus(asset)}
           </Text>
         </Stack>
@@ -127,13 +127,13 @@ export function AssetDetail({
         </Flex>
       </Flex>
 
-      <SimpleGrid columns={{ base: 2, md: 4 }} gap="3">
-        <DetailMetric label="QUANTITY" value={`${asset.quantity} units`} helper={asset.currency} />
-        <DetailMetric label="AVERAGE ACQUISITION" value={formatInvestmentAmount(asset.averageCost, asset.currency)} helper="Per unit" />
-        <DetailMetric label="CURRENT PRICE" value={formatInvestmentAmount(asset.currentPrice, asset.currency)} helper={quoteStatus(asset)} />
-        <DetailMetric label="REMAINING COST" value={formatInvestmentAmount(asset.remainingCost, asset.currency)} helper="Native currency" />
+      <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} gap="3">
+        <DetailMetric label="Quantity" value={`${asset.quantity} units`} />
+        <DetailMetric label="Average acquisition" value={formatInvestmentAmount(asset.averageCost, asset.currency)} helper="Per unit" />
+        <DetailMetric label="Current price" value={formatInvestmentAmount(asset.currentPrice, asset.currency)} />
+        <DetailMetric label="Remaining cost" value={formatInvestmentAmount(asset.remainingCost, asset.currency)} />
         <DetailMetric
-          label="CURRENT VALUE"
+          label="Current value"
           value={
             <InvestmentValue
               currentValue={asset.currentValue}
@@ -141,19 +141,19 @@ export function AssetDetail({
               currency={asset.currency}
             />
           }
-          helper={quoteStatus(asset)}
+
         />
-        <DetailMetric label="UNREALIZED" value={unrealized.value} valueColor={unrealized.color} helper={unrealized.label} />
-        <DetailMetric label="REALIZED" value={realized.value} valueColor={realized.color} helper={realized.label} />
+        <DetailMetric label="Unrealized" value={unrealized.value} valueColor={unrealized.label === "Gain" ? "positive" : unrealized.label === "Loss" ? "error" : "muted"} helper={unrealized.label} />
+        <DetailMetric label="Realized" value={realized.value} valueColor={realized.label === "Gain" ? "positive" : realized.label === "Loss" ? "error" : "muted"} helper={realized.label} />
       </SimpleGrid>
 
-      <Box mt="5" overflow="hidden" borderWidth="1px" borderColor="gray.200" borderRadius="2xl">
-        <Flex align="center" justify="space-between" gap="3" px={{ base: "4", md: "5" }} py="4" borderBottomWidth="1px" borderColor="gray.100">
+      <Box mt="5" overflow="hidden" borderWidth="1px" borderColor="border" borderRadius="2xl">
+        <Flex align="center" justify="space-between" gap="3" px={{ base: "4", md: "5" }} py="4" borderBottomWidth="1px" borderColor="canvas">
           <Stack gap="1">
             <Heading as="h4" size="md" letterSpacing="-0.02em">Transaction history</Heading>
-            <Text color="gray.500" fontSize="sm">Newest orders first · values in {asset.currency}</Text>
+            <Text color="muted" fontSize="sm">Newest orders first · values in {asset.currency}</Text>
           </Stack>
-          {isValidating && data ? <DataUpdating /> : null}
+          {data ? <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} /> : null}
         </Flex>
 
         {isLoading && !data ? (

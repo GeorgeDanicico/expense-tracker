@@ -22,10 +22,10 @@ export function AssetSelector({
   return (
     <Stack gap="3">
       <Flex align="center" justify="space-between" gap="3">
-        <Text color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.08em">
+        <Text color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.08em">
           ASSETS
         </Text>
-        <Text color="gray.400" fontSize="xs">
+        <Text color="muted" fontSize="xs">
           Select an asset to view orders
         </Text>
       </Flex>
@@ -54,29 +54,28 @@ export function AssetSelector({
               textAlign="start"
               whiteSpace="normal"
               borderRadius="2xl"
-              borderColor={selected ? "purple.400" : "gray.200"}
-              bg={selected ? "purple.50" : "white"}
-              boxShadow={selected ? "0 0 0 3px rgb(124 58 237 / 10%)" : "none"}
+              borderColor={selected ? "accent" : "border"}
+              bg={selected ? "selected" : "white"}
               aria-pressed={selected}
               aria-controls={selected ? detailId : undefined}
               aria-label={`View ${asset.displayName} (${asset.instrument})`}
               onClick={() => onSelect(asset)}
               _hover={{
-                borderColor: selected ? "purple.400" : "purple.300",
-                bg: selected ? "purple.50" : "purple.50/50",
+                borderColor: selected ? "accent" : "clay",
+                bg: selected ? "selected" : "selected",
               }}
             >
-              <Flex width="full" align="center" justify="space-between" gap="4">
+              <Flex width="full" align={{base:"flex-start",sm:"center"}} direction={{base:"column",sm:"row"}} justify="space-between" gap="2">
                 <Stack minW="0" gap="1">
-                  <Text color="gray.900" fontSize="sm" fontWeight="800" truncate>
+                  <Text color="fg" fontSize="sm" fontWeight="600" truncate>
                     {asset.displayName}
                   </Text>
-                  <Text color="gray.500" fontSize="xs" fontWeight="650" truncate>
+                  <Text color="muted" fontSize="xs" fontWeight="600" truncate>
                     {asset.instrument} · {asset.quantity} units · {asset.currency}
                   </Text>
                 </Stack>
-                <Stack flexShrink="0" align="flex-end" gap="1">
-                  <Text color="gray.900" fontSize="sm" fontWeight="800" whiteSpace="nowrap">
+                <Stack minW="0" align={{base:"flex-start",sm:"flex-end"}} gap="1">
+                  <Text color="fg" fontSize="sm" fontWeight="600" overflowWrap="anywhere">
                     <InvestmentValue
                       currentValue={asset.currentValue}
                       unrealizedGain={asset.unrealizedGain}
@@ -84,7 +83,7 @@ export function AssetSelector({
                     />
                   </Text>
                   <Flex align="center" gap="1.5">
-                    <Text color="gray.400" fontSize="xs" whiteSpace="nowrap">
+                    <Text color="muted" fontSize="xs" overflowWrap="anywhere">
                       {asset.priceStatus === "current" ? "Current value" : asset.priceStatus === "currency_mismatch" ? "Currency mismatch" : "No quote"}
                     </Text>
                     {asset.priceSource ? (

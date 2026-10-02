@@ -1,0 +1,145 @@
+[
+  {
+    "path": "/api/expenses",
+    "query": "",
+    "method": "POST",
+    "body": {
+      "selectedMonth": "2026-10",
+      "description": "Test expense",
+      "amount": "12.34",
+      "category": "groceries",
+      "expenseDate": "2026-10-31",
+      "notes": ""
+    }
+  },
+  {
+    "path": "/api/expenses",
+    "query": "",
+    "method": "POST",
+    "body": {
+      "selectedMonth": "2026-10",
+      "description": "Test expense",
+      "amount": "12.34",
+      "category": "groceries",
+      "expenseDate": "2026-10-31",
+      "notes": ""
+    }
+  },
+  {
+    "path": "/api/expenses/new-expense",
+    "query": "",
+    "method": "DELETE",
+    "body": null
+  },
+  {
+    "path": "/api/investment-transactions",
+    "query": "",
+    "method": "POST",
+    "body": {
+      "brokerId": "xtb",
+      "instrument": "VWCE.DE",
+      "currency": "EUR",
+      "side": "buy",
+      "amount": "200",
+      "quantity": "2",
+      "unitPrice": "100",
+      "executedAt": "2026-10-02T20:35:00.000Z"
+    }
+  },
+  {
+    "path": "/api/investment-transactions",
+    "query": "",
+    "method": "POST",
+    "body": {
+      "brokerId": "xtb",
+      "instrument": "VWCE.DE",
+      "currency": "EUR",
+      "side": "sell",
+      "amount": "110",
+      "quantity": "1",
+      "unitPrice": "110",
+      "executedAt": "2026-10-02T20:35:00.000Z"
+    }
+  },
+  {
+    "path": "/api/investment-transactions/order-1",
+    "query": "",
+    "method": "DELETE",
+    "body": null
+  },
+  {
+    "path": "/api/net-worth/items",
+    "query": "",
+    "method": "POST",
+    "body": {
+      "name": "Test savings",
+      "kind": "asset",
+      "category": "cash",
+      "currency": "EUR",
+      "purchaseAmount": null,
+      "value": "1500",
+      "valuedOn": "2026-10-02"
+    }
+  },
+  {
+    "path": "/api/net-worth/items/item-1/valuations",
+    "query": "",
+    "method": "POST",
+    "body": {
+      "value": "5500",
+      "valuedOn": "2026-10-01"
+    }
+  },
+  {
+    "path": "/api/net-worth/items/item-1",
+    "query": "",
+    "method": "PATCH",
+    "body": {
+      "name": "Renamed savings",
+      "category": "cash",
+      "purchaseAmount": null
+    }
+  },
+  {
+    "path": "/api/net-worth/items/item-1",
+    "query": "",
+    "method": "PATCH",
+    "body": {
+      "archived": true
+    }
+  },
+  {
+    "path": "/api/account",
+    "query": "",
+    "method": "PATCH",
+    "body": {
+      "currency": "USD"
+    }
+  },
+  {
+    "path": "/api/auth",
+    "query": "",
+    "method": "POST",
+    "body": {
+      "mode": "signup",
+      "email": "test@example.com",
+      "password": "<synthetic password>"
+    }
+  },
+  {
+    "path": "/api/auth",
+    "query": "",
+    "method": "POST",
+    "body": {
+      "mode": "login",
+      "email": "test@example.com",
+      "password": "<synthetic password>"
+    }
+  },
+  {
+    "path": "/api/auth",
+    "query": "",
+    "method": "DELETE",
+    "body": null
+  }
+]

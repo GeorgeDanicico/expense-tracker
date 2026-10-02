@@ -114,18 +114,17 @@ export function EditNetWorthItemDialog({
         </Button>
       </Dialog.Trigger>
       <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" backdropFilter="blur(4px)" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p={{ base: "0", sm: "4" }} pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
+        <Dialog.Backdrop bg="blackAlpha.500" />
+        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
           <Dialog.Content
-            maxH={{ base: "calc(100dvh - env(safe-area-inset-top) - 1rem)", sm: "90dvh" }}
-            borderRadius={{ base: "2xl 2xl 0 0", sm: "3xl" }}
-            boxShadow="2xl"
+            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
+            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
               <Stack gap="1">
                 <Dialog.Title>Edit {entry.name}</Dialog.Title>
-                <Dialog.Description color="gray.500" fontSize="sm">
+                <Dialog.Description color="muted" fontSize="sm">
                   Keep the item in {entry.currency}; add a new dated value from its row when the balance changes.
                 </Dialog.Description>
               </Stack>
@@ -197,7 +196,7 @@ export function EditNetWorthItemDialog({
                     >
                       <Archive size={16} aria-hidden="true" /> Archive item
                     </Button>
-                    <Text color="gray.500" fontSize="xs">
+                    <Text color="muted" fontSize="xs">
                       Archiving hides this item from current totals but preserves its valuation history.
                     </Text>
                   </Stack>

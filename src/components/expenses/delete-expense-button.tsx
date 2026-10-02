@@ -35,8 +35,6 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
       );
       void mutate(
         (cacheKey) => typeof cacheKey === "string" && cacheKey.startsWith("/api/dashboard?"),
-        undefined,
-        { revalidate: true },
       );
       setOpen(false);
     } catch (caught) {
@@ -52,18 +50,18 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
         <Button
           size="xs"
           variant="ghost"
-          color="gray.400"
+          color="muted"
           borderRadius="lg"
           aria-label={`Delete ${description}`}
-          _hover={{ color: "red.600", bg: "red.50" }}
+          _hover={{ color: "error", bg: "red.50" }}
         >
           <Trash2 size={15} aria-hidden="true" />
         </Button>
       </Dialog.Trigger>
       <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" backdropFilter="blur(3px)" />
+        <Dialog.Backdrop bg="blackAlpha.500" />
         <Dialog.Positioner p="4">
-          <Dialog.Content borderRadius="2xl" boxShadow="2xl">
+          <Dialog.Content borderRadius="2xl">
             <Dialog.Header pt="6">
               <Stack gap="3">
                 <Button
@@ -71,7 +69,7 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
                   width="11"
                   height="11"
                   p="0"
-                  color="red.600"
+                  color="error"
                   bg="red.50"
                   borderRadius="xl"
                   pointerEvents="none"
@@ -82,8 +80,8 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
               </Stack>
             </Dialog.Header>
             <Dialog.Body>
-              <Dialog.Description color="gray.600">
-                <Text as="span" fontWeight="700" color="gray.800">{description}</Text> will be permanently removed from your ledger.
+              <Dialog.Description color="muted">
+                <Text as="span" fontWeight="600" color="fg">{description}</Text> will be permanently removed from your ledger.
               </Dialog.Description>
               {error ? (
                 <Alert.Root mt="4" status="error" borderRadius="xl">
