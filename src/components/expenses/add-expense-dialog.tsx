@@ -76,8 +76,6 @@ function ExpenseForm({
       );
       void mutate(
         (cacheKey) => typeof cacheKey === "string" && cacheKey.startsWith("/api/dashboard?"),
-        undefined,
-        { revalidate: true },
       );
       onSuccess();
     } catch (error) {
@@ -166,25 +164,21 @@ export function AddExpenseDialog({
   return (
     <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
       <Dialog.Trigger asChild>
-        <Button flex={{ base: "1", sm: "initial" }} colorPalette="purple" borderRadius="xl" boxShadow="0 8px 18px rgb(124 58 237 / 16%)">
+        <Button flex={{ base: "1", sm: "initial" }} colorPalette="purple" borderRadius="xl">
           <Plus size={17} aria-hidden="true" /> Add expense
         </Button>
       </Dialog.Trigger>
       <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" backdropFilter="blur(4px)" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p={{ base: "0", sm: "4" }}>
+        <Dialog.Backdrop bg="blackAlpha.500" />
+        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4">
           <Dialog.Content
-            maxH={{ base: "calc(100dvh - env(safe-area-inset-top) - 1rem)", sm: "90dvh" }}
-            borderRadius={{ base: "2xl 2xl 0 0", sm: "3xl" }}
-            boxShadow="2xl"
+            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
+            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
               <Stack gap="1">
-                <Dialog.Title>Add an expense</Dialog.Title>
-                <Dialog.Description color="gray.500" fontSize="sm">
-                  Record a transaction in this month’s ledger.
-                </Dialog.Description>
+                <Dialog.Title>Add expense</Dialog.Title>
               </Stack>
             </Dialog.Header>
             <Dialog.Body>

@@ -32,13 +32,10 @@ export function BrokerSection({
       <Stack gap="6">
         <Flex align={{ base: "flex-start", sm: "center" }} justify="space-between" gap="4" direction={{ base: "column", sm: "row" }}>
           <Stack gap="1">
-            <Text color="purple.600" fontSize="xs" fontWeight="800" letterSpacing="0.1em">
-              BROKER ACCOUNT
-            </Text>
             <Heading as="h2" id={`investment-broker-${broker.accountId}`} size={{ base: "lg", md: "xl" }} letterSpacing="-0.03em">
               {INVESTMENT_BROKER_LABELS[broker.brokerId]}
             </Heading>
-            <Text color="gray.500" fontSize="sm">
+            <Text color="muted" fontSize="sm">
               {broker.assets.length} {broker.assets.length === 1 ? "asset" : "assets"} tracked in native currency.
             </Text>
           </Stack>
@@ -49,11 +46,11 @@ export function BrokerSection({
 
         <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap="3">
           {broker.totalsByCurrency.map((subtotal) => (
-            <Box key={subtotal.currency} p="4" borderRadius="2xl" bg="gray.50">
-              <Text color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em">
-                {subtotal.currency} TOTAL
+            <Box key={subtotal.currency}>
+              <Text color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">
+                Total ({subtotal.currency})
               </Text>
-              <Text mt="1" color="gray.900" fontSize={{ base: "lg", md: "xl" }} fontWeight="800" letterSpacing="-0.03em">
+              <Text mt="1" color="fg" fontSize={{ base: "lg", md: "xl" }} fontWeight="600" letterSpacing="-0.03em">
                 <InvestmentValue
                   currentValue={subtotal.currentValue}
                   unrealizedGain={subtotal.unrealizedGain}
@@ -61,7 +58,7 @@ export function BrokerSection({
                 />
               </Text>
               <Flex align="center" gap="2" mt="1.5">
-                <Text color="gray.500" fontSize="xs">
+                <Text color="muted" fontSize="xs">
                   Cost basis {formatInvestmentAmount(subtotal.remainingCost, subtotal.currency)}
                 </Text>
                 {subtotal.currentValue !== null ? (

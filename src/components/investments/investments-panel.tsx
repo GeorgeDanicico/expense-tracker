@@ -1,13 +1,14 @@
 "use client";
 
 import { Alert, Flex, Heading, Stack, Text } from "@chakra-ui/react";
-import { Inbox, TriangleAlert, TrendingUp } from "lucide-react";
+import { Inbox, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import useSWR from "swr";
 
 import { BrokerSection } from "@/components/investments/broker-section";
 import { AddInvestmentDialog } from "@/components/investments/add-investment-dialog";
-import { DataError, DataLoading, DataUpdating } from "@/components/ui/data-state";
+import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { Surface } from "@/components/ui/surface";
 import { apiFetcher } from "@/lib/api/client";
 import { INVESTMENTS_API_KEY } from "@/lib/api/keys";
@@ -17,15 +18,15 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 
 function EmptyInvestments() {
   return (
-    <Surface p={{ base: "8", md: "12" }}>
-      <Flex minH="17rem" align="center" justify="center" textAlign="center">
+    <Surface p="4">
+      <Flex minH="12rem" align="center" justify="center" textAlign="center">
         <Stack align="center" gap="4">
-          <Flex width="14" height="14" align="center" justify="center" borderRadius="2xl" color="purple.600" bg="purple.50">
+          <Flex width="8" height="8" align="center" justify="center" color="muted">
             <Inbox size={25} aria-hidden="true" />
           </Flex>
           <Stack align="center" gap="1.5">
             <Heading as="h2" size="lg" letterSpacing="-0.025em">No investments yet</Heading>
-            <Text maxW="28rem" color="gray.500" fontSize="sm">
+            <Text maxW="28rem" color="muted" fontSize="sm">
               Your investment accounts will appear here once their first executed order is recorded.
             </Text>
           </Stack>
@@ -42,7 +43,7 @@ function CalculationIssues({ overview }: { overview: InvestmentsOverview }) {
     <Alert.Root status="warning" borderRadius="2xl">
       <Alert.Indicator />
       <Stack gap="1">
-        <Text fontWeight="750">Some investment history needs attention</Text>
+        <Text fontWeight="600">Some investment history needs attention</Text>
         {overview.calculationIssues.map((issue) => (
           <Alert.Description key={`${issue.transactionId}-${issue.code}`}>
             {issue.instrument ? `${issue.instrument}: ` : ""}{issue.message}
@@ -81,22 +82,8 @@ export function InvestmentsPanel() {
 
   return (
     <Stack gap={{ base: "6", md: "7" }}>
-      <Stack gap="1">
-        <Flex align="center" gap="3">
-          <Text color="purple.600" fontSize="sm" fontWeight="750">INVESTMENTS</Text>
-          {isValidating ? <DataUpdating /> : null}
-        </Flex>
-        <Flex align={{ base: "flex-start", lg: "center" }} justify="space-between" gap="4" direction={{ base: "column", lg: "row" }}>
-          <Flex align="center" gap="3">
-            <TrendingUp size={26} color="#7c3aed" aria-hidden="true" />
-            <Heading as="h1" size={{ base: "2xl", md: "3xl" }} color="gray.900" letterSpacing="-0.045em">
-              Investments, kept clear
-            </Heading>
-          </Flex>
-          <AddInvestmentDialog />
-        </Flex>
-        <Text color="gray.500">Track holdings by broker and native currency. Current values come from the configured price service.</Text>
-      </Stack>
+      <PageHeader title="Investments"><AddInvestmentDialog /></PageHeader>
+      <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
 
       <CalculationIssues overview={data} />
 
@@ -115,7 +102,7 @@ export function InvestmentsPanel() {
       )}
 
       {data.brokers.length > 0 && !data.calculationIssues?.length ? (
-        <Flex align="center" gap="2" color="gray.400" fontSize="xs">
+        <Flex align="center" gap="2" color="muted" fontSize="xs">
           <TriangleAlert size={14} aria-hidden="true" />
           Values are shown separately by currency; no currencies are combined.
         </Flex>

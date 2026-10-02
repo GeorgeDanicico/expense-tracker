@@ -1,6 +1,7 @@
-import { Box, Flex, Stack, Text } from "@chakra-ui/react";
-
+import { Box, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
+import Link from "next/link";
 import { formatCurrency } from "@/lib/utils/currency";
+import { formatDate, formatMonth } from "@/lib/utils/dates";
 
 export function MonthlyBarChart({
   series,
@@ -10,62 +11,55 @@ export function MonthlyBarChart({
   currency: string;
 }) {
   const max = Math.max(...series.map((item) => item.total), 1);
-  const total = series.reduce((sum, item) => sum + item.total, 0);
-  const average = total / Math.max(series.length, 1);
-
-  if (!series.length) {
-    return (
-      <Flex minH="18rem" align="center" justify="center" textAlign="center">
-        <Stack gap="1">
-          <Text fontWeight="700">No spending history yet</Text>
-          <Text color="gray.500" fontSize="sm">Your monthly trend will appear here.</Text>
-        </Stack>
-      </Flex>
-    );
-  }
-
+  if (!series.length) return <Text color="muted">No recorded expenses</Text>;
   return (
-    <Box overflowX="auto" pb="1">
-      <Flex
-        minW={series.length > 12 ? "860px" : series.length > 6 ? "620px" : "100%"}
-        height={{ base: "230px", md: "270px" }}
-        align="end"
-        gap={{ base: "2", md: "3" }}
-        px="1"
-        pt="6"
-        role="img"
-        aria-label={`Expense totals by month. Average ${formatCurrency(average, currency)}.`}
-      >
-        {series.map((item) => {
-          const height = item.total ? Math.max((item.total / max) * 178, 8) : 3;
-          const aboveAverage = item.total >= average && item.total > 0;
-
-          return (
-            <Stack key={item.key} flex="1" minW="42px" height="full" justify="end" align="center" gap="2">
-              <Text
-                color="gray.500"
-                fontSize="10px"
-                fontWeight="650"
-                whiteSpace="nowrap"
-                opacity={item.total ? 1 : 0}
-              >
-                {item.total ? formatCurrency(item.total, currency) : "—"}
-              </Text>
-              <Box
-                width="full"
-                maxW="52px"
-                height={`${height}px`}
-                borderRadius="lg lg sm sm"
-                bg={item.total ? (aboveAverage ? "purple.600" : "purple.300") : "gray.200"}
-                boxShadow={aboveAverage ? "0 7px 15px rgb(124 58 237 / 16%)" : "none"}
-                transition="height 180ms ease, background 180ms ease"
-                title={`${item.label}: ${formatCurrency(item.total, currency)}`}
-              />
-              <Text color="gray.500" fontSize="xs" fontWeight="600" whiteSpace="nowrap">{item.label}</Text>
-            </Stack>
-          );
-        })}
-      </Flex>
-    </Box>
+    <Stack as="ul" gap="2" listStyleType="none" aria-label="Spending by month">
+      {series.map((item) => (
+        <Box as="li" key={item.key}>
+          <ChakraLink
+            asChild
+            display="block"
+            minH="11"
+            color="fg"
+            _hover={{ textDecoration: "none", bg: "canvas" }}
+            borderRadius="lg"
+            p="2"
+          >
+            <Link href={`/expenses?month=${item.key.slice(0, 7)}`}>
+              <Stack gap="1">
+                <Box
+                  display="flex"
+                  flexWrap="wrap"
+                  justifyContent="space-between"
+                  gap="2"
+                >
+                  <Text fontSize="sm">
+                    {item.key.length === 7
+                      ? formatMonth(item.key)
+                      : formatDate(item.key)}
+                  </Text>
+                  <Text fontSize="sm" fontWeight="600" overflowWrap="anywhere">
+                    {formatCurrency(item.total, currency)}
+                  </Text>
+                </Box>
+                <Box
+                  height="2"
+                  bg="canvas"
+                  borderRadius="full"
+                  aria-hidden="true"
+                >
+                  <Box
+                    height="full"
+                    width={`${(item.total / max) * 100}%`}
+                    bg="clay"
+                    borderRadius="full"
+                  />
+                </Box>
+              </Stack>
+            </Link>
+          </ChakraLink>
+        </Box>
+      ))}
+    </Stack>
   );
 }

@@ -7,10 +7,10 @@ import { Surface } from "@/components/ui/surface";
 
 export function DataLoading({ label = "Loading your ledger…" }: { label?: string }) {
   return (
-    <Flex minH="50dvh" align="center" justify="center" aria-busy="true" aria-live="polite" role="status">
-      <Stack align="center" gap="3" color="gray.500">
-        <Spinner size="lg" color="purple.500" borderWidth="3px" />
-        <Text fontSize="sm" fontWeight="650">{label}</Text>
+    <Flex minH="12rem" align="center" justify="center" aria-busy="true" aria-live="polite" role="status">
+      <Stack align="center" gap="3" color="muted">
+        <Spinner size="sm" color="accent" />
+        <Text fontSize="sm" fontWeight="600">{label}</Text>
       </Stack>
     </Flex>
   );
@@ -24,15 +24,13 @@ export function DataError({
   retry: () => void;
 }) {
   return (
-    <Flex minH="50dvh" align="center" justify="center">
+    <Flex minH="12rem" align="center" justify="center" role="alert">
       <Surface maxW="440px" p={{ base: "6", md: "8" }} textAlign="center">
         <Stack align="center" gap="4">
-          <Flex width="14" height="14" align="center" justify="center" borderRadius="2xl" color="red.600" bg="red.50">
-            <TriangleAlert size={25} aria-hidden="true" />
-          </Flex>
+          <TriangleAlert size={20} aria-hidden="true" />
           <Stack gap="2">
-            <Heading as="h1" size="xl" letterSpacing="-0.03em">We couldn’t load your data</Heading>
-            <Text color="gray.500">{message}</Text>
+            <Heading as="h2">Unable to load data</Heading>
+            <Text color="muted">{message}</Text>
           </Stack>
           <Button onClick={retry} minH="11" colorPalette="purple" borderRadius="xl">
             <RefreshCw size={17} aria-hidden="true" /> Try again
@@ -45,8 +43,16 @@ export function DataError({
 
 export function DataUpdating() {
   return (
-    <Flex align="center" gap="2" color="gray.400" fontSize="xs" aria-live="polite" role="status">
+    <Flex align="center" gap="2" color="muted" fontSize="xs" aria-live="polite" role="status">
       <Spinner size="xs" /> Updating…
     </Flex>
   );
+}
+
+export function DataRefresh({ error, updating, retry }: { error?: unknown; updating: boolean; retry: () => void }) {
+  if (error) return <Flex role="status" align="center" gap="3" wrap="wrap">
+    <Text color="error" fontSize="xs">Refresh failed. Showing the last loaded values.</Text>
+    <Button size="sm" variant="outline" onClick={retry}>Retry</Button>
+  </Flex>;
+  return updating ? <DataUpdating /> : null;
 }

@@ -1,8 +1,15 @@
 "use client";
 
-import { Button, Field, Flex, Input, NativeSelect, Stack } from "@chakra-ui/react";
+import {
+  Button,
+  Field,
+  Flex,
+  Input,
+  NativeSelect,
+  Stack,
+} from "@chakra-ui/react";
 import { SlidersHorizontal } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
 
 import type { AnalyticsPeriod, CustomGranularity } from "@/lib/types";
@@ -17,6 +24,7 @@ export function StatsFilter({
   initialCustomDate: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [period, setPeriod] = useState(initialPeriod);
   const [granularity, setGranularity] = useState(initialGranularity);
@@ -24,7 +32,9 @@ export function StatsFilter({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const params = new URLSearchParams({ period });
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", "history");
+    params.set("period", period);
 
     if (period === "custom") {
       params.set("granularity", granularity);
@@ -45,18 +55,28 @@ export function StatsFilter({
 
   return (
     <form onSubmit={submit}>
-      <Flex gap="3" align="end" wrap="wrap" width={{ base: "full", lg: "auto" }}>
-        <Field.Root flex={{ base: "1", sm: "initial" }} minW={{ base: "10rem", sm: "12rem" }}>
+      <Flex
+        gap="3"
+        align="end"
+        wrap="wrap"
+        width={{ base: "full", lg: "auto" }}
+      >
+        <Field.Root
+          flex={{ base: "1", sm: "initial" }}
+          minW={{ base: "10rem", sm: "12rem" }}
+        >
           <Field.Label>Analysis period</Field.Label>
           <NativeSelect.Root size="sm">
             <NativeSelect.Field
               value={period}
-              onChange={(event) => setPeriod(event.target.value as AnalyticsPeriod)}
+              onChange={(event) =>
+                setPeriod(event.target.value as AnalyticsPeriod)
+              }
             >
-              <option value="3m">Last 3 months</option>
-              <option value="6m">Last 6 months</option>
-              <option value="1y">Last year</option>
-              <option value="2y">Last 2 years</option>
+              <option value="3m">Previous 3 completed months</option>
+              <option value="6m">Previous 6 completed months</option>
+              <option value="1y">Previous 12 completed months</option>
+              <option value="2y">Previous 24 completed months</option>
               <option value="custom">Custom</option>
             </NativeSelect.Field>
             <NativeSelect.Indicator />
@@ -82,7 +102,9 @@ export function StatsFilter({
             </Field.Root>
 
             <Field.Root minW="170px">
-              <Field.Label>{granularity === "day" ? "Day" : "Month"}</Field.Label>
+              <Field.Label>
+                {granularity === "day" ? "Day" : "Month"}
+              </Field.Label>
               <Input
                 size="sm"
                 type={granularity === "day" ? "date" : "month"}
@@ -99,7 +121,7 @@ export function StatsFilter({
           size="sm"
           variant="outline"
           borderRadius="lg"
-          borderColor="gray.300"
+          borderColor="border"
           loading={pending}
         >
           <SlidersHorizontal size={15} aria-hidden="true" /> Apply

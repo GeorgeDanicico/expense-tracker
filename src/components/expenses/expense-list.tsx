@@ -14,7 +14,7 @@ import {
 import { Inbox, Search } from "lucide-react";
 import { useDeferredValue, useMemo, useState } from "react";
 
-import { CategoryVisual, CATEGORY_STYLES } from "@/components/expenses/category-visual";
+import { CategoryVisual } from "@/components/expenses/category-visual";
 import { DeleteExpenseButton } from "@/components/expenses/delete-expense-button";
 import {
   CATEGORY_LABELS,
@@ -27,14 +27,14 @@ import { formatDate } from "@/lib/utils/dates";
 
 function EmptyState({ filtered = false }: { filtered?: boolean }) {
   return (
-    <Flex minH="15rem" align="center" justify="center" px="5" py="10" textAlign="center">
+    <Flex minH="12rem" align="center" justify="center" px="5" py="10" textAlign="center">
       <Stack align="center" gap="3">
-        <Flex width="12" height="12" align="center" justify="center" borderRadius="2xl" color="purple.600" bg="purple.50">
+        <Flex width="8" height="8" align="center" justify="center" color="muted">
           {filtered ? <Search size={21} aria-hidden="true" /> : <Inbox size={22} aria-hidden="true" />}
         </Flex>
         <Stack gap="1">
-          <Text fontWeight="750">{filtered ? "No matching expenses" : "No expenses yet"}</Text>
-          <Text maxW="19rem" color="gray.500" fontSize="sm">
+          <Text fontWeight="600">{filtered ? "No matching expenses" : "No recorded expenses"}</Text>
+          <Text maxW="19rem" color="muted" fontSize="sm">
             {filtered
               ? "Try another search or choose a different category."
               : "Add your first expense to start building this month’s picture."}
@@ -86,7 +86,7 @@ export function ExpenseList({
           px={{ base: "5", md: "6" }}
           py="4"
           borderBottomWidth="1px"
-          borderColor="gray.100"
+          borderColor="canvas"
         >
           <InputGroup
             maxW={{ sm: "22rem" }}
@@ -98,12 +98,12 @@ export function ExpenseList({
               placeholder="Search expenses"
               aria-label="Search expenses"
               borderRadius="xl"
-              bg="gray.50"
-              borderColor="gray.200"
+              bg="canvas"
+              borderColor="border"
             />
           </InputGroup>
           <Flex align="center" gap="3">
-            <Text color="gray.500" fontSize="sm" whiteSpace="nowrap">
+            <Text color="muted" fontSize="sm" whiteSpace="nowrap">
               {filtered.length} of {expenses.length}
             </Text>
             <NativeSelect.Root size="sm" maxW="11rem">
@@ -131,35 +131,33 @@ export function ExpenseList({
             <Table.Root size="sm" variant="line">
               <Table.Caption className="sr-only">Expense transactions</Table.Caption>
               <Table.Header>
-                <Table.Row bg="gray.50">
-                  <Table.ColumnHeader pl="6" py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em">TRANSACTION</Table.ColumnHeader>
-                  <Table.ColumnHeader py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em">DATE</Table.ColumnHeader>
-                  <Table.ColumnHeader py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em">CATEGORY</Table.ColumnHeader>
-                  <Table.ColumnHeader py="3.5" color="gray.500" fontSize="xs" fontWeight="750" letterSpacing="0.06em" textAlign="end">AMOUNT</Table.ColumnHeader>
+                <Table.Row bg="canvas">
+                  <Table.ColumnHeader pl="6" py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">TRANSACTION</Table.ColumnHeader>
+                  <Table.ColumnHeader py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">DATE</Table.ColumnHeader>
+                  <Table.ColumnHeader py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">CATEGORY</Table.ColumnHeader>
+                  <Table.ColumnHeader py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em" textAlign="end">AMOUNT</Table.ColumnHeader>
                   {allowDelete ? <Table.ColumnHeader width="14" pr="5"><span className="sr-only">Actions</span></Table.ColumnHeader> : null}
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {filtered.map((expense) => (
-                  <Table.Row key={expense.id} _hover={{ bg: "purple.50/40" }} transition="background 140ms ease">
+                  <Table.Row key={expense.id} _hover={{ bg: "selected" }} transition="background 140ms ease">
                     <Table.Cell pl="6" py="4">
                       <Flex align="center" gap="3">
                         <CategoryVisual category={expense.category} />
                         <Stack minW="0" gap="0.5">
-                          <Text maxW={{ md: "16rem", xl: "25rem" }} fontWeight="700" truncate>{expense.description}</Text>
-                          <Text maxW={{ md: "16rem", xl: "25rem" }} minH="4" color="gray.500" fontSize="xs" truncate>
-                            {expense.notes || "No note"}
-                          </Text>
+                          <Text maxW={{ md: "16rem", xl: "25rem" }} fontWeight="600" truncate>{expense.description}</Text>
+                          {expense.notes ? <Text maxW={{ md: "16rem", xl: "25rem" }} color="muted" fontSize="xs" truncate>{expense.notes}</Text> : null}
                         </Stack>
                       </Flex>
                     </Table.Cell>
-                    <Table.Cell color="gray.600" whiteSpace="nowrap">{formatDate(expense.expenseDate)}</Table.Cell>
+                    <Table.Cell color="muted" whiteSpace="nowrap">{formatDate(expense.expenseDate)}</Table.Cell>
                     <Table.Cell>
-                      <Badge colorPalette={CATEGORY_STYLES[expense.category].badge} variant="subtle" borderRadius="full" px="2.5" py="1">
+                      <Badge colorPalette="purple" variant="subtle" borderRadius="full" px="2.5" py="1">
                         {CATEGORY_LABELS[expense.category]}
                       </Badge>
                     </Table.Cell>
-                    <Table.Cell textAlign="end" color="gray.900" fontSize="sm" fontWeight="800" whiteSpace="nowrap">
+                    <Table.Cell textAlign="end" color="fg" fontSize="sm" fontWeight="600" whiteSpace="nowrap">
                       {formatCurrency(expense.amount, currency)}
                     </Table.Cell>
                     {allowDelete ? (
@@ -187,20 +185,19 @@ export function ExpenseList({
                 px="2"
                 py="3.5"
                 borderBottomWidth="1px"
-                borderColor="gray.100"
-                css={{ contentVisibility: "auto", containIntrinsicSize: "72px" }}
+                borderColor="canvas"
                 _last={{ borderBottomWidth: "0" }}
               >
                 <CategoryVisual category={expense.category} />
                 <Stack flex="1" minW="0" gap="0.5">
-                  <Text fontSize="sm" fontWeight="700" truncate>{expense.description}</Text>
-                  <Text color="gray.500" fontSize="xs" truncate>
+                  <Text fontSize="sm" fontWeight="600" truncate>{expense.description}</Text>
+                  <Text color="muted" fontSize="xs" truncate>
                     {formatDate(expense.expenseDate)} · {CATEGORY_LABELS[expense.category]}
                   </Text>
-                  {expense.notes ? <Text color="gray.400" fontSize="xs" truncate>{expense.notes}</Text> : null}
+                  {expense.notes ? <Text color="muted" fontSize="xs" truncate>{expense.notes}</Text> : null}
                 </Stack>
                 <Stack flexShrink="0" align="flex-end" gap="1">
-                  <Text fontSize="sm" fontWeight="800" whiteSpace="nowrap">{formatCurrency(expense.amount, currency)}</Text>
+                  <Text fontSize="sm" fontWeight="600" whiteSpace="nowrap">{formatCurrency(expense.amount, currency)}</Text>
                   {allowDelete ? <DeleteExpenseButton id={expense.id} description={expense.description} /> : null}
                 </Stack>
               </Flex>

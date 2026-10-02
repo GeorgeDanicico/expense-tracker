@@ -1,186 +1,92 @@
 "use client";
 
-import {
-  Box,
-  Button,
-  Container,
-  Flex,
-  HStack,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { Landmark, LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { useSWRConfig } from "swr";
-
+import { Box, Container, Flex, Stack, Text } from "@chakra-ui/react";
+import { Landmark } from "lucide-react";
 import {
   DesktopNavigation,
   MobileNavigation,
+  NavigationLink,
 } from "@/components/layout/app-navigation";
-import { apiRequest } from "@/lib/api/client";
+import { SignOutButton } from "@/components/layout/sign-out-button";
+import { OfflineStatus } from "@/components/pwa/offline-status";
 
-function Brand({ compact = false }: { compact?: boolean }) {
+function Brand() {
   return (
-    <HStack gap="3">
-      <Flex
-        width={compact ? "9" : "10"}
-        height={compact ? "9" : "10"}
-        align="center"
-        justify="center"
-        flexShrink="0"
-        borderRadius="xl"
-        color="white"
-        bg="purple.600"
-        boxShadow="0 8px 18px rgb(124 58 237 / 24%)"
-      >
-        <Landmark size={compact ? 19 : 21} strokeWidth={2.3} aria-hidden="true" />
-      </Flex>
-      <Stack gap="0">
-        <Text color="gray.900" fontWeight="800" letterSpacing="-0.02em" lineHeight="1.2">
-          Simple Ledger
-        </Text>
-        {compact ? null : (
-          <Text color="gray.500" fontSize="xs">
-            Money, made clear.
-          </Text>
-        )}
-      </Stack>
-    </HStack>
+    <Flex align="center" gap="2" minH="11">
+      <Landmark size={20} color="#A64B32" aria-hidden="true" />
+      <Text fontWeight="600">Simple Ledger</Text>
+    </Flex>
   );
 }
 
-function SignOutButton({ compact = false }: { compact?: boolean }) {
-  const router = useRouter();
-  const { mutate } = useSWRConfig();
-  const [pending, setPending] = useState(false);
-
-  async function signOut() {
-    setPending(true);
-    try {
-      await apiRequest<{ success: true }>("/api/auth", { method: "DELETE" });
-      await mutate(() => true, undefined, { revalidate: false });
-      router.replace("/login");
-    } catch {
-      // Keep the current session visible so the user can retry safely.
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <Button
-      onClick={signOut}
-      loading={pending}
-      width={compact ? "10" : "full"}
-      minW={compact ? "10" : undefined}
-      height="10"
-      px={compact ? "0" : "3"}
-      justifyContent={compact ? "center" : "flex-start"}
-      variant="ghost"
-      color="gray.500"
-      borderRadius="xl"
-      aria-label="Sign out"
-      _hover={{ color: "red.600", bg: "red.50" }}
-    >
-      <LogOut size={17} aria-hidden="true" />
-      {compact ? null : <Text>Sign out</Text>}
-    </Button>
-  );
-}
-
-export function AppShell({ children, email }: { children: React.ReactNode; email: string }) {
-  const initial = (email[0] || "U").toUpperCase();
-
+export function AppShell({
+  children,
+  email,
+}: {
+  children: React.ReactNode;
+  email: string;
+}) {
   return (
     <Box minH="100dvh">
-      <Flex maxW="1600px" minH="100dvh" mx="auto">
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
+      <Flex maxW="1440px" minH="100dvh" mx="auto">
         <Box
           as="aside"
           aria-label="Application sidebar"
           display={{ base: "none", md: "flex" }}
           position="sticky"
           top="0"
-          width={{ md: "244px", xl: "268px" }}
+          width="208px"
           height="100dvh"
           flexShrink="0"
           flexDirection="column"
-          px={{ md: "5", xl: "6" }}
-          py="7"
-          bg="whiteAlpha.900"
+          p="4"
+          bg="surface"
           borderRightWidth="1px"
-          borderColor="gray.200"
-          backdropFilter="blur(18px)"
+          borderColor="border"
         >
           <Brand />
-
-          <Box mt="10">
-            <Text px="3.5" mb="2" color="gray.400" fontSize="xs" fontWeight="800" letterSpacing="0.12em">
-              WORKSPACE
-            </Text>
+          <Box mt="5">
             <DesktopNavigation />
           </Box>
-
-          <Stack mt="auto" gap="3">
-            <Flex align="center" gap="3" p="3" borderRadius="2xl" bg="gray.50" borderWidth="1px" borderColor="gray.100">
-              <Flex
-                width="9"
-                height="9"
-                flexShrink="0"
-                align="center"
-                justify="center"
-                borderRadius="full"
-                color="purple.700"
-                bg="purple.100"
-                fontSize="sm"
-                fontWeight="800"
-              >
-                {initial}
-              </Flex>
-              <Stack minW="0" gap="0">
-                <Text fontSize="sm" fontWeight="700">Personal account</Text>
-                <Text color="gray.500" fontSize="xs" truncate>{email}</Text>
-              </Stack>
-            </Flex>
+          <Stack mt="auto" gap="2">
+            <NavigationLink href="/settings" />
+            <Text color="muted" fontSize="xs" overflowWrap="anywhere" px="3">
+              {email}
+            </Text>
             <SignOutButton />
           </Stack>
         </Box>
-
         <Box flex="1" minW="0">
           <Flex
             as="header"
             display={{ base: "flex", md: "none" }}
-            position="sticky"
-            top="0"
-            zIndex="sticky"
-            minH="16"
-            align="center"
-            justify="space-between"
+            minH="14"
             px="4"
             pt="env(safe-area-inset-top)"
-            bg="whiteAlpha.950"
+            bg="surface"
             borderBottomWidth="1px"
-            borderColor="gray.200"
-            backdropFilter="blur(18px)"
+            borderColor="border"
           >
-            <Brand compact />
-            <SignOutButton compact />
+            <Brand />
           </Flex>
-
           <Container
             as="main"
-            maxW="1280px"
-            overflowX="hidden"
-            px={{ base: "4", sm: "6", md: "8", xl: "10" }}
-            pt={{ base: "6", md: "9", xl: "11" }}
-            pb={{ base: "28", md: "12" }}
+            id="main-content"
+            tabIndex={-1}
+            maxW="1200px"
+            px={{ base: "4", md: "6" }}
+            pt={{ base: "4", md: "6" }}
+            pb={{ base: "calc(6rem + env(safe-area-inset-bottom))", md: "6" }}
           >
+            <OfflineStatus />
             {children}
           </Container>
         </Box>
       </Flex>
-
-      <MobileNavigation />
+      <MobileNavigation email={email} />
     </Box>
   );
 }

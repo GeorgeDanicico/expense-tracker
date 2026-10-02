@@ -103,20 +103,16 @@ export function AddOrderDialog({
         </Button>
       </Dialog.Trigger>
       <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" backdropFilter="blur(4px)" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p={{ base: "0", sm: "4" }} pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
+        <Dialog.Backdrop bg="blackAlpha.500" />
+        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
           <Dialog.Content
-            maxH={{ base: "calc(100dvh - env(safe-area-inset-top) - 1rem)", sm: "90dvh" }}
-            borderRadius={{ base: "2xl 2xl 0 0", sm: "3xl" }}
-            boxShadow="2xl"
+            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
+            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
               <Stack gap="1">
-                <Dialog.Title>Add an order</Dialog.Title>
-                <Dialog.Description color="gray.500" fontSize="sm">
-                  Record another buy or sell for this asset.
-                </Dialog.Description>
+                <Dialog.Title>Add order</Dialog.Title>
               </Stack>
             </Dialog.Header>
             <Dialog.Body>
@@ -127,8 +123,8 @@ export function AddOrderDialog({
                       <Badge colorPalette="purple" variant="subtle" borderRadius="full" px="2.5" py="1">
                         {INVESTMENT_BROKER_LABELS[brokerId]}
                       </Badge>
-                      <Text color="gray.600" fontSize="sm" fontWeight="700">{asset.instrument}</Text>
-                      <Text color="gray.500" fontSize="sm">{asset.currency}</Text>
+                      <Text color="muted" fontSize="sm" fontWeight="600">{asset.instrument}</Text>
+                      <Text color="muted" fontSize="sm">{asset.currency}</Text>
                     </Flex>
 
                     <Field.Root invalid={Boolean(fieldError("side"))}>

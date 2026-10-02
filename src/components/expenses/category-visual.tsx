@@ -24,18 +24,18 @@ type CategoryStyle = {
 
 export const CATEGORY_STYLES: Record<ExpenseCategory, CategoryStyle> = {
   housing: { icon: House, color: "blue.700", bg: "blue.50", badge: "blue" },
-  groceries: { icon: ShoppingBasket, color: "green.700", bg: "green.50", badge: "green" },
+  groceries: { icon: ShoppingBasket, color: "positive", bg: "green.50", badge: "green" },
   transport: { icon: BusFront, color: "orange.700", bg: "orange.50", badge: "orange" },
   utilities: { icon: Lightbulb, color: "yellow.700", bg: "yellow.50", badge: "yellow" },
-  health: { icon: HeartPulse, color: "red.700", bg: "red.50", badge: "red" },
-  entertainment: { icon: Clapperboard, color: "purple.700", bg: "purple.50", badge: "purple" },
+  health: { icon: HeartPulse, color: "error", bg: "red.50", badge: "red" },
+  entertainment: { icon: Clapperboard, color: "accent", bg: "selected", badge: "purple" },
   shopping: { icon: ShoppingBag, color: "pink.700", bg: "pink.50", badge: "pink" },
   education: { icon: GraduationCap, color: "cyan.700", bg: "cyan.50", badge: "cyan" },
   travel: { icon: Plane, color: "teal.700", bg: "teal.50", badge: "teal" },
-  other: { icon: MoreHorizontal, color: "gray.700", bg: "gray.100", badge: "gray" },
+  other: { icon: MoreHorizontal, color: "fg", bg: "canvas", badge: "gray" },
 };
 
-export function CategoryVisual({ category, size = "10" }: { category: ExpenseCategory; size?: string }) {
+export function CategoryVisual({ category, size = "8" }: { category: ExpenseCategory; size?: string }) {
   const style = CATEGORY_STYLES[category];
   const Icon = style.icon;
 
@@ -47,8 +47,8 @@ export function CategoryVisual({ category, size = "10" }: { category: ExpenseCat
       align="center"
       justify="center"
       borderRadius="xl"
-      color={style.color}
-      bg={style.bg}
+      color="muted"
+      bg="transparent"
     >
       <Icon size={18} strokeWidth={2.1} aria-hidden="true" />
     </Flex>
