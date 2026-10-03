@@ -1,6 +1,9 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { SUBTYPE_LABELS } from "@/lib/expenses/categories";
+import { expenseTabDateBounds, type ExpenseTabFilters } from "@/lib/expenses/tab-filters";
+import type { ExpenseTab } from "@/lib/expenses/tabs";
 import {
   CATEGORY_LABELS,
   type Analytics,
@@ -9,6 +12,7 @@ import {
   type DashboardData,
   type Expense,
   type ExpenseCategory,
+  type ExpenseSubtype,
 } from "@/lib/types";
 import {
   formatDate,
@@ -25,6 +29,7 @@ type ExpenseRow = {
   description: string;
   amount: number | string;
   category: ExpenseCategory;
+  subtype: ExpenseSubtype | null;
   expense_date: string;
   notes: string | null;
 };
@@ -52,6 +57,7 @@ function toExpense(row: ExpenseRow): Expense {
     description: row.description,
     amount: Number(row.amount),
     category: row.category,
+    subtype: row.subtype,
     expenseDate: row.expense_date,
     notes: row.notes,
   };
@@ -149,24 +155,67 @@ function analyticsFromSummary(
   };
 }
 
-async function queryExpensesForUser(userId: string, start: string, endExclusive: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("expenses")
-    .select("id, description, amount, category, expense_date, notes")
-    .eq("user_id", userId)
-    .gte("expense_date", start)
-    .lt("expense_date", endExclusive)
-    .order("expense_date", { ascending: false })
-    .order("created_at", { ascending: false });
+type ExpenseQuery = {
+  start?: string;
+  endExclusive?: string;
+  tab?: ExpenseTab;
+  filters?: ExpenseTabFilters;
+};
 
-  if (error) throw new Error("Unable to load expenses.");
-  return (data as ExpenseRow[]).map(toExpense);
+const EXPENSE_PAGE_SIZE = 500;
+
+async function queryExpensesForUser(userId: string, options: ExpenseQuery) {
+  const supabase = await createClient();
+  const expenses: Expense[] = [];
+  let offset = 0;
+  // An empty selection must never turn into an unrestricted expense query.
+  if (options.tab && !options.tab.categoryKeys.length && !options.tab.subtypeKeys.length) return [];
+  while (true) {
+    let query = supabase.from("expenses")
+      .select("id, description, amount, category, subtype, expense_date, notes", { count: "exact" })
+      .eq("user_id", userId);
+    if (options.tab) {
+      const membership: string[] = [];
+      if (options.tab.categoryKeys.length) membership.push(`category.in.(${options.tab.categoryKeys.join(",")})`);
+      if (options.tab.subtypeKeys.length) membership.push(`subtype.in.(${options.tab.subtypeKeys.join(",")})`);
+      query = query.or(membership.join(","));
+    }
+    if (options.start) query = query.gte("expense_date", options.start);
+    if (options.endExclusive) query = query.lt("expense_date", options.endExclusive);
+    if (options.filters?.category) query = query.eq("category", options.filters.category);
+    if (options.filters?.subtype === "none") query = query.is("subtype", null);
+    else if (options.filters?.subtype && options.filters.subtype !== "all") query = query.eq("subtype", options.filters.subtype);
+    const { data, error, count } = await query
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(offset, offset + EXPENSE_PAGE_SIZE - 1);
+    if (error) throw new Error("Unable to load expenses.");
+    const page = (data ?? []) as ExpenseRow[];
+    if (!page.length) {
+      if (count !== null && offset < count) throw new Error("Unable to load complete expenses.");
+      break;
+    }
+    expenses.push(...page.map(toExpense));
+    offset += page.length;
+    // Advance by actual rows, so a server cap smaller than our page size cannot truncate history.
+    if (count !== null && offset >= count) break;
+  }
+  const search = options.filters?.search.toLowerCase() ?? "";
+  return search ? expenses.filter((expense) =>
+    [expense.description, expense.notes ?? "", CATEGORY_LABELS[expense.category],
+      expense.subtype ? SUBTYPE_LABELS[expense.subtype] : "No subtype"]
+      .some((value) => value.toLowerCase().includes(search))) : expenses;
 }
 
 export async function getMonthlyExpensesForUser(userId: string, month: string) {
   const range = getMonthRange(month);
-  return queryExpensesForUser(userId, range.start, range.endExclusive);
+  return queryExpensesForUser(userId, range);
+}
+
+/** The caller first resolves the saved tab using authenticated ownership. */
+export async function getExpenseTabExpensesForUser(userId: string, tab: ExpenseTab, filters: ExpenseTabFilters) {
+  return queryExpensesForUser(userId, { tab, filters, ...expenseTabDateBounds(filters) });
 }
 
 export async function getDashboardDataForUser(
@@ -181,7 +230,7 @@ export async function getDashboardDataForUser(
   const [recentResult, summaryResult] = await Promise.all([
     supabase
       .from("expenses")
-      .select("id, description, amount, category, expense_date, notes")
+      .select("id, description, amount, category, subtype, expense_date, notes")
       .eq("user_id", userId)
       .gte("expense_date", currentRange.start)
       .lt("expense_date", currentRange.endExclusive)

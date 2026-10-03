@@ -17,7 +17,8 @@ import { FormEvent, useState } from "react";
 import { useSWRConfig } from "swr";
 
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { expensesApiKey } from "@/lib/api/keys";
+import { expensesApiKey, mainExpensesApiKey } from "@/lib/api/keys";
+import { SUBTYPE_LABELS, subtypesForCategory, subtypeForCategory, type ExpenseCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
 import {
   CATEGORY_LABELS,
   EXPENSE_CATEGORIES,
@@ -40,6 +41,9 @@ function ExpenseForm({
   const { mutate } = useSWRConfig();
   const [state, setState] = useState<ActionState>(INITIAL_ACTION_STATE);
   const [pending, setPending] = useState(false);
+  const [category, setCategory] = useState<ExpenseCategory>("groceries");
+  const [subtype, setSubtype] = useState<ExpenseSubtype | null>(null);
+  const availableSubtypes = subtypesForCategory(category);
   const range = getMonthRange(selectedMonth);
   const endDate = new Date(`${range.endExclusive}T12:00:00`);
   endDate.setDate(endDate.getDate() - 1);
@@ -59,6 +63,7 @@ function ExpenseForm({
           description: formData.get("description"),
           amount: formData.get("amount"),
           category: formData.get("category"),
+          subtype,
           expenseDate: formData.get("expenseDate"),
           notes: formData.get("notes"),
         }),
@@ -73,6 +78,21 @@ function ExpenseForm({
           return { ...current, expenses, total, average: total / expenses.length };
         },
         { revalidate: false },
+      );
+      await mutate(
+        mainExpensesApiKey(selectedMonth),
+        (current: ExpensesData | undefined) => {
+          if (!current) return current;
+          const expenses = [expense, ...current.expenses];
+          const total = current.total + expense.amount;
+          return { ...current, expenses, total, average: total / expenses.length };
+        },
+        { revalidate: false },
+      );
+      void mutate((cacheKey) =>
+        typeof cacheKey === "string" &&
+        cacheKey.startsWith("/api/expense-tabs/") &&
+        cacheKey.includes("/expenses?"),
       );
       void mutate(
         (cacheKey) => typeof cacheKey === "string" && cacheKey.startsWith("/api/dashboard?"),
@@ -108,7 +128,11 @@ function ExpenseForm({
           <Field.Root flex="1" invalid={Boolean(state.fieldErrors?.category)}>
             <Field.Label>Category</Field.Label>
             <NativeSelect.Root>
-              <NativeSelect.Field name="category" defaultValue="groceries" borderRadius="xl">
+              <NativeSelect.Field name="category" value={category} onChange={(event) => {
+                const nextCategory = event.target.value as ExpenseCategory;
+                setCategory(nextCategory);
+                setSubtype((current) => subtypeForCategory(nextCategory, current));
+              }} borderRadius="xl">
                 {EXPENSE_CATEGORIES.map((category) => (
                   <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>
                 ))}
@@ -132,6 +156,20 @@ function ExpenseForm({
             <Field.ErrorText>{state.fieldErrors?.expenseDate?.[0]}</Field.ErrorText>
           </Field.Root>
         </Flex>
+
+        {availableSubtypes.length ? (
+          <Field.Root invalid={Boolean(state.fieldErrors?.subtype)}>
+            <Field.Label>Subtype <span aria-hidden="true">(optional)</span></Field.Label>
+            <NativeSelect.Root>
+              <NativeSelect.Field name="subtype" value={subtype ?? ""} onChange={(event) => setSubtype(event.target.value ? event.target.value as ExpenseSubtype : null)} borderRadius="xl">
+                <option value="">No subtype</option>
+                {availableSubtypes.map((option) => <option key={option} value={option}>{SUBTYPE_LABELS[option]}</option>)}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+            <Field.ErrorText>{state.fieldErrors?.subtype?.[0]}</Field.ErrorText>
+          </Field.Root>
+        ) : null}
 
         <Field.Root invalid={Boolean(state.fieldErrors?.notes)}>
           <Field.Label>Notes <span aria-hidden="true">(optional)</span></Field.Label>

@@ -1,36 +1,14 @@
-export const EXPENSE_CATEGORIES = [
-  "housing",
-  "groceries",
-  "transport",
-  "utilities",
-  "health",
-  "entertainment",
-  "shopping",
-  "education",
-  "travel",
-  "other",
-] as const;
+import type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
 
-export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
-
-export const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  housing: "Housing",
-  groceries: "Groceries",
-  transport: "Transport",
-  utilities: "Utilities",
-  health: "Health",
-  entertainment: "Entertainment",
-  shopping: "Shopping",
-  education: "Education",
-  travel: "Travel",
-  other: "Other",
-};
+export { EXPENSE_CATEGORIES, CATEGORY_LABELS, EXPENSE_SUBTYPES, SUBTYPE_LABELS, SUBTYPE_CATEGORIES } from "@/lib/expenses/categories";
+export type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
 
 export type Expense = {
   id: string;
   description: string;
   amount: number;
   category: ExpenseCategory;
+  subtype: ExpenseSubtype | null;
   expenseDate: string;
   notes: string | null;
 };

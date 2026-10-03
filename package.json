@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run lint && npm run typecheck && npm run build"
+    "check": "npm run lint && npm run typecheck && npm run build",
+    "test:db": "bash scripts/test-database.sh"
   },
   "dependencies": {
     "@chakra-ui/react": "3.36.1",

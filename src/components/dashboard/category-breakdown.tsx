@@ -6,9 +6,15 @@ import { formatCurrency } from "@/lib/utils/currency";
 export function CategoryBreakdown({
   items,
   currency,
+  ariaLabel = "Spending by category",
 }: {
-  items: Analytics["categoryTotals"];
+  items: (Analytics["categoryTotals"][number] | {
+    groupKey: string;
+    label: string;
+    total: number;
+  })[];
   currency: string;
+  ariaLabel?: string;
 }) {
   const categories = categoryShares(items);
   if (!categories.length)
@@ -18,10 +24,14 @@ export function CategoryBreakdown({
       as="ul"
       gap="3"
       listStyleType="none"
-      aria-label="Spending by category"
+      aria-label={ariaLabel}
     >
       {categories.map((item) => (
-        <Stack as="li" key={item.category} gap="1">
+        <Stack
+          as="li"
+          key={"groupKey" in item ? item.groupKey : item.category}
+          gap="1"
+        >
           <Flex justify="space-between" gap="2" wrap="wrap">
             <Text fontSize="sm">{item.label}</Text>
             <Text fontSize="sm" fontWeight="500" overflowWrap="anywhere">

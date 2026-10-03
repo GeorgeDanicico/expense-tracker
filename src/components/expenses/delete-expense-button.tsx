@@ -33,6 +33,11 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
         },
         { revalidate: false },
       );
+      void mutate((cacheKey) =>
+        typeof cacheKey === "string" &&
+        cacheKey.startsWith("/api/expense-tabs/") &&
+        cacheKey.includes("/expenses?"),
+      );
       void mutate(
         (cacheKey) => typeof cacheKey === "string" && cacheKey.startsWith("/api/dashboard?"),
       );

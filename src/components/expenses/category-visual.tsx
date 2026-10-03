@@ -1,6 +1,7 @@
 import { Flex } from "@chakra-ui/react";
 import {
   BusFront,
+  Car,
   Clapperboard,
   GraduationCap,
   HeartPulse,
@@ -26,6 +27,7 @@ export const CATEGORY_STYLES: Record<ExpenseCategory, CategoryStyle> = {
   housing: { icon: House, color: "blue.700", bg: "blue.50", badge: "blue" },
   groceries: { icon: ShoppingBasket, color: "positive", bg: "green.50", badge: "green" },
   transport: { icon: BusFront, color: "orange.700", bg: "orange.50", badge: "orange" },
+  car: { icon: Car, color: "orange.700", bg: "orange.50", badge: "orange" },
   utilities: { icon: Lightbulb, color: "yellow.700", bg: "yellow.50", badge: "yellow" },
   health: { icon: HeartPulse, color: "error", bg: "red.50", badge: "red" },
   entertainment: { icon: Clapperboard, color: "accent", bg: "selected", badge: "purple" },
