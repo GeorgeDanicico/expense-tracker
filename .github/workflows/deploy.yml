@@ -1,9 +1,8 @@
-name: Deploy production
+name: Deploy production (manual fallback)
 
+# Production deploys run centrally from GeorgeDanicico/vps-apps.
+# This workflow is kept only for manual emergency redeploys.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
