@@ -10,6 +10,28 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: "12.2.3 (519615d)" };
   public: {
     Tables: {
+      expense_tabs: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          category_keys: string[];
+          subtype_keys: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          category_keys?: string[];
+          subtype_keys?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["expense_tabs"]["Insert"]>;
+        Relationships: [];
+      };
       net_worth_items: {
         Row: {
           archived_at: string | null;
@@ -94,6 +116,7 @@ export type Database = {
         Row: {
           amount: number;
           category: string;
+          subtype: string | null;
           category_id: string | null;
           created_at: string;
           description: string;
@@ -106,6 +129,7 @@ export type Database = {
         Insert: {
           amount: number;
           category: string;
+          subtype?: string | null;
           category_id?: string | null;
           created_at?: string;
           description: string;

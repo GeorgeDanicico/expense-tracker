@@ -1,6 +1,33 @@
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
+export const APPLICATION_TIMEZONE = "Europe/Bucharest";
+
+const applicationMonthFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: APPLICATION_TIMEZONE,
+  year: "numeric",
+  month: "2-digit",
+});
+
+export function getApplicationCurrentMonth(now = new Date()) {
+  const parts = applicationMonthFormatter.formatToParts(now);
+  const year = parts.find((part) => part.type === "year")!.value;
+  const month = parts.find((part) => part.type === "month")!.value;
+  return `${year.padStart(4, "0")}-${month}`;
+}
+
+/** Resolve main-ledger URL/API selections against the shared application calendar. */
+export function resolveMainExpenseMonth(requested: string | null | undefined, now = new Date()) {
+  const currentMonth = getApplicationCurrentMonth(now);
+  return requested && isValidMonth(requested) && requested <= currentMonth
+    ? requested
+    : currentMonth;
+}
+
+export function isMonthAllowed(month: string, maxMonth?: string) {
+  return isValidMonth(month) && (!maxMonth || (isValidMonth(maxMonth) && month <= maxMonth));
+}
+
 export function getCurrentMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;

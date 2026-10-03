@@ -1,10 +1,19 @@
+import Decimal from "decimal.js";
 import {
   CATEGORY_LABELS,
+  SUBTYPE_LABELS,
   type Analytics,
   type AnalyticsFilters,
   type Expense,
 } from "@/lib/types";
-import { getCurrentMonth, getMonthRange, shiftMonth } from "@/lib/utils/dates";
+import type { ExpenseTabFilters } from "@/lib/expenses/tab-filters";
+import {
+  formatDate,
+  formatMonth,
+  getCurrentMonth,
+  getMonthRange,
+  shiftMonth,
+} from "@/lib/utils/dates";
 
 export function compareAmounts(current: number, previous: number) {
   return {
@@ -13,14 +22,193 @@ export function compareAmounts(current: number, previous: number) {
   };
 }
 
-export function categoryShares(items: Analytics["categoryTotals"]) {
-  const total = items.reduce((sum, item) => sum + item.total, 0);
+type ShareItem = { label: string; total: number } &
+  ({ category: string } | { groupKey: string });
+
+export function categoryShares<T extends ShareItem>(items: T[]) {
+  const total = items.reduce(
+    (sum, item) => sum.plus(item.total),
+    new Decimal(0),
+  );
   return items
     .toSorted((a, b) => b.total - a.total || a.label.localeCompare(b.label))
     .map((item) => ({
       ...item,
-      share: total === 0 ? 0 : (item.total / total) * 100,
+      share: total.isZero()
+        ? 0
+        : new Decimal(item.total).div(total).mul(100).toNumber(),
     }));
+}
+
+type ExpenseTabBucket = {
+  groupKey: string;
+  label: string;
+  total: number;
+};
+
+type ExpenseTabSeriesBucket = { key: string; label: string; total: number };
+
+function monthKey(date: string) {
+  return date.slice(0, 7);
+}
+
+function monthIndex(month: string) {
+  const [year, number] = month.split("-").map(Number);
+  return year * 12 + number - 1;
+}
+
+function monthFromIndex(index: number) {
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
+}
+
+function daysInMonth(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+}
+
+function periodLabel(
+  label: string,
+  actualStart: string,
+  actualEnd: string,
+  periodStart: string,
+  periodEnd: string,
+) {
+  if (actualStart === periodStart && actualEnd === periodEnd) return label;
+  return `${label} (${formatDate(actualStart)} – ${formatDate(actualEnd)})`;
+}
+
+function makeTimeSeries(
+  totals: Map<string, Decimal>,
+  filters: ExpenseTabFilters,
+  firstDate: string | null,
+  lastDate: string | null,
+): ExpenseTabSeriesBucket[] {
+  if (filters.scope === "year") {
+    return Array.from({ length: 12 }, (_, index) => {
+      const key = `${String(filters.year).padStart(4, "0")}-${String(index + 1).padStart(2, "0")}`;
+      return {
+        key,
+        label: formatMonth(key),
+        total: (totals.get(key) ?? new Decimal(0)).toNumber(),
+      };
+    });
+  }
+
+  if (filters.scope === "all") {
+    if (!firstDate || !lastDate) return [];
+    const firstYear = Number(firstDate.slice(0, 4));
+    const lastYear = Number(lastDate.slice(0, 4));
+    return Array.from({ length: lastYear - firstYear + 1 }, (_, index) => {
+      const key = String(firstYear + index).padStart(4, "0");
+      return {
+        key,
+        label: key,
+        total: (totals.get(key) ?? new Decimal(0)).toNumber(),
+      };
+    });
+  }
+
+  if (rangeUsesYears(filters)) {
+    const firstYear = Number(filters.startDate.slice(0, 4));
+    const lastYear = Number(filters.endDate.slice(0, 4));
+    return Array.from({ length: lastYear - firstYear + 1 }, (_, index) => {
+      const key = String(firstYear + index).padStart(4, "0");
+      const periodStart = `${key}-01-01`;
+      const periodEnd = `${key}-12-31`;
+      const actualStart = filters.startDate > periodStart ? filters.startDate : periodStart;
+      const actualEnd = filters.endDate < periodEnd ? filters.endDate : periodEnd;
+      return {
+        key,
+        label: periodLabel(key, actualStart, actualEnd, periodStart, periodEnd),
+        total: (totals.get(key) ?? new Decimal(0)).toNumber(),
+      };
+    });
+  }
+
+  const firstMonth = monthKey(filters.startDate);
+  const lastMonth = monthKey(filters.endDate);
+  const firstIndex = monthIndex(firstMonth);
+  const lastIndex = monthIndex(lastMonth);
+  return Array.from({ length: lastIndex - firstIndex + 1 }, (_, index) => {
+    const key = monthFromIndex(firstIndex + index);
+    const periodStart = `${key}-01`;
+    const periodEnd = `${key}-${String(daysInMonth(key)).padStart(2, "0")}`;
+    const actualStart = filters.startDate > periodStart ? filters.startDate : periodStart;
+    const actualEnd = filters.endDate < periodEnd ? filters.endDate : periodEnd;
+    return {
+      key,
+      label: periodLabel(formatMonth(key), actualStart, actualEnd, periodStart, periodEnd),
+      total: (totals.get(key) ?? new Decimal(0)).toNumber(),
+    };
+  });
+}
+
+/** Use yearly buckets for date ranges longer than two calendar years. */
+function rangeUsesYears(filters: Extract<ExpenseTabFilters, { scope: "range" }>) {
+  return monthIndex(monthKey(filters.endDate)) - monthIndex(monthKey(filters.startDate)) + 1 > 24;
+}
+
+function breakdownGroup(expense: Expense): { groupKey: string; label: string } {
+  if (expense.subtype) {
+    return {
+      groupKey: `subtype:${expense.subtype}`,
+      label: SUBTYPE_LABELS[expense.subtype],
+    };
+  }
+  return {
+    groupKey: `category:${expense.category}:no-subtype`,
+    label: `${CATEGORY_LABELS[expense.category]} (no subtype)`,
+  };
+}
+
+/**
+ * Summarize the exact filtered rows returned for a custom expense tab. Decimal
+ * arithmetic keeps the total, time series, and categorical buckets in sync.
+ */
+export function expenseTabAnalytics(expenses: Expense[], filters: ExpenseTabFilters) {
+  const timeTotals = new Map<string, Decimal>();
+  const groups = new Map<string, { label: string; total: Decimal }>();
+  let total = new Decimal(0);
+  let firstDate = expenses[0]?.expenseDate ?? "";
+  let lastDate = firstDate;
+  const yearly = filters.scope === "all" || (filters.scope === "range" && rangeUsesYears(filters));
+
+  for (const expense of expenses) {
+    const amount = new Decimal(expense.amount);
+    total = total.plus(amount);
+    const timeKey = yearly ? expense.expenseDate.slice(0, 4) : monthKey(expense.expenseDate);
+    timeTotals.set(
+      timeKey,
+      (timeTotals.get(timeKey) ?? new Decimal(0)).plus(amount),
+    );
+    if (expense.expenseDate < firstDate) firstDate = expense.expenseDate;
+    if (expense.expenseDate > lastDate) lastDate = expense.expenseDate;
+    const { groupKey, label } = breakdownGroup(expense);
+    const group = groups.get(groupKey);
+    groups.set(groupKey, {
+      label,
+      total: (group?.total ?? new Decimal(0)).plus(amount),
+    });
+  }
+
+  const timeSeries = makeTimeSeries(timeTotals, filters, firstDate, lastDate);
+  const breakdown: ExpenseTabBucket[] = [...groups]
+    .map(([groupKey, group]) => ({
+      groupKey,
+      label: group.label,
+      total: group.total.toNumber(),
+    }))
+    .toSorted((a, b) => b.total - a.total || a.label.localeCompare(b.label));
+
+  return {
+    total: total.toNumber(),
+    count: expenses.length,
+    average: expenses.length ? total.div(expenses.length).toNumber() : 0,
+    series: timeSeries,
+    breakdown,
+  };
 }
 
 export function monthAnalytics(expenses: Expense[], month: string) {

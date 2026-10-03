@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { getMonthlyExpensesForUser } from "@/lib/data/expenses";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMonth, isValidMonth } from "@/lib/utils/dates";
+import { getCurrentMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/utils/dates";
 import { expenseSchema } from "@/lib/validation/expense";
 
 const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
@@ -15,7 +15,10 @@ export async function GET(request: NextRequest) {
   }
 
   const requestedMonth = request.nextUrl.searchParams.get("month") ?? "";
-  const month = isValidMonth(requestedMonth) ? requestedMonth : getCurrentMonth();
+  const isMainLedger = request.nextUrl.searchParams.get("context") === "main";
+  const month = isMainLedger
+    ? resolveMainExpenseMonth(requestedMonth)
+    : isValidMonth(requestedMonth) ? requestedMonth : getCurrentMonth();
 
   try {
     const expenses = await getMonthlyExpensesForUser(user.id, month);
@@ -23,6 +26,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         month,
+        ...(isMainLedger ? { effectiveMonth: month } : {}),
         expenses,
         total,
         average: expenses.length ? total / expenses.length : 0,
@@ -75,10 +79,11 @@ export async function POST(request: NextRequest) {
       description: parsed.data.description,
       amount: parsed.data.amount,
       category: parsed.data.category,
+      subtype: parsed.data.subtype,
       expense_date: parsed.data.expenseDate,
       notes: parsed.data.notes || null,
     })
-    .select("id, description, amount, category, expense_date, notes")
+    .select("id, description, amount, category, subtype, expense_date, notes")
     .single();
 
   if (error) {
@@ -95,6 +100,7 @@ export async function POST(request: NextRequest) {
         description: data.description,
         amount: Number(data.amount),
         category: data.category,
+        subtype: data.subtype,
         expenseDate: data.expense_date,
         notes: data.notes,
       },

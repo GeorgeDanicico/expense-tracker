@@ -3,6 +3,7 @@ import "server-only";
 import { strToU8, zipSync } from "fflate";
 
 import { CATEGORY_LABELS, type Expense } from "@/lib/types";
+import { SUBTYPE_LABELS } from "@/lib/expenses/categories";
 
 function escapeXml(value: string) {
   return value
@@ -22,14 +23,14 @@ function numberCell(reference: string, value: number) {
 }
 
 export function buildExpenseWorkbook(expenses: Expense[], currency: string) {
-  const headers = ["Date", "Description", "Category", `Amount (${currency})`, "Notes"];
+  const headers = ["Date", "Description", "Category", `Amount (${currency})`, "Notes", "Subtype"];
   const rows = [
     `<row r="1" ht="24" customHeight="1">${headers
       .map((header, index) => textCell(`${String.fromCharCode(65 + index)}1`, header, 2))
       .join("")}</row>`,
     ...expenses.map((expense, index) => {
       const row = index + 2;
-      return `<row r="${row}">${textCell(`A${row}`, expense.expenseDate)}${textCell(`B${row}`, expense.description)}${textCell(`C${row}`, CATEGORY_LABELS[expense.category])}${numberCell(`D${row}`, expense.amount)}${textCell(`E${row}`, expense.notes ?? "")}</row>`;
+      return `<row r="${row}">${textCell(`A${row}`, expense.expenseDate)}${textCell(`B${row}`, expense.description)}${textCell(`C${row}`, CATEGORY_LABELS[expense.category])}${numberCell(`D${row}`, expense.amount)}${textCell(`E${row}`, expense.notes ?? "")}${textCell(`F${row}`, expense.subtype ? SUBTYPE_LABELS[expense.subtype] : "")}</row>`;
     }),
   ];
 
@@ -44,9 +45,9 @@ export function buildExpenseWorkbook(expenses: Expense[], currency: string) {
   const worksheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
-  <cols><col min="1" max="1" width="14" customWidth="1"/><col min="2" max="2" width="32" customWidth="1"/><col min="3" max="3" width="20" customWidth="1"/><col min="4" max="4" width="18" customWidth="1"/><col min="5" max="5" width="42" customWidth="1"/></cols>
+  <cols><col min="1" max="1" width="14" customWidth="1"/><col min="2" max="2" width="32" customWidth="1"/><col min="3" max="3" width="20" customWidth="1"/><col min="4" max="4" width="18" customWidth="1"/><col min="5" max="5" width="42" customWidth="1"/><col min="6" max="6" width="24" customWidth="1"/></cols>
   <sheetData>${rows.join("")}</sheetData>
-  <autoFilter ref="A1:E${Math.max(expenses.length + 1, 1)}"/>
+  <autoFilter ref="A1:F${Math.max(expenses.length + 1, 1)}"/>
 </worksheet>`;
 
   const files = {

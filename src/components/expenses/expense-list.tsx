@@ -16,6 +16,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 
 import { CategoryVisual } from "@/components/expenses/category-visual";
 import { DeleteExpenseButton } from "@/components/expenses/delete-expense-button";
+import { expenseClassificationLabel, SUBTYPE_LABELS } from "@/lib/expenses/categories";
 import {
   CATEGORY_LABELS,
   EXPENSE_CATEGORIES,
@@ -50,17 +51,20 @@ export function ExpenseList({
   currency,
   compact = false,
   allowDelete = false,
+  filterMode = "internal",
 }: {
   expenses: Expense[];
   currency: string;
   compact?: boolean;
   allowDelete?: boolean;
+  filterMode?: "internal" | "external";
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<ExpenseCategory | "all">("all");
   const deferredQuery = useDeferredValue(query.trim().toLocaleLowerCase());
   const filtered = useMemo(() => {
     if (compact) return expenses.slice(0, 5);
+    if (filterMode === "external") return expenses;
 
     return expenses.filter((expense) => {
       const categoryMatches = category === "all" || expense.category === category;
@@ -68,16 +72,17 @@ export function ExpenseList({
         !deferredQuery ||
         expense.description.toLocaleLowerCase().includes(deferredQuery) ||
         expense.notes?.toLocaleLowerCase().includes(deferredQuery) ||
-        CATEGORY_LABELS[expense.category].toLocaleLowerCase().includes(deferredQuery);
+        CATEGORY_LABELS[expense.category].toLocaleLowerCase().includes(deferredQuery) ||
+        (expense.subtype && SUBTYPE_LABELS[expense.subtype].toLocaleLowerCase().includes(deferredQuery));
       return categoryMatches && Boolean(queryMatches);
     });
-  }, [category, compact, deferredQuery, expenses]);
+  }, [category, compact, deferredQuery, expenses, filterMode]);
 
-  if (!expenses.length) return <EmptyState />;
+  if (!expenses.length) return <EmptyState filtered={filterMode === "external"} />;
 
   return (
     <>
-      {compact ? null : (
+      {compact || filterMode === "external" ? null : (
         <Flex
           align={{ base: "stretch", sm: "center" }}
           justify="space-between"
@@ -154,7 +159,7 @@ export function ExpenseList({
                     <Table.Cell color="muted" whiteSpace="nowrap">{formatDate(expense.expenseDate)}</Table.Cell>
                     <Table.Cell>
                       <Badge colorPalette="purple" variant="subtle" borderRadius="full" px="2.5" py="1">
-                        {CATEGORY_LABELS[expense.category]}
+                        {expenseClassificationLabel(expense.category, expense.subtype)}
                       </Badge>
                     </Table.Cell>
                     <Table.Cell textAlign="end" color="fg" fontSize="sm" fontWeight="600" whiteSpace="nowrap">
@@ -192,7 +197,7 @@ export function ExpenseList({
                 <Stack flex="1" minW="0" gap="0.5">
                   <Text fontSize="sm" fontWeight="600" truncate>{expense.description}</Text>
                   <Text color="muted" fontSize="xs" truncate>
-                    {formatDate(expense.expenseDate)} · {CATEGORY_LABELS[expense.category]}
+                    {formatDate(expense.expenseDate)} · {expenseClassificationLabel(expense.category, expense.subtype)}
                   </Text>
                   {expense.notes ? <Text color="muted" fontSize="xs" truncate>{expense.notes}</Text> : null}
                 </Stack>

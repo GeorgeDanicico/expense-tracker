@@ -14,12 +14,27 @@ const expense = (overrides: Partial<Expense> = {}): Expense => ({
   description: "Groceries",
   amount: 10,
   category: "groceries",
+  subtype: null,
   expenseDate: "2024-02-01",
   notes: null,
   ...overrides,
 });
 
 describe("recorded monthly analytics", () => {
+  it("continues grouping Car expenses by their main category across subtypes", () => {
+    const data = monthAnalytics([
+      expense({ id: "fuel", category: "car", subtype: "car_fuel", amount: 20 }),
+      expense({ id: "maintenance", category: "car", subtype: "car_maintenance", amount: 30 }),
+      expense({ id: "unspecified", category: "car", subtype: null, amount: 5 }),
+      expense({ id: "transport", category: "transport", amount: 10 }),
+    ], "2024-02");
+    expect(data.total).toBe(65);
+    expect(data.categories).toMatchObject([
+      { category: "car", label: "Car", total: 55 },
+      { category: "transport", label: "Transport", total: 10 },
+    ]);
+  });
+
   it("fills every day in an empty leap-year month with zero", () => {
     const data = monthAnalytics([], "2024-02");
     expect(data).toMatchObject({
