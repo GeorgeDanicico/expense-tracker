@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap;
-select plan(40);
+select plan(42);
 
 select results_eq($$
   select expense_classification_private.classify_expense_merchant(description, null)
@@ -53,6 +53,9 @@ select is(expense_classification_private.classify_expense_merchant('OMV',
 select is(expense_classification_private.classify_expense_merchant('OMV',
   'BT Star Forte statement 2026-08; processed: 2026-08-05; transaction: 2026-08-03 22:41; source: Taxi'),
   null::text, 'unrecognized substantive source conflicts with known description');
+select is(expense_classification_private.classify_expense_merchant('Allianz-Tiriac insurance',
+  'BT Star Forte statement 2026-08; processed: 2026-08-05; transaction: 2026-08-03 22:41; source: Allianz Tiriac card settlement'),
+  'car_maintenance', 'explicitly approved exact description overrides an unrecognized source');
 select is(expense_classification_private.classify_expense_merchant('Expense',
   'Other statement 2026-08; processed: 2026-08-05; transaction: 2026-08-03 22:41; source: OMV'),
   null::text, 'unapproved statement envelope cannot supply source');
@@ -97,6 +100,11 @@ select results_eq($$ select category || '/' || subtype from public.expenses
   where id between '72000000-0000-0000-0000-000000000012' and '72000000-0000-0000-0000-000000000014' order by id $$,
   $$ values ('car/car_maintenance'::text), ('car/car_maintenance'), ('car/car_maintenance') $$,
   'future writes classify each new exact description as Car maintenance');
+update public.expenses set notes =
+  'BT Star Forte statement 2026-08; processed: 2026-08-05; transaction: 2026-08-03 22:41; source: Allianz Tiriac card settlement'
+where id = '72000000-0000-0000-0000-000000000013';
+select is((select category || '/' || subtype from public.expenses where id = '72000000-0000-0000-0000-000000000013'),
+  'car/car_maintenance', 'trigger preserves approved Allianz description with an unrecognized source');
 insert into public.expenses (id, user_id, description, amount, category, expense_date, notes)
 values ('72000000-0000-0000-0000-000000000011', '72000000-0000-0000-0000-000000000001',
   'Expense', 1, 'transport', '2026-08-01', 'Paid at OMV earlier');
