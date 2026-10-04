@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getAuthenticatedUser } from "@/lib/auth";
-import { getMonthlyExpensesForUser } from "@/lib/data/expenses";
-import { createClient } from "@/lib/supabase/server";
+import { createExpenseForUser, getMonthlyExpensesForUser } from "@/lib/data/expenses";
+import { summarizeExpenses } from "@/lib/expenses/summary";
 import { getCurrentMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/utils/dates";
 import { expenseSchema } from "@/lib/validation/expense";
 
@@ -22,14 +22,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const expenses = await getMonthlyExpensesForUser(user.id, month);
-    const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const { total, average } = summarizeExpenses(expenses);
     return NextResponse.json(
       {
         month,
         ...(isMainLedger ? { effectiveMonth: month } : {}),
         expenses,
         total,
-        average: expenses.length ? total / expenses.length : 0,
+        average,
       },
       { headers: PRIVATE_HEADERS },
     );
@@ -71,40 +71,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("expenses")
-    .insert({
-      user_id: user.id,
-      description: parsed.data.description,
-      amount: parsed.data.amount,
-      category: parsed.data.category,
-      subtype: parsed.data.subtype,
-      expense_date: parsed.data.expenseDate,
-      notes: parsed.data.notes || null,
-    })
-    .select("id, description, amount, category, subtype, expense_date, notes")
-    .single();
-
-  if (error) {
+  try {
+    const expense = await createExpenseForUser(user.id, parsed.data);
+    return NextResponse.json({ expense }, { status: 201, headers: PRIVATE_HEADERS });
+  } catch {
     return NextResponse.json(
       { error: "The expense could not be saved." },
       { status: 500, headers: PRIVATE_HEADERS },
     );
   }
-
-  return NextResponse.json(
-    {
-      expense: {
-        id: data.id,
-        description: data.description,
-        amount: Number(data.amount),
-        category: data.category,
-        subtype: data.subtype,
-        expenseDate: data.expense_date,
-        notes: data.notes,
-      },
-    },
-    { status: 201, headers: PRIVATE_HEADERS },
-  );
 }

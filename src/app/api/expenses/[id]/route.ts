@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { deleteExpenseForUser } from "@/lib/data/expenses";
 
 const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 const expenseIdSchema = z.uuid();
@@ -22,14 +22,9 @@ export async function DELETE(_request: Request, context: RouteContext<"/api/expe
     );
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("expenses")
-    .delete()
-    .eq("id", parsed.data)
-    .eq("user_id", user.id);
-
-  if (error) {
+  try {
+    await deleteExpenseForUser(user.id, parsed.data);
+  } catch {
     return NextResponse.json(
       { error: "Unable to delete expense." },
       { status: 500, headers: PRIVATE_HEADERS },

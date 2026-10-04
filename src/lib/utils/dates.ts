@@ -16,6 +16,21 @@ export function getApplicationCurrentMonth(now = new Date()) {
   return `${year.padStart(4, "0")}-${month}`;
 }
 
+const applicationDateFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: APPLICATION_TIMEZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+export function getApplicationToday(now = new Date()) {
+  const parts = applicationDateFormatter.formatToParts(now);
+  const year = parts.find((part) => part.type === "year")!.value;
+  const month = parts.find((part) => part.type === "month")!.value;
+  const day = parts.find((part) => part.type === "day")!.value;
+  return `${year.padStart(4, "0")}-${month}-${day}`;
+}
+
 /** Resolve main-ledger URL/API selections against the shared application calendar. */
 export function resolveMainExpenseMonth(requested: string | null | undefined, now = new Date()) {
   const currentMonth = getApplicationCurrentMonth(now);

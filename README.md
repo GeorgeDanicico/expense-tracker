@@ -17,6 +17,7 @@ A private, mobile-first expense tracker built with Next.js 16, React 19, Chakra 
 - Searchable, category-filtered expense table with dedicated phone cards
 - Owner-only Supabase RLS policies, explicit grants, input constraints, and query indexes
 - Database-side dashboard aggregation so historical rows are not transferred to the app server
+- Remote MCP server at `/api/mcp` so Claude can read and record ledger data
 
 ## Run locally
 
@@ -61,6 +62,52 @@ Migrations live in `supabase/migrations`. They add or upgrade the expense ledger
 - authenticated-only SELECT, INSERT, UPDATE, and DELETE policies scoped to `auth.uid()`;
 - RLS-protected `net_worth_items` and `net_worth_valuations` with atomic first-value creation;
 - anonymous privilege revocation and hardened legacy tracker policies/functions.
+
+## MCP / Claude
+
+The app exposes its ledger to Claude as a remote [MCP](https://modelcontextprotocol.io) server, so Claude Code or Claude Desktop can read and record expenses, tabs, net worth, and investments on your behalf. Every tool runs as the signed-in user under the same Supabase RLS policies as the web app.
+
+- **Endpoint:** `/api/mcp`, stateless Streamable HTTP. Only `POST` is served; `GET` and `DELETE` return 405.
+- **Auth:** every request carries `Authorization: Basic base64(email:password)` for your Simple Ledger account. Missing or wrong credentials return 401 with `WWW-Authenticate`.
+
+Tools (the destructive ones carry the MCP `destructiveHint` annotation):
+
+- **Account:** `get_account`
+- **Expenses:** `list_expenses`, `get_spending_summary`, `add_expense`, `update_expense`, `delete_expense` (destructive)
+- **Expense tabs:** `list_expense_tabs`, `get_expense_tab_expenses`, `create_expense_tab`, `update_expense_tab`, `delete_expense_tab` (destructive)
+- **Net worth:** `get_net_worth`, `add_net_worth_item`, `update_net_worth_item`, `add_net_worth_valuation`, `update_net_worth_valuation`
+- **Investments:** `get_investments`, `list_investment_transactions`, `add_investment_transaction`, `delete_investment_transaction` (destructive)
+
+Claude Code:
+
+```bash
+claude mcp add --transport http expense-tracker https://<app>/api/mcp -s user \
+  --header "Authorization: Basic $(printf '%s' 'you@example.com:password' | base64)"
+```
+
+Claude Desktop, through `mcp-remote` in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "expense-tracker": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://<app>/api/mcp", "--header", "Authorization:${AUTH}"],
+      "env": { "AUTH": "Basic <base64>" }
+    }
+  }
+}
+```
+
+Security notes:
+
+- Production must be served over HTTPS; a Basic header over plain HTTP exposes the password.
+- The deploy workflow binds the container to `127.0.0.1:3000`. For private access from your own devices, run `sudo tailscale serve --bg 3000` on the VPS and set `SITE_URL` to the resulting `https://<host>.<tailnet>.ts.net` origin; use that URL in place of `<app>` above.
+- The credentials live in your local Claude config, so keep those files private.
+- After 5 failed sign-ins within 15 minutes, requests return 429 until the window passes.
+- Changing your password invalidates the cached session; update the header afterwards.
+- The signed-in session is cached in server memory. A restart or redeploy only means one fresh sign-in on the next request.
+- Browser requests with an `Origin` other than `SITE_URL` are rejected with 403 (DNS-rebinding guard). Without `SITE_URL`, only localhost origins are accepted; Claude Code and `mcp-remote` send no `Origin`.
 
 ## Docker on a VPS
 

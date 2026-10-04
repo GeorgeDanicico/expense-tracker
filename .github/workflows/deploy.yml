@@ -20,6 +20,8 @@ jobs:
       DEPLOY_ENV_FILE: ${{ vars.DEPLOY_ENV_FILE || '/etc/expense-tracker/.env.production' }}
       IMAGE_NAME: expense-tracker
       CONTAINER_NAME: expense-tracker-web
+      # Keep the plain-HTTP port private; Tailscale Serve or a reverse proxy provides HTTPS.
+      BIND_ADDRESS: 127.0.0.1
     steps:
       - name: Check out latest commit
         uses: actions/checkout@v4
