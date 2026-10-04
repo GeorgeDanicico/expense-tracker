@@ -102,6 +102,7 @@ Claude Desktop, through `mcp-remote` in `claude_desktop_config.json`:
 Security notes:
 
 - Production must be served over HTTPS; a Basic header over plain HTTP exposes the password.
+- The deploy workflow binds the container to `127.0.0.1:3000`. For private access from your own devices, run `sudo tailscale serve --bg 3000` on the VPS and set `SITE_URL` to the resulting `https://<host>.<tailnet>.ts.net` origin; use that URL in place of `<app>` above.
 - The credentials live in your local Claude config, so keep those files private.
 - After 5 failed sign-ins within 15 minutes, requests return 429 until the window passes.
 - Changing your password invalidates the cached session; update the header afterwards.
