@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   APPLICATION_TIMEZONE,
   getApplicationCurrentMonth,
+  getApplicationToday,
+  isValidDate,
   isMonthAllowed,
   resolveMainExpenseMonth,
   shiftMonth,
@@ -15,6 +17,14 @@ describe("main Expenses month limits", () => {
     expect(getApplicationCurrentMonth(new Date("2026-12-31T21:59:59Z"))).toBe("2026-12");
     expect(getApplicationCurrentMonth(new Date("2026-12-31T22:00:00Z"))).toBe("2027-01");
     expect(getApplicationCurrentMonth(new Date("2026-09-30T21:00:00Z"))).toBe("2026-10");
+  });
+
+  it("resolves today's date on the Bucharest calendar across midnight, DST and year rollover", () => {
+    expect(getApplicationToday(new Date("2026-12-31T21:59:59Z"))).toBe("2026-12-31");
+    expect(getApplicationToday(new Date("2026-12-31T22:00:00Z"))).toBe("2027-01-01");
+    expect(getApplicationToday(new Date("2026-07-14T20:59:59Z"))).toBe("2026-07-14");
+    expect(getApplicationToday(new Date("2026-07-14T21:00:00Z"))).toBe("2026-07-15");
+    expect(isValidDate(getApplicationToday())).toBe(true);
   });
 
   it("caps direct future URL requests and safely resolves invalid or absent values", () => {

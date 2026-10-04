@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { getExpenseTabForUser } from "@/lib/data/expense-tabs";
 import { getExpenseTabExpensesForUser } from "@/lib/data/expenses";
+import { summarizeExpenses } from "@/lib/expenses/summary";
 import type { ExpenseTabLedgerData } from "@/lib/expenses/tabs";
 import { parseExpenseTabFilters } from "@/lib/frontend/expense-tab-state";
 import { expenseTabIdSchema } from "@/lib/validation/expense-tab";
@@ -26,10 +27,10 @@ export async function GET(request: NextRequest, context: TabRouteContext) {
     const tab = await getExpenseTabForUser(user.id, id);
     if (!tab) return NextResponse.json({ error: "Expense tab not found." }, { status: 404, headers: PRIVATE_HEADERS });
     const expenses = await getExpenseTabExpensesForUser(user.id, tab, parsed.data);
-    const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const { total, count, average } = summarizeExpenses(expenses);
     const response: ExpenseTabLedgerData = {
       tab, tabId: tab.id, tabRevision: tab.updatedAt, filters: parsed.data, expenses,
-      total, count: expenses.length, average: expenses.length ? total / expenses.length : 0,
+      total, count, average,
     };
     return NextResponse.json(response, { headers: PRIVATE_HEADERS });
   } catch {

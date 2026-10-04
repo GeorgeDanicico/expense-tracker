@@ -15,6 +15,7 @@
   "dependencies": {
     "@chakra-ui/react": "3.36.1",
     "@emotion/react": "11.14.0",
+    "@modelcontextprotocol/server": "2.3.0",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.3",
     "buffer": "6.0.3",
@@ -30,6 +31,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.3.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

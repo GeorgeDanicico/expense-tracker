@@ -1,12 +1,24 @@
 import "server-only";
 
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { createServerClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 import type { Database } from "@/lib/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 
-export async function createClient() {
+const scopedClient = new AsyncLocalStorage<SupabaseClient<Database>>();
+
+export function runWithSupabaseClient<T>(client: SupabaseClient<Database>, fn: () => T): T {
+  return scopedClient.run(client, fn);
+}
+
+export async function createClient(): Promise<SupabaseClient<Database>> {
+  const scoped = scopedClient.getStore();
+  if (scoped) return scoped;
+
   const cookieStore = await cookies();
   const { url, publishableKey } = getSupabaseConfig();
 
