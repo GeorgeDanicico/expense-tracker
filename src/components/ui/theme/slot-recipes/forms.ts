@@ -1,6 +1,6 @@
 import { defineSlotRecipe } from "@chakra-ui/react";
 
-import { mobileInputFont } from "../recipes/shared";
+import { mobileFieldHeight, mobileInputFont } from "../recipes/shared";
 
 export const nativeSelectSlotRecipe = defineSlotRecipe({
   slots: ["root", "field", "indicator"],
@@ -24,7 +24,7 @@ export const nativeSelectSlotRecipe = defineSlotRecipe({
         indicator: { textStyle: "sm", insetEnd: "1.5" },
       },
       sm: {
-        root: { "--select-field-height": "sizes.8" },
+        root: { "--select-field-height": "sizes.8", ...mobileFieldHeight("--select-field-height") },
         field: { textStyle: "sm", ps: "2.5", pe: "7" },
         indicator: { textStyle: "md", insetEnd: "2" },
       },

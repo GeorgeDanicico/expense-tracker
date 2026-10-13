@@ -6,12 +6,15 @@ export function ListRow({
   leading,
   title,
   meta,
+  detail,
   trailing,
   actions,
 }: {
   leading?: ReactNode;
   title: ReactNode;
   meta?: ReactNode;
+  /** Optional second caption line (e.g. notes). */
+  detail?: ReactNode;
   trailing?: ReactNode;
   actions?: ReactNode;
 }) {
@@ -34,6 +37,11 @@ export function ListRow({
         {meta ? (
           <Text textStyle="caption" truncate>
             {meta}
+          </Text>
+        ) : null}
+        {detail ? (
+          <Text textStyle="caption" truncate>
+            {detail}
           </Text>
         ) : null}
       </Flex>

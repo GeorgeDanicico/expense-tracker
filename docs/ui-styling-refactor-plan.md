@@ -156,15 +156,15 @@ Create small, typed wrappers in `src/components/ui/` (one component, or one comp
 
 ### Task 4 — Expenses screen
 
-- [ ] Split `expense-list.tsx` into `expense-filters.tsx`, `expense-table.tsx`, `expense-mobile-list.tsx`; use `EmptyState`.
-- [ ] Split `add-expense-dialog.tsx` into `expense-form.tsx` + `add-expense-dialog.tsx` (uses `AppDialog`, `FormField`, `FormActions`).
-- [ ] `PageHeader`: `Add expense` = `solid size="sm"` (`md` on mobile), `Export` = `ghost` with icon.
-- [ ] Expense tabs: `line` tabs at 32px height and 13px; `New tab` = `IconButton xs` + label on desktop.
-- [ ] Month toolbar: a single 32px row: `‹ October 2026 ›` button group + compact month input + `Go` as `xs`. On mobile it stays one row by hiding the label visually (keep `aria-label`).
-- [ ] Metrics: `StatGroup` with **Total as `hero`**, Transactions and Average as `sm`, inside one `Card` (no extra border rows).
-- [ ] Table: 40px rows, sentence-case `label` headers, `CategoryBadge` in subtle tone, `Amount size="sm"` right-aligned, delete as `IconButton xs ghost` shown at reduced opacity until row hover/focus (always visible on touch).
-- [ ] Filters row: search input `sm` with `fg.subtle` icon token (no hex), category select `sm`, result count as `caption`.
-- [ ] Apply the same treatment to `custom-expense-tab.tsx`, `expense-tab-filters.tsx`, and `expense-tab-dialog.tsx` (split filters form out of the dialog).
+- [x] Split `expense-list.tsx` into `expense-filters.tsx`, `expense-table.tsx`, `expense-mobile-list.tsx`; use `EmptyState`.
+- [x] Split `add-expense-dialog.tsx` into `expense-form.tsx` + `add-expense-dialog.tsx` (uses `AppDialog`, `FormField`, `FormActions`).
+- [x] `PageHeader`: `Add expense` = `solid size="sm"` (`md` on mobile), `Export` = `ghost` with icon.
+- [x] Expense tabs: `line` tabs at 32px height and 13px; `New tab` = `IconButton xs` + label on desktop.
+- [x] Month toolbar: a single 32px row: `‹ October 2026 ›` button group + compact month input + `Go` as `xs`. On mobile it stays one row by hiding the label visually (keep `aria-label`).
+- [x] Metrics: `StatGroup` with **Total as `hero`**, Transactions and Average as `sm`, inside one `Card` (no extra border rows).
+- [x] Table: 40px rows, sentence-case `label` headers, `CategoryBadge` in subtle tone, `Amount size="sm"` right-aligned, delete as `IconButton xs ghost` shown at reduced opacity until row hover/focus (always visible on touch).
+- [x] Filters row: search input `sm` with `fg.subtle` icon token (no hex), category select `sm`, result count as `caption`.
+- [x] Apply the same treatment to `custom-expense-tab.tsx`, `expense-tab-filters.tsx`, and `expense-tab-dialog.tsx` (split filters form out of the dialog).
 
 **Acceptance:** About 30% more rows are visible above the fold on a 390 × 844 viewport and on 1280 × 800, compared with the baseline screenshots.
 

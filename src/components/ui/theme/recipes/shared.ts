@@ -20,3 +20,8 @@ export const coarseHitArea = {
     },
   },
 } as const;
+
+/** `sm` fields grow to 36px below `md`, where they also use a 16px font. */
+export const mobileFieldHeight = (variable: `--${string}`) => ({
+  "@media (max-width: 47.99rem)": { [variable]: "sizes.9" } as Record<`--${string}`, string>,
+});

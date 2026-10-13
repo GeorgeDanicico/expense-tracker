@@ -4,6 +4,13 @@ export const tableSlotRecipe = defineSlotRecipe({
   slots: ["root", "header", "body", "row", "columnHeader", "cell", "footer", "caption"],
   base: {
     root: { fontVariantNumeric: "tabular-nums" },
+    row: {
+      // Row actions stay quiet until the row is hovered or focused; always
+      // visible on touch screens.
+      "& [data-row-action]": { opacity: 0.4, transition: "opacity 120ms ease" },
+      "&:hover [data-row-action], &:focus-within [data-row-action]": { opacity: 1 },
+      "@media (hover: none)": { "& [data-row-action]": { opacity: 1 } },
+    },
     columnHeader: {
       textStyle: "label",
       color: "fg.muted",

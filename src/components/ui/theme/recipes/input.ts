@@ -1,10 +1,10 @@
 import { defineRecipe } from "@chakra-ui/react";
 
-import { mobileInputFont } from "./shared";
+import { mobileFieldHeight, mobileInputFont } from "./shared";
 
 const sizes = {
   xs: { textStyle: "xs", px: "2", "--input-height": "sizes.7" },
-  sm: { textStyle: "sm", px: "2.5", "--input-height": "sizes.8" },
+  sm: { textStyle: "sm", px: "2.5", "--input-height": "sizes.8", ...mobileFieldHeight("--input-height") },
   md: { textStyle: "md", px: "3", "--input-height": "sizes.9" },
 };
 

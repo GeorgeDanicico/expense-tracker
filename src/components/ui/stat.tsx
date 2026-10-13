@@ -21,7 +21,7 @@ export function Stat({
   tone?: "default" | "warning";
 }) {
   return (
-    <ChakraStat.Root size={SIZE[size]} flex={size === "hero" ? "1 1 12rem" : "0 1 auto"}>
+    <ChakraStat.Root size={SIZE[size]} flex="0 1 auto" minW={size === "hero" ? "10rem" : "6rem"}>
       <ChakraStat.Label>{label}</ChakraStat.Label>
       <ChakraStat.ValueText color={tone === "warning" ? "fg.warning" : undefined}>
         {value}
@@ -35,7 +35,7 @@ export function Stat({
 /** Lays out a hero stat followed by secondary stats, wrapping on narrow screens. */
 export function StatGroup({ children }: { children: ReactNode }) {
   return (
-    <Flex wrap="wrap" align="flex-end" columnGap={{ base: "6", md: "10" }} rowGap="4">
+    <Flex wrap="wrap" align="flex-end" columnGap={{ base: "6", md: "12" }} rowGap="3">
       {children}
     </Flex>
   );
