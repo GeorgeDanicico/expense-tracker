@@ -170,12 +170,12 @@ Create small, typed wrappers in `src/components/ui/` (one component, or one comp
 
 ### Task 5 — Home dashboards
 
-- [ ] View switcher (Summary/Monthly/History) becomes a `SegmentedControl` aligned with the page title on desktop, full-width under it on mobile.
-- [ ] `summary-dashboard`: one `hero` stat (month total) + three `sm` stats; trend and leading-category cards use `Card` with `SectionHeader`; footer links become a `ghost xs` link group in the card headers ("View all →").
-- [ ] `monthly-dashboard` (223 lines): extract `MonthlyStats`, `TopExpenses`, `MonthComparison` sections.
-- [ ] `history-dashboard` + `stats-filter`: presets as `SegmentedControl`, custom range in a compact `Toolbar`; `Apply` = `xs solid`.
-- [ ] Charts (`monthly-bar-chart`, `daily-spending-chart`, `category-breakdown`): 6px bar thickness, `border.default` tracks, `caption` axis/labels, values as `amountSm`; colours from tokens only.
-- [ ] Remove `stat-card.tsx` and `metric-strip.tsx` after migration.
+- [x] View switcher (Summary/Monthly/History) becomes a `SegmentedControl` aligned with the page title on desktop, full-width under it on mobile.
+- [x] `summary-dashboard`: one `hero` stat (month total) + three `sm` stats; trend and leading-category cards use `Card` with `SectionHeader`; footer links become a `ghost xs` link group in the card headers ("View all →").
+- [x] `monthly-dashboard` (223 lines): extract `MonthlyStats`, `TopExpenses`, `MonthComparison` sections.
+- [x] `history-dashboard` + `stats-filter`: presets as `SegmentedControl`, custom range in a compact `Toolbar`; `Apply` = `xs solid`.
+- [x] Charts (`monthly-bar-chart`, `daily-spending-chart`, `category-breakdown`): 6px bar thickness, `border.default` tracks, `caption` axis/labels, values as `amountSm`; colours from tokens only.
+- [x] Remove `stat-card.tsx` and `metric-strip.tsx` after migration.
 
 **Acceptance:** Each dashboard has exactly one hero figure; no card is taller than its content; tabs and filters stay usable at 320px.
 

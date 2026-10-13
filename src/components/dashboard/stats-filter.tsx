@@ -1,18 +1,20 @@
 "use client";
 
-import {
-  Button,
-  Field,
-  Flex,
-  Input,
-  NativeSelect,
-  Stack,
-} from "@chakra-ui/react";
-import { SlidersHorizontal } from "lucide-react";
+import { Button, Field, Flex, Input, NativeSelect } from "@chakra-ui/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
 
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Toolbar } from "@/components/ui/toolbar";
 import type { AnalyticsPeriod, CustomGranularity } from "@/lib/types";
+
+const PERIODS = [
+  { value: "3m", label: "3M", ariaLabel: "Previous 3 completed months" },
+  { value: "6m", label: "6M", ariaLabel: "Previous 6 completed months" },
+  { value: "1y", label: "12M", ariaLabel: "Previous 12 completed months" },
+  { value: "2y", label: "24M", ariaLabel: "Previous 24 completed months" },
+  { value: "custom", label: "Custom" },
+] as const;
 
 export function StatsFilter({
   initialPeriod,
@@ -55,77 +57,44 @@ export function StatsFilter({
 
   return (
     <form onSubmit={submit}>
-      <Flex
-        gap="3"
-        align="end"
-        wrap="wrap"
-        width={{ base: "full", lg: "auto" }}
-      >
-        <Field.Root
-          flex={{ base: "1", sm: "initial" }}
-          minW={{ base: "10rem", sm: "12rem" }}
-        >
-          <Field.Label>Analysis period</Field.Label>
-          <NativeSelect.Root size="sm">
-            <NativeSelect.Field
-              value={period}
-              onChange={(event) =>
-                setPeriod(event.target.value as AnalyticsPeriod)
-              }
-            >
-              <option value="3m">Previous 3 completed months</option>
-              <option value="6m">Previous 6 completed months</option>
-              <option value="1y">Previous 12 completed months</option>
-              <option value="2y">Previous 24 completed months</option>
-              <option value="custom">Custom</option>
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </Field.Root>
-
+      <Toolbar aria-label="Analysis period">
+        <SegmentedControl<AnalyticsPeriod>
+          aria-label="Analysis period"
+          name="analysis-period"
+          size="xs"
+          items={PERIODS}
+          value={period}
+          onValueChange={setPeriod}
+        />
         {period === "custom" ? (
-          <Stack direction={{ base: "column", sm: "row" }} gap="3" align="end">
-            <Field.Root minW="160px">
-              <Field.Label>Custom unit</Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={granularity}
-                  onChange={(event) =>
-                    changeGranularity(event.target.value as CustomGranularity)
-                  }
-                >
-                  <option value="month">Specific month</option>
-                  <option value="day">Specific day</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </Field.Root>
-
-            <Field.Root minW="170px">
-              <Field.Label>
-                {granularity === "day" ? "Day" : "Month"}
-              </Field.Label>
+          <Flex gap="2" align="center" wrap="wrap">
+            <NativeSelect.Root size="xs" width={{ base: "10.5rem", md: "8.5rem" }}>
+              <NativeSelect.Field
+                aria-label="Custom unit"
+                value={granularity}
+                onChange={(event) => changeGranularity(event.target.value as CustomGranularity)}
+              >
+                <option value="month">Specific month</option>
+                <option value="day">Specific day</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+            <Field.Root width="9.5rem">
+              <Field.Label srOnly>{granularity === "day" ? "Day" : "Month"}</Field.Label>
               <Input
-                size="sm"
+                size="xs"
                 type={granularity === "day" ? "date" : "month"}
                 value={customDate}
                 onChange={(event) => setCustomDate(event.target.value)}
                 required
               />
             </Field.Root>
-          </Stack>
+          </Flex>
         ) : null}
-
-        <Button
-          type="submit"
-          size="sm"
-          variant="outline"
-          borderColor="border"
-          loading={pending}
-        >
-          <SlidersHorizontal size={15} aria-hidden="true" /> Apply
+        <Button type="submit" size="xs" variant="solid" colorPalette="brand" loading={pending}>
+          Apply
         </Button>
-      </Flex>
+      </Toolbar>
     </form>
   );
 }

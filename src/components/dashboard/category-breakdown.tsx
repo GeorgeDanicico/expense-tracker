@@ -1,4 +1,6 @@
-import { Box, Flex, Stack, Text } from "@chakra-ui/react";
+import { Flex, Stack, Text } from "@chakra-ui/react";
+
+import { ChartBar } from "@/components/dashboard/chart-bar";
 import { categoryShares } from "@/lib/frontend/expense-analytics";
 import type { Analytics } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils/currency";
@@ -18,34 +20,19 @@ export function CategoryBreakdown({
 }) {
   const categories = categoryShares(items);
   if (!categories.length)
-    return <Text color="muted">No recorded expenses</Text>;
+    return <Text textStyle="bodySm" color="fg.muted">No recorded expenses</Text>;
   return (
-    <Stack
-      as="ul"
-      gap="3"
-      listStyleType="none"
-      aria-label={ariaLabel}
-    >
+    <Stack as="ul" gap="2.5" listStyleType="none" aria-label={ariaLabel}>
       {categories.map((item) => (
-        <Stack
-          as="li"
-          key={"groupKey" in item ? item.groupKey : item.category}
-          gap="1"
-        >
-          <Flex justify="space-between" gap="2" wrap="wrap">
-            <Text fontSize="sm">{item.label}</Text>
-            <Text fontSize="sm" fontWeight="500" overflowWrap="anywhere">
-              {formatCurrency(item.total, currency)} · {item.share.toFixed(1)}%
+        <Stack as="li" key={"groupKey" in item ? item.groupKey : item.category} gap="1">
+          <Flex justify="space-between" align="baseline" gap="2" wrap="wrap">
+            <Text textStyle="bodySm">{item.label}</Text>
+            <Text textStyle="amountSm" overflowWrap="anywhere">
+              {formatCurrency(item.total, currency)}
+              <Text as="span" textStyle="caption"> · {item.share.toFixed(1)}%</Text>
             </Text>
           </Flex>
-          <Box height="1.5" bg="canvas" borderRadius="full" aria-hidden="true">
-            <Box
-              height="full"
-              width={`${item.share}%`}
-              borderRadius="full"
-              bg="clay"
-            />
-          </Box>
+          <ChartBar share={item.share} />
         </Stack>
       ))}
     </Stack>

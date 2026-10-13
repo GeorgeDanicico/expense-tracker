@@ -1,41 +1,24 @@
 "use client";
 
-import {
-  Button,
-  Flex,
-  Heading,
-  SimpleGrid,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import Link from "next/link";
+import { Flex, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import useSWR from "swr";
-import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
-import { MonthToolbar } from "@/components/expenses/month-toolbar";
-import {
-  DataError,
-  DataLoading,
-  DataRefresh,
-} from "@/components/ui/data-state";
-import { Surface } from "@/components/ui/surface";
-import { AmountComparison } from "@/components/dashboard/amount-comparison";
+
+import { CardLink } from "@/components/dashboard/card-link";
 import { CategoryBreakdown } from "@/components/dashboard/category-breakdown";
 import { DailySpendingChart } from "@/components/dashboard/daily-spending-chart";
-import { MetricStrip } from "@/components/dashboard/metric-strip";
+import { MonthComparison } from "@/components/dashboard/month-comparison";
+import { MonthlyStats } from "@/components/dashboard/monthly-stats";
+import { TopExpenses } from "@/components/dashboard/top-expenses";
+import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
+import { MonthToolbar } from "@/components/expenses/month-toolbar";
+import { Card } from "@/components/ui/card";
+import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { ACCOUNT_API_KEY, expensesApiKey } from "@/lib/api/keys";
 import { dashboardHref } from "@/lib/frontend/dashboard-state";
-import {
-  categoryComparisons,
-  monthAnalytics,
-} from "@/lib/frontend/expense-analytics";
+import { monthAnalytics } from "@/lib/frontend/expense-analytics";
 import type { AccountData, ExpensesData } from "@/lib/types";
-import { DEFAULT_CURRENCY, formatCurrency } from "@/lib/utils/currency";
-import {
-  formatDate,
-  formatMonth,
-  getCurrentMonth,
-  shiftMonth,
-} from "@/lib/utils/dates";
+import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
+import { getCurrentMonth, shiftMonth } from "@/lib/utils/dates";
 
 export function MonthlyDashboard({
   month,
@@ -61,18 +44,14 @@ export function MonthlyDashboard({
   const completed = month < getCurrentMonth();
   const analytics = matching ? monthAnalytics(matching.expenses, month) : null;
   return (
-    <Stack gap="5">
+    <Stack gap="4">
       <MonthToolbar
         month={month}
-        href={(value) =>
-          dashboardHref(params, { view: "monthly", month: value })
-        }
+        href={(value) => dashboardHref(params, { view: "monthly", month: value })}
       />
-      <Flex gap="2" wrap="wrap">
+      <Flex gap="2" wrap="wrap" align="center">
         <AddExpenseDialog selectedMonth={month} currency={currency} />
-        <Button asChild variant="outline">
-          <Link href={`/expenses?month=${month}`}>View expenses</Link>
-        </Button>
+        <CardLink href={`/expenses?month=${month}`}>View expenses</CardLink>
       </Flex>
       {!analytics ? (
         current.error ? (
@@ -87,135 +66,46 @@ export function MonthlyDashboard({
             updating={current.isValidating}
             retry={() => void current.mutate()}
           />
-          <MetricStrip
-            items={[
-              {
-                label: "Total",
-                value: formatCurrency(analytics.total, currency),
-              },
-              { label: "Transactions", value: String(analytics.count) },
-              {
-                label: "Average expense",
-                value: formatCurrency(analytics.average, currency),
-              },
-              {
-                label: "Largest expense",
-                value: formatCurrency(analytics.largest, currency),
-              },
-            ]}
-          />
+          <Card>
+            <Card.Body>
+              <MonthlyStats analytics={analytics} currency={currency} />
+            </Card.Body>
+          </Card>
           {analytics.count === 0 ? (
-            <Text color="muted">No recorded expenses</Text>
+            <Text textStyle="bodySm" color="fg.muted">No recorded expenses</Text>
           ) : null}
-          <Surface p="4">
-            <Stack gap="3">
-              <Heading as="h2">Daily spending</Heading>
+          <Card>
+            <Card.Header title="Daily spending" />
+            <Card.Body>
               <DailySpendingChart days={analytics.daily} currency={currency} />
-            </Stack>
-          </Surface>
-          <SimpleGrid columns={{ base: 1, lg: 2 }} gap="4">
-            <Surface p="4">
-              <Stack gap="3">
-                <Heading as="h2">Categories</Heading>
-                <CategoryBreakdown
-                  items={analytics.categories}
-                  currency={currency}
-                />
-                {analytics.count ? (
-                  <Text fontSize="xs" color="muted">
-                    Top three categories: {analytics.concentration.toFixed(1)}%
-                    of recorded spending.
-                  </Text>
-                ) : null}
-              </Stack>
-            </Surface>
-            <Surface p="4">
-              <Stack gap="3">
-                <Heading as="h2">Largest recorded expenses</Heading>
-                {analytics.ranked.length ? (
-                  <Stack as="ol" pl="4" gap="3">
-                    {analytics.ranked.map((expense, index) => (
-                      <Stack as="li" key={expense.id} gap="1">
-                        <Flex justify="space-between" gap="2" wrap="wrap">
-                          <Text fontSize="sm">
-                            {index + 1}. {expense.description}
-                          </Text>
-                          <Text fontWeight="500" overflowWrap="anywhere">
-                            {formatCurrency(expense.amount, currency)}
-                          </Text>
-                        </Flex>
-                        <Text color="muted" fontSize="xs">
-                          {formatDate(expense.expenseDate)}
-                        </Text>
-                      </Stack>
-                    ))}
-                  </Stack>
-                ) : (
-                  <Text color="muted">No recorded expenses</Text>
-                )}
-              </Stack>
-            </Surface>
+            </Card.Body>
+          </Card>
+          <SimpleGrid columns={{ base: 1, lg: 2 }} gap="4" alignItems="start">
+            <Card>
+              <Card.Header title="Categories" />
+              <Card.Body>
+                <Stack gap="3">
+                  <CategoryBreakdown items={analytics.categories} currency={currency} />
+                  {analytics.count ? (
+                    <Text textStyle="caption">
+                      Top three categories: {analytics.concentration.toFixed(1)}% of recorded spending.
+                    </Text>
+                  ) : null}
+                </Stack>
+              </Card.Body>
+            </Card>
+            <TopExpenses expenses={analytics.ranked} currency={currency} />
           </SimpleGrid>
-          <Surface p="4">
-            <Stack gap="3">
-              <Heading as="h2">
-                Compared with {formatMonth(previousMonth)}
-              </Heading>
-              {!completed ? (
-                <Text color="muted" fontSize="sm">
-                  Comparison available after this month ends.
-                </Text>
-              ) : !before ? (
-                previous.error ? (
-                  <DataError retry={() => void previous.mutate()} />
-                ) : (
-                  <DataLoading label="Loading comparison…" />
-                )
-              ) : (
-                <>
-                  <DataRefresh
-                    error={previous.error}
-                    updating={previous.isValidating}
-                    retry={() => void previous.mutate()}
-                  />
-                  <AmountComparison
-                    current={analytics.total}
-                    previous={before.total}
-                    currency={currency}
-                  />
-                  <Stack as="ul" listStyleType="none" gap="3">
-                    {categoryComparisons(
-                      analytics.categories,
-                      before.categories,
-                    ).map((item) => (
-                      <Flex
-                        as="li"
-                        key={item.category}
-                        gap="2"
-                        justify="space-between"
-                        wrap="wrap"
-                      >
-                        <Text fontSize="sm">{item.label}</Text>
-                        <AmountComparison
-                          current={
-                            analytics.categories.find(
-                              (c) => c.category === item.category,
-                            )?.total ?? 0
-                          }
-                          previous={
-                            before.categories.find(
-                              (c) => c.category === item.category,
-                            )?.total ?? 0
-                          }
-                          currency={currency}
-                        />
-                      </Flex>
-                    ))}
-                  </Stack>
-                </>
-              )}
-            </Stack>
-          </Surface>
+          <MonthComparison
+            previousMonth={previousMonth}
+            completed={completed}
+            current={analytics}
+            before={before}
+            currency={currency}
+            previousError={previous.error}
+            previousValidating={previous.isValidating}
+            retryPrevious={() => void previous.mutate()}
+          />
         </>
       )}
     </Stack>

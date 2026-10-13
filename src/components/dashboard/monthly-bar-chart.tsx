@@ -1,5 +1,7 @@
-import { Box, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
+import { Box, Flex, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
 import Link from "next/link";
+
+import { ChartBar } from "@/components/dashboard/chart-bar";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatDate, formatMonth } from "@/lib/utils/dates";
 
@@ -21,9 +23,9 @@ export function MonthlyBarChart({
   getHref?: (item: { key: string; label: string; total: number }) => string | null;
 }) {
   const max = Math.max(...series.map((item) => item.total), 1);
-  if (!series.length) return <Text color="muted">No recorded expenses</Text>;
+  if (!series.length) return <Text textStyle="bodySm" color="fg.muted">No recorded expenses</Text>;
   return (
-    <Stack as="ul" gap="2" listStyleType="none" aria-label={ariaLabel}>
+    <Stack as="ul" gap="0.5" listStyleType="none" aria-label={ariaLabel} mx="-2">
       {series.map((item) => {
         const href = getHref
           ? getHref(item)
@@ -32,30 +34,13 @@ export function MonthlyBarChart({
             : null;
         const content = (
           <Stack gap="1">
-            <Box
-              display="flex"
-              flexWrap="wrap"
-              justifyContent="space-between"
-              gap="2"
-            >
-              <Text fontSize="sm">{item.label || formatSeriesLabel(item.key)}</Text>
-              <Text fontSize="sm" fontWeight="600" overflowWrap="anywhere">
+            <Flex justify="space-between" align="baseline" gap="2" wrap="wrap">
+              <Text textStyle="bodySm">{item.label || formatSeriesLabel(item.key)}</Text>
+              <Text textStyle="amountSm" overflowWrap="anywhere">
                 {formatCurrency(item.total, currency)}
               </Text>
-            </Box>
-            <Box
-              height="2"
-              bg="canvas"
-              borderRadius="full"
-              aria-hidden="true"
-            >
-              <Box
-                height="full"
-                width={`${(item.total / max) * 100}%`}
-                bg="clay"
-                borderRadius="full"
-              />
-            </Box>
+            </Flex>
+            <ChartBar share={(item.total / max) * 100} />
           </Stack>
         );
 
@@ -65,16 +50,16 @@ export function MonthlyBarChart({
               <ChakraLink
                 asChild
                 display="block"
-                minH="11"
+                px="2"
+                py="1.5"
                 color="fg"
-                _hover={{ textDecoration: "none", bg: "canvas" }}
-                borderRadius="lg"
-                p="2"
+                borderRadius="control"
+                _hover={{ textDecoration: "none", bg: "bg.subtle" }}
               >
                 <Link href={href}>{content}</Link>
               </ChakraLink>
             ) : (
-              <Box minH="11" borderRadius="lg" p="2">
+              <Box px="2" py="1.5">
                 {content}
               </Box>
             )}

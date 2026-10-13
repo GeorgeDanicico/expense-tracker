@@ -41,7 +41,7 @@ export function ExpenseTabDashboard({
         </Text>
       ) : null}
 
-      <SimpleGrid columns={{ base: 1, lg: 2 }} gap="3">
+      <SimpleGrid columns={{ base: 1, lg: 2 }} gap="3" alignItems="start">
         <Card variant="subtle" size="sm">
           <Card.Header title="Spending over time" />
           <Card.Body>
