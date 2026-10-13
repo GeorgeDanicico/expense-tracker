@@ -145,17 +145,6 @@ export const semanticTokens = defineSemanticTokens({
       border: "{colors.status.infoLine}",
       focusRing: "{colors.status.info}",
     }),
-
-    // Legacy aliases from the first UX refactor. Removed once every screen
-    // has moved to the semantic names above (Task 8).
-    canvas: { value: "{colors.bg.canvas}" },
-    surface: { value: "{colors.bg.surface}" },
-    muted: { value: "{colors.fg.muted}" },
-    accent: { value: "{colors.fg.accent}" },
-    clay: { value: "{colors.chart.bar}" },
-    selected: { value: "{colors.bg.selected}" },
-    positive: { value: "{colors.fg.success}" },
-    error: { value: "{colors.fg.error}" },
   },
   radii: {
     l1: { value: "{radii.badge}" },

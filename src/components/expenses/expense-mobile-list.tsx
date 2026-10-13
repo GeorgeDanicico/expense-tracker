@@ -19,7 +19,7 @@ export function ExpenseMobileList({
   allowDelete: boolean;
 }) {
   return (
-    <Box as="ul" display={{ base: "block", md: "none" }} px="4" m="0">
+    <Box as="ul" display={{ base: "block", lg: "none" }} px="4" m="0">
       {expenses.map((expense) => (
         <ListRow
           key={expense.id}

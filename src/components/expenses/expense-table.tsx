@@ -18,7 +18,7 @@ export function ExpenseTable({
   allowDelete: boolean;
 }) {
   return (
-    <Box display={{ base: "none", md: "block" }} overflowX="auto">
+    <Box display={{ base: "none", lg: "block" }} overflowX="auto">
       <Table.Root interactive>
         <Table.Caption className="sr-only">Expense transactions</Table.Caption>
         <Table.Header>
@@ -41,11 +41,11 @@ export function ExpenseTable({
                 <Flex align="center" gap="2.5">
                   <CategoryVisual category={expense.category} />
                   <Stack minW="0" gap="0">
-                    <Text maxW={{ md: "16rem", xl: "26rem" }} fontWeight="medium" truncate>
+                    <Text maxW={{ lg: "16rem", xl: "26rem" }} fontWeight="medium" truncate>
                       {expense.description}
                     </Text>
                     {expense.notes ? (
-                      <Text maxW={{ md: "16rem", xl: "26rem" }} textStyle="caption" truncate>
+                      <Text maxW={{ lg: "16rem", xl: "26rem" }} textStyle="caption" truncate>
                         {expense.notes}
                       </Text>
                     ) : null}

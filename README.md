@@ -159,6 +159,19 @@ When building on a different architecture, use Docker Buildx with the VPS platfo
 (for example, `--platform linux/amd64 --load` for an x86 VPS). Refresh the base-image
 digest periodically and rebuild to receive security fixes.
 
+## UI conventions
+
+The Chakra theme in `src/components/ui/theme/` is the single source of styling (tokens, text styles, recipes); screens compose the primitives exported from `src/components/ui/`. The full rationale is in [docs/ui-styling-refactor-plan.md](docs/ui-styling-refactor-plan.md).
+
+- **Sizes:** controls are `xs` 28px, `sm` 32px (default) and `md` 36px. Touch screens get a 40px hit area automatically; inputs keep a 16px font on mobile.
+- **Type:** pick a `textStyle` (`pageTitle`, `sectionTitle`, `body`, `bodySm`, `label`, `caption`, `amountHero`, `amount`, `amountSm`, …) instead of setting `fontSize`/`fontWeight`. One `amountHero` figure per screen.
+- **Colour:** use semantic tokens (`bg.surface`, `fg.muted`, `border`, `status.warning.fg`, `category.<key>.fg`) and the palettes `brand`, `neutral`, `danger`, `success`, `warning`, `info`. No hex values in components.
+- **Actions:** one primary action per view (`variant="solid" colorPalette="brand"`); everything else is `outline` (the default) or `ghost`.
+- **Building blocks:** `Card`, `PageHeader`, `SectionHeader`, `AppDialog`, `ConfirmDialog`, `FormField`/`FormRow`, `FormActions`, `Stat`/`StatGroup`, `Amount`, `ListRow`, `EmptyState`, `InlineAlert`, `StatusBadge`/`CategoryBadge`, `SegmentedControl`, `Toolbar`, `IconButton` and the `ICON` sizes.
+- **Guardrails:** `npm run lint` rejects hex colours, unknown colour palettes, radius overrides on controls and forced 44px minimum heights outside `src/components/ui/`.
+
+In development, `/dev/ui` shows every primitive, size, tone and token, and `/dev/preview/<screen>` (`dashboard`, `expenses`, `investments`, `net-worth`, `settings`) renders the real screens with fixture data so they can be reviewed without signing in. Both routes return 404 in production builds.
+
 ## Verification
 
 ```bash

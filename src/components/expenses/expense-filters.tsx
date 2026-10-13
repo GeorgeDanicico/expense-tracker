@@ -34,6 +34,7 @@ export function ExpenseFilters({
       borderColor="border"
     >
       <InputGroup
+        flex="1"
         maxW={{ sm: "20rem" }}
         startElement={<Search size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />}
         startElementProps={{ color: "fg.subtle" }}
@@ -49,7 +50,7 @@ export function ExpenseFilters({
         <Text textStyle="caption" whiteSpace="nowrap" aria-live="polite">
           {shown} of {total}
         </Text>
-        <NativeSelect.Root maxW="11rem">
+        <NativeSelect.Root width="11rem" flexShrink="0">
           <NativeSelect.Field
             value={category}
             onChange={(event) => onCategoryChange(event.target.value as ExpenseCategory | "all")}

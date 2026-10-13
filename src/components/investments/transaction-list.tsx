@@ -36,7 +36,7 @@ export function TransactionList({
 
   return (
     <>
-      <Box display={{ base: "none", md: "block" }} overflowX="auto">
+      <Box display={{ base: "none", lg: "block" }} overflowX="auto">
         <Table.Root interactive>
           <Table.Caption className="sr-only">Investment transaction history</Table.Caption>
           <Table.Header>
@@ -66,7 +66,7 @@ export function TransactionList({
         </Table.Root>
       </Box>
 
-      <Box as="ul" display={{ base: "block", md: "none" }} px="4" m="0" listStyleType="none" divideY="1px" divideColor="border">
+      <Box as="ul" display={{ base: "block", lg: "none" }} px="4" m="0" listStyleType="none" divideY="1px" divideColor="border">
         {transactions.map((transaction) => (
           <Flex as="li" key={transaction.id} align="center" justify="space-between" gap="3" py="2.5">
             <Stack minW="0" gap="0.5">

@@ -61,10 +61,6 @@ export const tokens = defineTokens({
     black: { value: 600 },
   },
   radii: {
-    // Legacy values still used by unmigrated screens; removed in Task 8.
-    lg: { value: "0.5rem" },
-    xl: { value: "0.5rem" },
-    "2xl": { value: "0.625rem" },
     badge: { value: "0.25rem" },
     control: { value: "0.375rem" },
     card: { value: "0.625rem" },
