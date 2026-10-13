@@ -119,7 +119,7 @@ export function AddNetWorthItemDialog({
       size="md"
     >
       <Dialog.Trigger asChild>
-        <Button width={{ base: "full", sm: "auto" }} minH="11" colorPalette="purple" borderRadius="xl">
+        <Button width={{ base: "full", sm: "auto" }} variant="solid" colorPalette="brand">
           <Plus size={17} aria-hidden="true" /> Add item
         </Button>
       </Dialog.Trigger>
@@ -128,7 +128,6 @@ export function AddNetWorthItemDialog({
         <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
           <Dialog.Content
             maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
@@ -145,7 +144,7 @@ export function AddNetWorthItemDialog({
                   <Stack gap="4.5">
                     <Field.Root invalid={Boolean(fieldError("name"))}>
                       <Field.Label>Name</Field.Label>
-                      <Input name="name" autoFocus placeholder="e.g. BCR current account" required borderRadius="xl" />
+                      <Input name="name" autoFocus placeholder="e.g. BCR current account" required />
                       <Field.ErrorText>{fieldError("name")}</Field.ErrorText>
                     </Field.Root>
 
@@ -157,7 +156,6 @@ export function AddNetWorthItemDialog({
                             name="kind"
                             value={kind}
                             onChange={(event) => changeKind(event.target.value as NetWorthItemKind)}
-                            borderRadius="xl"
                           >
                             <option value="asset">Asset I own</option>
                             <option value="liability">Debt I owe</option>
@@ -174,7 +172,6 @@ export function AddNetWorthItemDialog({
                             name="category"
                             value={category}
                             onChange={(event) => setCategory(event.target.value)}
-                            borderRadius="xl"
                           >
                             {categoryOptions(kind).map((option) => (
                               <option key={option.value} value={option.value}>{option.label}</option>
@@ -194,7 +191,6 @@ export function AddNetWorthItemDialog({
                           onChange={(event) => setCustomCategory(event.target.value)}
                           placeholder="e.g. Collectibles"
                           required
-                          borderRadius="xl"
                         />
                         <Field.HelperText>Use a short label; it will be normalized for grouping.</Field.HelperText>
                         <Field.ErrorText>{fieldError("category")}</Field.ErrorText>
@@ -204,7 +200,7 @@ export function AddNetWorthItemDialog({
                     <Field.Root invalid={Boolean(fieldError("currency"))}>
                       <Field.Label>Currency</Field.Label>
                       <NativeSelect.Root>
-                        <NativeSelect.Field name="currency" defaultValue={defaultCurrency} borderRadius="xl">
+                        <NativeSelect.Field name="currency" defaultValue={defaultCurrency}>
                           {CURRENCY_OPTIONS.map((option) => (
                             <option key={option.code} value={option.code}>{option.code} · {option.label}</option>
                           ))}
@@ -218,7 +214,7 @@ export function AddNetWorthItemDialog({
                     {kind === "asset" && category !== "cash" ? (
                       <Field.Root invalid={Boolean(fieldError("purchaseAmount"))}>
                         <Field.Label>Optional purchase amount</Field.Label>
-                        <Input name="purchaseAmount" type="number" inputMode="decimal" min="0" step="any" placeholder="Leave blank if unknown" borderRadius="xl" />
+                        <Input name="purchaseAmount" type="number" inputMode="decimal" min="0" step="any" placeholder="Leave blank if unknown" />
                         <Field.HelperText>Comparison baseline only, not a tax-grade cost basis.</Field.HelperText>
                         <Field.ErrorText>{fieldError("purchaseAmount")}</Field.ErrorText>
                       </Field.Root>
@@ -227,18 +223,18 @@ export function AddNetWorthItemDialog({
                     <Flex gap="4" direction={{ base: "column", sm: "row" }}>
                       <Field.Root flex="1" invalid={Boolean(fieldError("value"))}>
                         <Field.Label>{kind === "liability" ? "Current amount owed" : "Current value"}</Field.Label>
-                        <Input name="value" type="number" inputMode="decimal" min="0" step="any" placeholder="0.00" required borderRadius="xl" />
+                        <Input name="value" type="number" inputMode="decimal" min="0" step="any" placeholder="0.00" required />
                         <Field.ErrorText>{fieldError("value")}</Field.ErrorText>
                       </Field.Root>
                       <Field.Root flex="1" invalid={Boolean(fieldError("valuedOn"))}>
                         <Field.Label>Valued on</Field.Label>
-                        <Input name="valuedOn" type="date" defaultValue={currentDateValue()} required borderRadius="xl" />
+                        <Input name="valuedOn" type="date" defaultValue={currentDateValue()} required />
                         <Field.ErrorText>{fieldError("valuedOn")}</Field.ErrorText>
                       </Field.Root>
                     </Flex>
 
                     {error ? (
-                      <Alert.Root status="error" borderRadius="xl">
+                      <Alert.Root status="error">
                         <Alert.Indicator />
                         <Alert.Description>{error}</Alert.Description>
                       </Alert.Root>
@@ -247,7 +243,7 @@ export function AddNetWorthItemDialog({
                     <Text className="sr-only" role="status" aria-live="polite">
                       {pending ? "Saving net-worth item…" : ""}
                     </Text>
-                    <Button type="submit" minH="11" colorPalette="purple" borderRadius="xl" loading={pending}>
+                    <Button type="submit" variant="solid" colorPalette="brand" loading={pending}>
                       Save item
                     </Button>
                   </Stack>
@@ -255,7 +251,7 @@ export function AddNetWorthItemDialog({
               ) : null}
             </Dialog.Body>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

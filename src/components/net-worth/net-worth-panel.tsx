@@ -83,7 +83,7 @@ function NetWorthSummaryCard({ total }: { total: NetWorthTotal }) {
               Net worth ({total.currency})
             </Text>
             <Badge
-              colorPalette={total.status === "complete" ? "green" : "orange"}
+              colorPalette={total.status === "complete" ? "success" : "warning"}
               variant="subtle"
               borderRadius="full"
               fontSize="2xs"
@@ -128,11 +128,11 @@ function NetWorthSummaryCard({ total }: { total: NetWorthTotal }) {
 }
 
 function entryStatus(entry: NetWorthEntry) {
-  if (entry.status === "current") return { label: "Current quote", colorPalette: "green" as const };
-  if (entry.status === "manual") return { label: "Manual value", colorPalette: "purple" as const };
-  if (entry.status === "currency_mismatch") return { label: "Currency mismatch", colorPalette: "orange" as const };
-  if (entry.status === "missing_quote") return { label: "Quote unavailable", colorPalette: "orange" as const };
-  return { label: "Value needed", colorPalette: "orange" as const };
+  if (entry.status === "current") return { label: "Current quote", colorPalette: "success" as const };
+  if (entry.status === "manual") return { label: "Manual value", colorPalette: "neutral" as const };
+  if (entry.status === "currency_mismatch") return { label: "Currency mismatch", colorPalette: "warning" as const };
+  if (entry.status === "missing_quote") return { label: "Quote unavailable", colorPalette: "warning" as const };
+  return { label: "Value needed", colorPalette: "warning" as const };
 }
 
 function entryDate(entry: NetWorthEntry) {
@@ -169,7 +169,7 @@ function NetWorthEntryRow({ entry }: { entry: NetWorthEntry }) {
             <NetWorthValue entry={entry} />
           </Text>
           {entry.source === "investment" ? (
-            <Button asChild minH="11" size="sm" variant="outline" borderRadius="xl" flexShrink="0">
+            <Button asChild size="sm" variant="outline" flexShrink="0">
               <Link href="/investments">View investment <ArrowRight size={15} aria-hidden="true" /></Link>
             </Button>
           ) : (
@@ -221,7 +221,7 @@ function AttentionArea({ overview }: { overview: NetWorthOverview }) {
   if (!overview.attention.length) return null;
 
   return (
-    <Alert.Root status="warning" borderRadius="2xl">
+    <Alert.Root status="warning">
       <Alert.Indicator />
       <Stack minW="0" gap="2">
         <Text fontWeight="600">Some figures need attention</Text>

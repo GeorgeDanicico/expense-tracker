@@ -17,7 +17,7 @@ export default function AppError({ reset }: { error: Error & { digest?: string }
             <Heading as="h1" size="xl" letterSpacing="-0.03em">We couldn’t load this page</Heading>
             <Text color="gray.500">Your data is safe. Check your connection and try again.</Text>
           </Stack>
-          <Button onClick={reset} colorPalette="purple" borderRadius="xl">
+          <Button onClick={reset} variant="solid" colorPalette="brand">
             <RefreshCw size={17} aria-hidden="true" /> Try again
           </Button>
         </Stack>

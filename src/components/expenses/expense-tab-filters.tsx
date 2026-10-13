@@ -99,7 +99,6 @@ export function ExpenseTabFiltersForm({
               <NativeSelect.Field
                 value={draft.scope}
                 onChange={(event) => change("scope", event.target.value as Scope)}
-                borderRadius="xl"
                 bg="white"
               >
                 <option value="all">All time</option>
@@ -120,7 +119,6 @@ export function ExpenseTabFiltersForm({
                 step="1"
                 value={draft.year}
                 onChange={(event) => change("year", event.target.value)}
-                borderRadius="xl"
               />
             </Field.Root>
           ) : null}
@@ -132,7 +130,6 @@ export function ExpenseTabFiltersForm({
                   type="date"
                   value={draft.startDate}
                   onChange={(event) => change("startDate", event.target.value)}
-                  borderRadius="xl"
                 />
               </Field.Root>
               <Field.Root flex="1" minW="8rem">
@@ -141,7 +138,6 @@ export function ExpenseTabFiltersForm({
                   type="date"
                   value={draft.endDate}
                   onChange={(event) => change("endDate", event.target.value)}
-                  borderRadius="xl"
                 />
               </Field.Root>
             </Flex>
@@ -154,7 +150,6 @@ export function ExpenseTabFiltersForm({
               maxLength={200}
               onChange={(event) => change("search", event.target.value)}
               placeholder="Description, notes, or category"
-              borderRadius="xl"
             />
           </Field.Root>
 
@@ -164,7 +159,6 @@ export function ExpenseTabFiltersForm({
               <NativeSelect.Field
                 value={draft.category}
                 onChange={(event) => change("category", event.target.value as ExpenseCategory | "all")}
-                borderRadius="xl"
                 bg="white"
               >
                 <option value="all">All categories</option>
@@ -182,7 +176,6 @@ export function ExpenseTabFiltersForm({
               <NativeSelect.Field
                 value={draft.subtype}
                 onChange={(event) => change("subtype", event.target.value as ExpenseTabFilters["subtype"])}
-                borderRadius="xl"
                 bg="white"
               >
                 <option value="all">All subtypes</option>
@@ -196,8 +189,8 @@ export function ExpenseTabFiltersForm({
           </Field.Root>
 
           <Flex gap="2" align="end">
-            <Button type="submit" colorPalette="purple" borderRadius="xl">Apply filters</Button>
-            <Button type="button" variant="outline" borderRadius="xl" onClick={reset}>Reset</Button>
+            <Button type="submit" variant="solid" colorPalette="brand">Apply filters</Button>
+            <Button type="button" variant="outline" onClick={reset}>Reset</Button>
           </Flex>
         </Flex>
         {error ? <Text role="alert" color="error" fontSize="sm">{error}</Text> : null}

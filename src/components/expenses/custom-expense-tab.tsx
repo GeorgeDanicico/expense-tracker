@@ -81,8 +81,8 @@ export function CustomExpenseTab({
           <Text color="muted" fontSize="sm">All matching expenses across your recorded history.</Text>
         </Stack>
         <Flex gap="2" wrap="wrap">
-          <Button variant="outline" borderRadius="xl" onClick={() => onEdit(tab)}>Edit tab</Button>
-          <Button colorPalette="red" variant="outline" borderRadius="xl" onClick={() => setDeleteOpen(true)}>
+          <Button variant="outline" onClick={() => onEdit(tab)}>Edit tab</Button>
+          <Button colorPalette="danger" variant="outline" onClick={() => setDeleteOpen(true)}>
             Delete tab
           </Button>
         </Flex>
@@ -149,7 +149,7 @@ function DeleteExpenseTabDialog({
       <Portal>
         <Dialog.Backdrop bg="blackAlpha.500" />
         <Dialog.Positioner p="4">
-          <Dialog.Content borderRadius="2xl">
+          <Dialog.Content>
             <Dialog.Header>
               <Stack gap="2">
                 <Dialog.Title>Delete this tab?</Dialog.Title>
@@ -160,7 +160,7 @@ function DeleteExpenseTabDialog({
             </Dialog.Header>
             <Dialog.Body>
               {error ? (
-                <Alert.Root status="error" borderRadius="xl">
+                <Alert.Root status="error">
                   <Alert.Indicator />
                   <Alert.Description>{error}</Alert.Description>
                 </Alert.Root>
@@ -168,14 +168,14 @@ function DeleteExpenseTabDialog({
             </Dialog.Body>
             <Dialog.Footer gap="3">
               <Dialog.ActionTrigger asChild>
-                <Button variant="outline" borderRadius="xl" disabled={pending}>Keep tab</Button>
+                <Button variant="outline" disabled={pending}>Keep tab</Button>
               </Dialog.ActionTrigger>
-              <Button colorPalette="red" borderRadius="xl" loading={pending} onClick={onDelete}>
+              <Button variant="solid" colorPalette="danger" loading={pending} onClick={onDelete}>
                 Delete tab
               </Button>
             </Dialog.Footer>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

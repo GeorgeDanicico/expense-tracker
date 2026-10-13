@@ -120,7 +120,6 @@ export function StatsFilter({
           type="submit"
           size="sm"
           variant="outline"
-          borderRadius="lg"
           borderColor="border"
           loading={pending}
         >

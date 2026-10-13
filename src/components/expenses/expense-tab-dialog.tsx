@@ -122,7 +122,6 @@ export function ExpenseTabDialog({
           <Dialog.Content
             maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
             overflowY="auto"
-            borderRadius="2xl"
           >
             <Dialog.Header>
               <Stack gap="1">
@@ -144,7 +143,6 @@ export function ExpenseTabDialog({
                       placeholder="e.g. Car"
                       autoFocus
                       required
-                      borderRadius="xl"
                     />
                     <Field.ErrorText>{fieldErrors?.name?.[0]}</Field.ErrorText>
                   </Field.Root>
@@ -205,7 +203,7 @@ export function ExpenseTabDialog({
                   </Box>
 
                   {error ? (
-                    <Alert.Root status="error" borderRadius="xl">
+                    <Alert.Root status="error">
                       <Alert.Indicator />
                       <Alert.Description>{error}</Alert.Description>
                     </Alert.Root>
@@ -215,20 +213,19 @@ export function ExpenseTabDialog({
             </Dialog.Body>
             <Dialog.Footer gap="3">
               <Dialog.CloseTrigger asChild>
-                <Button variant="outline" borderRadius="xl" disabled={pending}>Cancel</Button>
+                <Button variant="outline" disabled={pending}>Cancel</Button>
               </Dialog.CloseTrigger>
               <Button
                 type="submit"
                 form="expense-tab-form"
-                colorPalette="purple"
-                borderRadius="xl"
+                variant="solid" colorPalette="brand"
                 loading={pending}
               >
                 {editing ? "Save changes" : "Create tab"}
               </Button>
             </Dialog.Footer>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

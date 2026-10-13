@@ -91,7 +91,7 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
         <Field.Root invalid={Boolean(fieldError("brokerId"))}>
           <Field.Label>Broker</Field.Label>
           <NativeSelect.Root>
-            <NativeSelect.Field name="brokerId" defaultValue={INVESTMENT_BROKER_IDS[0]} borderRadius="xl">
+            <NativeSelect.Field name="brokerId" defaultValue={INVESTMENT_BROKER_IDS[0]}>
               {INVESTMENT_BROKER_IDS.map((brokerId) => (
                 <option key={brokerId} value={brokerId}>{INVESTMENT_BROKER_LABELS[brokerId]}</option>
               ))}
@@ -111,7 +111,6 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
             placeholder="e.g. VWCE.DE"
             autoFocus
             required
-            borderRadius="xl"
           />
           <Field.HelperText>{instrumentHint}</Field.HelperText>
           <Field.ErrorText>{fieldError("instrument")}</Field.ErrorText>
@@ -120,7 +119,7 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
         <Field.Root invalid={Boolean(fieldError("currency"))}>
           <Field.Label>Instrument currency</Field.Label>
           <NativeSelect.Root>
-            <NativeSelect.Field name="currency" defaultValue="EUR" borderRadius="xl">
+            <NativeSelect.Field name="currency" defaultValue="EUR">
               {CURRENCY_OPTIONS.map((option) => (
                 <option key={option.code} value={option.code}>{option.code} · {option.label}</option>
               ))}
@@ -136,32 +135,32 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
           <Flex gap="4" direction={{ base: "column", sm: "row" }}>
             <Field.Root flex="1" invalid={Boolean(fieldError("quantity"))}>
               <Field.Label>Quantity</Field.Label>
-              <Input name="quantity" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required borderRadius="xl" />
+              <Input name="quantity" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
               <Field.ErrorText>{fieldError("quantity")}</Field.ErrorText>
             </Field.Root>
             <Field.Root flex="1" invalid={Boolean(fieldError("unitPrice"))}>
               <Field.Label>Unit price</Field.Label>
-              <Input name="unitPrice" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required borderRadius="xl" />
+              <Input name="unitPrice" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
               <Field.ErrorText>{fieldError("unitPrice")}</Field.ErrorText>
             </Field.Root>
           </Flex>
 
           <Field.Root invalid={Boolean(fieldError("amount"))}>
             <Field.Label>Order amount</Field.Label>
-            <Input name="amount" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required borderRadius="xl" />
+            <Input name="amount" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
             <Field.HelperText>Total order value in the selected currency.</Field.HelperText>
             <Field.ErrorText>{fieldError("amount")}</Field.ErrorText>
           </Field.Root>
 
           <Field.Root invalid={Boolean(fieldError("executedAt"))}>
             <Field.Label>Execution date and time</Field.Label>
-            <Input name="executedAt" type="datetime-local" defaultValue={localDateTimeValue()} required borderRadius="xl" />
+            <Input name="executedAt" type="datetime-local" defaultValue={localDateTimeValue()} required />
             <Field.ErrorText>{fieldError("executedAt")}</Field.ErrorText>
           </Field.Root>
         </Stack>
 
         {error ? (
-          <Alert.Root status="error" borderRadius="xl">
+          <Alert.Root status="error">
             <Alert.Indicator />
             <Alert.Description>{error}</Alert.Description>
           </Alert.Root>
@@ -170,7 +169,7 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
         <Text className="sr-only" role="status" aria-live="polite">
           {pending ? "Saving investment…" : ""}
         </Text>
-        <Button type="submit" minH="11" colorPalette="purple" borderRadius="xl" loading={pending}>
+        <Button type="submit" variant="solid" colorPalette="brand" loading={pending}>
           Save investment
         </Button>
       </Stack>
@@ -184,7 +183,7 @@ export function AddInvestmentDialog() {
   return (
     <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
       <Dialog.Trigger asChild>
-        <Button width={{ base: "full", sm: "auto" }} minH="11" colorPalette="purple" borderRadius="xl">
+        <Button width={{ base: "full", sm: "auto" }} variant="solid" colorPalette="brand">
           <Plus size={17} aria-hidden="true" /> Add investment
         </Button>
       </Dialog.Trigger>
@@ -193,7 +192,6 @@ export function AddInvestmentDialog() {
         <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
           <Dialog.Content
             maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
@@ -208,7 +206,7 @@ export function AddInvestmentDialog() {
               {open ? <InvestmentForm onSuccess={() => setOpen(false)} /> : null}
             </Dialog.Body>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

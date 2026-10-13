@@ -59,14 +59,14 @@ export default function SettingsPage() {
       <PageHeader title="Settings" />
 
       {status === "saved" ? (
-        <Alert.Root status="success" borderRadius="2xl" variant="surface">
+        <Alert.Root status="success" variant="surface">
           <Alert.Indicator />
           <Alert.Description>Your account currency was updated.</Alert.Description>
         </Alert.Root>
       ) : null}
 
       {status === "error" ? (
-        <Alert.Root status="error" borderRadius="2xl" variant="surface">
+        <Alert.Root status="error" variant="surface">
           <Alert.Indicator />
           <Alert.Description>{message}</Alert.Description>
         </Alert.Root>
@@ -92,7 +92,7 @@ export default function SettingsPage() {
             <Stack gap="5" align="start">
               <Field.Root maxW="390px">
                 <Field.Label>Account currency</Field.Label>
-                <NativeSelect.Root size="lg">
+                <NativeSelect.Root size="md">
                   <NativeSelect.Field
                     name="currency"
                     value={currency}
@@ -100,7 +100,6 @@ export default function SettingsPage() {
                       setSelectedCurrency(event.target.value);
                       setStatus("idle");
                     }}
-                    borderRadius="xl"
                   >
                     {CURRENCY_OPTIONS.map((option) => (
                       <option key={option.code} value={option.code}>
@@ -117,7 +116,7 @@ export default function SettingsPage() {
                 Changing currency updates the label only. Existing amounts are not converted.
               </Flex>
 
-              <Button type="submit" colorPalette="purple" borderRadius="xl" loading={status === "saving"}>
+              <Button type="submit" variant="solid" colorPalette="brand" loading={status === "saving"}>
                 <Save size={17} aria-hidden="true" /> Save changes
               </Button>
             </Stack>

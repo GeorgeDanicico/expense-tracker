@@ -37,7 +37,6 @@ export function ExpenseTabs({
           >
             <Tabs.Trigger
               value={MAIN_EXPENSE_TAB}
-              minH="11"
               px="4"
               whiteSpace="nowrap"
               color="muted"
@@ -49,7 +48,6 @@ export function ExpenseTabs({
               <Tabs.Trigger
                 key={tab.id}
                 value={tab.id}
-                minH="11"
                 maxW="14rem"
                 px="4"
                 whiteSpace="nowrap"
@@ -65,9 +63,7 @@ export function ExpenseTabs({
         </Box>
         <Button
           flexShrink="0"
-          minH="11"
           variant="outline"
-          borderRadius="xl"
           onClick={onCreate}
           aria-label="Create expense tab"
         >

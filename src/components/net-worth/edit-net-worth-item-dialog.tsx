@@ -109,7 +109,7 @@ export function EditNetWorthItemDialog({
   return (
     <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
       <Dialog.Trigger asChild>
-        <Button type="button" minH="11" size="sm" variant="outline" borderRadius="xl">
+        <Button type="button" size="sm" variant="outline">
           Edit details
         </Button>
       </Dialog.Trigger>
@@ -118,7 +118,6 @@ export function EditNetWorthItemDialog({
         <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
           <Dialog.Content
             maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
@@ -135,14 +134,14 @@ export function EditNetWorthItemDialog({
                   <Stack gap="4.5">
                     <Field.Root invalid={Boolean(fieldError("name"))}>
                       <Field.Label>Name</Field.Label>
-                      <Input name="name" defaultValue={entry.name} autoFocus required borderRadius="xl" />
+                      <Input name="name" defaultValue={entry.name} autoFocus required />
                       <Field.ErrorText>{fieldError("name")}</Field.ErrorText>
                     </Field.Root>
 
                     <Field.Root invalid={Boolean(fieldError("category"))}>
                       <Field.Label>Category</Field.Label>
                       <NativeSelect.Root>
-                        <NativeSelect.Field value={category} onChange={(event) => setCategory(event.target.value)} borderRadius="xl">
+                        <NativeSelect.Field value={category} onChange={(event) => setCategory(event.target.value)}>
                           {suggestedCategories.map((value) => (
                             <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>
                           ))}
@@ -160,7 +159,6 @@ export function EditNetWorthItemDialog({
                           value={customCategory}
                           onChange={(event) => setCustomCategory(event.target.value)}
                           required
-                          borderRadius="xl"
                         />
                         <Field.ErrorText>{fieldError("category")}</Field.ErrorText>
                       </Field.Root>
@@ -169,28 +167,26 @@ export function EditNetWorthItemDialog({
                     {entry.kind === "asset" && category !== "cash" ? (
                       <Field.Root invalid={Boolean(fieldError("purchaseAmount"))}>
                         <Field.Label>Optional purchase amount</Field.Label>
-                        <Input name="purchaseAmount" defaultValue={entry.purchaseAmount ?? ""} type="number" inputMode="decimal" min="0" step="any" placeholder="Leave blank if unknown" borderRadius="xl" />
+                        <Input name="purchaseAmount" defaultValue={entry.purchaseAmount ?? ""} type="number" inputMode="decimal" min="0" step="any" placeholder="Leave blank if unknown" />
                         <Field.HelperText>Comparison baseline only, not a tax-grade cost basis.</Field.HelperText>
                         <Field.ErrorText>{fieldError("purchaseAmount")}</Field.ErrorText>
                       </Field.Root>
                     ) : null}
 
                     {error ? (
-                      <Alert.Root status="error" borderRadius="xl">
+                      <Alert.Root status="error">
                         <Alert.Indicator />
                         <Alert.Description>{error}</Alert.Description>
                       </Alert.Root>
                     ) : null}
 
-                    <Button type="submit" minH="11" colorPalette="purple" borderRadius="xl" loading={pending}>
+                    <Button type="submit" variant="solid" colorPalette="brand" loading={pending}>
                       Save changes
                     </Button>
                     <Button
                       type="button"
-                      minH="11"
                       variant="ghost"
-                      colorPalette="red"
-                      borderRadius="xl"
+                      colorPalette="danger"
                       loading={archiving}
                       onClick={() => void archive()}
                     >
@@ -204,7 +200,7 @@ export function EditNetWorthItemDialog({
               ) : null}
             </Dialog.Body>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

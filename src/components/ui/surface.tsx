@@ -6,7 +6,7 @@ export function Surface(props: BoxProps) {
       bg="surface"
       borderWidth="1px"
       borderColor="border"
-      borderRadius="2xl"
+      borderRadius="card"
       {...props}
     />
   );

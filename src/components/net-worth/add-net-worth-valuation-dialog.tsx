@@ -76,14 +76,14 @@ export function AddNetWorthValuationDialog({
   return (
     <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
       <Dialog.Trigger asChild>
-        <Button type="button" minH="11" size="sm" colorPalette="purple" borderRadius="xl">
+        <Button type="button" size="sm" variant="solid" colorPalette="brand">
           <Plus size={16} aria-hidden="true" /> Add value
         </Button>
       </Dialog.Trigger>
       <Portal>
         <Dialog.Backdrop bg="blackAlpha.500" />
         <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
-          <Dialog.Content borderRadius="2xl">
+          <Dialog.Content>
             <Dialog.Header>
               <Stack gap="1">
                 <Dialog.Title>Add a dated value</Dialog.Title>
@@ -108,25 +108,25 @@ export function AddNetWorthValuationDialog({
 
                     <Field.Root invalid={Boolean(fieldError("value"))}>
                       <Field.Label>{entry.kind === "liability" ? "Amount owed" : "Current value"}</Field.Label>
-                      <Input name="value" defaultValue={entry.currentValue ?? ""} type="number" inputMode="decimal" min="0" step="any" autoFocus required borderRadius="xl" />
+                      <Input name="value" defaultValue={entry.currentValue ?? ""} type="number" inputMode="decimal" min="0" step="any" autoFocus required />
                       <Field.ErrorText>{fieldError("value")}</Field.ErrorText>
                     </Field.Root>
 
                     <Field.Root invalid={Boolean(fieldError("valuedOn"))}>
                       <Field.Label>Valued on</Field.Label>
-                      <Input name="valuedOn" defaultValue={entry.valuedOn ?? currentDateValue()} type="date" required borderRadius="xl" />
+                      <Input name="valuedOn" defaultValue={entry.valuedOn ?? currentDateValue()} type="date" required />
                       <Field.HelperText>{entry.valuedOn ? `Latest observation: ${formatDate(entry.valuedOn)}` : "Use the date you observed or estimated this value."}</Field.HelperText>
                       <Field.ErrorText>{fieldError("valuedOn")}</Field.ErrorText>
                     </Field.Root>
 
                     {error ? (
-                      <Alert.Root status="error" borderRadius="xl">
+                      <Alert.Root status="error">
                         <Alert.Indicator />
                         <Alert.Description>{error}</Alert.Description>
                       </Alert.Root>
                     ) : null}
 
-                    <Button type="submit" minH="11" colorPalette="purple" borderRadius="xl" loading={pending}>
+                    <Button type="submit" variant="solid" colorPalette="brand" loading={pending}>
                       Save value
                     </Button>
                   </Stack>
@@ -134,7 +134,7 @@ export function AddNetWorthValuationDialog({
               ) : null}
             </Dialog.Body>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

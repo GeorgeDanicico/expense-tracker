@@ -9,7 +9,7 @@ export function PageHeader({
 }) {
   return (
     <Flex align="center" justify="space-between" gap="3" wrap="wrap">
-      <Heading as="h1">{title}</Heading>
+      <Heading as="h1" textStyle="pageTitle">{title}</Heading>
       {children}
     </Flex>
   );

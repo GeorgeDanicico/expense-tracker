@@ -81,8 +81,7 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
-            size="lg"
-            borderRadius="xl"
+            size="md"
             required
           />
           <Field.ErrorText>{state.fieldErrors?.email?.[0]}</Field.ErrorText>
@@ -97,8 +96,7 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
               mode === "login" ? "current-password" : "new-password"
             }
             placeholder="At least 8 characters"
-            size="lg"
-            borderRadius="xl"
+            size="md"
             minLength={8}
             required
           />
@@ -111,7 +109,6 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
         {state.message ? (
           <Alert.Root
             status={state.status === "error" ? "error" : "success"}
-            borderRadius="xl"
             variant="surface"
           >
             <Alert.Indicator />
@@ -123,10 +120,9 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
 
         <Button
           type="submit"
-          colorPalette="purple"
-          size="lg"
+          variant="solid" colorPalette="brand"
+          size="md"
           width="full"
-          borderRadius="xl"
           loading={pending}
         >
           {mode === "login" ? "Sign in" : "Create account"}
@@ -145,7 +141,7 @@ export function AuthForm() {
           <Landmark size={20} color="#A64B32" aria-hidden="true" />
           <Text fontWeight="600">Simple Ledger</Text>
         </Flex>
-        <Heading as="h1">
+        <Heading as="h1" textStyle="pageTitle">
           {mode === "login" ? "Sign in" : "Create account"}
         </Heading>
         <Flex gap="2" role="group" aria-label="Authentication mode">

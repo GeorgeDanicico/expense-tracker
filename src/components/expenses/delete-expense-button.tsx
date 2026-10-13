@@ -56,7 +56,6 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
           size="xs"
           variant="ghost"
           color="muted"
-          borderRadius="lg"
           aria-label={`Delete ${description}`}
           _hover={{ color: "error", bg: "red.50" }}
         >
@@ -66,7 +65,7 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
       <Portal>
         <Dialog.Backdrop bg="blackAlpha.500" />
         <Dialog.Positioner p="4">
-          <Dialog.Content borderRadius="2xl">
+          <Dialog.Content>
             <Dialog.Header pt="6">
               <Stack gap="3">
                 <Button
@@ -76,7 +75,6 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
                   p="0"
                   color="error"
                   bg="red.50"
-                  borderRadius="xl"
                   pointerEvents="none"
                 >
                   <TriangleAlert size={21} aria-hidden="true" />
@@ -89,7 +87,7 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
                 <Text as="span" fontWeight="600" color="fg">{description}</Text> will be permanently removed from your ledger.
               </Dialog.Description>
               {error ? (
-                <Alert.Root mt="4" status="error" borderRadius="xl">
+                <Alert.Root mt="4" status="error">
                   <Alert.Indicator />
                   <Alert.Description>{error}</Alert.Description>
                 </Alert.Root>
@@ -97,16 +95,16 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
             </Dialog.Body>
             <Dialog.Footer gap="3" pb="6">
               <Dialog.ActionTrigger asChild>
-                <Button variant="outline" borderRadius="xl">Keep it</Button>
+                <Button variant="outline">Keep it</Button>
               </Dialog.ActionTrigger>
               <form onSubmit={submit}>
-                <Button type="submit" colorPalette="red" borderRadius="xl" loading={pending}>
+                <Button type="submit" variant="solid" colorPalette="danger" loading={pending}>
                   Delete expense
                 </Button>
               </form>
             </Dialog.Footer>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

@@ -55,7 +55,6 @@ function DashboardContent() {
               value={value}
               flex="1"
               minW="0"
-              minH="11"
               px="1"
               whiteSpace="normal"
               overflowWrap="anywhere"

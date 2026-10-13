@@ -40,7 +40,7 @@ function CalculationIssues({ overview }: { overview: InvestmentsOverview }) {
   if (!overview.calculationIssues?.length) return null;
 
   return (
-    <Alert.Root status="warning" borderRadius="2xl">
+    <Alert.Root status="warning">
       <Alert.Indicator />
       <Stack gap="1">
         <Text fontWeight="600">Some investment history needs attention</Text>

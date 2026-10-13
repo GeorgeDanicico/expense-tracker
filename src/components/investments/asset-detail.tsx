@@ -102,7 +102,7 @@ export function AssetDetail({
               {asset.displayName}
             </Heading>
             {asset.priceSource ? (
-              <Badge colorPalette="purple" variant="subtle" borderRadius="full" px="2.5" py="1">
+              <Badge colorPalette="brand" variant="subtle" borderRadius="full" px="2.5" py="1">
                 {asset.priceSource === "ZF" ? "ZF" : "Yahoo Finance"}
               </Badge>
             ) : null}
@@ -117,8 +117,6 @@ export function AssetDetail({
             type="button"
             variant="ghost"
             size="sm"
-            borderRadius="lg"
-            minH="11"
             aria-label={`Close ${asset.instrument} details`}
             onClick={onClose}
           >
@@ -163,11 +161,11 @@ export function AssetDetail({
           </>
         ) : null}
         {error && !data ? (
-          <Alert.Root status="error" m="4" borderRadius="xl">
+          <Alert.Root status="error" m="4">
             <Alert.Indicator />
             <Stack flex="1" gap="2">
               <Alert.Description>{error instanceof Error ? error.message : "Unable to load transaction history."}</Alert.Description>
-              <Button type="button" alignSelf="flex-start" size="sm" variant="outline" borderRadius="lg" onClick={() => void mutate()}>
+              <Button type="button" alignSelf="flex-start" size="sm" variant="outline" onClick={() => void mutate()}>
                 <RefreshCw size={15} aria-hidden="true" /> Try again
               </Button>
             </Stack>

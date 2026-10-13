@@ -6,7 +6,7 @@ import { formatInvestmentAmount } from "@/lib/utils/currency";
 import { formatDateTime } from "@/lib/utils/dates";
 
 function sideColor(side: InvestmentTransactionDto["side"]) {
-  return side === "buy" ? "blue" : "orange";
+  return side === "buy" ? "info" : "warning";
 }
 
 export function TransactionList({

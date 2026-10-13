@@ -98,7 +98,7 @@ export function AddOrderDialog({
   return (
     <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
       <Dialog.Trigger asChild>
-        <Button type="button" size="sm" colorPalette="purple" borderRadius="xl" minH="11">
+        <Button type="button" size="sm" variant="solid" colorPalette="brand">
           <Plus size={16} aria-hidden="true" /> Add order
         </Button>
       </Dialog.Trigger>
@@ -107,7 +107,6 @@ export function AddOrderDialog({
         <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
           <Dialog.Content
             maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
@@ -120,7 +119,7 @@ export function AddOrderDialog({
                 <form onSubmit={submit} aria-busy={pending}>
                   <Stack gap="4.5">
                     <Flex gap="2" wrap="wrap" align="center">
-                      <Badge colorPalette="purple" variant="subtle" borderRadius="full" px="2.5" py="1">
+                      <Badge colorPalette="brand" variant="subtle" borderRadius="full" px="2.5" py="1">
                         {INVESTMENT_BROKER_LABELS[brokerId]}
                       </Badge>
                       <Text color="muted" fontSize="sm" fontWeight="600">{asset.instrument}</Text>
@@ -130,7 +129,7 @@ export function AddOrderDialog({
                     <Field.Root invalid={Boolean(fieldError("side"))}>
                       <Field.Label>Order side</Field.Label>
                       <NativeSelect.Root>
-                        <NativeSelect.Field name="side" defaultValue="buy" autoFocus borderRadius="xl">
+                        <NativeSelect.Field name="side" defaultValue="buy" autoFocus>
                           <option value="buy">Buy</option>
                           <option value="sell">Sell</option>
                         </NativeSelect.Field>
@@ -143,31 +142,31 @@ export function AddOrderDialog({
                     <Flex gap="4" direction={{ base: "column", sm: "row" }}>
                       <Field.Root flex="1" invalid={Boolean(fieldError("quantity"))}>
                         <Field.Label>Quantity</Field.Label>
-                        <Input name="quantity" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required borderRadius="xl" />
+                        <Input name="quantity" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
                         <Field.ErrorText>{fieldError("quantity")}</Field.ErrorText>
                       </Field.Root>
                       <Field.Root flex="1" invalid={Boolean(fieldError("unitPrice"))}>
                         <Field.Label>Unit price</Field.Label>
-                        <Input name="unitPrice" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required borderRadius="xl" />
+                        <Input name="unitPrice" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
                         <Field.ErrorText>{fieldError("unitPrice")}</Field.ErrorText>
                       </Field.Root>
                     </Flex>
 
                     <Field.Root invalid={Boolean(fieldError("amount"))}>
                       <Field.Label>Order amount ({asset.currency})</Field.Label>
-                      <Input name="amount" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required borderRadius="xl" />
+                      <Input name="amount" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
                       <Field.HelperText>Total order value in the instrument currency.</Field.HelperText>
                       <Field.ErrorText>{fieldError("amount")}</Field.ErrorText>
                     </Field.Root>
 
                     <Field.Root invalid={Boolean(fieldError("executedAt"))}>
                       <Field.Label>Execution date and time</Field.Label>
-                      <Input name="executedAt" type="datetime-local" defaultValue={localDateTimeValue()} required borderRadius="xl" />
+                      <Input name="executedAt" type="datetime-local" defaultValue={localDateTimeValue()} required />
                       <Field.ErrorText>{fieldError("executedAt")}</Field.ErrorText>
                     </Field.Root>
 
                     {error ? (
-                      <Alert.Root status="error" borderRadius="xl">
+                      <Alert.Root status="error">
                         <Alert.Indicator />
                         <Alert.Description>{error}</Alert.Description>
                       </Alert.Root>
@@ -176,7 +175,7 @@ export function AddOrderDialog({
                     <Text className="sr-only" role="status" aria-live="polite">
                       {pending ? "Saving order…" : ""}
                     </Text>
-                    <Button type="submit" minH="11" colorPalette="purple" borderRadius="xl" loading={pending}>
+                    <Button type="submit" variant="solid" colorPalette="brand" loading={pending}>
                       Save order
                     </Button>
                   </Stack>
@@ -184,7 +183,7 @@ export function AddOrderDialog({
               ) : null}
             </Dialog.Body>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

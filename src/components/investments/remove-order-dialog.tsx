@@ -59,10 +59,8 @@ export function RemoveOrderDialog({
         <Button
           type="button"
           size="sm"
-          minH="11"
           variant="ghost"
           color="muted"
-          borderRadius="lg"
           aria-label={`Remove ${side.toLowerCase()} order for ${instrument}`}
           _hover={{ color: "error", bg: "red.50" }}
         >
@@ -72,7 +70,7 @@ export function RemoveOrderDialog({
       <Portal>
         <Dialog.Backdrop bg="blackAlpha.500" />
         <Dialog.Positioner p="4" pb={{ base: "calc(1rem + env(safe-area-inset-bottom))", sm: "4" }}>
-          <Dialog.Content borderRadius="2xl">
+          <Dialog.Content>
             <Dialog.Header pt="6">
               <Stack gap="3">
                 <Button
@@ -82,7 +80,6 @@ export function RemoveOrderDialog({
                   p="0"
                   color="error"
                   bg="red.50"
-                  borderRadius="xl"
                   pointerEvents="none"
                 >
                   <TriangleAlert size={21} aria-hidden="true" />
@@ -100,7 +97,7 @@ export function RemoveOrderDialog({
                 <Text color="muted" fontSize="sm">Executed {formatDateTime(transaction.executedAt)}</Text>
               </Stack>
               {error ? (
-                <Alert.Root mt="4" status="error" borderRadius="xl">
+                <Alert.Root mt="4" status="error">
                   <Alert.Indicator />
                   <Alert.Description>{error}</Alert.Description>
                 </Alert.Root>
@@ -108,14 +105,14 @@ export function RemoveOrderDialog({
             </Dialog.Body>
             <Dialog.Footer gap="3" pb="6" direction={{ base: "column-reverse", sm: "row" }}>
               <Dialog.ActionTrigger asChild>
-                <Button width={{ base: "full", sm: "auto" }} minH="11" variant="outline" borderRadius="xl">Keep order</Button>
+                <Button width={{ base: "full", sm: "auto" }} variant="outline">Keep order</Button>
               </Dialog.ActionTrigger>
               <Box
                 as="form"
                 onSubmit={(event) => submit(event as unknown as FormEvent<HTMLFormElement>)}
                 width={{ base: "full", sm: "auto" }}
               >
-                <Button width={{ base: "full", sm: "auto" }} minH="11" type="submit" colorPalette="red" borderRadius="xl" loading={pending}>
+                <Button width={{ base: "full", sm: "auto" }} type="submit" variant="solid" colorPalette="danger" loading={pending}>
                   Remove order
                 </Button>
               </Box>
@@ -124,7 +121,7 @@ export function RemoveOrderDialog({
               </Text>
             </Dialog.Footer>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

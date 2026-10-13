@@ -17,7 +17,7 @@ export default function OfflinePage() {
               Reconnect to view or change your private ledger. Financial data is intentionally never stored in the offline cache.
             </Text>
           </Stack>
-          <Button asChild colorPalette="purple" borderRadius="xl">
+          <Button asChild variant="solid" colorPalette="brand">
             <a href="/dashboard"><RefreshCw size={17} aria-hidden="true" /> Try again</a>
           </Button>
         </Stack>

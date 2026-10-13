@@ -114,13 +114,13 @@ function ExpenseForm({
       <Stack gap="4.5">
         <Field.Root invalid={Boolean(state.fieldErrors?.description)}>
           <Field.Label>Description</Field.Label>
-          <Input name="description" maxLength={120} placeholder="e.g. Weekly groceries" autoFocus required borderRadius="xl" />
+          <Input name="description" maxLength={120} placeholder="e.g. Weekly groceries" autoFocus required />
           <Field.ErrorText>{state.fieldErrors?.description?.[0]}</Field.ErrorText>
         </Field.Root>
 
         <Field.Root invalid={Boolean(state.fieldErrors?.amount)}>
           <Field.Label>Amount ({currency})</Field.Label>
-          <Input name="amount" type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" placeholder="0.00" required borderRadius="xl" />
+          <Input name="amount" type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" placeholder="0.00" required />
           <Field.ErrorText>{state.fieldErrors?.amount?.[0]}</Field.ErrorText>
         </Field.Root>
 
@@ -132,7 +132,7 @@ function ExpenseForm({
                 const nextCategory = event.target.value as ExpenseCategory;
                 setCategory(nextCategory);
                 setSubtype((current) => subtypeForCategory(nextCategory, current));
-              }} borderRadius="xl">
+              }}>
                 {EXPENSE_CATEGORIES.map((category) => (
                   <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>
                 ))}
@@ -151,7 +151,6 @@ function ExpenseForm({
               min={range.start}
               max={maxDate}
               required
-              borderRadius="xl"
             />
             <Field.ErrorText>{state.fieldErrors?.expenseDate?.[0]}</Field.ErrorText>
           </Field.Root>
@@ -161,7 +160,7 @@ function ExpenseForm({
           <Field.Root invalid={Boolean(state.fieldErrors?.subtype)}>
             <Field.Label>Subtype <span aria-hidden="true">(optional)</span></Field.Label>
             <NativeSelect.Root>
-              <NativeSelect.Field name="subtype" value={subtype ?? ""} onChange={(event) => setSubtype(event.target.value ? event.target.value as ExpenseSubtype : null)} borderRadius="xl">
+              <NativeSelect.Field name="subtype" value={subtype ?? ""} onChange={(event) => setSubtype(event.target.value ? event.target.value as ExpenseSubtype : null)}>
                 <option value="">No subtype</option>
                 {availableSubtypes.map((option) => <option key={option} value={option}>{SUBTYPE_LABELS[option]}</option>)}
               </NativeSelect.Field>
@@ -173,7 +172,7 @@ function ExpenseForm({
 
         <Field.Root invalid={Boolean(state.fieldErrors?.notes)}>
           <Field.Label>Notes <span aria-hidden="true">(optional)</span></Field.Label>
-          <Textarea name="notes" maxLength={500} rows={3} placeholder="Add an optional note" borderRadius="xl" resize="vertical" />
+          <Textarea name="notes" maxLength={500} rows={3} placeholder="Add an optional note" resize="vertical" />
           <Field.ErrorText>{state.fieldErrors?.notes?.[0]}</Field.ErrorText>
         </Field.Root>
 
@@ -184,7 +183,7 @@ function ExpenseForm({
           </Alert.Root>
         ) : null}
 
-        <Button type="submit" colorPalette="purple" borderRadius="xl" loading={pending}>Save expense</Button>
+        <Button type="submit" variant="solid" colorPalette="brand" loading={pending}>Save expense</Button>
       </Stack>
     </form>
   );
@@ -202,7 +201,7 @@ export function AddExpenseDialog({
   return (
     <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
       <Dialog.Trigger asChild>
-        <Button flex={{ base: "1", sm: "initial" }} colorPalette="purple" borderRadius="xl">
+        <Button flex={{ base: "1", sm: "initial" }} variant="solid" colorPalette="brand">
           <Plus size={17} aria-hidden="true" /> Add expense
         </Button>
       </Dialog.Trigger>
@@ -211,7 +210,6 @@ export function AddExpenseDialog({
         <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4">
           <Dialog.Content
             maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            borderRadius="2xl"
             overflowY="auto"
           >
             <Dialog.Header>
@@ -229,7 +227,7 @@ export function AddExpenseDialog({
               ) : null}
             </Dialog.Body>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
+              <Button variant="ghost" size="sm" aria-label="Close dialog">
                 <X size={17} aria-hidden="true" />
               </Button>
             </Dialog.CloseTrigger>

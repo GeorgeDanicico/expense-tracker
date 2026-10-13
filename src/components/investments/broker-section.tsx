@@ -39,7 +39,7 @@ export function BrokerSection({
               {broker.assets.length} {broker.assets.length === 1 ? "asset" : "assets"} tracked in native currency.
             </Text>
           </Stack>
-          <Badge colorPalette="purple" variant="subtle" borderRadius="full" px="3" py="1.5">
+          <Badge colorPalette="brand" variant="subtle" borderRadius="full" px="3" py="1.5">
             Totals by currency
           </Badge>
         </Flex>
@@ -62,7 +62,7 @@ export function BrokerSection({
                   Cost basis {formatInvestmentAmount(subtotal.remainingCost, subtotal.currency)}
                 </Text>
                 {subtotal.currentValue !== null ? (
-                  <Badge colorPalette="purple" variant="subtle" borderRadius="full" fontSize="2xs">
+                  <Badge colorPalette="brand" variant="subtle" borderRadius="full" fontSize="2xs">
                     Latest price
                   </Badge>
                 ) : null}

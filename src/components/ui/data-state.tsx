@@ -32,7 +32,7 @@ export function DataError({
             <Heading as="h2">Unable to load data</Heading>
             <Text color="muted">{message}</Text>
           </Stack>
-          <Button onClick={retry} minH="11" colorPalette="purple" borderRadius="xl">
+          <Button onClick={retry} variant="solid" colorPalette="brand">
             <RefreshCw size={17} aria-hidden="true" /> Try again
           </Button>
         </Stack>

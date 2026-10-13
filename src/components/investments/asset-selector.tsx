@@ -53,7 +53,6 @@ export function AssetSelector({
               justifyContent="stretch"
               textAlign="start"
               whiteSpace="normal"
-              borderRadius="2xl"
               borderColor={selected ? "accent" : "border"}
               bg={selected ? "selected" : "white"}
               aria-pressed={selected}
@@ -87,7 +86,7 @@ export function AssetSelector({
                       {asset.priceStatus === "current" ? "Current value" : asset.priceStatus === "currency_mismatch" ? "Currency mismatch" : "No quote"}
                     </Text>
                     {asset.priceSource ? (
-                      <Badge colorPalette="purple" variant="subtle" borderRadius="full" fontSize="2xs">
+                      <Badge colorPalette="brand" variant="subtle" borderRadius="full" fontSize="2xs">
                         {asset.priceSource === "ZF" ? "ZF" : "Yahoo Finance"}
                       </Badge>
                     ) : null}

@@ -102,7 +102,6 @@ export function ExpenseList({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search expenses"
               aria-label="Search expenses"
-              borderRadius="xl"
               bg="canvas"
               borderColor="border"
             />
@@ -116,7 +115,6 @@ export function ExpenseList({
                 value={category}
                 onChange={(event) => setCategory(event.target.value as ExpenseCategory | "all")}
                 aria-label="Filter by category"
-                borderRadius="lg"
                 bg="white"
               >
                 <option value="all">All categories</option>
@@ -158,7 +156,7 @@ export function ExpenseList({
                     </Table.Cell>
                     <Table.Cell color="muted" whiteSpace="nowrap">{formatDate(expense.expenseDate)}</Table.Cell>
                     <Table.Cell>
-                      <Badge colorPalette="purple" variant="subtle" borderRadius="full" px="2.5" py="1">
+                      <Badge colorPalette="brand" variant="subtle" borderRadius="full" px="2.5" py="1">
                         {expenseClassificationLabel(expense.category, expense.subtype)}
                       </Badge>
                     </Table.Cell>
