@@ -13,7 +13,7 @@ export function AmountComparison({
 }) {
   const { difference, percentage } = compareAmounts(current, previous);
   return (
-    <Text fontSize="sm" overflowWrap="anywhere">
+    <Text textStyle="bodySm" overflowWrap="anywhere">
       {formatCurrency(Math.abs(difference), currency)}{" "}
       {difference > 0 ? "more" : difference < 0 ? "less" : "difference"}
       {percentage === null

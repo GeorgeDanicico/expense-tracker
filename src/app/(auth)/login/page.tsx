@@ -1,6 +1,6 @@
 "use client";
 
-import { Center } from "@chakra-ui/react";
+import { Box, Center } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -18,13 +18,21 @@ export default function LoginPage() {
     if (data) router.replace("/dashboard");
   }, [data, router]);
 
-  if (isLoading || data) return <DataLoading label="Checking your session…" />;
+  if (isLoading || data) {
+    return (
+      <Center minH="100dvh" px="4">
+        <Box width="full" maxW="360px">
+          <DataLoading layout="section" label="Checking your session…" />
+        </Box>
+      </Center>
+    );
+  }
   return (
     <Center
       minH="100dvh"
       px={{ base: "4", md: "6" }}
       py={{ base: "6", md: "10" }}
-      bg="canvas"
+      bg="bg.canvas"
     >
       <AuthForm />
     </Center>

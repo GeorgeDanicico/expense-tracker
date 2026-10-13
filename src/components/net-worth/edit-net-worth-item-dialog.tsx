@@ -1,20 +1,15 @@
 "use client";
 
-import {
-  Alert,
-  Button,
-  Dialog,
-  Field,
-  Input,
-  NativeSelect,
-  Portal,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { Archive, X } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { Button, Stack, Text } from "@chakra-ui/react";
+import { Archive } from "lucide-react";
+import { FormEvent, useId, useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { NetWorthItemFields } from "@/components/net-worth/net-worth-item-fields";
+import { AppDialog } from "@/components/ui/app-dialog";
+import { FormActions } from "@/components/ui/form-actions";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { NET_WORTH_API_KEY } from "@/lib/api/keys";
 import { NET_WORTH_SUGGESTED_CATEGORIES, type NetWorthEntry } from "@/lib/net-worth/types";
@@ -40,6 +35,7 @@ export function EditNetWorthItemDialog({
   const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
+  const formId = useId();
 
   if (entry.itemId === null) return null;
   const itemId = entry.itemId;
@@ -107,110 +103,59 @@ export function EditNetWorthItemDialog({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
-      <Dialog.Trigger asChild>
-        <Button type="button" minH="11" size="sm" variant="outline" borderRadius="xl">
-          Edit details
-        </Button>
-      </Dialog.Trigger>
-      <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
-          <Dialog.Content
-            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            borderRadius="2xl"
-            overflowY="auto"
-          >
-            <Dialog.Header>
-              <Stack gap="1">
-                <Dialog.Title>Edit {entry.name}</Dialog.Title>
-                <Dialog.Description color="muted" fontSize="sm">
-                  Keep the item in {entry.currency}; add a new dated value from its row when the balance changes.
-                </Dialog.Description>
-              </Stack>
-            </Dialog.Header>
-            <Dialog.Body>
-              {open ? (
-                <form onSubmit={save} aria-busy={pending || archiving}>
-                  <Stack gap="4.5">
-                    <Field.Root invalid={Boolean(fieldError("name"))}>
-                      <Field.Label>Name</Field.Label>
-                      <Input name="name" defaultValue={entry.name} autoFocus required borderRadius="xl" />
-                      <Field.ErrorText>{fieldError("name")}</Field.ErrorText>
-                    </Field.Root>
+    <AppDialog
+      open={open}
+      onOpenChange={setOpen}
+      title={`Edit ${entry.name}`}
+      description={`Keep the item in ${entry.currency}; add a new dated value from its row when the balance changes.`}
+      trigger={<Button type="button" size="xs" variant="ghost">Edit details</Button>}
+      footer={
+        <FormActions
+          form={formId}
+          closesDialog
+          pending={pending}
+          disabled={archiving}
+          submitLabel="Save changes"
+          leading={
+            <Button
+              type="button"
+              variant="ghost"
+              colorPalette="danger"
+              size={{ base: "md", sm: "sm" }}
+              loading={archiving}
+              disabled={pending}
+              onClick={() => void archive()}
+            >
+              <Archive size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Archive item
+            </Button>
+          }
+        />
+      }
+    >
+      <form id={formId} onSubmit={save} aria-busy={pending || archiving}>
+        <Stack gap="3">
+          <NetWorthItemFields
+            kind={entry.kind}
+            category={category}
+            onCategoryChange={setCategory}
+            categoryOptions={[
+              ...suggestedCategories.map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) })),
+              { value: "custom", label: "Custom category" },
+            ]}
+            customCategory={customCategory}
+            onCustomCategoryChange={setCustomCategory}
+            fieldError={fieldError}
+            defaultName={entry.name}
+            defaultPurchaseAmount={entry.purchaseAmount ?? ""}
+          />
 
-                    <Field.Root invalid={Boolean(fieldError("category"))}>
-                      <Field.Label>Category</Field.Label>
-                      <NativeSelect.Root>
-                        <NativeSelect.Field value={category} onChange={(event) => setCategory(event.target.value)} borderRadius="xl">
-                          {suggestedCategories.map((value) => (
-                            <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>
-                          ))}
-                          <option value="custom">Custom category</option>
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                      <Field.ErrorText>{fieldError("category")}</Field.ErrorText>
-                    </Field.Root>
+          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
 
-                    {category === "custom" ? (
-                      <Field.Root invalid={Boolean(fieldError("category"))}>
-                        <Field.Label>Custom category</Field.Label>
-                        <Input
-                          value={customCategory}
-                          onChange={(event) => setCustomCategory(event.target.value)}
-                          required
-                          borderRadius="xl"
-                        />
-                        <Field.ErrorText>{fieldError("category")}</Field.ErrorText>
-                      </Field.Root>
-                    ) : null}
-
-                    {entry.kind === "asset" && category !== "cash" ? (
-                      <Field.Root invalid={Boolean(fieldError("purchaseAmount"))}>
-                        <Field.Label>Optional purchase amount</Field.Label>
-                        <Input name="purchaseAmount" defaultValue={entry.purchaseAmount ?? ""} type="number" inputMode="decimal" min="0" step="any" placeholder="Leave blank if unknown" borderRadius="xl" />
-                        <Field.HelperText>Comparison baseline only, not a tax-grade cost basis.</Field.HelperText>
-                        <Field.ErrorText>{fieldError("purchaseAmount")}</Field.ErrorText>
-                      </Field.Root>
-                    ) : null}
-
-                    {error ? (
-                      <Alert.Root status="error" borderRadius="xl">
-                        <Alert.Indicator />
-                        <Alert.Description>{error}</Alert.Description>
-                      </Alert.Root>
-                    ) : null}
-
-                    <Button type="submit" minH="11" colorPalette="purple" borderRadius="xl" loading={pending}>
-                      Save changes
-                    </Button>
-                    <Button
-                      type="button"
-                      minH="11"
-                      variant="ghost"
-                      colorPalette="red"
-                      borderRadius="xl"
-                      loading={archiving}
-                      onClick={() => void archive()}
-                    >
-                      <Archive size={16} aria-hidden="true" /> Archive item
-                    </Button>
-                    <Text color="muted" fontSize="xs">
-                      Archiving hides this item from current totals but preserves its valuation history.
-                    </Text>
-                  </Stack>
-                </form>
-              ) : null}
-            </Dialog.Body>
-            <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
-                <X size={17} aria-hidden="true" />
-              </Button>
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+          <Text textStyle="caption">
+            Archiving hides this item from current totals but preserves its valuation history.
+          </Text>
+        </Stack>
+      </form>
+    </AppDialog>
   );
 }

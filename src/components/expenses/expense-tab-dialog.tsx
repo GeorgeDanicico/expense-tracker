@@ -1,32 +1,20 @@
 "use client";
 
-import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  Dialog,
-  Field,
-  Input,
-  Portal,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { X } from "lucide-react";
+import { Input, Stack } from "@chakra-ui/react";
 import { type FormEvent, useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { ExpenseTabCategoryFields } from "@/components/expenses/expense-tab-category-fields";
+import { AppDialog } from "@/components/ui/app-dialog";
+import { FormActions } from "@/components/ui/form-actions";
+import { FormField } from "@/components/ui/form-field";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { EXPENSE_TABS_API_KEY, expenseTabApiKey } from "@/lib/api/keys";
-import {
-  CATEGORY_LABELS,
-  EXPENSE_CATEGORIES,
-  type ExpenseCategory,
-} from "@/lib/types";
+import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/types";
 import {
   EXPENSE_SUBTYPES,
   SUBTYPE_CATEGORIES,
-  SUBTYPE_LABELS,
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
@@ -115,126 +103,45 @@ export function ExpenseTabDialog({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)} size="lg">
-      <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" />
-        <Dialog.Positioner p="4">
-          <Dialog.Content
-            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            overflowY="auto"
-            borderRadius="2xl"
-          >
-            <Dialog.Header>
-              <Stack gap="1">
-                <Dialog.Title>{editing ? "Edit expense tab" : "Create expense tab"}</Dialog.Title>
-                <Dialog.Description color="muted" fontSize="sm">
-                  Choose the categories this tab should include. Your expenses stay in the main ledger.
-                </Dialog.Description>
-              </Stack>
-            </Dialog.Header>
-            <Dialog.Body>
-              <form id="expense-tab-form" onSubmit={submit}>
-                <Stack gap="5">
-                  <Field.Root invalid={Boolean(fieldErrors?.name)}>
-                    <Field.Label>Tab name</Field.Label>
-                    <Input
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      maxLength={80}
-                      placeholder="e.g. Car"
-                      autoFocus
-                      required
-                      borderRadius="xl"
-                    />
-                    <Field.ErrorText>{fieldErrors?.name?.[0]}</Field.ErrorText>
-                  </Field.Root>
+    <AppDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      size="lg"
+      title={editing ? "Edit expense tab" : "Create expense tab"}
+      description="Choose the categories this tab should include. Your expenses stay in the main ledger."
+      footer={
+        <FormActions
+          form="expense-tab-form"
+          closesDialog
+          pending={pending}
+          submitLabel={editing ? "Save changes" : "Create tab"}
+        />
+      }
+    >
+      <form id="expense-tab-form" onSubmit={submit}>
+        <Stack gap="4">
+          <FormField label="Tab name" error={fieldErrors?.name?.[0]}>
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={80}
+              placeholder="e.g. Car"
+              autoFocus
+              required
+            />
+          </FormField>
 
-                  <Box>
-                    <Text fontWeight="600">Included categories</Text>
-                    <Text color="muted" fontSize="sm" mt="1">
-                      Selecting a parent category includes all of its subtypes. To include only particular subtypes, leave the parent unchecked and choose those subtypes below.
-                    </Text>
-                    <Stack gap="3" mt="3">
-                      {EXPENSE_CATEGORIES.map((category) => {
-                        const categorySubtypes = EXPENSE_SUBTYPES.filter(
-                          (subtype) => SUBTYPE_CATEGORIES[subtype] === category,
-                        );
-                        const parentSelected = categories.includes(category);
-                        return (
-                          <Stack key={category} gap="2" p="3" borderWidth="1px" borderColor="border" borderRadius="xl">
-                            <Checkbox.Root
-                              checked={parentSelected}
-                              onCheckedChange={(details) => toggleCategory(category, details.checked === true)}
-                            >
-                              <Checkbox.HiddenInput />
-                              <Checkbox.Control />
-                              <Checkbox.Label fontWeight="600">
-                                {CATEGORY_LABELS[category]}{categorySubtypes.length ? " — includes all subtypes" : ""}
-                              </Checkbox.Label>
-                            </Checkbox.Root>
-                            {categorySubtypes.length ? (
-                              <Stack pl="7" gap="2" aria-label={`${CATEGORY_LABELS[category]} subtypes`}>
-                                {categorySubtypes.map((subtype) => (
-                                  <Checkbox.Root
-                                    key={subtype}
-                                    checked={parentSelected || subtypes.includes(subtype)}
-                                    disabled={parentSelected}
-                                    onCheckedChange={(details) => toggleSubtype(subtype, details.checked === true)}
-                                  >
-                                    <Checkbox.HiddenInput />
-                                    <Checkbox.Control />
-                                    <Checkbox.Label>{SUBTYPE_LABELS[subtype]}</Checkbox.Label>
-                                  </Checkbox.Root>
-                                ))}
-                                {parentSelected ? (
-                                  <Text color="muted" fontSize="xs">
-                                    Clear {CATEGORY_LABELS[category]} to choose individual subtypes.
-                                  </Text>
-                                ) : null}
-                              </Stack>
-                            ) : null}
-                          </Stack>
-                        );
-                      })}
-                    </Stack>
-                    {fieldErrors?.categoryKeys?.[0] || fieldErrors?.subtypeKeys?.[0] ? (
-                      <Text role="alert" color="error" fontSize="sm" mt="2">
-                        {fieldErrors.categoryKeys?.[0] ?? fieldErrors.subtypeKeys?.[0]}
-                      </Text>
-                    ) : null}
-                  </Box>
+          <ExpenseTabCategoryFields
+            categories={categories}
+            subtypes={subtypes}
+            onToggleCategory={toggleCategory}
+            onToggleSubtype={toggleSubtype}
+            error={fieldErrors?.categoryKeys?.[0] ?? fieldErrors?.subtypeKeys?.[0]}
+          />
 
-                  {error ? (
-                    <Alert.Root status="error" borderRadius="xl">
-                      <Alert.Indicator />
-                      <Alert.Description>{error}</Alert.Description>
-                    </Alert.Root>
-                  ) : null}
-                </Stack>
-              </form>
-            </Dialog.Body>
-            <Dialog.Footer gap="3">
-              <Dialog.CloseTrigger asChild>
-                <Button variant="outline" borderRadius="xl" disabled={pending}>Cancel</Button>
-              </Dialog.CloseTrigger>
-              <Button
-                type="submit"
-                form="expense-tab-form"
-                colorPalette="purple"
-                borderRadius="xl"
-                loading={pending}
-              >
-                {editing ? "Save changes" : "Create tab"}
-              </Button>
-            </Dialog.Footer>
-            <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
-                <X size={17} aria-hidden="true" />
-              </Button>
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
+        </Stack>
+      </form>
+    </AppDialog>
   );
 }

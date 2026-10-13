@@ -1,10 +1,12 @@
 "use client";
 
-import { Alert, Box, Button, Dialog, Portal, Stack, Text } from "@chakra-ui/react";
-import { Trash2, TriangleAlert, X } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { Button, Stack, Text } from "@chakra-ui/react";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { INVESTMENTS_API_KEY, investmentTransactionsApiKey, NET_WORTH_API_KEY } from "@/lib/api/keys";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
@@ -29,8 +31,7 @@ export function RemoveOrderDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function remove() {
     if (pending) return;
     setPending(true);
     setError("");
@@ -54,83 +55,36 @@ export function RemoveOrderDialog({
   const side = transaction.side === "buy" ? "Buy" : "Sell";
 
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} role="alertdialog" size="sm">
-      <Dialog.Trigger asChild>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
         <Button
           type="button"
-          size="sm"
-          minH="11"
+          size="xs"
           variant="ghost"
-          color="muted"
-          borderRadius="lg"
+          colorPalette="danger"
           aria-label={`Remove ${side.toLowerCase()} order for ${instrument}`}
-          _hover={{ color: "error", bg: "red.50" }}
         >
-          <Trash2 size={15} aria-hidden="true" /> Remove
+          <Trash2 size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Remove
         </Button>
-      </Dialog.Trigger>
-      <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" />
-        <Dialog.Positioner p="4" pb={{ base: "calc(1rem + env(safe-area-inset-bottom))", sm: "4" }}>
-          <Dialog.Content borderRadius="2xl">
-            <Dialog.Header pt="6">
-              <Stack gap="3">
-                <Button
-                  as="div"
-                  width="11"
-                  height="11"
-                  p="0"
-                  color="error"
-                  bg="red.50"
-                  borderRadius="xl"
-                  pointerEvents="none"
-                >
-                  <TriangleAlert size={21} aria-hidden="true" />
-                </Button>
-                <Dialog.Title>Remove this order?</Dialog.Title>
-              </Stack>
-            </Dialog.Header>
-            <Dialog.Body>
-              <Dialog.Description color="muted">
-                This permanently removes the recorded order. Totals and cost basis will be recalculated from the remaining history.
-              </Dialog.Description>
-              <Stack mt="4" gap="1" p="4" borderRadius="xl" bg="canvas">
-                <Text color="fg" fontWeight="600">{side} · {instrument}</Text>
-                <Text color="muted" fontSize="sm">{transaction.quantity} units · {formatInvestmentAmount(transaction.amount, currency)}</Text>
-                <Text color="muted" fontSize="sm">Executed {formatDateTime(transaction.executedAt)}</Text>
-              </Stack>
-              {error ? (
-                <Alert.Root mt="4" status="error" borderRadius="xl">
-                  <Alert.Indicator />
-                  <Alert.Description>{error}</Alert.Description>
-                </Alert.Root>
-              ) : null}
-            </Dialog.Body>
-            <Dialog.Footer gap="3" pb="6" direction={{ base: "column-reverse", sm: "row" }}>
-              <Dialog.ActionTrigger asChild>
-                <Button width={{ base: "full", sm: "auto" }} minH="11" variant="outline" borderRadius="xl">Keep order</Button>
-              </Dialog.ActionTrigger>
-              <Box
-                as="form"
-                onSubmit={(event) => submit(event as unknown as FormEvent<HTMLFormElement>)}
-                width={{ base: "full", sm: "auto" }}
-              >
-                <Button width={{ base: "full", sm: "auto" }} minH="11" type="submit" colorPalette="red" borderRadius="xl" loading={pending}>
-                  Remove order
-                </Button>
-              </Box>
-              <Text className="sr-only" role="status" aria-live="polite">
-                {pending ? "Removing order…" : ""}
-              </Text>
-            </Dialog.Footer>
-            <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
-                <X size={17} aria-hidden="true" />
-              </Button>
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+      }
+      title="Remove this order?"
+      description="This permanently removes the recorded order. Totals and cost basis will be recalculated from the remaining history."
+      cancelLabel="Keep order"
+      confirmLabel="Remove order"
+      pending={pending}
+      error={error}
+      onConfirm={() => void remove()}
+    >
+      <Stack gap="0.5" px="3" py="2.5" borderRadius="control" bg="bg.subtle">
+        <Text textStyle="bodySm" fontWeight="medium">{side} · {instrument}</Text>
+        <Text textStyle="caption">{transaction.quantity} units · {formatInvestmentAmount(transaction.amount, currency)}</Text>
+        <Text textStyle="caption">Executed {formatDateTime(transaction.executedAt)}</Text>
+      </Stack>
+      <Text className="sr-only" role="status" aria-live="polite">
+        {pending ? "Removing order…" : ""}
+      </Text>
+    </ConfirmDialog>
   );
 }

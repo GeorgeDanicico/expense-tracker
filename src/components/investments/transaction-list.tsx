@@ -1,12 +1,14 @@
-import { Badge, Box, Flex, Stack, Table, Text } from "@chakra-ui/react";
+import { Box, Flex, Stack, Table, Text } from "@chakra-ui/react";
 
 import { RemoveOrderDialog } from "@/components/investments/remove-order-dialog";
+import { Amount } from "@/components/ui/amount";
+import { StatusBadge } from "@/components/ui/status-badge";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
 import { formatDateTime } from "@/lib/utils/dates";
 
-function sideColor(side: InvestmentTransactionDto["side"]) {
-  return side === "buy" ? "blue" : "orange";
+function SideBadge({ side }: { side: InvestmentTransactionDto["side"] }) {
+  return <StatusBadge tone={side === "buy" ? "info" : "warning"}>{side === "buy" ? "Buy" : "Sell"}</StatusBadge>;
 }
 
 export function TransactionList({
@@ -22,47 +24,41 @@ export function TransactionList({
   currency: string;
   onDeleted: () => void;
 }) {
+  const remove = (transaction: InvestmentTransactionDto) => (
+    <RemoveOrderDialog
+      accountId={accountId}
+      instrument={instrument}
+      currency={currency}
+      transaction={transaction}
+      onDeleted={onDeleted}
+    />
+  );
+
   return (
     <>
-      <Box display={{ base: "none", md: "block" }} overflowX="auto">
-        <Table.Root size="sm" variant="line">
+      <Box display={{ base: "none", lg: "block" }} overflowX="auto">
+        <Table.Root interactive>
           <Table.Caption className="sr-only">Investment transaction history</Table.Caption>
           <Table.Header>
-            <Table.Row bg="canvas">
-              <Table.ColumnHeader pl="5" py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">SIDE</Table.ColumnHeader>
-              <Table.ColumnHeader py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">EXECUTED</Table.ColumnHeader>
-              <Table.ColumnHeader py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em" textAlign="end">QUANTITY</Table.ColumnHeader>
-              <Table.ColumnHeader py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em" textAlign="end">UNIT PRICE</Table.ColumnHeader>
-              <Table.ColumnHeader pr="5" py="3.5" color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em" textAlign="end">ORDER VALUE</Table.ColumnHeader>
-              <Table.ColumnHeader width="7rem" pr="5"><span className="sr-only">Actions</span></Table.ColumnHeader>
+            <Table.Row>
+              <Table.ColumnHeader ps="4">Side</Table.ColumnHeader>
+              <Table.ColumnHeader>Executed</Table.ColumnHeader>
+              <Table.ColumnHeader data-numeric>Quantity</Table.ColumnHeader>
+              <Table.ColumnHeader data-numeric>Unit price</Table.ColumnHeader>
+              <Table.ColumnHeader data-numeric>Order value</Table.ColumnHeader>
+              <Table.ColumnHeader width="6rem" pe="3"><span className="sr-only">Actions</span></Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
             {transactions.map((transaction) => (
-              <Table.Row key={transaction.id} _hover={{ bg: "selected" }}>
-                <Table.Cell pl="5" py="3.5">
-                  <Badge colorPalette={sideColor(transaction.side)} variant="subtle" borderRadius="full" px="2.5" py="1">
-                    {transaction.side === "buy" ? "Buy" : "Sell"}
-                  </Badge>
-                </Table.Cell>
-                <Table.Cell color="muted" whiteSpace="nowrap">{formatDateTime(transaction.executedAt)}</Table.Cell>
-                <Table.Cell textAlign="end" color="fg" fontWeight="600" whiteSpace="nowrap">
-                  {transaction.quantity} units
-                </Table.Cell>
-                <Table.Cell textAlign="end" color="muted" whiteSpace="nowrap">
-                  {formatInvestmentAmount(transaction.unitPrice, currency)}
-                </Table.Cell>
-                <Table.Cell pr="5" textAlign="end" color="fg" fontWeight="600" whiteSpace="nowrap">
-                  {formatInvestmentAmount(transaction.amount, currency)}
-                </Table.Cell>
-                <Table.Cell pr="5" textAlign="end">
-                  <RemoveOrderDialog
-                    accountId={accountId}
-                    instrument={instrument}
-                    currency={currency}
-                    transaction={transaction}
-                    onDeleted={onDeleted}
-                  />
+              <Table.Row key={transaction.id}>
+                <Table.Cell ps="4"><SideBadge side={transaction.side} /></Table.Cell>
+                <Table.Cell color="fg.muted" whiteSpace="nowrap">{formatDateTime(transaction.executedAt)}</Table.Cell>
+                <Table.Cell data-numeric fontWeight="medium">{transaction.quantity} units</Table.Cell>
+                <Table.Cell data-numeric color="fg.muted">{formatInvestmentAmount(transaction.unitPrice, currency)}</Table.Cell>
+                <Table.Cell data-numeric><Amount value={transaction.amount} currency={currency} size="sm" /></Table.Cell>
+                <Table.Cell pe="3" textAlign="end">
+                  <Box data-row-action display="inline-flex">{remove(transaction)}</Box>
                 </Table.Cell>
               </Table.Row>
             ))}
@@ -70,33 +66,23 @@ export function TransactionList({
         </Table.Root>
       </Box>
 
-      <Stack display={{ base: "flex", md: "none" }} gap="0" px="3" pb="2">
+      <Box as="ul" display={{ base: "block", lg: "none" }} px="4" m="0" listStyleType="none" divideY="1px" divideColor="border">
         {transactions.map((transaction) => (
-          <Flex key={transaction.id} align="flex-start" justify="space-between" gap="4" px="2" py="3.5" borderBottomWidth="1px" borderColor="canvas" _last={{ borderBottomWidth: "0" }}>
-            <Stack minW="0" gap="1.5">
+          <Flex as="li" key={transaction.id} align="center" justify="space-between" gap="3" py="2.5">
+            <Stack minW="0" gap="0.5">
               <Flex align="center" gap="2">
-                <Badge colorPalette={sideColor(transaction.side)} variant="subtle" borderRadius="full" px="2.5" py="1">
-                  {transaction.side === "buy" ? "Buy" : "Sell"}
-                </Badge>
-                <Text color="muted" fontSize="xs" truncate>{formatDateTime(transaction.executedAt)}</Text>
+                <SideBadge side={transaction.side} />
+                <Text textStyle="caption" truncate>{formatDateTime(transaction.executedAt)}</Text>
               </Flex>
-              <Text color="muted" fontSize="xs">{transaction.quantity} units at {formatInvestmentAmount(transaction.unitPrice, currency)}</Text>
+              <Text textStyle="caption">{transaction.quantity} units at {formatInvestmentAmount(transaction.unitPrice, currency)}</Text>
             </Stack>
-            <Stack flexShrink="0" align="flex-end" gap="1">
-              <Text color="fg" fontSize="sm" fontWeight="600" whiteSpace="nowrap">
-                {formatInvestmentAmount(transaction.amount, currency)}
-              </Text>
-              <RemoveOrderDialog
-                accountId={accountId}
-                instrument={instrument}
-                currency={currency}
-                transaction={transaction}
-                onDeleted={onDeleted}
-              />
-            </Stack>
+            <Flex flexShrink="0" align="center" gap="1">
+              <Amount value={transaction.amount} currency={currency} size="sm" />
+              {remove(transaction)}
+            </Flex>
           </Flex>
         ))}
-      </Stack>
+      </Box>
     </>
   );
 }

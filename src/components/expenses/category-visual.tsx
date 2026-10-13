@@ -14,45 +14,37 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import type { ExpenseCategory } from "@/lib/types";
 
-type CategoryStyle = {
-  icon: LucideIcon;
-  color: string;
-  bg: string;
-  badge: string;
+export const CATEGORY_ICONS: Record<ExpenseCategory, LucideIcon> = {
+  housing: House,
+  groceries: ShoppingBasket,
+  transport: BusFront,
+  car: Car,
+  utilities: Lightbulb,
+  health: HeartPulse,
+  entertainment: Clapperboard,
+  shopping: ShoppingBag,
+  education: GraduationCap,
+  travel: Plane,
+  other: MoreHorizontal,
 };
 
-export const CATEGORY_STYLES: Record<ExpenseCategory, CategoryStyle> = {
-  housing: { icon: House, color: "blue.700", bg: "blue.50", badge: "blue" },
-  groceries: { icon: ShoppingBasket, color: "positive", bg: "green.50", badge: "green" },
-  transport: { icon: BusFront, color: "orange.700", bg: "orange.50", badge: "orange" },
-  car: { icon: Car, color: "orange.700", bg: "orange.50", badge: "orange" },
-  utilities: { icon: Lightbulb, color: "yellow.700", bg: "yellow.50", badge: "yellow" },
-  health: { icon: HeartPulse, color: "error", bg: "red.50", badge: "red" },
-  entertainment: { icon: Clapperboard, color: "accent", bg: "selected", badge: "purple" },
-  shopping: { icon: ShoppingBag, color: "pink.700", bg: "pink.50", badge: "pink" },
-  education: { icon: GraduationCap, color: "cyan.700", bg: "cyan.50", badge: "cyan" },
-  travel: { icon: Plane, color: "teal.700", bg: "teal.50", badge: "teal" },
-  other: { icon: MoreHorizontal, color: "fg", bg: "canvas", badge: "gray" },
-};
-
-export function CategoryVisual({ category, size = "8" }: { category: ExpenseCategory; size?: string }) {
-  const style = CATEGORY_STYLES[category];
-  const Icon = style.icon;
-
+/** Category icon in a small neutral square, used as the leading visual in rows. */
+export function CategoryVisual({ category }: { category: ExpenseCategory }) {
+  const Icon = CATEGORY_ICONS[category];
   return (
     <Flex
-      width={size}
-      height={size}
+      boxSize="7"
       flexShrink="0"
       align="center"
       justify="center"
-      borderRadius="xl"
-      color="muted"
-      bg="transparent"
+      borderRadius="control"
+      bg="bg.muted"
+      color="fg.muted"
     >
-      <Icon size={18} strokeWidth={2.1} aria-hidden="true" />
+      <Icon size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
     </Flex>
   );
 }

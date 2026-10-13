@@ -1,22 +1,16 @@
 "use client";
 
-import {
-  Alert,
-  Badge,
-  Button,
-  Dialog,
-  Field,
-  Flex,
-  Input,
-  NativeSelect,
-  Portal,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { Plus, X } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { Button, Flex, Input, NativeSelect, Stack, Text } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
+import { FormEvent, useId, useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { AppDialog } from "@/components/ui/app-dialog";
+import { FormActions } from "@/components/ui/form-actions";
+import { FormField, FormRow } from "@/components/ui/form-field";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { INVESTMENTS_API_KEY, investmentTransactionsApiKey, NET_WORTH_API_KEY } from "@/lib/api/keys";
 import {
@@ -52,6 +46,7 @@ export function AddOrderDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
+  const formId = useId();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,101 +91,67 @@ export function AddOrderDialog({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
-      <Dialog.Trigger asChild>
-        <Button type="button" size="sm" colorPalette="purple" borderRadius="xl" minH="11">
-          <Plus size={16} aria-hidden="true" /> Add order
+    <AppDialog
+      open={open}
+      onOpenChange={setOpen}
+      title="Add order"
+      trigger={
+        <Button type="button" size="xs" variant="solid" colorPalette="brand">
+          <Plus size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add order
         </Button>
-      </Dialog.Trigger>
-      <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
-          <Dialog.Content
-            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            borderRadius="2xl"
-            overflowY="auto"
+      }
+      footer={<FormActions form={formId} closesDialog pending={pending} submitLabel="Save order" />}
+    >
+      <form id={formId} onSubmit={submit} aria-busy={pending}>
+        <Stack gap="3">
+          <Flex gap="2" wrap="wrap" align="center">
+            <StatusBadge tone="brand">{INVESTMENT_BROKER_LABELS[brokerId]}</StatusBadge>
+            <Text textStyle="bodySm" fontWeight="medium">{asset.instrument}</Text>
+            <Text textStyle="bodySm" color="fg.muted">{asset.currency}</Text>
+          </Flex>
+
+          <FormField
+            label="Order side"
+            error={fieldError("side")}
+            hint="A sell is checked against units available at its execution time."
           >
-            <Dialog.Header>
-              <Stack gap="1">
-                <Dialog.Title>Add order</Dialog.Title>
-              </Stack>
-            </Dialog.Header>
-            <Dialog.Body>
-              {open ? (
-                <form onSubmit={submit} aria-busy={pending}>
-                  <Stack gap="4.5">
-                    <Flex gap="2" wrap="wrap" align="center">
-                      <Badge colorPalette="purple" variant="subtle" borderRadius="full" px="2.5" py="1">
-                        {INVESTMENT_BROKER_LABELS[brokerId]}
-                      </Badge>
-                      <Text color="muted" fontSize="sm" fontWeight="600">{asset.instrument}</Text>
-                      <Text color="muted" fontSize="sm">{asset.currency}</Text>
-                    </Flex>
+            <NativeSelect.Root>
+              <NativeSelect.Field name="side" defaultValue="buy" autoFocus>
+                <option value="buy">Buy</option>
+                <option value="sell">Sell</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </FormField>
 
-                    <Field.Root invalid={Boolean(fieldError("side"))}>
-                      <Field.Label>Order side</Field.Label>
-                      <NativeSelect.Root>
-                        <NativeSelect.Field name="side" defaultValue="buy" autoFocus borderRadius="xl">
-                          <option value="buy">Buy</option>
-                          <option value="sell">Sell</option>
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                      <Field.HelperText>A sell is checked against units available at its execution time.</Field.HelperText>
-                      <Field.ErrorText>{fieldError("side")}</Field.ErrorText>
-                    </Field.Root>
+          <FormRow>
+            <FormField flex="1" label="Quantity" error={fieldError("quantity")}>
+              <Input name="quantity" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
+            </FormField>
+            <FormField flex="1" label="Unit price" error={fieldError("unitPrice")}>
+              <Input name="unitPrice" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
+            </FormField>
+          </FormRow>
 
-                    <Flex gap="4" direction={{ base: "column", sm: "row" }}>
-                      <Field.Root flex="1" invalid={Boolean(fieldError("quantity"))}>
-                        <Field.Label>Quantity</Field.Label>
-                        <Input name="quantity" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required borderRadius="xl" />
-                        <Field.ErrorText>{fieldError("quantity")}</Field.ErrorText>
-                      </Field.Root>
-                      <Field.Root flex="1" invalid={Boolean(fieldError("unitPrice"))}>
-                        <Field.Label>Unit price</Field.Label>
-                        <Input name="unitPrice" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required borderRadius="xl" />
-                        <Field.ErrorText>{fieldError("unitPrice")}</Field.ErrorText>
-                      </Field.Root>
-                    </Flex>
+          <FormField
+            label={`Order amount (${asset.currency})`}
+            error={fieldError("amount")}
+            hint="Total order value in the instrument currency."
+          >
+            <Input name="amount" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
+          </FormField>
 
-                    <Field.Root invalid={Boolean(fieldError("amount"))}>
-                      <Field.Label>Order amount ({asset.currency})</Field.Label>
-                      <Input name="amount" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required borderRadius="xl" />
-                      <Field.HelperText>Total order value in the instrument currency.</Field.HelperText>
-                      <Field.ErrorText>{fieldError("amount")}</Field.ErrorText>
-                    </Field.Root>
+          <FormField label="Execution date and time" error={fieldError("executedAt")}>
+            <Input name="executedAt" type="datetime-local" defaultValue={localDateTimeValue()} required />
+          </FormField>
 
-                    <Field.Root invalid={Boolean(fieldError("executedAt"))}>
-                      <Field.Label>Execution date and time</Field.Label>
-                      <Input name="executedAt" type="datetime-local" defaultValue={localDateTimeValue()} required borderRadius="xl" />
-                      <Field.ErrorText>{fieldError("executedAt")}</Field.ErrorText>
-                    </Field.Root>
+          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
 
-                    {error ? (
-                      <Alert.Root status="error" borderRadius="xl">
-                        <Alert.Indicator />
-                        <Alert.Description>{error}</Alert.Description>
-                      </Alert.Root>
-                    ) : null}
-
-                    <Text className="sr-only" role="status" aria-live="polite">
-                      {pending ? "Saving order…" : ""}
-                    </Text>
-                    <Button type="submit" minH="11" colorPalette="purple" borderRadius="xl" loading={pending}>
-                      Save order
-                    </Button>
-                  </Stack>
-                </form>
-              ) : null}
-            </Dialog.Body>
-            <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
-                <X size={17} aria-hidden="true" />
-              </Button>
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+          <Text className="sr-only" role="status" aria-live="polite">
+            {pending ? "Saving order…" : ""}
+          </Text>
+        </Stack>
+      </form>
+    </AppDialog>
   );
 }

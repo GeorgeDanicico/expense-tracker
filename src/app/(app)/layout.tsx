@@ -30,7 +30,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   }, [data, error, router]);
 
   if ((isLoading && !data) || (error instanceof ApiError && error.status === 401)) {
-    return <DataLoading label="Opening your ledger…" />;
+    return <DataLoading layout="screen" label="Opening your ledger…" />;
   }
 
   if (!data) {

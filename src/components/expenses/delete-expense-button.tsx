@@ -1,10 +1,13 @@
 "use client";
 
-import { Alert, Button, Dialog, Portal, Stack, Text } from "@chakra-ui/react";
-import { Trash2, TriangleAlert, X } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { Text } from "@chakra-ui/react";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { IconButton } from "@/components/ui/icon-button";
 import { apiRequest } from "@/lib/api/client";
 import type { ExpensesData } from "@/lib/types";
 
@@ -14,8 +17,7 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function remove() {
     setPending(true);
     setError("");
 
@@ -50,69 +52,25 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} role="alertdialog" size="sm">
-      <Dialog.Trigger asChild>
-        <Button
-          size="xs"
-          variant="ghost"
-          color="muted"
-          borderRadius="lg"
-          aria-label={`Delete ${description}`}
-          _hover={{ color: "error", bg: "red.50" }}
-        >
-          <Trash2 size={15} aria-hidden="true" />
-        </Button>
-      </Dialog.Trigger>
-      <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" />
-        <Dialog.Positioner p="4">
-          <Dialog.Content borderRadius="2xl">
-            <Dialog.Header pt="6">
-              <Stack gap="3">
-                <Button
-                  as="div"
-                  width="11"
-                  height="11"
-                  p="0"
-                  color="error"
-                  bg="red.50"
-                  borderRadius="xl"
-                  pointerEvents="none"
-                >
-                  <TriangleAlert size={21} aria-hidden="true" />
-                </Button>
-                <Dialog.Title>Delete this expense?</Dialog.Title>
-              </Stack>
-            </Dialog.Header>
-            <Dialog.Body>
-              <Dialog.Description color="muted">
-                <Text as="span" fontWeight="600" color="fg">{description}</Text> will be permanently removed from your ledger.
-              </Dialog.Description>
-              {error ? (
-                <Alert.Root mt="4" status="error" borderRadius="xl">
-                  <Alert.Indicator />
-                  <Alert.Description>{error}</Alert.Description>
-                </Alert.Root>
-              ) : null}
-            </Dialog.Body>
-            <Dialog.Footer gap="3" pb="6">
-              <Dialog.ActionTrigger asChild>
-                <Button variant="outline" borderRadius="xl">Keep it</Button>
-              </Dialog.ActionTrigger>
-              <form onSubmit={submit}>
-                <Button type="submit" colorPalette="red" borderRadius="xl" loading={pending}>
-                  Delete expense
-                </Button>
-              </form>
-            </Dialog.Footer>
-            <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" borderRadius="lg" aria-label="Close dialog">
-                <X size={17} aria-hidden="true" />
-              </Button>
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <IconButton aria-label={`Delete ${description}`} size="xs" tone="danger">
+          <Trash2 size={ICON.xs} strokeWidth={ICON_STROKE} />
+        </IconButton>
+      }
+      title="Delete this expense?"
+      description={
+        <>
+          <Text as="span" fontWeight="semibold" color="fg">{description}</Text> will be permanently removed from your ledger.
+        </>
+      }
+      cancelLabel="Keep it"
+      confirmLabel="Delete expense"
+      pending={pending}
+      error={error}
+      onConfirm={() => void remove()}
+    />
   );
 }

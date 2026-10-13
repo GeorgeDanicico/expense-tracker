@@ -1,8 +1,10 @@
 "use client";
 
-import { Button, Flex, Text } from "@chakra-ui/react";
+import { Box, Button } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
+
+import { InlineAlert } from "@/components/ui/inline-alert";
 
 export function OfflineStatus() {
   const [offline, setOffline] = useState(false);
@@ -21,29 +23,24 @@ export function OfflineStatus() {
   }, []);
   if (!offline) return null;
   return (
-    <Flex
-      role="status"
-      align="center"
-      justify="space-between"
-      gap="3"
-      mb="4"
-      borderBottomWidth="1px"
-      borderColor="border"
-      pb="2"
-    >
-      <Text color="muted" fontSize="xs">
-        Offline. Reconnect to save changes.
-      </Text>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          setOffline(!navigator.onLine);
-          void mutate(() => true);
-        }}
+    <Box role="status" mb="4">
+      <InlineAlert
+        status="warning"
+        action={
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => {
+              setOffline(!navigator.onLine);
+              void mutate(() => true);
+            }}
+          >
+            Retry
+          </Button>
+        }
       >
-        Retry
-      </Button>
-    </Flex>
+        Offline. Reconnect to save changes.
+      </InlineAlert>
+    </Box>
   );
 }

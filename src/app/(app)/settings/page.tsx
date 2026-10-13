@@ -1,23 +1,16 @@
 "use client";
 
-import {
-  Alert,
-  Box,
-  Button,
-  Field,
-  Flex,
-  Heading,
-  NativeSelect,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { Info, Save } from "lucide-react";
+import { Button, NativeSelect, Stack } from "@chakra-ui/react";
+import { Save } from "lucide-react";
 import { FormEvent, useState } from "react";
 import useSWR from "swr";
 
 import { DataError, DataLoading } from "@/components/ui/data-state";
+import { Card } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { Surface } from "@/components/ui/surface";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { apiRequest } from "@/lib/api/client";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
@@ -55,44 +48,26 @@ export default function SettingsPage() {
   const currency = selectedCurrency ?? data.currency;
 
   return (
-    <Stack maxW="780px" gap={{ base: "6", md: "7" }}>
+    <Stack maxW="780px" gap={{ base: "4", md: "5" }}>
       <PageHeader title="Settings" />
 
-      {status === "saved" ? (
-        <Alert.Root status="success" borderRadius="2xl" variant="surface">
-          <Alert.Indicator />
-          <Alert.Description>Your account currency was updated.</Alert.Description>
-        </Alert.Root>
-      ) : null}
+      {status === "saved" ? <InlineAlert status="success">Your account currency was updated.</InlineAlert> : null}
+      {status === "error" ? <InlineAlert status="error">{message}</InlineAlert> : null}
 
-      {status === "error" ? (
-        <Alert.Root status="error" borderRadius="2xl" variant="surface">
-          <Alert.Indicator />
-          <Alert.Description>{message}</Alert.Description>
-        </Alert.Root>
-      ) : null}
-
-      <Surface overflow="hidden">
-        <Flex
-          align={{ base: "flex-start", sm: "center" }}
-          gap="4"
-          p={{ base: "5", md: "6" }}
-          bg="surface"
-          borderBottomWidth="1px"
-          borderColor="canvas"
-        >
-          <Stack gap="1">
-            <Heading as="h2" size="lg" letterSpacing="-0.025em">Display currency</Heading>
-            <Text color="muted" fontSize="sm">Used across your dashboard, expense list, and exports.</Text>
-          </Stack>
-        </Flex>
-
-        <Box p={{ base: "5", md: "6" }}>
-          <form onSubmit={saveCurrency}>
-            <Stack gap="5" align="start">
-              <Field.Root maxW="390px">
-                <Field.Label>Account currency</Field.Label>
-                <NativeSelect.Root size="lg">
+      <Card>
+        <Card.Header
+          title="Display currency"
+          description="Used across your dashboard, expense list, and exports."
+        />
+        <form onSubmit={saveCurrency}>
+          <Card.Body>
+            <Stack gap="3">
+              <FormField
+                label="Account currency"
+                orientation={{ base: "vertical", md: "horizontal" }}
+                css={{ "--field-label-width": "sizes.40" }}
+              >
+                <NativeSelect.Root maxW={{ md: "20rem" }}>
                   <NativeSelect.Field
                     name="currency"
                     value={currency}
@@ -100,7 +75,6 @@ export default function SettingsPage() {
                       setSelectedCurrency(event.target.value);
                       setStatus("idle");
                     }}
-                    borderRadius="xl"
                   >
                     {CURRENCY_OPTIONS.map((option) => (
                       <option key={option.code} value={option.code}>
@@ -110,20 +84,19 @@ export default function SettingsPage() {
                   </NativeSelect.Field>
                   <NativeSelect.Indicator />
                 </NativeSelect.Root>
-              </Field.Root>
-
-              <Flex maxW="35rem" align="flex-start" gap="2.5" p="3.5" borderRadius="xl" color="muted" bg="canvas" fontSize="sm">
-                <Box mt="0.5" color="muted"><Info size={16} aria-hidden="true" /></Box>
+              </FormField>
+              <InlineAlert status="neutral">
                 Changing currency updates the label only. Existing amounts are not converted.
-              </Flex>
-
-              <Button type="submit" colorPalette="purple" borderRadius="xl" loading={status === "saving"}>
-                <Save size={17} aria-hidden="true" /> Save changes
-              </Button>
+              </InlineAlert>
             </Stack>
-          </form>
-        </Box>
-      </Surface>
+          </Card.Body>
+          <Card.Footer justifyContent="flex-end" borderTopWidth="1px" pt="3">
+            <Button type="submit" variant="solid" colorPalette="brand" loading={status === "saving"}>
+              <Save size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Save changes
+            </Button>
+          </Card.Footer>
+        </form>
+      </Card>
     </Stack>
   );
 }

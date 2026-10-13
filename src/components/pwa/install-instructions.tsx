@@ -1,6 +1,8 @@
 "use client";
 
 import { Button, Stack, Text } from "@chakra-ui/react";
+
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { Download } from "lucide-react";
 import {
   createContext,
@@ -80,24 +82,25 @@ export function InstallInstructions() {
   );
   if (platform === "standalone") return null;
   return (
-    <Stack px="3" pt="3" gap="2" borderTopWidth="1px" borderColor="border">
+    <Stack px="3" pt="3" mt="1" gap="1" borderTopWidth="1px" borderColor="border">
       {prompt ? (
         <Button
           variant="outline"
+          size="md"
           onClick={async () => {
             await prompt.prompt();
             await prompt.userChoice;
             dismiss();
           }}
         >
-          <Download size={17} aria-hidden="true" /> Install Simple Ledger
+          <Download size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Install Simple Ledger
         </Button>
       ) : (
         <>
-          <Text fontSize="sm" fontWeight="500">
+          <Text textStyle="bodySm" fontWeight="medium">
             Install Simple Ledger
           </Text>
-          <Text fontSize="xs" color="muted">
+          <Text textStyle="caption">
             {platform === "ios"
               ? "In Safari, open Share, then Add to Home Screen."
               : platform === "android"

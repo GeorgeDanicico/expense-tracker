@@ -1,17 +1,11 @@
 "use client";
 
-import {
-  Button,
-  Field,
-  Flex,
-  Input,
-  NativeSelect,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
+import { Button, Flex, Input, NativeSelect, Stack, Text } from "@chakra-ui/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
+import { FormField } from "@/components/ui/form-field";
+import { Toolbar } from "@/components/ui/toolbar";
 import {
   CATEGORY_LABELS,
   EXPENSE_CATEGORIES,
@@ -91,16 +85,13 @@ export function ExpenseTabFiltersForm({
 
   return (
     <form onSubmit={apply}>
-      <Stack gap="3" p={{ base: "4", md: "5" }} borderBottomWidth="1px" borderColor="canvas">
+      <Stack gap="2" p="4" borderBottomWidth="1px" borderColor="border">
         <Flex gap="3" wrap="wrap" align="end">
-          <Field.Root w={{ base: "full", sm: "10rem" }}>
-            <Field.Label>Date scope</Field.Label>
+          <FormField label="Date scope" w={{ base: "full", sm: "9rem" }}>
             <NativeSelect.Root>
               <NativeSelect.Field
                 value={draft.scope}
                 onChange={(event) => change("scope", event.target.value as Scope)}
-                borderRadius="xl"
-                bg="white"
               >
                 <option value="all">All time</option>
                 <option value="year">Year</option>
@@ -108,11 +99,10 @@ export function ExpenseTabFiltersForm({
               </NativeSelect.Field>
               <NativeSelect.Indicator />
             </NativeSelect.Root>
-          </Field.Root>
+          </FormField>
 
           {draft.scope === "year" ? (
-            <Field.Root w={{ base: "full", sm: "8rem" }}>
-              <Field.Label>Year</Field.Label>
+            <FormField label="Year" w={{ base: "full", sm: "7rem" }}>
               <Input
                 type="number"
                 min="100"
@@ -120,52 +110,42 @@ export function ExpenseTabFiltersForm({
                 step="1"
                 value={draft.year}
                 onChange={(event) => change("year", event.target.value)}
-                borderRadius="xl"
               />
-            </Field.Root>
+            </FormField>
           ) : null}
           {draft.scope === "range" ? (
-            <Flex flex="1" minW={{ base: "full", sm: "18rem" }} gap="3" wrap="wrap">
-              <Field.Root flex="1" minW="8rem">
-                <Field.Label>From</Field.Label>
+            <Flex flex="1" minW={{ base: "full", sm: "17rem" }} gap="3" wrap="wrap">
+              <FormField label="From" flex="1" minW="8rem">
                 <Input
                   type="date"
                   value={draft.startDate}
                   onChange={(event) => change("startDate", event.target.value)}
-                  borderRadius="xl"
                 />
-              </Field.Root>
-              <Field.Root flex="1" minW="8rem">
-                <Field.Label>To</Field.Label>
+              </FormField>
+              <FormField label="To" flex="1" minW="8rem">
                 <Input
                   type="date"
                   value={draft.endDate}
                   onChange={(event) => change("endDate", event.target.value)}
-                  borderRadius="xl"
                 />
-              </Field.Root>
+              </FormField>
             </Flex>
           ) : null}
 
-          <Field.Root flex="1" minW={{ base: "full", sm: "12rem" }}>
-            <Field.Label>Search</Field.Label>
+          <FormField label="Search" flex="1" minW={{ base: "full", sm: "12rem" }}>
             <Input
               value={draft.search}
               maxLength={200}
               onChange={(event) => change("search", event.target.value)}
               placeholder="Description, notes, or category"
-              borderRadius="xl"
             />
-          </Field.Root>
+          </FormField>
 
-          <Field.Root w={{ base: "full", sm: "12rem" }}>
-            <Field.Label>Category</Field.Label>
+          <FormField label="Category" w={{ base: "full", sm: "11rem" }}>
             <NativeSelect.Root>
               <NativeSelect.Field
                 value={draft.category}
                 onChange={(event) => change("category", event.target.value as ExpenseCategory | "all")}
-                borderRadius="xl"
-                bg="white"
               >
                 <option value="all">All categories</option>
                 {EXPENSE_CATEGORIES.map((category) => (
@@ -174,16 +154,13 @@ export function ExpenseTabFiltersForm({
               </NativeSelect.Field>
               <NativeSelect.Indicator />
             </NativeSelect.Root>
-          </Field.Root>
+          </FormField>
 
-          <Field.Root w={{ base: "full", sm: "12rem" }}>
-            <Field.Label>Subtype</Field.Label>
+          <FormField label="Subtype" w={{ base: "full", sm: "11rem" }}>
             <NativeSelect.Root>
               <NativeSelect.Field
                 value={draft.subtype}
                 onChange={(event) => change("subtype", event.target.value as ExpenseTabFilters["subtype"])}
-                borderRadius="xl"
-                bg="white"
               >
                 <option value="all">All subtypes</option>
                 <option value="none">No subtype</option>
@@ -193,14 +170,14 @@ export function ExpenseTabFiltersForm({
               </NativeSelect.Field>
               <NativeSelect.Indicator />
             </NativeSelect.Root>
-          </Field.Root>
+          </FormField>
 
-          <Flex gap="2" align="end">
-            <Button type="submit" colorPalette="purple" borderRadius="xl">Apply filters</Button>
-            <Button type="button" variant="outline" borderRadius="xl" onClick={reset}>Reset</Button>
-          </Flex>
+          <Toolbar gap="1">
+            <Button type="submit" variant="solid" colorPalette="brand">Apply filters</Button>
+            <Button type="button" variant="ghost" onClick={reset}>Reset</Button>
+          </Toolbar>
         </Flex>
-        {error ? <Text role="alert" color="error" fontSize="sm">{error}</Text> : null}
+        {error ? <Text role="alert" textStyle="caption" color="fg.error">{error}</Text> : null}
       </Stack>
     </form>
   );

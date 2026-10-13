@@ -3,8 +3,6 @@
 import {
   Box,
   Button,
-  Flex,
-  Heading,
   Stack,
   Tabs,
   Text,
@@ -16,81 +14,28 @@ import { useEffect, useState } from "react";
 import { Suspense } from "react";
 import useSWR from "swr";
 
-import { MetricStrip } from "@/components/dashboard/metric-strip";
 import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
 import { CustomExpenseTab } from "@/components/expenses/custom-expense-tab";
-import { ExpenseList } from "@/components/expenses/expense-list";
 import { ExpenseTabDialog } from "@/components/expenses/expense-tab-dialog";
 import { ExpenseTabs, MAIN_EXPENSE_TAB } from "@/components/expenses/expense-tabs";
-import { MonthToolbar } from "@/components/expenses/month-toolbar";
-import {
-  DataError,
-  DataLoading,
-  DataRefresh,
-} from "@/components/ui/data-state";
+import { MainExpensesPanel } from "@/components/expenses/main-expenses-panel";
+import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
-import { Surface } from "@/components/ui/surface";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   ACCOUNT_API_KEY,
   EXPENSE_TABS_API_KEY,
-  mainExpensesApiKey,
   mainExpensesExportUrl,
 } from "@/lib/api/keys";
 import { expenseTabHref, readExpenseTabFilters } from "@/lib/frontend/expense-tab-state";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-import type { AccountData, ExpensesData } from "@/lib/types";
-import { DEFAULT_CURRENCY, formatCurrency } from "@/lib/utils/currency";
-import { getApplicationCurrentMonth, resolveMainExpenseMonth } from "@/lib/utils/dates";
+import type { AccountData } from "@/lib/types";
+import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
+import { resolveMainExpenseMonth } from "@/lib/utils/dates";
 
 type TabsResponse = { tabs: ExpenseTab[] };
 type DialogTarget = { mode: "create" } | { mode: "edit"; tab: ExpenseTab };
-
-function MainExpensesPanel({ month, currency }: { month: string; currency: string }) {
-  const { data, error, isValidating, mutate } = useSWR<ExpensesData>(
-    mainExpensesApiKey(month),
-    { keepPreviousData: false },
-  );
-  const matching = data?.month === month ? data : undefined;
-
-  return (
-    <Stack gap="5">
-      <MonthToolbar
-        month={month}
-        maxMonth={getApplicationCurrentMonth()}
-        href={(value) => `/expenses?month=${value}`}
-      />
-      {!matching ? (
-        error ? (
-          <DataError retry={() => void mutate()} />
-        ) : (
-          <DataLoading label="Loading expenses…" />
-        )
-      ) : (
-        <>
-          <DataRefresh
-            error={error}
-            updating={isValidating}
-            retry={() => void mutate()}
-          />
-          <MetricStrip
-            items={[
-              { label: "Total", value: formatCurrency(matching.total, currency) },
-              { label: "Transactions", value: String(matching.expenses.length) },
-              { label: "Average expense", value: formatCurrency(matching.average, currency) },
-            ]}
-          />
-          <Surface overflow="hidden">
-            <Box p="4" pb="0">
-              <Heading as="h2">All expenses</Heading>
-            </Box>
-            <ExpenseList expenses={matching.expenses} currency={currency} allowDelete />
-          </Surface>
-        </>
-      )}
-    </Stack>
-  );
-}
 
 function ExpensesContent() {
   useDocumentTitle("Expenses");
@@ -136,19 +81,20 @@ function ExpensesContent() {
   }
 
   return (
-    <Stack gap="5">
-      <PageHeader title="Expenses">
-        {activeTabId === null ? (
-          <Flex gap="2" wrap="wrap">
+    <Stack gap={{ base: "4", md: "5" }}>
+      <PageHeader
+        title="Expenses"
+        actions={activeTabId === null ? (
+          <>
             <AddExpenseDialog selectedMonth={month} currency={currency} />
-            <Button asChild variant="outline">
+            <Button asChild variant="ghost" size={{ base: "md", sm: "sm" }}>
               <Link href={mainExpensesExportUrl(month)}>
-                <Download size={17} aria-hidden="true" /> Export
+                <Download size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Export
               </Link>
             </Button>
-          </Flex>
-        ) : null}
-      </PageHeader>
+          </>
+        ) : undefined}
+      />
 
       {tabsError ? (
         <DataRefresh error={tabsError} updating={tabsUpdating} retry={() => void mutateTabs()} />
@@ -185,7 +131,7 @@ function ExpensesContent() {
         ) : null}
         {activeTabId && tabsResult && !tabs.some((tab) => tab.id === activeTabId) ? (
           <Box py="8" role="status">
-            <Text color="muted">This tab is no longer available. Returning to Expenses…</Text>
+            <Text textStyle="bodySm" color="fg.muted">This tab is no longer available. Returning to Expenses…</Text>
           </Box>
         ) : null}
       </ExpenseTabs>

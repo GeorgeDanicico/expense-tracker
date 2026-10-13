@@ -1,4 +1,4 @@
-const CACHE_NAME = "simple-ledger-shell-v3";
+const CACHE_NAME = "simple-ledger-shell-v4";
 const OFFLINE_ASSETS = ["/offline", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

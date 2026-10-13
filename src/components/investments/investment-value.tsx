@@ -1,5 +1,12 @@
-import { ValueWithChange } from "@/components/ui/value-with-change";
+import { ValueWithChange, type ValueChangeTone } from "@/components/ui/value-with-change";
 import { getInvestmentValuePresentation } from "@/lib/investments/presentation";
+
+/** Maps the presentation helper's colour names onto value-change tones. */
+export function gainTone(color: string): ValueChangeTone {
+  if (color === "green.700") return "positive";
+  if (color === "red.700") return "negative";
+  return "neutral";
+}
 
 export function InvestmentValue({
   currentValue,
@@ -12,19 +19,13 @@ export function InvestmentValue({
 }) {
   const presentation = getInvestmentValuePresentation(currentValue, unrealizedGain, currency);
 
-  const changeTone = presentation.changeColor === "green.700"
-    ? "positive"
-    : presentation.changeColor === "red.700"
-      ? "negative"
-      : "neutral";
-
   return (
     <ValueWithChange
       value={currentValue}
       currency={currency}
       change={presentation.change && unrealizedGain !== null ? unrealizedGain : null}
       changeLabel={presentation.change ? presentation.changeLabel : null}
-      changeTone={changeTone}
+      changeTone={gainTone(presentation.changeColor)}
     />
   );
 }

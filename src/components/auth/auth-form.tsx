@@ -1,21 +1,15 @@
 "use client";
 
-import {
-  Alert,
-  Button,
-  Field,
-  Flex,
-  Heading,
-  Input,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { Landmark } from "lucide-react";
-import { Surface } from "@/components/ui/surface";
+import { Button, Heading, Input, Stack } from "@chakra-ui/react";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSWRConfig } from "swr";
 
+import { Brand } from "@/components/layout/brand";
+import { Card } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 import { INITIAL_ACTION_STATE, type ActionState } from "@/lib/types";
@@ -73,23 +67,23 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
 
   return (
     <form onSubmit={submit}>
-      <Stack gap="4.5">
-        <Field.Root invalid={Boolean(state.fieldErrors?.email)}>
-          <Field.Label>Email address</Field.Label>
+      <Stack gap="3">
+        <FormField label="Email address" error={state.fieldErrors?.email?.[0]}>
           <Input
             name="email"
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
-            size="lg"
-            borderRadius="xl"
+            size="md"
             required
           />
-          <Field.ErrorText>{state.fieldErrors?.email?.[0]}</Field.ErrorText>
-        </Field.Root>
+        </FormField>
 
-        <Field.Root invalid={Boolean(state.fieldErrors?.password)}>
-          <Field.Label>Password</Field.Label>
+        <FormField
+          label="Password"
+          error={state.fieldErrors?.password?.[0]}
+          hint={mode === "signup" ? "Use at least 8 characters." : undefined}
+        >
           <Input
             name="password"
             type="password"
@@ -97,36 +91,25 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
               mode === "login" ? "current-password" : "new-password"
             }
             placeholder="At least 8 characters"
-            size="lg"
-            borderRadius="xl"
+            size="md"
             minLength={8}
             required
           />
-          {mode === "signup" ? (
-            <Field.HelperText>Use at least 8 characters.</Field.HelperText>
-          ) : null}
-          <Field.ErrorText>{state.fieldErrors?.password?.[0]}</Field.ErrorText>
-        </Field.Root>
+        </FormField>
 
         {state.message ? (
-          <Alert.Root
-            status={state.status === "error" ? "error" : "success"}
-            borderRadius="xl"
-            variant="surface"
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Description>{state.message}</Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
+          <InlineAlert status={state.status === "error" ? "error" : "success"}>
+            {state.message}
+          </InlineAlert>
         ) : null}
 
         <Button
           type="submit"
-          colorPalette="purple"
-          size="lg"
+          variant="solid"
+          colorPalette="brand"
+          size="md"
           width="full"
-          borderRadius="xl"
+          mt="1"
           loading={pending}
         >
           {mode === "login" ? "Sign in" : "Create account"}
@@ -139,39 +122,27 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
 export function AuthForm() {
   const [mode, setMode] = useState<AuthMode>("login");
   return (
-    <Surface width="full" maxW="420px" p={{ base: "5", md: "6" }}>
-      <Stack gap="5">
-        <Flex align="center" gap="2">
-          <Landmark size={20} color="#A64B32" aria-hidden="true" />
-          <Text fontWeight="600">Simple Ledger</Text>
-        </Flex>
-        <Heading as="h1">
-          {mode === "login" ? "Sign in" : "Create account"}
-        </Heading>
-        <Flex gap="2" role="group" aria-label="Authentication mode">
-          <Button
-            flex="1"
-            variant="ghost"
-            aria-pressed={mode === "login"}
-            bg={mode === "login" ? "selected" : "transparent"}
-            color={mode === "login" ? "accent" : "muted"}
-            onClick={() => setMode("login")}
-          >
-            Sign in
-          </Button>
-          <Button
-            flex="1"
-            variant="ghost"
-            aria-pressed={mode === "signup"}
-            bg={mode === "signup" ? "selected" : "transparent"}
-            color={mode === "signup" ? "accent" : "muted"}
-            onClick={() => setMode("signup")}
-          >
-            Create account
-          </Button>
-        </Flex>
-        <AuthModeForm key={mode} mode={mode} />
-      </Stack>
-    </Surface>
+    <Card width="full" maxW="360px">
+      <Card.Body p={{ base: "5", md: "6" }}>
+        <Stack gap="5">
+          <Brand />
+          <Heading as="h1" size="xl">
+            {mode === "login" ? "Sign in" : "Create account"}
+          </Heading>
+          <SegmentedControl<AuthMode>
+            aria-label="Authentication mode"
+            name="auth-mode"
+            fullWidth
+            value={mode}
+            onValueChange={setMode}
+            items={[
+              { value: "login", label: "Sign in" },
+              { value: "signup", label: "Create account" },
+            ]}
+          />
+          <AuthModeForm key={mode} mode={mode} />
+        </Stack>
+      </Card.Body>
+    </Card>
   );
 }

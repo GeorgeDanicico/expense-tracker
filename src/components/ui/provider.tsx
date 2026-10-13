@@ -1,10 +1,12 @@
 "use client";
 
 import { ChakraProvider } from "@chakra-ui/react";
+import { LucideProvider } from "lucide-react";
 import { ThemeProvider } from "next-themes";
 import { SWRConfig } from "swr";
 
 import { ApiError, apiFetcher } from "@/lib/api/client";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { ledgerSystem } from "@/components/ui/theme";
 import { PwaInstallProvider } from "@/components/pwa/install-instructions";
 
@@ -31,7 +33,9 @@ export function Provider({ children }: { children: React.ReactNode }) {
           forcedTheme="light"
           disableTransitionOnChange
         >
-          <PwaInstallProvider>{children}</PwaInstallProvider>
+          <LucideProvider size={ICON.sm} strokeWidth={ICON_STROKE}>
+            <PwaInstallProvider>{children}</PwaInstallProvider>
+          </LucideProvider>
         </ThemeProvider>
       </SWRConfig>
     </ChakraProvider>

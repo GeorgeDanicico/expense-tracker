@@ -5,8 +5,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent } from "react";
+
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { IconButton } from "@/components/ui/icon-button";
 import { formatMonth, isMonthAllowed, shiftMonth } from "@/lib/utils/dates";
 
+/** One 32px row: ‹ Month › stepper and a compact jump-to-month form. */
 export function MonthToolbar({
   month,
   href,
@@ -26,48 +30,48 @@ export function MonthToolbar({
       router.push(href(nextMonth));
   }
   return (
-    <Flex align="center" justify="space-between" gap="3" wrap="wrap">
-      <Flex align="center" gap="1">
-        <Button asChild size="sm" variant="ghost" aria-label="Previous month">
+    <Flex align="center" justify="space-between" gap="2" wrap="wrap">
+      <Flex align="center" gap="0.5">
+        <IconButton asChild size="xs" aria-label="Previous month">
           <Link href={href(shiftMonth(month, -1))}>
-            <ChevronLeft size={18} aria-hidden="true" />
+            <ChevronLeft size={ICON.sm} strokeWidth={ICON_STROKE} />
           </Link>
-        </Button>
-        <Text minW="8rem" textAlign="center" fontWeight="500">
+        </IconButton>
+        <Text minW="6.25rem" textAlign="center" textStyle="bodySm" fontWeight="medium">
           {formatMonth(month)}
         </Text>
         {canAdvance ? (
-          <Button asChild size="sm" variant="ghost" aria-label="Next month">
+          <IconButton asChild size="xs" aria-label="Next month">
             <Link
               href={href(nextMonth)}
               onClick={(event) => {
                 if (!isMonthAllowed(nextMonth, maxMonth)) event.preventDefault();
               }}
             >
-              <ChevronRight size={18} aria-hidden="true" />
+              <ChevronRight size={ICON.sm} strokeWidth={ICON_STROKE} />
             </Link>
-          </Button>
+          </IconButton>
         ) : (
-          <Button disabled size="sm" variant="ghost" aria-label="Next month">
-            <ChevronRight size={18} aria-hidden="true" />
-          </Button>
+          <IconButton disabled size="xs" aria-label="Next month">
+            <ChevronRight size={ICON.sm} strokeWidth={ICON_STROKE} />
+          </IconButton>
         )}
       </Flex>
       <form onSubmit={jumpToMonth} style={{ maxWidth: "100%" }}>
-        <Flex gap="2" align="end">
-          <Field.Root minW="0">
-            <Field.Label>Month</Field.Label>
+        <Flex gap="1" align="center">
+          <Field.Root minW="0" width={{ base: "9.5rem", md: "8.75rem" }}>
+            <Field.Label srOnly>Month</Field.Label>
             <Input
               key={month}
               name="month"
               type="month"
-              size="sm"
+              size="xs"
               defaultValue={month}
               max={maxMonth}
               required
             />
           </Field.Root>
-          <Button type="submit" size="sm" variant="outline">
+          <Button type="submit" size="xs" variant="outline">
             Go
           </Button>
         </Flex>
