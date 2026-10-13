@@ -1,21 +1,16 @@
 "use client";
 
-import {
-  Alert,
-  Button,
-  Dialog,
-  Field,
-  Flex,
-  Input,
-  NativeSelect,
-  Portal,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { Plus, X } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { Button, Input, NativeSelect, Stack, Text } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
+import { FormEvent, useId, useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { NetWorthItemFields } from "@/components/net-worth/net-worth-item-fields";
+import { AppDialog } from "@/components/ui/app-dialog";
+import { FormActions } from "@/components/ui/form-actions";
+import { FormField, FormRow } from "@/components/ui/form-field";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { NET_WORTH_API_KEY } from "@/lib/api/keys";
 import { type NetWorthItemKind } from "@/lib/net-worth/types";
@@ -54,6 +49,7 @@ export function AddNetWorthItemDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
+  const formId = useId();
 
   function resetForm() {
     setKind("asset");
@@ -110,154 +106,81 @@ export function AddNetWorthItemDialog({
   }
 
   return (
-    <Dialog.Root
+    <AppDialog
       open={open}
-      onOpenChange={(details) => {
-        setOpen(details.open);
-        if (details.open) resetForm();
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) resetForm();
       }}
-      size="md"
-    >
-      <Dialog.Trigger asChild>
-        <Button width={{ base: "full", sm: "auto" }} variant="solid" colorPalette="brand">
-          <Plus size={17} aria-hidden="true" /> Add item
+      title="Add a net-worth item"
+      description="Record one native-currency balance, estimate or debt. You can add another dated value later."
+      trigger={
+        <Button variant="solid" colorPalette="brand" size={{ base: "md", sm: "sm" }} flex={{ base: "1", sm: "initial" }}>
+          <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add item
         </Button>
-      </Dialog.Trigger>
-      <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
-          <Dialog.Content
-            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            overflowY="auto"
-          >
-            <Dialog.Header>
-              <Stack gap="1">
-                <Dialog.Title>Add a net-worth item</Dialog.Title>
-                <Dialog.Description color="muted" fontSize="sm">
-                  Record one native-currency balance, estimate or debt. You can add another dated value later.
-                </Dialog.Description>
-              </Stack>
-            </Dialog.Header>
-            <Dialog.Body>
-              {open ? (
-                <form onSubmit={submit} aria-busy={pending}>
-                  <Stack gap="4.5">
-                    <Field.Root invalid={Boolean(fieldError("name"))}>
-                      <Field.Label>Name</Field.Label>
-                      <Input name="name" autoFocus placeholder="e.g. BCR current account" required />
-                      <Field.ErrorText>{fieldError("name")}</Field.ErrorText>
-                    </Field.Root>
+      }
+      footer={<FormActions form={formId} closesDialog pending={pending} submitLabel="Save item" />}
+    >
+      <form id={formId} onSubmit={submit} aria-busy={pending}>
+        <Stack gap="3">
+          <NetWorthItemFields
+            kind={kind}
+            category={category}
+            onCategoryChange={setCategory}
+            categoryOptions={categoryOptions(kind)}
+            customCategory={customCategory}
+            onCustomCategoryChange={setCustomCategory}
+            fieldError={fieldError}
+            customCategoryHint="Use a short label; it will be normalized for grouping."
+            kindField={
+              <FormField flex="1" label="Type" error={fieldError("kind")}>
+                <NativeSelect.Root>
+                  <NativeSelect.Field
+                    name="kind"
+                    value={kind}
+                    onChange={(event) => changeKind(event.target.value as NetWorthItemKind)}
+                  >
+                    <option value="asset">Asset I own</option>
+                    <option value="liability">Debt I owe</option>
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </FormField>
+            }
+            beforePurchase={
+              <FormField
+                label="Currency"
+                error={fieldError("currency")}
+                hint="Net Worth keeps each currency separate; it does not convert values."
+              >
+                <NativeSelect.Root>
+                  <NativeSelect.Field name="currency" defaultValue={defaultCurrency}>
+                    {CURRENCY_OPTIONS.map((option) => (
+                      <option key={option.code} value={option.code}>{option.code} · {option.label}</option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </FormField>
+            }
+          />
 
-                    <Flex gap="4" direction={{ base: "column", sm: "row" }}>
-                      <Field.Root flex="1" invalid={Boolean(fieldError("kind"))}>
-                        <Field.Label>Type</Field.Label>
-                        <NativeSelect.Root>
-                          <NativeSelect.Field
-                            name="kind"
-                            value={kind}
-                            onChange={(event) => changeKind(event.target.value as NetWorthItemKind)}
-                          >
-                            <option value="asset">Asset I own</option>
-                            <option value="liability">Debt I owe</option>
-                          </NativeSelect.Field>
-                          <NativeSelect.Indicator />
-                        </NativeSelect.Root>
-                        <Field.ErrorText>{fieldError("kind")}</Field.ErrorText>
-                      </Field.Root>
+          <FormRow>
+            <FormField flex="1" label={kind === "liability" ? "Current amount owed" : "Current value"} error={fieldError("value")}>
+              <Input name="value" type="number" inputMode="decimal" min="0" step="any" placeholder="0.00" required />
+            </FormField>
+            <FormField flex="1" label="Valued on" error={fieldError("valuedOn")}>
+              <Input name="valuedOn" type="date" defaultValue={currentDateValue()} required />
+            </FormField>
+          </FormRow>
 
-                      <Field.Root flex="1" invalid={Boolean(fieldError("category"))}>
-                        <Field.Label>Category</Field.Label>
-                        <NativeSelect.Root>
-                          <NativeSelect.Field
-                            name="category"
-                            value={category}
-                            onChange={(event) => setCategory(event.target.value)}
-                          >
-                            {categoryOptions(kind).map((option) => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                          </NativeSelect.Field>
-                          <NativeSelect.Indicator />
-                        </NativeSelect.Root>
-                        <Field.ErrorText>{fieldError("category")}</Field.ErrorText>
-                      </Field.Root>
-                    </Flex>
+          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
 
-                    {category === "custom" ? (
-                      <Field.Root invalid={Boolean(fieldError("category"))}>
-                        <Field.Label>Custom category</Field.Label>
-                        <Input
-                          value={customCategory}
-                          onChange={(event) => setCustomCategory(event.target.value)}
-                          placeholder="e.g. Collectibles"
-                          required
-                        />
-                        <Field.HelperText>Use a short label; it will be normalized for grouping.</Field.HelperText>
-                        <Field.ErrorText>{fieldError("category")}</Field.ErrorText>
-                      </Field.Root>
-                    ) : null}
-
-                    <Field.Root invalid={Boolean(fieldError("currency"))}>
-                      <Field.Label>Currency</Field.Label>
-                      <NativeSelect.Root>
-                        <NativeSelect.Field name="currency" defaultValue={defaultCurrency}>
-                          {CURRENCY_OPTIONS.map((option) => (
-                            <option key={option.code} value={option.code}>{option.code} · {option.label}</option>
-                          ))}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                      <Field.HelperText>Net Worth keeps each currency separate; it does not convert values.</Field.HelperText>
-                      <Field.ErrorText>{fieldError("currency")}</Field.ErrorText>
-                    </Field.Root>
-
-                    {kind === "asset" && category !== "cash" ? (
-                      <Field.Root invalid={Boolean(fieldError("purchaseAmount"))}>
-                        <Field.Label>Optional purchase amount</Field.Label>
-                        <Input name="purchaseAmount" type="number" inputMode="decimal" min="0" step="any" placeholder="Leave blank if unknown" />
-                        <Field.HelperText>Comparison baseline only, not a tax-grade cost basis.</Field.HelperText>
-                        <Field.ErrorText>{fieldError("purchaseAmount")}</Field.ErrorText>
-                      </Field.Root>
-                    ) : null}
-
-                    <Flex gap="4" direction={{ base: "column", sm: "row" }}>
-                      <Field.Root flex="1" invalid={Boolean(fieldError("value"))}>
-                        <Field.Label>{kind === "liability" ? "Current amount owed" : "Current value"}</Field.Label>
-                        <Input name="value" type="number" inputMode="decimal" min="0" step="any" placeholder="0.00" required />
-                        <Field.ErrorText>{fieldError("value")}</Field.ErrorText>
-                      </Field.Root>
-                      <Field.Root flex="1" invalid={Boolean(fieldError("valuedOn"))}>
-                        <Field.Label>Valued on</Field.Label>
-                        <Input name="valuedOn" type="date" defaultValue={currentDateValue()} required />
-                        <Field.ErrorText>{fieldError("valuedOn")}</Field.ErrorText>
-                      </Field.Root>
-                    </Flex>
-
-                    {error ? (
-                      <Alert.Root status="error">
-                        <Alert.Indicator />
-                        <Alert.Description>{error}</Alert.Description>
-                      </Alert.Root>
-                    ) : null}
-
-                    <Text className="sr-only" role="status" aria-live="polite">
-                      {pending ? "Saving net-worth item…" : ""}
-                    </Text>
-                    <Button type="submit" variant="solid" colorPalette="brand" loading={pending}>
-                      Save item
-                    </Button>
-                  </Stack>
-                </form>
-              ) : null}
-            </Dialog.Body>
-            <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" aria-label="Close dialog">
-                <X size={17} aria-hidden="true" />
-              </Button>
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+          <Text className="sr-only" role="status" aria-live="polite">
+            {pending ? "Saving net-worth item…" : ""}
+          </Text>
+        </Stack>
+      </form>
+    </AppDialog>
   );
 }

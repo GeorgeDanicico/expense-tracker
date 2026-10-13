@@ -1,21 +1,15 @@
 "use client";
 
-import {
-  Alert,
-  Button,
-  Dialog,
-  Field,
-  Flex,
-  Input,
-  NativeSelect,
-  Portal,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { Plus, X } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { Button, Input, NativeSelect, Stack, Text } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
+import { FormEvent, useId, useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { AppDialog } from "@/components/ui/app-dialog";
+import { FormActions } from "@/components/ui/form-actions";
+import { FormField, FormRow } from "@/components/ui/form-field";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { INVESTMENTS_API_KEY, NET_WORTH_API_KEY } from "@/lib/api/keys";
 import {
@@ -37,9 +31,21 @@ function formTimestamp(value: FormDataEntryValue | null) {
   return Number.isNaN(date.valueOf()) ? value : date.toISOString();
 }
 
-function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
+function InvestmentForm({
+  id,
+  onSuccess,
+  onPendingChange,
+}: {
+  id: string;
+  onSuccess: () => void;
+  onPendingChange: (pending: boolean) => void;
+}) {
   const { mutate } = useSWRConfig();
-  const [pending, setPending] = useState(false);
+  const [pending, setPendingState] = useState(false);
+  function setPending(next: boolean) {
+    setPendingState(next);
+    onPendingChange(next);
+  }
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
   const [instrument, setInstrument] = useState("");
@@ -86,10 +92,9 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} aria-busy={pending}>
-      <Stack gap="4.5">
-        <Field.Root invalid={Boolean(fieldError("brokerId"))}>
-          <Field.Label>Broker</Field.Label>
+    <form id={id} onSubmit={submit} aria-busy={pending}>
+      <Stack gap="3">
+        <FormField label="Broker" error={fieldError("brokerId")}>
           <NativeSelect.Root>
             <NativeSelect.Field name="brokerId" defaultValue={INVESTMENT_BROKER_IDS[0]}>
               {INVESTMENT_BROKER_IDS.map((brokerId) => (
@@ -98,11 +103,9 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
             </NativeSelect.Field>
             <NativeSelect.Indicator />
           </NativeSelect.Root>
-          <Field.ErrorText>{fieldError("brokerId")}</Field.ErrorText>
-        </Field.Root>
+        </FormField>
 
-        <Field.Root invalid={Boolean(fieldError("instrument"))}>
-          <Field.Label>Instrument / listing symbol</Field.Label>
+        <FormField label="Instrument / listing symbol" error={fieldError("instrument")} hint={instrumentHint}>
           <Input
             name="instrument"
             value={instrument}
@@ -112,12 +115,13 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
             autoFocus
             required
           />
-          <Field.HelperText>{instrumentHint}</Field.HelperText>
-          <Field.ErrorText>{fieldError("instrument")}</Field.ErrorText>
-        </Field.Root>
+        </FormField>
 
-        <Field.Root invalid={Boolean(fieldError("currency"))}>
-          <Field.Label>Instrument currency</Field.Label>
+        <FormField
+          label="Instrument currency"
+          error={fieldError("currency")}
+          hint="Amount and prices are recorded in this native currency."
+        >
           <NativeSelect.Root>
             <NativeSelect.Field name="currency" defaultValue="EUR">
               {CURRENCY_OPTIONS.map((option) => (
@@ -126,52 +130,33 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
             </NativeSelect.Field>
             <NativeSelect.Indicator />
           </NativeSelect.Root>
-          <Field.HelperText>Amount and prices are recorded in this native currency.</Field.HelperText>
-          <Field.ErrorText>{fieldError("currency")}</Field.ErrorText>
-        </Field.Root>
+        </FormField>
 
-        <Stack gap="3">
-          <Text color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">First buy order</Text>
-          <Flex gap="4" direction={{ base: "column", sm: "row" }}>
-            <Field.Root flex="1" invalid={Boolean(fieldError("quantity"))}>
-              <Field.Label>Quantity</Field.Label>
+        <Stack gap="3" pt="3" borderTopWidth="1px" borderColor="border">
+          <Text textStyle="label" color="fg.muted">First buy order</Text>
+          <FormRow>
+            <FormField flex="1" label="Quantity" error={fieldError("quantity")}>
               <Input name="quantity" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
-              <Field.ErrorText>{fieldError("quantity")}</Field.ErrorText>
-            </Field.Root>
-            <Field.Root flex="1" invalid={Boolean(fieldError("unitPrice"))}>
-              <Field.Label>Unit price</Field.Label>
+            </FormField>
+            <FormField flex="1" label="Unit price" error={fieldError("unitPrice")}>
               <Input name="unitPrice" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
-              <Field.ErrorText>{fieldError("unitPrice")}</Field.ErrorText>
-            </Field.Root>
-          </Flex>
+            </FormField>
+          </FormRow>
 
-          <Field.Root invalid={Boolean(fieldError("amount"))}>
-            <Field.Label>Order amount</Field.Label>
+          <FormField label="Order amount" error={fieldError("amount")} hint="Total order value in the selected currency.">
             <Input name="amount" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
-            <Field.HelperText>Total order value in the selected currency.</Field.HelperText>
-            <Field.ErrorText>{fieldError("amount")}</Field.ErrorText>
-          </Field.Root>
+          </FormField>
 
-          <Field.Root invalid={Boolean(fieldError("executedAt"))}>
-            <Field.Label>Execution date and time</Field.Label>
+          <FormField label="Execution date and time" error={fieldError("executedAt")}>
             <Input name="executedAt" type="datetime-local" defaultValue={localDateTimeValue()} required />
-            <Field.ErrorText>{fieldError("executedAt")}</Field.ErrorText>
-          </Field.Root>
+          </FormField>
         </Stack>
 
-        {error ? (
-          <Alert.Root status="error">
-            <Alert.Indicator />
-            <Alert.Description>{error}</Alert.Description>
-          </Alert.Root>
-        ) : null}
+        {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
 
         <Text className="sr-only" role="status" aria-live="polite">
           {pending ? "Saving investment…" : ""}
         </Text>
-        <Button type="submit" variant="solid" colorPalette="brand" loading={pending}>
-          Save investment
-        </Button>
       </Stack>
     </form>
   );
@@ -179,40 +164,23 @@ function InvestmentForm({ onSuccess }: { onSuccess: () => void }) {
 
 export function AddInvestmentDialog() {
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const formId = useId();
 
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
-      <Dialog.Trigger asChild>
-        <Button width={{ base: "full", sm: "auto" }} variant="solid" colorPalette="brand">
-          <Plus size={17} aria-hidden="true" /> Add investment
+    <AppDialog
+      open={open}
+      onOpenChange={setOpen}
+      title="Add investment"
+      description="The first recorded order creates the investment under its broker."
+      trigger={
+        <Button variant="solid" colorPalette="brand" size={{ base: "md", sm: "sm" }} flex={{ base: "1", sm: "initial" }}>
+          <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add investment
         </Button>
-      </Dialog.Trigger>
-      <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
-          <Dialog.Content
-            maxH="calc(var(--available-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem)"
-            overflowY="auto"
-          >
-            <Dialog.Header>
-              <Stack gap="1">
-                <Dialog.Title>Add investment</Dialog.Title>
-                <Dialog.Description color="muted" fontSize="sm">
-                  The first recorded order creates the investment under its broker.
-                </Dialog.Description>
-              </Stack>
-            </Dialog.Header>
-            <Dialog.Body>
-              {open ? <InvestmentForm onSuccess={() => setOpen(false)} /> : null}
-            </Dialog.Body>
-            <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" aria-label="Close dialog">
-                <X size={17} aria-hidden="true" />
-              </Button>
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+      }
+      footer={<FormActions form={formId} closesDialog pending={pending} submitLabel="Save investment" />}
+    >
+      <InvestmentForm id={formId} onPendingChange={setPending} onSuccess={() => setOpen(false)} />
+    </AppDialog>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Stack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import { AppDialog } from "@/components/ui/app-dialog";
@@ -56,10 +57,10 @@ export function ConfirmDialog({
       }
     >
       {children || error ? (
-        <>
+        <Stack gap="3">
           {children}
           {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
-        </>
+        </Stack>
       ) : null}
     </AppDialog>
   );

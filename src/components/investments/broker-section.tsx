@@ -1,11 +1,12 @@
 "use client";
 
-import { Badge, Box, Flex, Heading, SimpleGrid, Stack, Text } from "@chakra-ui/react";
+import { Flex, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 
 import { AssetDetail } from "@/components/investments/asset-detail";
 import { AssetSelector } from "@/components/investments/asset-selector";
 import { InvestmentValue } from "@/components/investments/investment-value";
-import { Surface } from "@/components/ui/surface";
+import { Card } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { investmentAssetKey, investmentDetailId } from "@/lib/investments/identity";
 import type { InvestmentsOverview } from "@/lib/investments/types";
 import { INVESTMENT_BROKER_LABELS } from "@/lib/investments/types";
@@ -23,72 +24,61 @@ export function BrokerSection({
   onClose: () => void;
 }) {
   const detailId = investmentDetailId(broker.accountId);
+  const headingId = `investment-broker-${broker.accountId}`;
   const selectedAsset = broker.assets.find(
     (asset) => selectedKey === investmentAssetKey(broker.accountId, asset.instrument, asset.currency),
   );
 
   return (
-    <Surface as="section" aria-labelledby={`investment-broker-${broker.accountId}`} p={{ base: "5", md: "6" }}>
-      <Stack gap="6">
-        <Flex align={{ base: "flex-start", sm: "center" }} justify="space-between" gap="4" direction={{ base: "column", sm: "row" }}>
-          <Stack gap="1">
-            <Heading as="h2" id={`investment-broker-${broker.accountId}`} size={{ base: "lg", md: "xl" }} letterSpacing="-0.03em">
-              {INVESTMENT_BROKER_LABELS[broker.brokerId]}
-            </Heading>
-            <Text color="muted" fontSize="sm">
-              {broker.assets.length} {broker.assets.length === 1 ? "asset" : "assets"} tracked in native currency.
-            </Text>
-          </Stack>
-          <Badge colorPalette="brand" variant="subtle" borderRadius="full" px="3" py="1.5">
-            Totals by currency
-          </Badge>
-        </Flex>
-
-        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap="3">
-          {broker.totalsByCurrency.map((subtotal) => (
-            <Box key={subtotal.currency}>
-              <Text color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.06em">
-                Total ({subtotal.currency})
-              </Text>
-              <Text mt="1" color="fg" fontSize={{ base: "lg", md: "xl" }} fontWeight="600" letterSpacing="-0.03em">
-                <InvestmentValue
-                  currentValue={subtotal.currentValue}
-                  unrealizedGain={subtotal.unrealizedGain}
-                  currency={subtotal.currency}
-                />
-              </Text>
-              <Flex align="center" gap="2" mt="1.5">
-                <Text color="muted" fontSize="xs">
-                  Cost basis {formatInvestmentAmount(subtotal.remainingCost, subtotal.currency)}
+    <Card as="section" aria-labelledby={headingId}>
+      <Card.Header
+        id={headingId}
+        title={INVESTMENT_BROKER_LABELS[broker.brokerId]}
+        description={`${broker.assets.length} ${broker.assets.length === 1 ? "asset" : "assets"} tracked in native currency.`}
+        actions={<StatusBadge>Totals by currency</StatusBadge>}
+      />
+      <Card.Body>
+        <Stack gap="5">
+          <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap="4">
+            {broker.totalsByCurrency.map((subtotal) => (
+              <Stack key={subtotal.currency} gap="0.5" minW="0">
+                <Text textStyle="label" color="fg.muted">Total ({subtotal.currency})</Text>
+                <Text textStyle="amountLg">
+                  <InvestmentValue
+                    currentValue={subtotal.currentValue}
+                    unrealizedGain={subtotal.unrealizedGain}
+                    currency={subtotal.currency}
+                  />
                 </Text>
-                {subtotal.currentValue !== null ? (
-                  <Badge colorPalette="brand" variant="subtle" borderRadius="full" fontSize="2xs">
-                    Latest price
-                  </Badge>
-                ) : null}
-              </Flex>
-            </Box>
-          ))}
-        </SimpleGrid>
+                <Flex align="center" gap="2" wrap="wrap">
+                  <Text textStyle="caption">
+                    Cost basis {formatInvestmentAmount(subtotal.remainingCost, subtotal.currency)}
+                  </Text>
+                  {subtotal.currentValue !== null ? <StatusBadge tone="brand">Latest price</StatusBadge> : null}
+                </Flex>
+              </Stack>
+            ))}
+          </SimpleGrid>
 
-        <AssetSelector
-          accountId={broker.accountId}
-          assets={broker.assets}
-          selectedKey={selectedKey}
-          detailId={detailId}
-          onSelect={onSelect}
-        />
-
-        {selectedAsset ? (
-          <AssetDetail
-            asset={selectedAsset}
+          <AssetSelector
             accountId={broker.accountId}
-            brokerId={broker.brokerId}
+            assets={broker.assets}
+            selectedKey={selectedKey}
             detailId={detailId}
-            onClose={onClose}
+            onSelect={onSelect}
           />
-        ) : null}
-      </Stack>
-    </Surface>
+
+          {selectedAsset ? (
+            <AssetDetail
+              asset={selectedAsset}
+              accountId={broker.accountId}
+              brokerId={broker.brokerId}
+              detailId={detailId}
+              onClose={onClose}
+            />
+          ) : null}
+        </Stack>
+      </Card.Body>
+    </Card>
   );
 }

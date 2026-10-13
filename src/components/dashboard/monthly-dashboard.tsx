@@ -3,7 +3,7 @@
 import { Flex, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import useSWR from "swr";
 
-import { CardLink } from "@/components/dashboard/card-link";
+import { CardLink } from "@/components/ui/card-link";
 import { CategoryBreakdown } from "@/components/dashboard/category-breakdown";
 import { DailySpendingChart } from "@/components/dashboard/daily-spending-chart";
 import { MonthComparison } from "@/components/dashboard/month-comparison";

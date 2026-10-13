@@ -181,10 +181,10 @@ Create small, typed wrappers in `src/components/ui/` (one component, or one comp
 
 ### Task 6 — Investments and Net worth
 
-- [ ] `net-worth-panel` (308 lines): split into `net-worth-summary.tsx`, `net-worth-group.tsx`, `net-worth-entry-row.tsx`; headline uses `amountHero`; status badge uses `StatusBadge` (`warning` tone replaces `orange.700`).
-- [ ] Net-worth dialogs (`add-net-worth-item`, `edit-net-worth-item`, `add-net-worth-valuation`): migrate to `AppDialog` / `FormField` / `FormActions`; extract shared `net-worth-item-fields.tsx` used by add and edit.
-- [ ] `investments-panel`, `broker-section`, `asset-detail`, `asset-selector`, `transaction-list`: `Card` + `SectionHeader`; asset rows as `ListRow` on mobile; transaction table uses the table recipe; gains/losses via `Amount tone="auto"` / `ValueWithChange`.
-- [ ] `add-investment-dialog`, `add-order-dialog`: `AppDialog` + shared fields; `remove-order-dialog` → `ConfirmDialog`.
+- [x] `net-worth-panel` (308 lines): split into `net-worth-summary.tsx`, `net-worth-group.tsx`, `net-worth-entry-row.tsx`; headline uses `amountHero`; status badge uses `StatusBadge` (`warning` tone replaces `orange.700`).
+- [x] Net-worth dialogs (`add-net-worth-item`, `edit-net-worth-item`, `add-net-worth-valuation`): migrate to `AppDialog` / `FormField` / `FormActions`; extract shared `net-worth-item-fields.tsx` used by add and edit.
+- [x] `investments-panel`, `broker-section`, `asset-detail`, `asset-selector`, `transaction-list`: `Card` + `SectionHeader`; asset rows as `ListRow` on mobile; transaction table uses the table recipe; gains/losses via `Amount tone="auto"` / `ValueWithChange`.
+- [x] `add-investment-dialog`, `add-order-dialog`: `AppDialog` + shared fields; `remove-order-dialog` → `ConfirmDialog`.
 
 **Acceptance:** Positive/negative/warning colours come only from `status.*` tokens; all forms share identical label, spacing, and action layouts.
 

@@ -5,9 +5,9 @@ import { formatInvestmentAmount } from "@/lib/utils/currency";
 export type ValueChangeTone = "positive" | "negative" | "neutral";
 
 function changeColor(tone: ValueChangeTone) {
-  if (tone === "positive") return "positive";
-  if (tone === "negative") return "error";
-  return "muted";
+  if (tone === "positive") return "fg.success";
+  if (tone === "negative") return "fg.error";
+  return "fg.muted";
 }
 
 function formatSignedAmount(amount: string, currency: string) {
@@ -32,7 +32,7 @@ export function ValueWithChange({
   unavailableLabel?: string;
 }) {
   return (
-    <>
+    <span>
       {value === null ? unavailableLabel : formatInvestmentAmount(value, currency)}
       {change !== null && changeLabel ? (
         <Text
@@ -40,12 +40,12 @@ export function ValueWithChange({
           ml="2"
           color={changeColor(changeTone)}
           fontSize="0.85em"
-          fontWeight="600"
+          fontWeight="medium"
           whiteSpace="normal"
         >
           {changeLabel} {formatSignedAmount(change, currency)}
         </Text>
       ) : null}
-    </>
+    </span>
   );
 }

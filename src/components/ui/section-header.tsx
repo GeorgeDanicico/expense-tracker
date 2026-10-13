@@ -12,7 +12,7 @@ export function SectionHeader({
   title: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
-  as?: "h2" | "h3";
+  as?: "h2" | "h3" | "h4";
   id?: string;
 }) {
   return (

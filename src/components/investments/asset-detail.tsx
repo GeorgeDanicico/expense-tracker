@@ -1,14 +1,19 @@
 "use client";
 
-import { Alert, Badge, Box, Button, Flex, Heading, SimpleGrid, Skeleton, Stack, Text } from "@chakra-ui/react";
+import { Box, Button, Flex, SimpleGrid, Skeleton, Stack, Text } from "@chakra-ui/react";
 import { RefreshCw, X } from "lucide-react";
-import type { ReactNode } from "react";
 import useSWR from "swr";
 
 import { AddOrderDialog } from "@/components/investments/add-order-dialog";
 import { InvestmentValue } from "@/components/investments/investment-value";
 import { TransactionList } from "@/components/investments/transaction-list";
 import { DataRefresh } from "@/components/ui/data-state";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { IconButton } from "@/components/ui/icon-button";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { SectionHeader } from "@/components/ui/section-header";
+import { Stat } from "@/components/ui/stat";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { apiFetcher } from "@/lib/api/client";
 import { investmentTransactionsApiKey } from "@/lib/api/keys";
 import type {
@@ -16,33 +21,9 @@ import type {
   InvestmentOverviewAsset,
   InvestmentTransactionsResponse,
 } from "@/lib/investments/types";
-import { getInvestmentGainPresentation } from "@/lib/investments/presentation";
+import { getInvestmentGainPresentation, type InvestmentGainPresentation } from "@/lib/investments/presentation";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
 import { formatDateTime } from "@/lib/utils/dates";
-
-function DetailMetric({
-  label,
-  value,
-  helper,
-  valueColor = "fg",
-}: {
-  label: string;
-  value: ReactNode;
-  helper?: string;
-  valueColor?: string;
-}) {
-  return (
-    <Box>
-      <Text color="muted" fontSize="xs" fontWeight="600" letterSpacing="0.05em">
-        {label}
-      </Text>
-      <Text mt="1" color={valueColor} fontSize="1.5rem" fontWeight="600" overflowWrap="anywhere" letterSpacing="-0.03em">
-        {value}
-      </Text>
-      {helper ? <Text mt="1" color="muted" fontSize="xs">{helper}</Text> : null}
-    </Box>
-  );
-}
 
 function quoteStatus(asset: InvestmentOverviewAsset) {
   if (asset.priceStatus === "current" && asset.priceAsOf) {
@@ -55,14 +36,17 @@ function quoteStatus(asset: InvestmentOverviewAsset) {
   return "Price unavailable · transaction data is still available";
 }
 
+function gainStatTone(gain: InvestmentGainPresentation) {
+  if (gain.label === "Gain") return "positive";
+  if (gain.label === "Loss") return "negative";
+  return "muted";
+}
+
 function DetailLoading() {
   return (
-    <Stack gap="4" p={{ base: "4", md: "5" }} aria-busy="true" aria-live="polite">
-      <Skeleton height="5" width="12rem" />
-      <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} gap="3">
-        {["one", "two", "three", "four"].map((item) => <Skeleton key={item} height="6rem" borderRadius="2xl" />)}
-      </SimpleGrid>
-      <Skeleton height="11rem" borderRadius="2xl" />
+    <Stack gap="3" p="4" aria-busy="true" aria-live="polite">
+      <Skeleton height="4" width="12rem" />
+      {["one", "two", "three"].map((item) => <Skeleton key={item} height="9" borderRadius="control" />)}
     </Stack>
   );
 }
@@ -91,68 +75,56 @@ export function AssetDetail({
       tabIndex={-1}
       borderTopWidth="1px"
       borderColor="border"
-      pt="5"
+      pt="4"
       aria-labelledby={`${detailId}-title`}
       aria-live="polite"
+      _focusVisible={{ outline: "none" }}
     >
-      <Flex align="flex-start" justify="space-between" gap="4" mb="5" wrap="wrap">
-        <Stack minW="0" gap="1">
+      <Flex align="flex-start" justify="space-between" gap="3" mb="4" wrap="wrap">
+        <Stack minW="0" gap="0.5">
           <Flex align="center" gap="2" wrap="wrap">
-            <Heading as="h3" id={`${detailId}-title`} size={{ base: "lg", md: "xl" }} letterSpacing="-0.03em" truncate>
+            <Text as="h3" id={`${detailId}-title`} textStyle="dialogTitle" truncate>
               {asset.displayName}
-            </Heading>
+            </Text>
             {asset.priceSource ? (
-              <Badge colorPalette="brand" variant="subtle" borderRadius="full" px="2.5" py="1">
-                {asset.priceSource === "ZF" ? "ZF" : "Yahoo Finance"}
-              </Badge>
+              <StatusBadge tone="brand">{asset.priceSource === "ZF" ? "ZF" : "Yahoo Finance"}</StatusBadge>
             ) : null}
           </Flex>
-          <Text color="muted" fontSize="sm" fontWeight="600">
+          <Text textStyle="caption">
             {asset.instrument} · {asset.currency} · {quoteStatus(asset)}
           </Text>
         </Stack>
-        <Flex align="center" gap="2" flexShrink="0" ml="auto">
+        <Flex align="center" gap="1" flexShrink="0" ms="auto">
           <AddOrderDialog accountId={accountId} brokerId={brokerId} asset={asset} />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label={`Close ${asset.instrument} details`}
-            onClick={onClose}
-          >
-            <X size={17} aria-hidden="true" />
-          </Button>
+          <IconButton aria-label={`Close ${asset.instrument} details`} size="xs" tooltip onClick={onClose}>
+            <X size={ICON.sm} strokeWidth={ICON_STROKE} />
+          </IconButton>
         </Flex>
       </Flex>
 
-      <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} gap="3">
-        <DetailMetric label="Quantity" value={`${asset.quantity} units`} />
-        <DetailMetric label="Average acquisition" value={formatInvestmentAmount(asset.averageCost, asset.currency)} helper="Per unit" />
-        <DetailMetric label="Current price" value={formatInvestmentAmount(asset.currentPrice, asset.currency)} />
-        <DetailMetric label="Remaining cost" value={formatInvestmentAmount(asset.remainingCost, asset.currency)} />
-        <DetailMetric
+      <SimpleGrid columns={{ base: 2, md: 4 }} columnGap="4" rowGap="4">
+        <Stat size="sm" label="Quantity" value={`${asset.quantity} units`} />
+        <Stat size="sm" label="Average acquisition" value={formatInvestmentAmount(asset.averageCost, asset.currency)} helper="Per unit" />
+        <Stat size="sm" label="Current price" value={formatInvestmentAmount(asset.currentPrice, asset.currency)} />
+        <Stat size="sm" label="Remaining cost" value={formatInvestmentAmount(asset.remainingCost, asset.currency)} />
+        <Stat
+          size="sm"
           label="Current value"
-          value={
-            <InvestmentValue
-              currentValue={asset.currentValue}
-              unrealizedGain={asset.unrealizedGain}
-              currency={asset.currency}
-            />
-          }
-
+          value={<InvestmentValue currentValue={asset.currentValue} unrealizedGain={asset.unrealizedGain} currency={asset.currency} />}
         />
-        <DetailMetric label="Unrealized" value={unrealized.value} valueColor={unrealized.label === "Gain" ? "positive" : unrealized.label === "Loss" ? "error" : "muted"} helper={unrealized.label} />
-        <DetailMetric label="Realized" value={realized.value} valueColor={realized.label === "Gain" ? "positive" : realized.label === "Loss" ? "error" : "muted"} helper={realized.label} />
+        <Stat size="sm" label="Unrealized" value={unrealized.value} tone={gainStatTone(unrealized)} helper={unrealized.label} />
+        <Stat size="sm" label="Realized" value={realized.value} tone={gainStatTone(realized)} helper={realized.label} />
       </SimpleGrid>
 
-      <Box mt="5" overflow="hidden" borderWidth="1px" borderColor="border" borderRadius="2xl">
-        <Flex align="center" justify="space-between" gap="3" px={{ base: "4", md: "5" }} py="4" borderBottomWidth="1px" borderColor="canvas">
-          <Stack gap="1">
-            <Heading as="h4" size="md" letterSpacing="-0.02em">Transaction history</Heading>
-            <Text color="muted" fontSize="sm">Newest orders first · values in {asset.currency}</Text>
-          </Stack>
-          {data ? <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} /> : null}
-        </Flex>
+      <Box mt="5" overflow="hidden" borderWidth="1px" borderColor="border" borderRadius="control">
+        <Box px="4" py="3" borderBottomWidth="1px" borderColor="border">
+          <SectionHeader
+            as="h4"
+            title="Transaction history"
+            meta={`Newest orders first · values in ${asset.currency}`}
+            actions={data ? <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} /> : null}
+          />
+        </Box>
 
         {isLoading && !data ? (
           <>
@@ -161,15 +133,18 @@ export function AssetDetail({
           </>
         ) : null}
         {error && !data ? (
-          <Alert.Root status="error" m="4">
-            <Alert.Indicator />
-            <Stack flex="1" gap="2">
-              <Alert.Description>{error instanceof Error ? error.message : "Unable to load transaction history."}</Alert.Description>
-              <Button type="button" alignSelf="flex-start" size="sm" variant="outline" onClick={() => void mutate()}>
-                <RefreshCw size={15} aria-hidden="true" /> Try again
-              </Button>
-            </Stack>
-          </Alert.Root>
+          <Box p="3">
+            <InlineAlert
+              status="error"
+              action={
+                <Button type="button" size="xs" variant="outline" onClick={() => void mutate()}>
+                  <RefreshCw size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Try again
+                </Button>
+              }
+            >
+              {error instanceof Error ? error.message : "Unable to load transaction history."}
+            </InlineAlert>
+          </Box>
         ) : null}
         {data ? (
           <TransactionList

@@ -1,4 +1,4 @@
-import { Field, Text, type FieldRootProps } from "@chakra-ui/react";
+import { Field, Flex, Text, type FieldRootProps } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import type { WithoutStyleOverrides } from "@/components/ui/types";
@@ -32,5 +32,14 @@ export function FormField({
       {hint && !error ? <Field.HelperText>{hint}</Field.HelperText> : null}
       <Field.ErrorText>{error}</Field.ErrorText>
     </Field.Root>
+  );
+}
+
+/** Two or more fields side by side on wider screens, stacked on mobile. */
+export function FormRow({ children }: { children: ReactNode }) {
+  return (
+    <Flex gap="3" direction={{ base: "column", sm: "row" }}>
+      {children}
+    </Flex>
   );
 }

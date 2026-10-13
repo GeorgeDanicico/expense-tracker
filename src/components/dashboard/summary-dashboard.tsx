@@ -4,7 +4,7 @@ import { Box, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import useSWR from "swr";
 
 import { AmountComparison } from "@/components/dashboard/amount-comparison";
-import { CardLink } from "@/components/dashboard/card-link";
+import { CardLink } from "@/components/ui/card-link";
 import { MonthlyBarChart } from "@/components/dashboard/monthly-bar-chart";
 import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
 import { ExpenseList } from "@/components/expenses/expense-list";

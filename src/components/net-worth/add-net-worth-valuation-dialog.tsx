@@ -1,20 +1,15 @@
 "use client";
 
-import {
-  Alert,
-  Button,
-  Dialog,
-  Field,
-  Flex,
-  Input,
-  Portal,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { Plus, X } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { Button, Flex, Input, Stack, Text } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
+import { FormEvent, useId, useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { AppDialog } from "@/components/ui/app-dialog";
+import { FormActions } from "@/components/ui/form-actions";
+import { FormField } from "@/components/ui/form-field";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { NET_WORTH_API_KEY } from "@/lib/api/keys";
 import type { NetWorthEntry } from "@/lib/net-worth/types";
@@ -37,6 +32,7 @@ export function AddNetWorthValuationDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
+  const formId = useId();
 
   if (entry.itemId === null) return null;
   const itemId = entry.itemId;
@@ -74,73 +70,45 @@ export function AddNetWorthValuationDialog({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => setOpen(details.open)} size="md">
-      <Dialog.Trigger asChild>
-        <Button type="button" size="sm" variant="solid" colorPalette="brand">
-          <Plus size={16} aria-hidden="true" /> Add value
+    <AppDialog
+      open={open}
+      onOpenChange={setOpen}
+      title="Add a dated value"
+      description="Correcting the same date replaces its observation instead of creating a duplicate."
+      trigger={
+        <Button type="button" size="xs" variant="outline">
+          <Plus size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add value
         </Button>
-      </Dialog.Trigger>
-      <Portal>
-        <Dialog.Backdrop bg="blackAlpha.500" />
-        <Dialog.Positioner alignItems={{ base: "flex-end", sm: "center" }} p="4" pb={{ base: "env(safe-area-inset-bottom)", sm: "4" }}>
-          <Dialog.Content>
-            <Dialog.Header>
-              <Stack gap="1">
-                <Dialog.Title>Add a dated value</Dialog.Title>
-                <Dialog.Description color="muted" fontSize="sm">
-                  Correcting the same date replaces its observation instead of creating a duplicate.
-                </Dialog.Description>
-              </Stack>
-            </Dialog.Header>
-            <Dialog.Body>
-              {open ? (
-                <form onSubmit={submit} aria-busy={pending}>
-                  <Stack gap="4.5">
-                    <Flex align="center" justify="space-between" gap="3" p="4" borderRadius="xl" bg="canvas">
-                      <Stack minW="0" gap="1">
-                        <Text color="fg" fontWeight="600" truncate>{entry.name}</Text>
-                        <Text color="muted" fontSize="sm">{entry.currency} · {entry.kind === "liability" ? "amount owed" : "owned value"}</Text>
-                      </Stack>
-                      <Text color="fg" fontWeight="600" whiteSpace="nowrap">
-                        {entry.currentValue === null ? "No value" : formatInvestmentAmount(entry.currentValue, entry.currency)}
-                      </Text>
-                    </Flex>
+      }
+      footer={<FormActions form={formId} closesDialog pending={pending} submitLabel="Save value" />}
+    >
+      <form id={formId} onSubmit={submit} aria-busy={pending}>
+        <Stack gap="3">
+          <Flex align="center" justify="space-between" gap="3" px="3" py="2.5" borderRadius="control" bg="bg.subtle">
+            <Stack minW="0" gap="0">
+              <Text textStyle="bodySm" fontWeight="medium" truncate>{entry.name}</Text>
+              <Text textStyle="caption">{entry.currency} · {entry.kind === "liability" ? "amount owed" : "owned value"}</Text>
+            </Stack>
+            <Text textStyle="amountSm" whiteSpace="nowrap">
+              {entry.currentValue === null ? "No value" : formatInvestmentAmount(entry.currentValue, entry.currency)}
+            </Text>
+          </Flex>
 
-                    <Field.Root invalid={Boolean(fieldError("value"))}>
-                      <Field.Label>{entry.kind === "liability" ? "Amount owed" : "Current value"}</Field.Label>
-                      <Input name="value" defaultValue={entry.currentValue ?? ""} type="number" inputMode="decimal" min="0" step="any" autoFocus required />
-                      <Field.ErrorText>{fieldError("value")}</Field.ErrorText>
-                    </Field.Root>
+          <FormField label={entry.kind === "liability" ? "Amount owed" : "Current value"} error={fieldError("value")}>
+            <Input name="value" defaultValue={entry.currentValue ?? ""} type="number" inputMode="decimal" min="0" step="any" autoFocus required />
+          </FormField>
 
-                    <Field.Root invalid={Boolean(fieldError("valuedOn"))}>
-                      <Field.Label>Valued on</Field.Label>
-                      <Input name="valuedOn" defaultValue={entry.valuedOn ?? currentDateValue()} type="date" required />
-                      <Field.HelperText>{entry.valuedOn ? `Latest observation: ${formatDate(entry.valuedOn)}` : "Use the date you observed or estimated this value."}</Field.HelperText>
-                      <Field.ErrorText>{fieldError("valuedOn")}</Field.ErrorText>
-                    </Field.Root>
+          <FormField
+            label="Valued on"
+            error={fieldError("valuedOn")}
+            hint={entry.valuedOn ? `Latest observation: ${formatDate(entry.valuedOn)}` : "Use the date you observed or estimated this value."}
+          >
+            <Input name="valuedOn" defaultValue={entry.valuedOn ?? currentDateValue()} type="date" required />
+          </FormField>
 
-                    {error ? (
-                      <Alert.Root status="error">
-                        <Alert.Indicator />
-                        <Alert.Description>{error}</Alert.Description>
-                      </Alert.Root>
-                    ) : null}
-
-                    <Button type="submit" variant="solid" colorPalette="brand" loading={pending}>
-                      Save value
-                    </Button>
-                  </Stack>
-                </form>
-              ) : null}
-            </Dialog.Body>
-            <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="sm" aria-label="Close dialog">
-                <X size={17} aria-hidden="true" />
-              </Button>
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
+        </Stack>
+      </form>
+    </AppDialog>
   );
 }

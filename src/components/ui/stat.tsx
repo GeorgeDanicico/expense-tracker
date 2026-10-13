@@ -2,6 +2,13 @@ import { Flex, Stat as ChakraStat } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 const SIZE = { hero: "lg", md: "md", sm: "sm" } as const;
+const TONE = {
+  default: undefined,
+  positive: "fg.success",
+  negative: "fg.error",
+  warning: "fg.warning",
+  muted: "fg.muted",
+} as const;
 
 /** Label + figure. One `hero` stat per screen; secondary metrics use `sm`. */
 export function Stat({
@@ -10,7 +17,7 @@ export function Stat({
   size = "md",
   helper,
   change,
-  tone,
+  tone = "default",
 }: {
   label: ReactNode;
   value: ReactNode;
@@ -18,12 +25,12 @@ export function Stat({
   helper?: ReactNode;
   /** Optional delta rendered under the value (e.g. `<ValueWithChange>`). */
   change?: ReactNode;
-  tone?: "default" | "warning";
+  tone?: keyof typeof TONE;
 }) {
   return (
     <ChakraStat.Root size={SIZE[size]} flex="0 1 auto" minW={size === "hero" ? "10rem" : "6rem"}>
       <ChakraStat.Label>{label}</ChakraStat.Label>
-      <ChakraStat.ValueText color={tone === "warning" ? "fg.warning" : undefined}>
+      <ChakraStat.ValueText color={TONE[tone]}>
         {value}
       </ChakraStat.ValueText>
       {change ? <ChakraStat.HelpText>{change}</ChakraStat.HelpText> : null}
