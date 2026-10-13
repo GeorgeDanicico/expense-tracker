@@ -136,8 +136,9 @@ Create small, typed wrappers in `src/components/ui/` (one component, or one comp
 | `SegmentedControl` | dashboard view tabs, stats-filter presets | Chakra `SegmentGroup`, 28/32px |
 | `Toolbar` | month toolbar, list filters row | Consistent gap/wrap behaviour for filter rows |
 
-- [ ] Export from `src/components/ui/index.ts`.
-- [ ] Add `src/app/(app)/dev/ui/page.tsx`, a style gallery that renders every primitive, size, and tone. It returns `notFound()` when `NODE_ENV === "production"`.
+- [x] Export from `src/components/ui/index.ts`.
+- [x] Add `src/app/dev/ui/page.tsx`, a style gallery that renders every primitive, size, and tone. It returns `notFound()` when `NODE_ENV === "production"`. (Placed outside the `(app)` group so it renders without signing in.)
+- [x] Add `src/app/dev/preview/[screen]/page.tsx` (also development-only): renders Home, Expenses, Investments, Net worth, and Settings inside the app shell with fixture data, so screens can be reviewed without a Supabase session.
 
 **Acceptance:** Every primitive renders in the gallery; none of them takes raw colour, radius, or font-weight props.
 

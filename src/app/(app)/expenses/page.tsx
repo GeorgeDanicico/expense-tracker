@@ -3,7 +3,6 @@
 import {
   Box,
   Button,
-  Flex,
   Heading,
   Stack,
   Tabs,
@@ -137,18 +136,19 @@ function ExpensesContent() {
 
   return (
     <Stack gap="5">
-      <PageHeader title="Expenses">
-        {activeTabId === null ? (
-          <Flex gap="2" wrap="wrap">
+      <PageHeader
+        title="Expenses"
+        actions={activeTabId === null ? (
+          <>
             <AddExpenseDialog selectedMonth={month} currency={currency} />
             <Button asChild variant="outline">
               <Link href={mainExpensesExportUrl(month)}>
                 <Download size={17} aria-hidden="true" /> Export
               </Link>
             </Button>
-          </Flex>
-        ) : null}
-      </PageHeader>
+          </>
+        ) : undefined}
+      />
 
       {tabsError ? (
         <DataRefresh error={tabsError} updating={tabsUpdating} retry={() => void mutateTabs()} />

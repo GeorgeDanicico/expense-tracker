@@ -1,0 +1,66 @@
+"use client";
+
+import type { ReactNode } from "react";
+
+import { AppDialog } from "@/components/ui/app-dialog";
+import { FormActions } from "@/components/ui/form-actions";
+import { InlineAlert } from "@/components/ui/inline-alert";
+
+/** Confirmation for destructive or irreversible actions. */
+export function ConfirmDialog({
+  title,
+  description,
+  confirmLabel,
+  cancelLabel = "Cancel",
+  onConfirm,
+  pending = false,
+  error,
+  open,
+  onOpenChange,
+  trigger,
+  tone = "danger",
+  children,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  pending?: boolean;
+  error?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: ReactNode;
+  tone?: "danger" | "brand";
+  children?: ReactNode;
+}) {
+  return (
+    <AppDialog
+      title={title}
+      description={description}
+      trigger={trigger}
+      open={open}
+      onOpenChange={onOpenChange}
+      size="sm"
+      placement="center"
+      role="alertdialog"
+      footer={
+        <FormActions
+          submitLabel={confirmLabel}
+          cancelLabel={cancelLabel}
+          closesDialog
+          pending={pending}
+          tone={tone}
+          onSubmit={onConfirm}
+        />
+      }
+    >
+      {children || error ? (
+        <>
+          {children}
+          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
+        </>
+      ) : null}
+    </AppDialog>
+  );
+}

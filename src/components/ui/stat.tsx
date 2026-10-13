@@ -1,0 +1,42 @@
+import { Flex, Stat as ChakraStat } from "@chakra-ui/react";
+import type { ReactNode } from "react";
+
+const SIZE = { hero: "lg", md: "md", sm: "sm" } as const;
+
+/** Label + figure. One `hero` stat per screen; secondary metrics use `sm`. */
+export function Stat({
+  label,
+  value,
+  size = "md",
+  helper,
+  change,
+  tone,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  size?: keyof typeof SIZE;
+  helper?: ReactNode;
+  /** Optional delta rendered under the value (e.g. `<ValueWithChange>`). */
+  change?: ReactNode;
+  tone?: "default" | "warning";
+}) {
+  return (
+    <ChakraStat.Root size={SIZE[size]} flex={size === "hero" ? "1 1 12rem" : "0 1 auto"}>
+      <ChakraStat.Label>{label}</ChakraStat.Label>
+      <ChakraStat.ValueText color={tone === "warning" ? "fg.warning" : undefined}>
+        {value}
+      </ChakraStat.ValueText>
+      {change ? <ChakraStat.HelpText>{change}</ChakraStat.HelpText> : null}
+      {helper ? <ChakraStat.HelpText>{helper}</ChakraStat.HelpText> : null}
+    </ChakraStat.Root>
+  );
+}
+
+/** Lays out a hero stat followed by secondary stats, wrapping on narrow screens. */
+export function StatGroup({ children }: { children: ReactNode }) {
+  return (
+    <Flex wrap="wrap" align="flex-end" columnGap={{ base: "6", md: "10" }} rowGap="4">
+      {children}
+    </Flex>
+  );
+}

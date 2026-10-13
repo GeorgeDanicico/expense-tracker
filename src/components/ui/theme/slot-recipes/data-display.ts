@@ -30,12 +30,12 @@ export const tableSlotRecipe = defineSlotRecipe({
       sm: {
         root: { textStyle: "bodySm" },
         columnHeader: { px: "3", py: "2", h: "8" },
-        cell: { px: "3", py: "1.5", h: "9" },
+        cell: { px: "3", py: "0.5", h: "9" },
       },
       md: {
         root: { textStyle: "bodySm" },
         columnHeader: { px: "3", py: "2", h: "9" },
-        cell: { px: "3", py: "2", h: "10" },
+        cell: { px: "3", py: "1", h: "10" },
       },
     },
   },

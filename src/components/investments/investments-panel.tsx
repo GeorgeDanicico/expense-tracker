@@ -82,7 +82,7 @@ export function InvestmentsPanel() {
 
   return (
     <Stack gap={{ base: "6", md: "7" }}>
-      <PageHeader title="Investments"><AddInvestmentDialog /></PageHeader>
+      <PageHeader title="Investments" actions={<AddInvestmentDialog />} />
       <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
 
       <CalculationIssues overview={data} />

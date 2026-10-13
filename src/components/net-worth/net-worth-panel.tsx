@@ -281,7 +281,7 @@ export function NetWorthPanel() {
 
   return (
     <Stack gap={{ base: "6", md: "7" }}>
-      <PageHeader title="Net worth"><AddNetWorthItemDialog defaultCurrency={account?.currency ?? "EUR"} onSuccess={() => undefined} /></PageHeader>
+      <PageHeader title="Net worth" actions={<AddNetWorthItemDialog defaultCurrency={account?.currency ?? "EUR"} onSuccess={() => undefined} />} />
       <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
 
       <AttentionArea overview={data} />
