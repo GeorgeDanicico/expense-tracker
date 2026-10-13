@@ -102,7 +102,7 @@ export function CustomExpenseTab({
         {error && !matching ? (
           <DataError retry={() => void mutate()} />
         ) : !matching ? (
-          <DataLoading label={`Loading ${tab.name} expenses…`} />
+          <Box p="4"><DataLoading layout="section" label={`Loading ${tab.name} expenses…`} /></Box>
         ) : (
           <Stack gap="4" p="4">
             <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />

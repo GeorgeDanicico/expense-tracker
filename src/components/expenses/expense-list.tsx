@@ -14,6 +14,7 @@ function NoExpenses({ filtered = false }: { filtered?: boolean }) {
   return (
     <EmptyState
       size="sm"
+      titleAs="p"
       icon={filtered ? <Search /> : <Inbox />}
       title={filtered ? "No matching expenses" : "No recorded expenses"}
       description={

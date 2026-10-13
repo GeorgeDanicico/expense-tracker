@@ -40,7 +40,7 @@ export function MonthComparison({
           previousError ? (
             <DataError retry={retryPrevious} />
           ) : (
-            <DataLoading label="Loading comparison…" />
+            <DataLoading layout="section" label="Loading comparison…" />
           )
         ) : (
           <Stack gap="3">

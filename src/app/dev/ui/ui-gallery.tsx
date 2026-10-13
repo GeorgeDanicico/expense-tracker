@@ -39,6 +39,7 @@ import {
   Toolbar,
   ValueWithChange,
 } from "@/components/ui";
+import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { EXPENSE_CATEGORIES } from "@/lib/expenses/categories";
 
 import { GalleryRow, GallerySection } from "./gallery-section";
@@ -318,6 +319,22 @@ export function UiGallery() {
               confirmLabel="Delete expense"
               onConfirm={() => setConfirmOpen(false)}
             />
+          </GalleryRow>
+        </GallerySection>
+
+        <GallerySection title="Data states" description="Skeleton loading (page and section), error, and refresh status.">
+          <DataLoading label="Loading example…" />
+          <Card>
+            <Card.Body>
+              <DataLoading layout="section" label="Loading section…" />
+            </Card.Body>
+          </Card>
+          <Card>
+            <DataError retry={() => undefined} />
+          </Card>
+          <GalleryRow label="DataRefresh">
+            <DataRefresh updating retry={() => undefined} />
+            <DataRefresh error={new Error("failed")} updating={false} retry={() => undefined} />
           </GalleryRow>
         </GallerySection>
 

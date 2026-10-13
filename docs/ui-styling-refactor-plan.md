@@ -190,11 +190,11 @@ Create small, typed wrappers in `src/components/ui/` (one component, or one comp
 
 ### Task 7 — Settings, auth, offline, PWA
 
-- [ ] Settings: grouped `Card`s with `SectionHeader` + description, form rows label-left/control-right on desktop.
-- [ ] Auth form: 360px centred card, `md` controls, logo mark from token colour; preserve the login/signup/confirmation flows.
-- [ ] Offline page, `offline-status`, `install-instructions`: `InlineAlert` / `EmptyState`; remove the hex colour.
-- [ ] `data-state.tsx`: `DataLoading` uses a `Skeleton` that matches the target layout instead of a centred spinner; `DataError` uses `EmptyState` + `sm` retry button; `DataRefresh` becomes an inline `caption` + `xs` button.
-- [ ] Bump the offline-shell cache version because the shell appearance changes.
+- [x] Settings: grouped `Card`s with `SectionHeader` + description, form rows label-left/control-right on desktop.
+- [x] Auth form: 360px centred card, `md` controls, logo mark from token colour; preserve the login/signup/confirmation flows.
+- [x] Offline page, `offline-status`, `install-instructions`: `InlineAlert` / `EmptyState`; remove the hex colour.
+- [x] `data-state.tsx`: `DataLoading` uses a `Skeleton` that matches the target layout instead of a centred spinner; `DataError` uses `EmptyState` + `sm` retry button; `DataRefresh` becomes an inline `caption` + `xs` button.
+- [x] Bump the offline-shell cache version because the shell appearance changes.
 
 ### Task 8 — Guardrails and cleanup
 

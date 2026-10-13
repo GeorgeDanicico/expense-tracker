@@ -22,5 +22,5 @@ export default function HomePage() {
     return <DataError message={error.message} retry={() => void mutate()} />;
   }
 
-  return <DataLoading label="Opening Simple Ledger…" />;
+  return <DataLoading layout="screen" label="Opening Simple Ledger…" />;
 }

@@ -8,19 +8,22 @@ export function EmptyState({
   description,
   action,
   size = "md",
+  titleAs = "h3",
 }: {
   icon?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
   size?: "sm" | "md";
+  /** Heading level of the title; use `p` when the state is not a section. */
+  titleAs?: "h1" | "h2" | "h3" | "p";
 }) {
   return (
     <ChakraEmptyState.Root size={size}>
       <ChakraEmptyState.Content textAlign="center">
         {icon ? <ChakraEmptyState.Indicator>{icon}</ChakraEmptyState.Indicator> : null}
         <Flex direction="column" align="center" gap="1">
-          <ChakraEmptyState.Title>{title}</ChakraEmptyState.Title>
+          <ChakraEmptyState.Title as={titleAs}>{title}</ChakraEmptyState.Title>
           {description ? (
             <ChakraEmptyState.Description>{description}</ChakraEmptyState.Description>
           ) : null}
