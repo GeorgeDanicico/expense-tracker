@@ -144,13 +144,13 @@ Create small, typed wrappers in `src/components/ui/` (one component, or one comp
 
 ### Task 3 — App shell and navigation
 
-- [ ] Split `app-navigation.tsx` into `sidebar-nav.tsx`, `mobile-tab-bar.tsx`, `more-sheet.tsx`, and a shared `nav-items.ts`.
-- [ ] Sidebar: width 208 → **220px**, nav items 44 → **32px** tall, `bodySm` labels, 16px icons, active state = `bg.selected` + `fg.default` text with a 2px clay indicator. The account block becomes one compact row (avatar initial + email truncated + sign-out `IconButton` with tooltip).
-- [ ] Mobile header: 56 → **48px** (plus safe area), brand at 14px semibold. The page title appears in the header only when scrolled past `PageHeader` (optional, later).
-- [ ] Mobile tab bar: 56 → **52px** items, 18px icons, 11px labels; active = accent colour without a filled pill.
-- [ ] More sheet uses `AppDialog` (bottom placement) and the same `NavItem` rows.
-- [ ] Replace the hex colour in `Brand` with a token.
-- [ ] Main container: max width 1200px stays; padding 16px mobile and 24px desktop; top padding 20px desktop.
+- [x] Split `app-navigation.tsx` into `sidebar-nav.tsx`, `mobile-tab-bar.tsx`, `more-sheet.tsx`, and a shared `nav-items.ts`.
+- [x] Sidebar: width 208 → **220px**, nav items 44 → **32px** tall, `bodySm` labels, 16px icons, active state = `bg.selected` + `fg.default` text with a 2px clay indicator. The account block becomes one compact row (avatar initial + email truncated + sign-out `IconButton` with tooltip).
+- [x] Mobile header: 56 → **48px** (plus safe area), brand at 14px semibold. The page title appears in the header only when scrolled past `PageHeader` (optional, later).
+- [x] Mobile tab bar: 56 → **52px** items, 18px icons, 11px labels; active = accent colour without a filled pill.
+- [x] More sheet uses `AppDialog` (bottom placement) and the same `NavItem` rows.
+- [x] Replace the hex colour in `Brand` with a token.
+- [x] Main container: max width 1200px stays; padding 16px mobile and 24px desktop; top padding 20px desktop.
 
 **Acceptance:** Navigation looks identical in structure but lighter; `aria-current`, the skip link, focus trap, and safe areas behave as before.
 

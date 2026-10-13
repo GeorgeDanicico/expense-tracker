@@ -1,23 +1,11 @@
 "use client";
 
-import { Box, Container, Flex, Stack, Text } from "@chakra-ui/react";
-import { Landmark } from "lucide-react";
-import {
-  DesktopNavigation,
-  MobileNavigation,
-  NavigationLink,
-} from "@/components/layout/app-navigation";
-import { SignOutButton } from "@/components/layout/sign-out-button";
-import { OfflineStatus } from "@/components/pwa/offline-status";
+import { Box, Container, Flex } from "@chakra-ui/react";
 
-function Brand() {
-  return (
-    <Flex align="center" gap="2" minH="11">
-      <Landmark size={20} color="#A64B32" aria-hidden="true" />
-      <Text fontWeight="600">Simple Ledger</Text>
-    </Flex>
-  );
-}
+import { Brand } from "@/components/layout/brand";
+import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
+import { SidebarNav } from "@/components/layout/sidebar-nav";
+import { OfflineStatus } from "@/components/pwa/offline-status";
 
 export function AppShell({
   children,
@@ -32,41 +20,16 @@ export function AppShell({
         Skip to content
       </a>
       <Flex maxW="1440px" minH="100dvh" mx="auto">
-        <Box
-          as="aside"
-          aria-label="Application sidebar"
-          display={{ base: "none", md: "flex" }}
-          position="sticky"
-          top="0"
-          width="208px"
-          height="100dvh"
-          flexShrink="0"
-          flexDirection="column"
-          p="4"
-          bg="surface"
-          borderRightWidth="1px"
-          borderColor="border"
-        >
-          <Brand />
-          <Box mt="5">
-            <DesktopNavigation />
-          </Box>
-          <Stack mt="auto" gap="2">
-            <NavigationLink href="/settings" />
-            <Text color="muted" fontSize="xs" overflowWrap="anywhere" px="3">
-              {email}
-            </Text>
-            <SignOutButton />
-          </Stack>
-        </Box>
+        <SidebarNav email={email} />
         <Box flex="1" minW="0">
           <Flex
             as="header"
             display={{ base: "flex", md: "none" }}
-            minH="14"
+            align="center"
+            h="calc(3rem + env(safe-area-inset-top))"
             px="4"
             pt="env(safe-area-inset-top)"
-            bg="surface"
+            bg="bg.surface"
             borderBottomWidth="1px"
             borderColor="border"
           >
@@ -78,15 +41,15 @@ export function AppShell({
             tabIndex={-1}
             maxW="1200px"
             px={{ base: "4", md: "6" }}
-            pt={{ base: "4", md: "6" }}
-            pb={{ base: "calc(6rem + env(safe-area-inset-bottom))", md: "6" }}
+            pt={{ base: "4", md: "5" }}
+            pb={{ base: "calc(4.5rem + env(safe-area-inset-bottom))", md: "8" }}
           >
             <OfflineStatus />
             {children}
           </Container>
         </Box>
       </Flex>
-      <MobileNavigation email={email} />
+      <MobileTabBar email={email} />
     </Box>
   );
 }

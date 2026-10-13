@@ -1,13 +1,17 @@
 "use client";
 
-import { Alert, Button, Stack } from "@chakra-ui/react";
+import { Button, Stack } from "@chakra-ui/react";
 import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
+
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { IconButton } from "@/components/ui/icon-button";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { apiRequest } from "@/lib/api/client";
 
-export function SignOutButton() {
+function useSignOut() {
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const [pending, setPending] = useState(false);
@@ -29,22 +33,45 @@ export function SignOutButton() {
       setPending(false);
     }
   }
+  return { signOut, pending, error };
+}
+
+/** Full-width sign-out row (More sheet). */
+export function SignOutButton() {
+  const { signOut, pending, error } = useSignOut();
   return (
     <Stack gap="2">
       <Button
         onClick={signOut}
         loading={pending}
         variant="ghost"
+        size="md"
+        h="11"
+        px="3"
         justifyContent="flex-start"
-        color="muted"
+        color="fg.muted"
+        fontWeight="medium"
       >
-        <LogOut size={18} aria-hidden="true" /> Sign out
+        <LogOut size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" /> Sign out
       </Button>
-      {error ? (
-        <Alert.Root status="error">
-          <Alert.Description>{error}</Alert.Description>
-        </Alert.Root>
-      ) : null}
+      {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
     </Stack>
+  );
+}
+
+/** Icon-only sign-out with a tooltip (sidebar account row). */
+export function SignOutIconButton() {
+  const { signOut, pending, error } = useSignOut();
+  return (
+    <>
+      <IconButton aria-label="Sign out" size="xs" tooltip onClick={signOut} loading={pending}>
+        <LogOut size={ICON.xs} strokeWidth={ICON_STROKE} />
+      </IconButton>
+      {error ? (
+        <Stack position="absolute" insetX="3" bottom="100%" mb="2">
+          <InlineAlert status="error">{error}</InlineAlert>
+        </Stack>
+      ) : null}
+    </>
   );
 }
