@@ -3,6 +3,7 @@ import "server-only";
 import type { z } from "zod";
 
 import { getInvestmentsOverviewForUser } from "@/lib/data/investments";
+import type { Database } from "@/lib/database.types";
 import { DomainError } from "@/lib/errors";
 import { buildNetWorthOverview } from "@/lib/net-worth/calculation";
 import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
@@ -17,30 +18,17 @@ import type { netWorthItemPatchSchema, netWorthItemSchema, netWorthValuationSche
 
 const MAX_ACTIVE_ITEMS = 500;
 
-type NetWorthValuationRow = {
-  id: string;
-  item_id: string;
-  value: number | string;
-  valued_on: string;
-};
+type Tables = Database["public"]["Tables"];
 
-type NetWorthItemRow = {
-  id: string;
-  name: string;
-  kind: string;
-  category: string;
-  currency: string;
-  purchase_amount: number | string | null;
-  archived_at: string | null;
+const VALUATION_COLUMNS = "id, item_id, value, valued_on";
+const ITEM_COLUMNS = "id, name, kind, category, currency, purchase_amount, archived_at";
+const OWNED_ITEM_COLUMNS = "id, kind, category, archived_at";
+
+type NetWorthValuationRow = Tables["net_worth_valuations"]["Row"];
+
+/** Embedded selects are untyped because the generated types declare no relationships. */
+type NetWorthItemRow = Omit<Tables["net_worth_items"]["Row"], "user_id"> & {
   net_worth_valuations: NetWorthValuationRow[] | null;
-};
-
-type OwnedNetWorthItemRow = {
-  id: string;
-  /** The table's check constraint limits `kind` to the known kinds. */
-  kind: NetWorthItemKind;
-  category: string;
-  archived_at: string | null;
 };
 
 /** Callers normalize an omitted purchase amount to `null` before creating. */
@@ -85,9 +73,7 @@ async function queryActiveManualItemsForUser(userId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("net_worth_items")
-    .select(
-      "id, name, kind, category, currency, purchase_amount, archived_at, net_worth_valuations(id, item_id, value, valued_on)",
-    )
+    .select(`${ITEM_COLUMNS}, net_worth_valuations(${VALUATION_COLUMNS})`)
     .eq("user_id", userId)
     .is("archived_at", null)
     .order("category", { ascending: true })
@@ -119,15 +105,20 @@ async function queryOwnedItem(userId: string, itemId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("net_worth_items")
-    .select("id, kind, category, archived_at")
+    .select(OWNED_ITEM_COLUMNS)
     .eq("id", itemId)
     .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw new Error("Unable to load the net-worth item.");
-  return data as unknown as OwnedNetWorthItemRow | null;
+  // The table's check constraint limits `kind` to the known kinds.
+  return data && { ...data, kind: data.kind as NetWorthItemKind };
 }
 
+/**
+ * Ownership comes from `auth.uid()` inside the `create_net_worth_item_with_valuation` RPC, which
+ * inserts the item and its first valuation together; `_userId` is kept for a uniform signature.
+ */
 export async function createNetWorthItemForUser(
   _userId: string,
   input: NetWorthItemCreateInput,
@@ -173,12 +164,7 @@ export async function updateNetWorthItemForUser(
     );
   }
 
-  const update: {
-    name?: string;
-    category?: string;
-    purchase_amount?: string | null;
-    archived_at?: string | null;
-  } = {};
+  const update: Tables["net_worth_items"]["Update"] = {};
   if (input.name !== undefined) update.name = input.name;
   if (input.category !== undefined) {
     update.category = input.category;
@@ -218,7 +204,7 @@ export async function addNetWorthValuationForUser(
       { item_id: itemId, value: input.value, valued_on: input.valuedOn },
       { onConflict: "item_id,valued_on" },
     )
-    .select("id, item_id, value, valued_on")
+    .select(VALUATION_COLUMNS)
     .single();
 
   if (error || !data) {
@@ -228,7 +214,7 @@ export async function addNetWorthValuationForUser(
     throw new Error("The valuation could not be saved.");
   }
 
-  return toValuation(data as unknown as NetWorthValuationRow);
+  return toValuation(data);
 }
 
 export async function updateNetWorthValuationForUser(
@@ -253,7 +239,7 @@ export async function updateNetWorthValuationForUser(
     .from("net_worth_valuations")
     .update({ value: input.value, valued_on: input.valuedOn })
     .eq("id", valuationId)
-    .select("id, item_id, value, valued_on")
+    .select(VALUATION_COLUMNS)
     .single();
 
   if (error || !data) {
@@ -263,5 +249,5 @@ export async function updateNetWorthValuationForUser(
     throw new Error("The valuation could not be corrected.");
   }
 
-  return toValuation(data as unknown as NetWorthValuationRow);
+  return toValuation(data);
 }

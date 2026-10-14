@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Database } from "@/lib/database.types";
 import { DomainError } from "@/lib/errors";
 import {
   aggregateInvestments,
@@ -13,6 +14,7 @@ import {
   isInvestmentBrokerId,
   type InvestmentAccount,
   type InvestmentBrokerId,
+  type InvestmentTransactionSide,
   type InvestmentTransactionInput,
   type InvestmentTransaction,
   type InvestmentTransactionsResponse,
@@ -23,27 +25,18 @@ import { createClient } from "@/lib/supabase/server";
 const MAX_ACCOUNTS = 2;
 const MAX_TRANSACTIONS_PER_ACCOUNT = 5_000;
 
-type InvestmentTransactionRow = {
-  id: string;
-  investment_account_id: string;
-  instrument: string;
-  currency: string;
-  side: "buy" | "sell";
-  amount: number | string;
-  quantity: number | string;
-  unit_price: number | string;
-  executed_at: string;
-};
+type Tables = Database["public"]["Tables"];
 
-type InvestmentAccountWithTransactionsRow = {
-  id: string;
-  broker_id: string;
+const TRANSACTION_COLUMNS =
+  "id, investment_account_id, instrument, currency, side, amount, quantity, unit_price, executed_at";
+const ACCOUNT_COLUMNS = "id, broker_id";
+
+type InvestmentTransactionRow = Tables["investment_transactions"]["Row"];
+type InvestmentAccountRow = Pick<Tables["investment_accounts"]["Row"], "id" | "broker_id">;
+
+/** Embedded selects are untyped because the generated types declare no relationships. */
+type InvestmentAccountWithTransactionsRow = InvestmentAccountRow & {
   investment_transactions: InvestmentTransactionRow[] | null;
-};
-
-type InvestmentAccountRow = {
-  id: string;
-  broker_id: string;
 };
 
 function toTransaction(row: InvestmentTransactionRow): InvestmentTransaction {
@@ -52,7 +45,8 @@ function toTransaction(row: InvestmentTransactionRow): InvestmentTransaction {
     investmentAccountId: row.investment_account_id,
     instrument: row.instrument,
     currency: row.currency,
-    side: row.side,
+    // The table's check constraint limits `side` to buy/sell.
+    side: row.side as InvestmentTransactionSide,
     amount: String(row.amount),
     quantity: String(row.quantity),
     unitPrice: String(row.unit_price),
@@ -60,16 +54,29 @@ function toTransaction(row: InvestmentTransactionRow): InvestmentTransaction {
   };
 }
 
-function parseAccountRow(row: InvestmentAccountWithTransactionsRow) {
-  if (!isInvestmentBrokerId(row.broker_id)) {
-    throw new Error("Unable to load investments.");
-  }
-
+function toTransactionInsert(transaction: InvestmentTransaction): Tables["investment_transactions"]["Insert"] {
   return {
-    account: {
-      id: row.id,
-      brokerId: row.broker_id,
-    } satisfies InvestmentAccount,
+    id: transaction.id,
+    investment_account_id: transaction.investmentAccountId,
+    instrument: transaction.instrument,
+    currency: transaction.currency,
+    side: transaction.side,
+    amount: transaction.amount,
+    quantity: transaction.quantity,
+    unit_price: transaction.unitPrice,
+    executed_at: transaction.executedAt,
+  };
+}
+
+/** Rejects a stored broker id this version does not know, failing with `failure`. */
+function toAccount(row: InvestmentAccountRow, failure: string): InvestmentAccount {
+  if (!isInvestmentBrokerId(row.broker_id)) throw new Error(failure);
+  return { id: row.id, brokerId: row.broker_id };
+}
+
+function parseAccountRow(row: InvestmentAccountWithTransactionsRow) {
+  return {
+    account: toAccount(row, "Unable to load investments."),
     transactions: (row.investment_transactions ?? []).map(toTransaction),
   };
 }
@@ -78,9 +85,7 @@ async function queryAccountsWithTransactions(userId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("investment_accounts")
-    .select(
-      "id, broker_id, investment_transactions(id, investment_account_id, instrument, currency, side, amount, quantity, unit_price, executed_at)",
-    )
+    .select(`${ACCOUNT_COLUMNS}, investment_transactions(${TRANSACTION_COLUMNS})`)
     .eq("user_id", userId)
     .order("broker_id", { ascending: true })
     .order("executed_at", {
@@ -128,9 +133,7 @@ async function queryTransactionsForAsset(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("investment_accounts")
-    .select(
-      "id, broker_id, investment_transactions!inner(id, investment_account_id, instrument, currency, side, amount, quantity, unit_price, executed_at)",
-    )
+    .select(`${ACCOUNT_COLUMNS}, investment_transactions!inner(${TRANSACTION_COLUMNS})`)
     .eq("id", accountId)
     .eq("user_id", userId)
     .eq("investment_transactions.instrument", instrument)
@@ -150,55 +153,37 @@ async function queryTransactionsForAsset(
   return data as unknown as InvestmentAccountWithTransactionsRow | null;
 }
 
-async function queryOwnedAccountForBroker(userId: string, brokerId: InvestmentBrokerId) {
+/** Reads an account only when it belongs to `userId`. */
+async function queryOwnedAccount(userId: string, by: { id: string } | { brokerId: InvestmentBrokerId }) {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("investment_accounts")
-    .select("id, broker_id")
-    .eq("user_id", userId)
-    .eq("broker_id", brokerId)
-    .maybeSingle();
+    .select(ACCOUNT_COLUMNS)
+    .eq("user_id", userId);
+  query = "id" in by ? query.eq("id", by.id) : query.eq("broker_id", by.brokerId);
+  const { data, error } = await query.maybeSingle();
 
   if (error) throw new Error("Unable to load investment account.");
-  if (!data) return null;
-
-  const row = data as unknown as InvestmentAccountRow;
-  if (!isInvestmentBrokerId(row.broker_id)) {
-    throw new Error("Unable to load investment account.");
-  }
-
-  return {
-    id: row.id,
-    brokerId: row.broker_id,
-  } satisfies InvestmentAccount;
+  return data ? toAccount(data, "Unable to load investment account.") : null;
 }
 
 async function getOrCreateOwnedAccount(userId: string, brokerId: InvestmentBrokerId) {
-  const existing = await queryOwnedAccountForBroker(userId, brokerId);
+  const existing = await queryOwnedAccount(userId, { brokerId });
   if (existing) return existing;
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("investment_accounts")
     .insert({ user_id: userId, broker_id: brokerId })
-    .select("id, broker_id")
+    .select(ACCOUNT_COLUMNS)
     .single();
 
-  if (!error && data) {
-    const row = data as unknown as InvestmentAccountRow;
-    if (!isInvestmentBrokerId(row.broker_id)) {
-      throw new Error("Unable to create investment account.");
-    }
-    return {
-      id: row.id,
-      brokerId: row.broker_id,
-    } satisfies InvestmentAccount;
-  }
+  if (!error && data) return toAccount(data, "Unable to create investment account.");
 
   // A second request can win the unique (user_id, broker_id) race. The
   // account is immutable in this version, so re-reading is sufficient.
   if (error?.code === "23505") {
-    const racedAccount = await queryOwnedAccountForBroker(userId, brokerId);
+    const racedAccount = await queryOwnedAccount(userId, { brokerId });
     if (racedAccount) return racedAccount;
   }
 
@@ -213,7 +198,7 @@ async function queryDirectAssetTransactions(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("investment_transactions")
-    .select("id, investment_account_id, instrument, currency, side, amount, quantity, unit_price, executed_at")
+    .select(TRANSACTION_COLUMNS)
     .eq("investment_account_id", accountId)
     .eq("instrument", instrument)
     .eq("currency", currency)
@@ -222,7 +207,7 @@ async function queryDirectAssetTransactions(
     .limit(MAX_TRANSACTIONS_PER_ACCOUNT);
 
   if (error) throw new Error("Unable to load investment history.");
-  return (data as unknown as InvestmentTransactionRow[]).map(toTransaction);
+  return data.map(toTransaction);
 }
 
 function throwMutationCalculationError(error: unknown, prefix = "") {
@@ -267,18 +252,8 @@ export async function createInvestmentTransactionForUser(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("investment_transactions")
-    .insert({
-      id: transaction.id,
-      investment_account_id: transaction.investmentAccountId,
-      instrument: transaction.instrument,
-      currency: transaction.currency,
-      side: transaction.side,
-      amount: transaction.amount,
-      quantity: transaction.quantity,
-      unit_price: transaction.unitPrice,
-      executed_at: transaction.executedAt,
-    })
-    .select("id, investment_account_id, instrument, currency, side, amount, quantity, unit_price, executed_at")
+    .insert(toTransactionInsert(transaction))
+    .select(TRANSACTION_COLUMNS)
     .single();
 
   if (error || !data) throw new Error("The investment order could not be saved.");
@@ -298,15 +273,15 @@ export async function deleteInvestmentTransactionForUser(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("investment_transactions")
-    .select("id, investment_account_id, instrument, currency, side, amount, quantity, unit_price, executed_at")
+    .select(TRANSACTION_COLUMNS)
     .eq("id", transactionId)
     .maybeSingle();
 
   if (error) throw new Error("Unable to load investment order.");
   if (!data) return false;
 
-  const target = toTransaction(data as unknown as InvestmentTransactionRow);
-  const account = await queryOwnedAccountById(userId, target.investmentAccountId);
+  const target = toTransaction(data);
+  const account = await queryOwnedAccount(userId, { id: target.investmentAccountId });
   if (!account) return false;
 
   const transactions = await queryDirectAssetTransactions(
@@ -335,23 +310,6 @@ export async function deleteInvestmentTransactionForUser(
   return true;
 }
 
-async function queryOwnedAccountById(userId: string, accountId: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("investment_accounts")
-    .select("id, broker_id")
-    .eq("id", accountId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) throw new Error("Unable to load investment account.");
-  if (!data) return null;
-
-  const row = data as unknown as InvestmentAccountRow;
-  if (!isInvestmentBrokerId(row.broker_id)) throw new Error("Unable to load investment account.");
-  return { id: row.id, brokerId: row.broker_id } satisfies InvestmentAccount;
-}
-
 export async function getInvestmentTransactionsForUser(
   userId: string,
   params: { accountId: string; instrument: string; currency: string },
@@ -363,6 +321,7 @@ export async function getInvestmentTransactionsForUser(
     params.currency,
   );
   if (!row || !isInvestmentBrokerId(row.broker_id)) return null;
+  const brokerId = row.broker_id;
 
   return {
     accountId: row.id,
@@ -370,7 +329,7 @@ export async function getInvestmentTransactionsForUser(
     currency: params.currency,
     transactions: (row.investment_transactions ?? []).map((transaction) => ({
       ...toTransaction(transaction),
-      brokerId: row.broker_id as InvestmentBrokerId,
+      brokerId,
     })),
   };
 }

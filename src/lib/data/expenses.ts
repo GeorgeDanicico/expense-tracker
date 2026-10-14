@@ -1,7 +1,9 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
 
+import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import {
   SUBTYPE_LABELS,
@@ -38,23 +40,19 @@ export type ExpensePatch = Partial<{
   notes: string | null;
 }>;
 
-type ExpenseRow = {
-  id: string;
-  description: string;
-  amount: number | string;
-  category: ExpenseCategory;
-  subtype: ExpenseSubtype | null;
-  expense_date: string;
-  notes: string | null;
-};
+type ExpenseRow = Pick<
+  Database["public"]["Tables"]["expenses"]["Row"],
+  "id" | "description" | "amount" | "category" | "subtype" | "expense_date" | "notes"
+>;
 
 function toExpense(row: ExpenseRow): Expense {
   return {
     id: row.id,
     description: row.description,
     amount: Number(row.amount),
-    category: row.category,
-    subtype: row.subtype,
+    // The table's check constraints limit both columns to the known keys.
+    category: row.category as ExpenseCategory,
+    subtype: row.subtype as ExpenseSubtype | null,
     expenseDate: row.expense_date,
     notes: row.notes,
   };
@@ -69,48 +67,72 @@ type ExpenseQuery = {
 
 const EXPENSE_PAGE_SIZE = 500;
 
-async function queryExpensesForUser(userId: string, options: ExpenseQuery) {
-  const supabase = await createClient();
-  const expenses: Expense[] = [];
+type ExpenseFilterQuery = ReturnType<typeof selectOwnedExpensePage>;
+
+function selectOwnedExpensePage(supabase: SupabaseClient<Database>, userId: string) {
+  return supabase.from("expenses")
+    .select(EXPENSE_COLUMNS, { count: "exact" })
+    .eq("user_id", userId);
+}
+
+/** Narrows an owner-scoped query by tab membership, date bounds, category and subtype. */
+function applyExpenseScope(query: ExpenseFilterQuery, options: ExpenseQuery) {
+  if (options.tab) {
+    const membership: string[] = [];
+    if (options.tab.categoryKeys.length) membership.push(`category.in.(${options.tab.categoryKeys.join(",")})`);
+    if (options.tab.subtypeKeys.length) membership.push(`subtype.in.(${options.tab.subtypeKeys.join(",")})`);
+    query = query.or(membership.join(","));
+  }
+  if (options.start) query = query.gte("expense_date", options.start);
+  if (options.endExclusive) query = query.lt("expense_date", options.endExclusive);
+  if (options.filters?.category) query = query.eq("category", options.filters.category);
+  if (options.filters?.subtype === "none") query = query.is("subtype", null);
+  else if (options.filters?.subtype && options.filters.subtype !== "all") query = query.eq("subtype", options.filters.subtype);
+  return query;
+}
+
+type Page<Row> = { data: Row[] | null; error: unknown; count: number | null };
+
+/** Reads every page, failing the whole read when any page errors or the total comes up short. */
+async function fetchAllPages<Row>(fetchPage: (from: number, to: number) => PromiseLike<Page<Row>>) {
+  const rows: Row[] = [];
   let offset = 0;
-  // An empty selection must never turn into an unrestricted expense query.
-  if (options.tab && !options.tab.categoryKeys.length && !options.tab.subtypeKeys.length) return [];
   while (true) {
-    let query = supabase.from("expenses")
-      .select(EXPENSE_COLUMNS, { count: "exact" })
-      .eq("user_id", userId);
-    if (options.tab) {
-      const membership: string[] = [];
-      if (options.tab.categoryKeys.length) membership.push(`category.in.(${options.tab.categoryKeys.join(",")})`);
-      if (options.tab.subtypeKeys.length) membership.push(`subtype.in.(${options.tab.subtypeKeys.join(",")})`);
-      query = query.or(membership.join(","));
-    }
-    if (options.start) query = query.gte("expense_date", options.start);
-    if (options.endExclusive) query = query.lt("expense_date", options.endExclusive);
-    if (options.filters?.category) query = query.eq("category", options.filters.category);
-    if (options.filters?.subtype === "none") query = query.is("subtype", null);
-    else if (options.filters?.subtype && options.filters.subtype !== "all") query = query.eq("subtype", options.filters.subtype);
-    const { data, error, count } = await query
-      .order("expense_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(offset, offset + EXPENSE_PAGE_SIZE - 1);
+    const { data, error, count } = await fetchPage(offset, offset + EXPENSE_PAGE_SIZE - 1);
     if (error) throw new Error("Unable to load expenses.");
-    const page = (data ?? []) as ExpenseRow[];
+    const page = data ?? [];
     if (!page.length) {
       if (count !== null && offset < count) throw new Error("Unable to load complete expenses.");
       break;
     }
-    expenses.push(...page.map(toExpense));
+    rows.push(...page);
     offset += page.length;
     // Advance by actual rows, so a server cap smaller than our page size cannot truncate history.
     if (count !== null && offset >= count) break;
   }
+  return rows;
+}
+
+/** `term` is already lower-cased. */
+function matchesSearch(expense: Expense, term: string) {
+  return [expense.description, expense.notes ?? "", CATEGORY_LABELS[expense.category],
+    expense.subtype ? SUBTYPE_LABELS[expense.subtype] : "No subtype"]
+    .some((value) => value.toLowerCase().includes(term));
+}
+
+async function queryExpensesForUser(userId: string, options: ExpenseQuery) {
+  const supabase = await createClient();
+  // An empty selection must never turn into an unrestricted expense query.
+  if (options.tab && !options.tab.categoryKeys.length && !options.tab.subtypeKeys.length) return [];
+  const rows = await fetchAllPages((from, to) =>
+    applyExpenseScope(selectOwnedExpensePage(supabase, userId), options)
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to));
+  const expenses = rows.map(toExpense);
   const search = options.filters?.search.toLowerCase() ?? "";
-  return search ? expenses.filter((expense) =>
-    [expense.description, expense.notes ?? "", CATEGORY_LABELS[expense.category],
-      expense.subtype ? SUBTYPE_LABELS[expense.subtype] : "No subtype"]
-      .some((value) => value.toLowerCase().includes(search))) : expenses;
+  return search ? expenses.filter((expense) => matchesSearch(expense, search)) : expenses;
 }
 
 export async function getMonthlyExpensesForUser(userId: string, month: string) {
@@ -154,7 +176,7 @@ export async function getDashboardDataForUser(
     throw new Error("Unable to load dashboard data.");
   }
 
-  const currentExpenses = (recentResult.data as ExpenseRow[]).map(toExpense);
+  const currentExpenses = recentResult.data.map(toExpense);
   const summary = summaryResult.data as unknown as DashboardSummary;
   const currentTotal = Number(summary.currentTotal);
   const currentCount = Number(summary.currentCount);
@@ -191,7 +213,7 @@ export async function createExpenseForUser(userId: string, input: ExpenseInput):
     .select(EXPENSE_COLUMNS)
     .single();
   if (error || !data) throw new Error("The expense could not be saved.");
-  return toExpense(data as ExpenseRow);
+  return toExpense(data);
 }
 
 /** Resolves to whether an owned row was deleted. */
@@ -227,7 +249,7 @@ export async function updateExpenseForUser(
   if (loadError) throw new Error("Unable to load expense.");
   if (!existing) return null;
 
-  const current = toExpense(existing as ExpenseRow);
+  const current = toExpense(existing);
   const category = patch.category ?? current.category;
   const subtype = patch.subtype !== undefined
     ? patch.subtype
@@ -250,5 +272,5 @@ export async function updateExpenseForUser(
     .select(EXPENSE_COLUMNS)
     .maybeSingle();
   if (error) throw new Error("The expense could not be saved.");
-  return data ? toExpense(data as ExpenseRow) : null;
+  return data ? toExpense(data) : null;
 }
