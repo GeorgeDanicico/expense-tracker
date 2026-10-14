@@ -93,7 +93,7 @@ export function DataError({
   );
 }
 
-export function DataUpdating() {
+function DataUpdating() {
   return (
     <Flex align="center" gap="1.5" textStyle="caption" aria-live="polite" role="status">
       <Spinner size="xs" color="fg.subtle" /> Updating…

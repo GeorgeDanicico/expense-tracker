@@ -11,10 +11,11 @@ import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { EXPENSE_TABS_API_KEY, expenseTabApiKey } from "@/lib/api/keys";
-import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/types";
 import {
+  EXPENSE_CATEGORIES,
   EXPENSE_SUBTYPES,
   SUBTYPE_CATEGORIES,
+  type ExpenseCategory,
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
 import type { ExpenseTab } from "@/lib/expenses/tabs";

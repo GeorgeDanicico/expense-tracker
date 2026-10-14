@@ -17,7 +17,7 @@ const CalculationDecimal = Decimal.clone({
 });
 
 /** Values use the same fractional scale as the investment database columns. */
-export const INVESTMENT_DECIMAL_PLACES = 10;
+const INVESTMENT_DECIMAL_PLACES = 10;
 
 export function formatInvestmentDecimal(value: InstanceType<typeof CalculationDecimal>) {
   const rounded = value.toDecimalPlaces(

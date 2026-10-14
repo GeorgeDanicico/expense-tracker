@@ -1,8 +1,5 @@
 import type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
 
-export { EXPENSE_CATEGORIES, CATEGORY_LABELS, EXPENSE_SUBTYPES, SUBTYPE_LABELS, SUBTYPE_CATEGORIES } from "@/lib/expenses/categories";
-export type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
-
 export type Expense = {
   id: string;
   description: string;

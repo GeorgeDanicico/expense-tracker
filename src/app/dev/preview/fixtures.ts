@@ -5,13 +5,12 @@ import type {
   InvestmentTransactionsResponse,
 } from "@/lib/investments/types";
 import type { NetWorthOverview } from "@/lib/net-worth/types";
-import {
-  CATEGORY_LABELS,
-  type AccountData,
-  type DashboardData,
-  type Expense,
-  type ExpenseCategory,
-  type ExpensesData,
+import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
+import type {
+  AccountData,
+  DashboardData,
+  Expense,
+  ExpensesData,
 } from "@/lib/types";
 import { getCurrentMonth, shiftMonth } from "@/lib/utils/dates";
 

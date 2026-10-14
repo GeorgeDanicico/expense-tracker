@@ -2,7 +2,7 @@ import { ValueWithChange, type ValueChangeTone } from "@/components/ui/value-wit
 import { getInvestmentValuePresentation } from "@/lib/investments/presentation";
 
 /** Maps the presentation helper's colour names onto value-change tones. */
-export function gainTone(color: string): ValueChangeTone {
+function gainTone(color: string): ValueChangeTone {
   if (color === "green.700") return "positive";
   if (color === "red.700") return "negative";
   return "neutral";

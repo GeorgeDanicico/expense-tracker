@@ -7,8 +7,8 @@ import { ExpenseFilters } from "@/components/expenses/expense-filters";
 import { ExpenseMobileList } from "@/components/expenses/expense-mobile-list";
 import { ExpenseTable } from "@/components/expenses/expense-table";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SUBTYPE_LABELS } from "@/lib/expenses/categories";
-import { CATEGORY_LABELS, type Expense, type ExpenseCategory } from "@/lib/types";
+import { SUBTYPE_LABELS, CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
+import type { Expense } from "@/lib/types";
 
 function NoExpenses({ filtered = false }: { filtered?: boolean }) {
   return (

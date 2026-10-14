@@ -8,9 +8,9 @@ import { z } from "zod";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 
-export type McpCredentials = { email: string; password: string };
-export type McpSession = { client: SupabaseClient<Database>; userId: string; email: string };
-export type McpAuthResult =
+type McpCredentials = { email: string; password: string };
+type McpSession = { client: SupabaseClient<Database>; userId: string; email: string };
+type McpAuthResult =
   | { status: "ok"; session: McpSession }
   | { status: "unauthorized" }
   | { status: "throttled" };

@@ -5,7 +5,8 @@ import type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories"
 
 const mocks = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => mocks);
-import { summarizeExpenses, updateExpenseForUser } from "./expenses";
+import { summarizeExpenses } from "@/lib/expenses/summary";
+import { updateExpenseForUser } from "./expenses";
 
 type Row = { id: string; user_id: string; description: string; amount: string; category: ExpenseCategory; subtype: ExpenseSubtype | null; expense_date: string; notes: string | null };
 const fuel: Row = { id: "fuel", user_id: "owner", description: "Fuel", amount: "10.50", category: "car", subtype: "car_fuel", expense_date: "2026-09-01", notes: "Full tank" };

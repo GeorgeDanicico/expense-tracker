@@ -4,7 +4,7 @@ import { Flex, Input, InputGroup, NativeSelect, Text } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
-import { CATEGORY_LABELS, EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/types";
+import { CATEGORY_LABELS, EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/expenses/categories";
 
 /** Search + category filter row above the main expense list. */
 export function ExpenseFilters({

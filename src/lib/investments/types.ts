@@ -20,8 +20,6 @@ export type InvestmentTransactionSide = (typeof INVESTMENT_TRANSACTION_SIDES)[nu
  */
 export type InvestmentCurrency = string;
 
-export const INVESTMENT_CURRENCY_EXAMPLES = ["EUR", "USD", "RON"] as const;
-
 export function isInvestmentCurrency(value: string) {
   return /^[A-Z]{3}$/.test(value);
 }

@@ -8,10 +8,16 @@ import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { expensesApiKey, mainExpensesApiKey } from "@/lib/api/keys";
-import { SUBTYPE_LABELS, subtypesForCategory, subtypeForCategory, type ExpenseCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
 import {
+  SUBTYPE_LABELS,
+  subtypesForCategory,
+  subtypeForCategory,
   CATEGORY_LABELS,
   EXPENSE_CATEGORIES,
+  type ExpenseCategory,
+  type ExpenseSubtype,
+} from "@/lib/expenses/categories";
+import {
   INITIAL_ACTION_STATE,
   type ActionState,
   type Expense,

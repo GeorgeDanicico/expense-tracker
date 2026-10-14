@@ -3,18 +3,21 @@ import "server-only";
 import type { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
-import { SUBTYPE_LABELS, subtypeForCategory } from "@/lib/expenses/categories";
-import { expenseTabDateBounds, type ExpenseTabFilters } from "@/lib/expenses/tab-filters";
-import type { ExpenseTab } from "@/lib/expenses/tabs";
 import {
+  SUBTYPE_LABELS,
+  subtypeForCategory,
   CATEGORY_LABELS,
-  type Analytics,
-  type AnalyticsFilters,
-  type AnalyticsPeriod,
-  type DashboardData,
-  type Expense,
   type ExpenseCategory,
   type ExpenseSubtype,
+} from "@/lib/expenses/categories";
+import { expenseTabDateBounds, type ExpenseTabFilters } from "@/lib/expenses/tab-filters";
+import type { ExpenseTab } from "@/lib/expenses/tabs";
+import type {
+  Analytics,
+  AnalyticsFilters,
+  AnalyticsPeriod,
+  DashboardData,
+  Expense,
 } from "@/lib/types";
 import {
   formatDate,
@@ -26,8 +29,6 @@ import {
   shiftMonth,
 } from "@/lib/utils/dates";
 import { expenseSchema } from "@/lib/validation/expense";
-
-export { summarizeExpenses } from "@/lib/expenses/summary";
 
 const EXPENSE_COLUMNS = "id, description, amount, category, subtype, expense_date, notes";
 

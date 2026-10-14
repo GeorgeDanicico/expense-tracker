@@ -36,7 +36,7 @@ export const investmentTransactionQuerySchema = z.object({
   currency: currencyQuerySchema,
 });
 
-export const investmentBrokerIdSchema = z.enum(INVESTMENT_BROKER_IDS);
+const investmentBrokerIdSchema = z.enum(INVESTMENT_BROKER_IDS);
 
 export const investmentTransactionSchema = z.object({
   brokerId: investmentBrokerIdSchema,

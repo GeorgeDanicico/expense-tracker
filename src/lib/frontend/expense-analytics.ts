@@ -1,10 +1,9 @@
 import Decimal from "decimal.js";
-import {
-  CATEGORY_LABELS,
-  SUBTYPE_LABELS,
-  type Analytics,
-  type AnalyticsFilters,
-  type Expense,
+import { CATEGORY_LABELS, SUBTYPE_LABELS } from "@/lib/expenses/categories";
+import type {
+  Analytics,
+  AnalyticsFilters,
+  Expense,
 } from "@/lib/types";
 import type { ExpenseTabFilters } from "@/lib/expenses/tab-filters";
 import {

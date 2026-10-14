@@ -5,7 +5,7 @@ import { InvestmentMutationError } from "@/lib/data/investments";
 import { NetWorthMutationError } from "@/lib/data/net-worth";
 
 export type ToolContext = { userId: string; email: string };
-export type ToolRegistrar = (server: McpServer, ctx: ToolContext) => void;
+type ToolRegistrar = (server: McpServer, ctx: ToolContext) => void;
 
 type ToolDefinition<S extends z.ZodType> = {
   name: string;
