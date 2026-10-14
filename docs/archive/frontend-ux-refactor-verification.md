@@ -83,7 +83,7 @@ Additional captures: [More sheet](./frontend-ux/screenshots/after-more-sheet.png
 
 ## App icon
 
-The existing notebook/checkmark identity was edited with the built-in `image_gen` tool in opaque image-edit mode. The output was resized into [512px](../public/icon-512.png), [192px](../public/icon-192.png), [Next icon](../src/app/icon.png), [Apple icon](../src/app/apple-icon.png) and [favicon](../src/app/favicon.ico) assets. The existing [SVG icon](../public/icon.svg) was recolored to match. No image-generation API key or application dependency was used.
+The existing notebook/checkmark identity was edited with the built-in `image_gen` tool in opaque image-edit mode. The output was resized into [512px](../../public/icon-512.png), [192px](../../public/icon-192.png), [Next icon](../../src/app/icon.png), [Apple icon](../../src/app/apple-icon.png) and [favicon](../../src/app/favicon.ico) assets. The existing [SVG icon](../../public/icon.svg) was recolored to match. No image-generation API key or application dependency was used.
 
 Exact image-edit prompt:
 
