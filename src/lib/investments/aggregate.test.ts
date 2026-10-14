@@ -4,10 +4,8 @@ import {
   aggregateInvestments,
   calculateInvestmentPosition,
 } from "@/lib/investments/aggregate";
-import type {
-  InvestmentAccount,
-  InvestmentTransaction,
-} from "@/lib/investments/types";
+import type { InvestmentAccount } from "@/lib/investments/types";
+import { aTransaction } from "@/test/builders";
 
 const accountXtb: InvestmentAccount = { id: "account-xtb", brokerId: "xtb" };
 const accountBt: InvestmentAccount = {
@@ -15,26 +13,11 @@ const accountBt: InvestmentAccount = {
   brokerId: "banca_transilvania",
 };
 
-function transaction(
-  overrides: Partial<InvestmentTransaction> & Pick<InvestmentTransaction, "id" | "side">,
-): InvestmentTransaction {
-  return {
-    investmentAccountId: accountXtb.id,
-    instrument: "VWCE.DE",
-    currency: "EUR",
-    amount: "150",
-    quantity: "1.5",
-    unitPrice: "100",
-    executedAt: "2026-01-01T10:00:00Z",
-    ...overrides,
-  };
-}
-
 describe("investment aggregation", () => {
   it("calculates fractional weighted-average cost and a partial sell", () => {
     const position = calculateInvestmentPosition([
-      transaction({ id: "01-buy", side: "buy" }),
-      transaction({
+      aTransaction({ id: "01-buy", side: "buy" }),
+      aTransaction({
         id: "02-buy",
         side: "buy",
         amount: "30",
@@ -42,7 +25,7 @@ describe("investment aggregation", () => {
         unitPrice: "120",
         executedAt: "2026-01-02T10:00:00Z",
       }),
-      transaction({
+      aTransaction({
         id: "03-sell",
         side: "sell",
         amount: "70",
@@ -60,14 +43,14 @@ describe("investment aggregation", () => {
 
   it("processes same-time orders by id for deterministic results", () => {
     const position = calculateInvestmentPosition([
-      transaction({
+      aTransaction({
         id: "a-buy",
         side: "buy",
         quantity: "1.5",
         amount: "150",
         executedAt: "2026-01-01T10:00:00Z",
       }),
-      transaction({
+      aTransaction({
         id: "z-sell",
         side: "sell",
         quantity: "0.5",
@@ -83,8 +66,8 @@ describe("investment aggregation", () => {
 
   it("supports a full sell and preserves realized gain with no remaining cost", () => {
     const position = calculateInvestmentPosition([
-      transaction({ id: "01-buy", side: "buy" }),
-      transaction({
+      aTransaction({ id: "01-buy", side: "buy" }),
+      aTransaction({
         id: "02-sell",
         side: "sell",
         amount: "180",
@@ -104,8 +87,8 @@ describe("investment aggregation", () => {
     const result = aggregateInvestments(
       [accountXtb, accountBt],
       [
-        transaction({ id: "eur", side: "buy", amount: "100" }),
-        transaction({
+        aTransaction({ id: "eur", side: "buy", amount: "100" }),
+        aTransaction({
           id: "usd",
           side: "buy",
           instrument: "AAPL.US",
@@ -114,7 +97,7 @@ describe("investment aggregation", () => {
           quantity: "0.5",
           unitPrice: "500",
         }),
-        transaction({
+        aTransaction({
           id: "ron",
           side: "buy",
           investmentAccountId: accountBt.id,
@@ -144,8 +127,8 @@ describe("investment aggregation", () => {
     const result = aggregateInvestments(
       [accountXtb],
       [
-        transaction({ id: "01-buy", side: "buy" }),
-        transaction({
+        aTransaction({ id: "01-buy", side: "buy" }),
+        aTransaction({
           id: "02-sell-too-much",
           side: "sell",
           amount: "200",
@@ -171,7 +154,7 @@ describe("investment aggregation", () => {
 
   it("rejects a sell when no units are available", () => {
     expect(() => calculateInvestmentPosition([
-      transaction({
+      aTransaction({
         id: "01-sell",
         side: "sell",
         amount: "100",

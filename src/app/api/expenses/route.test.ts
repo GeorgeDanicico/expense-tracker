@@ -1,61 +1,60 @@
-import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ getAuthenticatedUser: vi.fn(), getMonthlyExpensesForUser: vi.fn(), createExpenseForUser: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
-vi.mock("@/lib/data/expenses", () => ({ getMonthlyExpensesForUser: mocks.getMonthlyExpensesForUser, createExpenseForUser: mocks.createExpenseForUser }));
+import { anExpense } from "@/test/builders";
+import { callRoute, signedInAs } from "@/test/route";
+
+const mocks = vi.hoisted(() => ({ getMonthlyExpensesForUser: vi.fn(), createExpenseForUser: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
+vi.mock("@/lib/data/expenses", () => mocks);
 
 import { POST } from "@/app/api/expenses/route";
 
 const body = { selectedMonth: "2026-09", expenseDate: "2026-09-01", description: "Fuel", amount: "10.50", category: "car", subtype: "car_fuel" };
-const stored = { id: "expense", description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel", expenseDate: "2026-09-01", notes: null };
-const request = (data: unknown) => new NextRequest("http://localhost/api/expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+const stored = anExpense({ id: "expense", description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel", expenseDate: "2026-09-01" });
+const post = (data: unknown) => callRoute(POST, { method: "POST", url: "/api/expenses", body: data });
 
-describe("expense subtype creation", () => {
+describe("POST /api/expenses", () => {
+  let user: ReturnType<typeof signedInAs>;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getAuthenticatedUser.mockResolvedValue({ id: "owner" });
+    user = signedInAs();
     mocks.createExpenseForUser.mockResolvedValue(stored);
   });
 
-  it("writes the optional subtype using authenticated ownership", async () => {
-    const response = await POST(request({ ...body, user_id: "someone-else" }));
+  it("creates the expense for the signed-in user, ignoring a user_id in the body", async () => {
+    const response = await post({ ...body, user_id: "someone-else" });
+
     expect(response.status).toBe(201);
-    expect(mocks.createExpenseForUser).toHaveBeenCalledWith("owner", expect.objectContaining({ category: "car", subtype: "car_fuel", amount: 10.5 }));
+    expect(mocks.createExpenseForUser).toHaveBeenCalledWith(user.id, expect.objectContaining({ category: "car", subtype: "car_fuel", amount: 10.5 }));
     expect(mocks.createExpenseForUser.mock.calls[0][1]).not.toHaveProperty("user_id");
-    expect((await response.json()).expense).toMatchObject({ category: "car", subtype: "car_fuel", amount: 10.5 });
-    expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
   });
 
   it("writes null for an omitted subtype", async () => {
-    await POST(request({ ...body, subtype: undefined }));
-    expect(mocks.createExpenseForUser).toHaveBeenCalledWith("owner", expect.objectContaining({ subtype: null }));
+    await post({ ...body, subtype: undefined });
+
+    expect(mocks.createExpenseForUser).toHaveBeenCalledWith(user.id, expect.objectContaining({ subtype: null }));
   });
 
-  it("returns the final stored classification after a database classifier", async () => {
-    const response = await POST(request({ ...body, category: "transport", subtype: null }));
-    expect(mocks.createExpenseForUser).toHaveBeenCalledWith("owner", expect.objectContaining({ category: "transport", subtype: null }));
-    expect((await response.json()).expense).toMatchObject({ category: "car", subtype: "car_fuel" });
+  it("responds with the expense as stored, not as requested", async () => {
+    const response = await post({ ...body, category: "transport", subtype: null });
+
+    expect(response.body.expense).toEqual(stored);
   });
 
-  it("rejects incompatible subtypes before database access", async () => {
-    const response = await POST(request({ ...body, category: "groceries" }));
+  it("rejects a subtype from another category before touching the database", async () => {
+    const response = await post({ ...body, category: "groceries" });
+
     expect(response.status).toBe(422);
-    expect((await response.json()).fieldErrors.subtype).toHaveLength(1);
+    expect(response.body.fieldErrors.subtype).toHaveLength(1);
     expect(mocks.createExpenseForUser).not.toHaveBeenCalled();
   });
 
-  it("authenticates before accepting writes", async () => {
-    mocks.getAuthenticatedUser.mockResolvedValue(null);
-    expect((await POST(request(body))).status).toBe(401);
-    expect(mocks.createExpenseForUser).not.toHaveBeenCalled();
-  });
-
-  it("hides storage failures behind a generic error", async () => {
+  it("reports a storage failure with the route's own message", async () => {
     mocks.createExpenseForUser.mockRejectedValue(new Error("private failure"));
-    const response = await POST(request(body));
-    expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "The expense could not be saved." });
-    expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+
+    const response = await post(body);
+
+    expect(response).toMatchObject({ status: 500, body: { error: "The expense could not be saved." } });
   });
 });

@@ -43,9 +43,10 @@ vi.mock("@/lib/data/net-worth", () => ({
 
 import { DomainError } from "@/lib/errors";
 import { createMcpServer } from "@/lib/mcp/server";
+import { aTab, anExpense } from "@/test/builders";
 
 const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
-const stored = { id: ID, description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel", expenseDate: "2026-10-04", notes: null };
+const stored = anExpense({ id: ID, description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel", expenseDate: "2026-10-04" });
 
 async function connect() {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -70,36 +71,78 @@ describe("MCP server", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("lists the 20 tools with their annotations", async () => {
-    const { tools } = await (await connect()).listTools();
-    expect(tools).toHaveLength(20);
-    const byName = Object.fromEntries(tools.map((tool) => [tool.name, tool]));
-    for (const name of ["get_account", "list_expenses", "get_spending_summary", "list_expense_tabs", "get_expense_tab_expenses",
-      "get_investments", "list_investment_transactions", "get_net_worth"]) {
-      expect(byName[name].annotations).toMatchObject({ readOnlyHint: true });
-    }
-    const destructive = tools.filter((tool) => tool.annotations?.destructiveHint).map((tool) => tool.name).sort();
-    expect(destructive).toEqual(["delete_expense", "delete_expense_tab", "delete_investment_transaction"]);
-    for (const name of ["update_expense", "update_expense_tab", "update_net_worth_item", "add_net_worth_valuation", "update_net_worth_valuation"]) {
-      expect(byName[name].annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
-    }
-    expect(byName.add_expense.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: false });
-    for (const tool of tools) {
-      expect(Object.keys((tool.inputSchema.properties ?? {}) as object)).not.toContain("userId");
-    }
-    expect(byName.add_expense.inputSchema.required).not.toContain("expenseDate");
+  describe("tool list", () => {
+    const listTools = async () => (await (await connect()).listTools()).tools;
+    const annotationsOf = async (name: string) => (await listTools()).find((tool) => tool.name === name)?.annotations;
+
+    it("lists 20 tools", async () => {
+      expect(await listTools()).toHaveLength(20);
+    });
+
+    it.each(["get_account", "list_expenses", "get_spending_summary", "list_expense_tabs", "get_expense_tab_expenses",
+      "get_investments", "list_investment_transactions", "get_net_worth"])("marks %s read-only", async (name) => {
+      expect(await annotationsOf(name)).toMatchObject({ readOnlyHint: true });
+    });
+
+    it("marks only the three delete tools destructive", async () => {
+      const destructive = (await listTools()).filter((tool) => tool.annotations?.destructiveHint).map((tool) => tool.name);
+
+      expect(destructive.sort()).toEqual(["delete_expense", "delete_expense_tab", "delete_investment_transaction"]);
+    });
+
+    it.each(["update_expense", "update_expense_tab", "update_net_worth_item", "add_net_worth_valuation", "update_net_worth_valuation"])(
+      "marks %s as an idempotent, non-destructive write",
+      async (name) => {
+        expect(await annotationsOf(name)).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
+      },
+    );
+
+    it("marks add_expense as a non-idempotent, non-destructive write", async () => {
+      expect(await annotationsOf("add_expense")).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: false });
+    });
+
+    it("never accepts a userId input", async () => {
+      const inputs = (await listTools()).flatMap((tool) => Object.keys((tool.inputSchema.properties ?? {}) as object));
+
+      expect(inputs).not.toContain("userId");
+    });
+
+    it("lets add_expense omit the expense date", async () => {
+      const addExpense = (await listTools()).find((tool) => tool.name === "add_expense");
+
+      expect(addExpense?.inputSchema.required).not.toContain("expenseDate");
+    });
   });
 
-  it("adds expenses for the session user with today's date by default", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-10-03T22:30:00Z"));
-    mocks.createExpenseForUser.mockResolvedValue(stored);
-    const result = await call("add_expense", { description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel", user_id: "someone-else", userId: "someone-else" });
-    expect(result.isError).toBeFalsy();
-    expect(mocks.createExpenseForUser).toHaveBeenCalledWith("owner", expect.objectContaining({ amount: 10.5, expenseDate: "2026-10-04" }));
-    expect(mocks.createExpenseForUser.mock.calls[0][1]).not.toHaveProperty("user_id");
-    expect(mocks.createExpenseForUser.mock.calls[0][1]).not.toHaveProperty("userId");
-    expect(result.structuredContent).toEqual({ expense: stored });
+  describe("add_expense", () => {
+    const fuel = { description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel" };
+
+    beforeEach(() => mocks.createExpenseForUser.mockResolvedValue(stored));
+
+    it("adds the expense for the session user, ignoring user ids in the arguments", async () => {
+      await call("add_expense", { ...fuel, user_id: "someone-else", userId: "someone-else" });
+
+      const [userId, input] = mocks.createExpenseForUser.mock.calls[0];
+      expect(userId).toBe("owner");
+      expect(input).not.toHaveProperty("user_id");
+      expect(input).not.toHaveProperty("userId");
+    });
+
+    it("defaults the date to today in Bucharest", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-03T22:30:00Z"));
+
+      await call("add_expense", fuel);
+
+      expect(mocks.createExpenseForUser).toHaveBeenCalledWith("owner", expect.objectContaining({ expenseDate: "2026-10-04" }));
+    });
+
+    it("returns the stored expense", async () => {
+      const result = await call("add_expense", fuel);
+
+      expect(result.isError).toBeFalsy();
+      expect(result.structuredContent).toEqual({ expense: stored });
+    });
   });
 
   it("rejects a subtype outside the category with field errors and no data call", async () => {
@@ -153,18 +196,31 @@ describe("MCP server", () => {
     expect(result.structuredContent).toMatchObject({ month: "2026-10", total: 15, count: 2, average: 7.5 });
   });
 
-  it("defaults and validates expense tab filters", async () => {
-    const tab = { id: ID, name: "Car", categoryKeys: ["car"], subtypeKeys: [] };
-    mocks.getExpenseTabForUser.mockResolvedValue(tab);
-    mocks.getExpenseTabExpensesForUser.mockResolvedValue([]);
-    await call("get_expense_tab_expenses", { tabId: ID });
-    expect(mocks.getExpenseTabExpensesForUser).toHaveBeenCalledWith("owner", tab, { scope: "all", subtype: "all", category: null, search: "" });
+  describe("get_expense_tab_expenses", () => {
+    const tab = aTab({ id: ID });
 
-    await call("get_expense_tab_expenses", { tabId: ID, filters: { scope: "year", year: 2025 } });
-    expect(mocks.getExpenseTabExpensesForUser).toHaveBeenLastCalledWith("owner", tab, expect.objectContaining({ scope: "year", year: 2025 }));
+    beforeEach(() => {
+      mocks.getExpenseTabForUser.mockResolvedValue(tab);
+      mocks.getExpenseTabExpensesForUser.mockResolvedValue([]);
+    });
 
-    const invalid = await call("get_expense_tab_expenses", { tabId: ID, filters: { scope: "range", startDate: "2026-02-01", endDate: "2026-01-01" } });
-    expect(invalid.isError).toBe(true);
-    expect(mocks.getExpenseTabExpensesForUser).toHaveBeenCalledTimes(2);
+    it("defaults to all of the tab's expenses", async () => {
+      await call("get_expense_tab_expenses", { tabId: ID });
+
+      expect(mocks.getExpenseTabExpensesForUser).toHaveBeenCalledWith("owner", tab, { scope: "all", subtype: "all", category: null, search: "" });
+    });
+
+    it("passes the given filters through", async () => {
+      await call("get_expense_tab_expenses", { tabId: ID, filters: { scope: "year", year: 2025 } });
+
+      expect(mocks.getExpenseTabExpensesForUser).toHaveBeenCalledWith("owner", tab, expect.objectContaining({ scope: "year", year: 2025 }));
+    });
+
+    it("rejects an inverted date range without reading expenses", async () => {
+      const result = await call("get_expense_tab_expenses", { tabId: ID, filters: { scope: "range", startDate: "2026-02-01", endDate: "2026-01-01" } });
+
+      expect(result.isError).toBe(true);
+      expect(mocks.getExpenseTabExpensesForUser).not.toHaveBeenCalled();
+    });
   });
 });

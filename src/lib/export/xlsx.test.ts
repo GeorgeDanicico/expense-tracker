@@ -2,11 +2,11 @@ import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 
 import { buildExpenseWorkbook } from "@/lib/export/xlsx";
-import type { Expense } from "@/lib/expenses/types";
+import { anExpense } from "@/test/builders";
 
 describe("expense workbook", () => {
   it("exports subtype labels while preserving numeric amount cells and the total formula", () => {
-    const base: Expense = { id: "1", description: "Fuel & service", amount: 12.5, category: "car", subtype: "car_fuel", expenseDate: "2026-09-01", notes: null };
+    const base = anExpense({ id: "1", description: "Fuel & service", amount: 12.5, category: "car", subtype: "car_fuel", expenseDate: "2026-09-01" });
     const files = unzipSync(buildExpenseWorkbook([base, { ...base, id: "2", subtype: null, amount: 5 }], "RON"));
     const sheet = strFromU8(files["xl/worksheets/sheet1.xml"]);
     expect(sheet).toContain('r="F1"');

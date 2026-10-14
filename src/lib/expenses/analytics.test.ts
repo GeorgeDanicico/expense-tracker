@@ -12,25 +12,16 @@ import {
 } from "@/lib/expenses/analytics";
 import type { ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { Expense } from "@/lib/expenses/types";
+import { anExpense } from "@/test/builders";
 
-const expense = (overrides: Partial<Expense> = {}): Expense => ({
-  id: "1",
-  description: "Groceries",
-  amount: 10,
-  category: "groceries",
-  subtype: null,
-  expenseDate: "2024-02-01",
-  notes: null,
-  ...overrides,
-});
 
 describe("recorded monthly analytics", () => {
   it("continues grouping Car expenses by their main category across subtypes", () => {
     const data = monthAnalytics([
-      expense({ id: "fuel", category: "car", subtype: "car_fuel", amount: 20 }),
-      expense({ id: "maintenance", category: "car", subtype: "car_maintenance", amount: 30 }),
-      expense({ id: "unspecified", category: "car", subtype: null, amount: 5 }),
-      expense({ id: "transport", category: "transport", amount: 10 }),
+      anExpense({ id: "fuel", category: "car", subtype: "car_fuel", amount: 20 }),
+      anExpense({ id: "maintenance", category: "car", subtype: "car_maintenance", amount: 30 }),
+      anExpense({ id: "unspecified", category: "car", subtype: null, amount: 5 }),
+      anExpense({ id: "transport", category: "transport", amount: 10 }),
     ], "2024-02");
     expect(data.total).toBe(65);
     expect(data.categories).toMatchObject([
@@ -63,7 +54,7 @@ describe("recorded monthly analytics", () => {
     expect(monthAnalytics([], "2027-01").daily[0].key).toBe("2027-01-01");
   });
   it("derives one recorded expense and its category share", () => {
-    const data = monthAnalytics([expense()], "2024-02");
+    const data = monthAnalytics([anExpense()], "2024-02");
     expect(data).toMatchObject({
       total: 10,
       count: 1,
@@ -81,17 +72,17 @@ describe("recorded monthly analytics", () => {
   });
   it("aggregates days and categories, ranks five largest without mutating rows", () => {
     const rows = [
-      expense({ id: "a", amount: 15 }),
-      expense({ id: "b", amount: 20 }),
-      expense({ id: "c", amount: 30, category: "housing" }),
-      expense({
+      anExpense({ id: "a", amount: 15 }),
+      anExpense({ id: "b", amount: 20 }),
+      anExpense({ id: "c", amount: 30, category: "housing" }),
+      anExpense({
         id: "d",
         amount: 25,
         category: "housing",
         expenseDate: "2024-02-29",
       }),
-      expense({ id: "e", amount: 5, category: "transport" }),
-      expense({ id: "f", amount: 10, category: "other" }),
+      anExpense({ id: "e", amount: 5, category: "transport" }),
+      anExpense({ id: "f", amount: 10, category: "other" }),
     ];
     const original = [...rows];
     const data = monthAnalytics(rows, "2024-02");
@@ -107,9 +98,9 @@ describe("recorded monthly analytics", () => {
     expect(
       monthAnalytics(
         [
-          expense({ id: "b" }),
-          expense({ id: "a" }),
-          expense({ id: "c", expenseDate: "2024-02-02" }),
+          anExpense({ id: "b" }),
+          anExpense({ id: "a" }),
+          anExpense({ id: "c", expenseDate: "2024-02-02" }),
         ],
         "2024-02",
       ).ranked.map((row) => row.id),
@@ -229,16 +220,8 @@ describe("historical series", () => {
 });
 
 describe("custom tab dashboard analytics", () => {
-  const expense = (overrides: Partial<Expense> = {}): Expense => ({
-    id: "expense-1",
-    description: "Recorded expense",
-    amount: 1,
-    category: "car",
-    subtype: null,
-    expenseDate: "2024-01-01",
-    notes: null,
-    ...overrides,
-  });
+  const carExpense = (overrides: Partial<Expense> = {}) =>
+    anExpense({ description: "Recorded expense", amount: 1, category: "car", expenseDate: "2024-01-01", ...overrides });
 
   const allFilters: ExpenseTabFilters = {
     scope: "all",
@@ -253,11 +236,11 @@ describe("custom tab dashboard analytics", () => {
 
   it("reconciles exact totals across time and subtype buckets for unique filtered rows", () => {
     const rows = [
-      expense({ id: "fuel", subtype: "car_fuel", amount: 0.1, expenseDate: "2024-01-03" }),
-      expense({ id: "maintenance", subtype: "car_maintenance", amount: 0.2, expenseDate: "2024-02-03" }),
-      expense({ id: "car-no-subtype", amount: 0.3, expenseDate: "2024-12-31" }),
-      expense({ id: "groceries", category: "groceries", amount: 0.4, expenseDate: "2026-03-01" }),
-      expense({ id: "repairs", subtype: "car_repairs", amount: 1.05, expenseDate: "2026-03-02" }),
+      carExpense({ id: "fuel", subtype: "car_fuel", amount: 0.1, expenseDate: "2024-01-03" }),
+      carExpense({ id: "maintenance", subtype: "car_maintenance", amount: 0.2, expenseDate: "2024-02-03" }),
+      carExpense({ id: "car-no-subtype", amount: 0.3, expenseDate: "2024-12-31" }),
+      carExpense({ id: "groceries", category: "groceries", amount: 0.4, expenseDate: "2026-03-01" }),
+      carExpense({ id: "repairs", subtype: "car_repairs", amount: 1.05, expenseDate: "2026-03-02" }),
     ];
 
     const result = expenseTabAnalytics(rows, allFilters);
@@ -283,8 +266,8 @@ describe("custom tab dashboard analytics", () => {
   it("fills all twelve months for a selected year, including zero buckets", () => {
     const result = expenseTabAnalytics(
       [
-        expense({ id: "jan", amount: 5, expenseDate: "2025-01-10" }),
-        expense({ id: "dec", amount: 7, expenseDate: "2025-12-10" }),
+        carExpense({ id: "jan", amount: 5, expenseDate: "2025-01-10" }),
+        carExpense({ id: "dec", amount: 7, expenseDate: "2025-12-10" }),
       ],
       { ...allFilters, scope: "year", year: 2025 },
     );
@@ -298,7 +281,7 @@ describe("custom tab dashboard analytics", () => {
 
   it("labels short date-range boundary months and keeps empty months", () => {
     const result = expenseTabAnalytics(
-      [expense({ amount: 8, expenseDate: "2025-01-20" })],
+      [carExpense({ amount: 8, expenseDate: "2025-01-20" })],
       {
         ...allFilters,
         scope: "range",
@@ -323,7 +306,7 @@ describe("custom tab dashboard analytics", () => {
 
   it("uses yearly buckets for long ranges and labels partial years", () => {
     const result = expenseTabAnalytics(
-      [expense({ amount: 4, expenseDate: "2020-06-30" })],
+      [carExpense({ amount: 4, expenseDate: "2020-06-30" })],
       {
         ...allFilters,
         scope: "range",

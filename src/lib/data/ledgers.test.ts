@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/filters";
-import type { ExpenseTab } from "@/lib/expenses/tabs";
-import type { Expense } from "@/lib/expenses/types";
+import { aTab, anExpense } from "@/test/builders";
 
 const mocks = vi.hoisted(() => ({
   getExpenseTabForUser: vi.fn(),
@@ -16,10 +15,8 @@ vi.mock("@/lib/data/expenses", () => ({
 }));
 import { getExpenseTabLedgerForUser, getMonthlyLedgerForUser } from "./ledgers";
 
-const expense = (id: string, amount: number): Expense => ({
-  id, amount, description: `Expense ${id}`, category: "car", subtype: null, expenseDate: "2026-09-01", notes: null,
-});
-const tab: ExpenseTab = { id: "tab", name: "Car", categoryKeys: ["car"], subtypeKeys: [], createdAt: "2026-01-01", updatedAt: "2026-02-01" };
+const expense = (id: string, amount: number) => anExpense({ id, amount });
+const tab = aTab({ id: "tab" });
 
 beforeEach(() => vi.resetAllMocks());
 

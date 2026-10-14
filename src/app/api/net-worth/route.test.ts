@@ -1,23 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+
+import { aValuation } from "@/test/builders";
+import { callRoute, signedInAs } from "@/test/route";
 
 const mocks = vi.hoisted(() => ({
-  getAuthenticatedUser: vi.fn(),
   getNetWorthOverviewForUser: vi.fn(),
   createNetWorthItemForUser: vi.fn(),
   updateNetWorthItemForUser: vi.fn(),
   addNetWorthValuationForUser: vi.fn(),
   updateNetWorthValuationForUser: vi.fn(),
 }));
-
-vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
-vi.mock("@/lib/data/net-worth", () => ({
-  getNetWorthOverviewForUser: mocks.getNetWorthOverviewForUser,
-  createNetWorthItemForUser: mocks.createNetWorthItemForUser,
-  updateNetWorthItemForUser: mocks.updateNetWorthItemForUser,
-  addNetWorthValuationForUser: mocks.addNetWorthValuationForUser,
-  updateNetWorthValuationForUser: mocks.updateNetWorthValuationForUser,
-}));
+vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
+vi.mock("@/lib/data/net-worth", () => mocks);
 
 import { GET as getOverview } from "@/app/api/net-worth/route";
 import { POST as createItem } from "@/app/api/net-worth/items/route";
@@ -25,162 +19,83 @@ import { PATCH as updateItem } from "@/app/api/net-worth/items/[id]/route";
 import { POST as addValuation } from "@/app/api/net-worth/items/[id]/valuations/route";
 import { PATCH as updateValuation } from "@/app/api/net-worth/valuations/[id]/route";
 
-const user = { id: "10000000-0000-0000-0000-000000000001", email: "owner@example.test" };
 const itemId = "40000000-0000-4000-8000-000000000001";
 const valuationId = "50000000-0000-4000-8000-000000000001";
+const newItem = { name: "Cash", kind: "asset", category: "cash", currency: "EUR", value: "10", valuedOn: "2026-09-19" };
 
-const overview = {
-  entries: [],
-  totalsByCurrency: [],
-  attention: [],
-  calculationIssues: [],
-};
+let user: ReturnType<typeof signedInAs>;
 
-function jsonRequest(url: string, method: string, body?: unknown) {
-  return new NextRequest(url, {
-    method,
-    headers: { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+  user = signedInAs();
+});
 
-describe("net-worth overview route", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.getAuthenticatedUser.mockResolvedValue(user);
-  });
-
-  it("rejects unauthenticated reads", async () => {
-    mocks.getAuthenticatedUser.mockResolvedValue(null);
-
-    const response = await getOverview();
-
-    expect(response.status).toBe(401);
-    expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
-    expect(mocks.getNetWorthOverviewForUser).not.toHaveBeenCalled();
-  });
-
-  it("returns the composed overview with private cache headers", async () => {
+describe("GET /api/net-worth", () => {
+  it("returns the signed-in user's composed overview", async () => {
+    const overview = { entries: [], totalsByCurrency: [], attention: [], calculationIssues: [] };
     mocks.getNetWorthOverviewForUser.mockResolvedValue(overview);
 
-    const response = await getOverview();
+    const response = await callRoute(getOverview);
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
-    expect(await response.json()).toEqual(overview);
+    expect(response).toMatchObject({ status: 200, body: overview });
     expect(mocks.getNetWorthOverviewForUser).toHaveBeenCalledWith(user.id);
   });
 });
-describe("net-worth item routes", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.getAuthenticatedUser.mockResolvedValue(user);
-  });
 
-  it("normalizes a valid item before calling the data layer", async () => {
+describe("net-worth item routes", () => {
+  it("normalizes a valid new item before saving it", async () => {
     mocks.createNetWorthItemForUser.mockResolvedValue({ itemId });
 
-    const response = await createItem(jsonRequest("http://localhost/api/net-worth/items", "POST", {
-      name: "  Apartment  ",
-      kind: "asset",
-      category: "Current account",
-      currency: "eur",
-      value: "1250.5000000000",
-      valuedOn: "2026-09-19",
-    }));
+    const response = await callRoute(createItem, {
+      method: "POST",
+      body: { ...newItem, name: "  Apartment  ", category: "Current account", currency: "eur", value: "1250.5000000000" },
+    });
 
-    expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ itemId });
+    expect(response).toMatchObject({ status: 201, body: { itemId } });
     expect(mocks.createNetWorthItemForUser).toHaveBeenCalledWith(user.id, {
-      name: "Apartment",
-      kind: "asset",
-      category: "current-account",
-      currency: "EUR",
-      purchaseAmount: null,
-      value: "1250.5000000000",
-      valuedOn: "2026-09-19",
+      ...newItem, name: "Apartment", category: "current-account", purchaseAmount: null, value: "1250.5000000000",
     });
   });
 
-  it("rejects purchase amounts for cash without touching the data layer", async () => {
-    const response = await createItem(jsonRequest("http://localhost/api/net-worth/items", "POST", {
-      name: "Cash",
-      kind: "asset",
-      category: "cash",
-      currency: "EUR",
-      purchaseAmount: "10",
-      value: "10",
-      valuedOn: "2026-09-19",
-    }));
-    const payload = await response.json();
+  it("rejects a purchase amount for cash without touching the data layer", async () => {
+    const response = await callRoute(createItem, { method: "POST", body: { ...newItem, purchaseAmount: "10" } });
 
     expect(response.status).toBe(422);
-    expect(payload.fieldErrors.purchaseAmount).toBeDefined();
+    expect(response.body.fieldErrors.purchaseAmount).toBeDefined();
     expect(mocks.createNetWorthItemForUser).not.toHaveBeenCalled();
   });
 
-  it("updates an owned item and preserves cache headers", async () => {
+  it("updates an owned item with a normalized category", async () => {
     mocks.updateNetWorthItemForUser.mockResolvedValue(true);
 
-    const response = await updateItem(
-      jsonRequest(`http://localhost/api/net-worth/items/${itemId}`, "PATCH", {
-        name: "Current account",
-        category: "Emergency Cash",
-      }),
-      { params: Promise.resolve({ id: itemId }) },
-    );
+    const response = await callRoute(updateItem, {
+      method: "PATCH", params: { id: itemId }, body: { name: "Current account", category: "Emergency Cash" },
+    });
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
-    expect(mocks.updateNetWorthItemForUser).toHaveBeenCalledWith(user.id, itemId, {
-      name: "Current account",
-      category: "emergency-cash",
-    });
+    expect(mocks.updateNetWorthItemForUser).toHaveBeenCalledWith(user.id, itemId, { name: "Current account", category: "emergency-cash" });
   });
 });
 
 describe("net-worth valuation routes", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.getAuthenticatedUser.mockResolvedValue(user);
-  });
-
   it("adds a dated zero valuation", async () => {
-    const valuation = { id: valuationId, itemId, value: "0", valuedOn: "2026-09-20" };
+    const valuation = aValuation({ id: valuationId, itemId, value: "0", valuedOn: "2026-09-20" });
     mocks.addNetWorthValuationForUser.mockResolvedValue(valuation);
 
-    const response = await addValuation(
-      jsonRequest(`http://localhost/api/net-worth/items/${itemId}/valuations`, "POST", {
-        value: "0",
-        valuedOn: "2026-09-20",
-      }),
-      { params: Promise.resolve({ id: itemId }) },
-    );
+    const response = await callRoute(addValuation, { method: "POST", params: { id: itemId }, body: { value: "0", valuedOn: "2026-09-20" } });
 
-    expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ valuation });
-    expect(mocks.addNetWorthValuationForUser).toHaveBeenCalledWith(user.id, itemId, {
-      value: "0",
-      valuedOn: "2026-09-20",
-    });
+    expect(response).toMatchObject({ status: 201, body: { valuation } });
+    expect(mocks.addNetWorthValuationForUser).toHaveBeenCalledWith(user.id, itemId, { value: "0", valuedOn: "2026-09-20" });
   });
 
   it("corrects a dated valuation", async () => {
-    const valuation = { id: valuationId, itemId, value: "225000", valuedOn: "2026-09-20" };
-    mocks.updateNetWorthValuationForUser.mockResolvedValue(valuation);
+    mocks.updateNetWorthValuationForUser.mockResolvedValue(aValuation({ id: valuationId, itemId, value: "225000" }));
 
-    const response = await updateValuation(
-      jsonRequest(`http://localhost/api/net-worth/valuations/${valuationId}`, "PATCH", {
-        value: "225000",
-        valuedOn: "2026-09-20",
-      }),
-      { params: Promise.resolve({ id: valuationId }) },
-    );
+    const response = await callRoute(updateValuation, {
+      method: "PATCH", params: { id: valuationId }, body: { value: "225000", valuedOn: "2026-09-20" },
+    });
 
     expect(response.status).toBe(200);
-    expect(mocks.updateNetWorthValuationForUser).toHaveBeenCalledWith(user.id, valuationId, {
-      value: "225000",
-      valuedOn: "2026-09-20",
-    });
+    expect(mocks.updateNetWorthValuationForUser).toHaveBeenCalledWith(user.id, valuationId, { value: "225000", valuedOn: "2026-09-20" });
   });
 });

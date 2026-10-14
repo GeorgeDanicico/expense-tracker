@@ -12,7 +12,8 @@ import {
   afterTabSaved,
 } from "@/lib/api/invalidate";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-import type { Expense, ExpensesData } from "@/lib/expenses/types";
+import type { ExpensesData } from "@/lib/expenses/types";
+import { aTab, anExpense } from "@/test/builders";
 
 const CACHED_KEYS = [
   "/api/account",
@@ -42,8 +43,8 @@ function recorder() {
   return { mutate: mutate as unknown as ScopedMutator, calls };
 }
 
-const expense = { id: "e-2", amount: 30 } as Expense;
-const tab = { id: "tab-1", name: "Car" } as ExpenseTab;
+const expense = anExpense({ id: "e-2", amount: 30 });
+const tab = aTab({ id: "tab-1", name: "Car" });
 const NO_REVALIDATE = { revalidate: false };
 
 describe("cache invalidation after mutations", () => {
