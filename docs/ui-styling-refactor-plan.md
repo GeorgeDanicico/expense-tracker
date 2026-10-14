@@ -4,7 +4,7 @@
 
 Make Simple Ledger look and feel like a professional finance tool: denser layouts, smaller controls, a clear type scale, consistent surfaces, and a small library of reusable UI primitives so screens stop styling themselves inline.
 
-This builds on the [frontend UX refactor](./frontend-ux-refactor-plan.md) (cream/clay palette, Home/Expenses/More navigation, three dashboards). It keeps that palette and information architecture and changes **how** things are drawn, not **what** is shown.
+This builds on the [frontend UX refactor](./archive/frontend-ux-refactor-plan.md) (cream/clay palette, Home/Expenses/More navigation, three dashboards). It keeps that palette and information architecture and changes **how** things are drawn, not **what** is shown.
 
 In scope:
 
