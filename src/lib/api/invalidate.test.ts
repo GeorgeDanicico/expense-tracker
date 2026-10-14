@@ -1,0 +1,140 @@
+import type { ScopedMutator } from "swr";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  afterExpenseCreated,
+  afterExpenseDeleted,
+  afterInvestmentChange,
+  afterNetWorthChange,
+  afterSignIn,
+  afterSignOut,
+  afterTabDeleted,
+  afterTabSaved,
+} from "@/lib/api/invalidate";
+import type { ExpenseTab } from "@/lib/expenses/tabs";
+import type { Expense, ExpensesData } from "@/lib/expenses/types";
+
+const CACHED_KEYS = [
+  "/api/account",
+  "/api/investments",
+  "/api/net-worth",
+  "/api/expense-tabs",
+  "/api/expense-tabs/tab-1/expenses?revision=r1",
+  "/api/expense-tabs/tab-2/expenses?revision=r2",
+  "/api/dashboard?period=1m&granularity=day&date=2026-10-14",
+  "/api/expenses?month=2026-10",
+  "/api/expenses?month=2026-09&context=main",
+  "/api/investment-transactions?accountId=a&instrument=X&currency=EUR",
+];
+
+type Call = { keys: string[]; data: unknown; options: unknown };
+
+/** Records each mutate call with the cached keys it targets. */
+function recorder() {
+  const calls: Call[] = [];
+  const mutate = vi.fn((key: unknown, data?: unknown, options?: unknown) => {
+    const keys = typeof key === "function"
+      ? CACHED_KEYS.filter((cached) => (key as (value: string) => boolean)(cached))
+      : [key as string];
+    calls.push({ keys, data, options });
+    return Promise.resolve(undefined);
+  });
+  return { mutate: mutate as unknown as ScopedMutator, calls };
+}
+
+const expense = { id: "e-2", amount: 30 } as Expense;
+const tab = { id: "tab-1", name: "Car" } as ExpenseTab;
+const NO_REVALIDATE = { revalidate: false };
+
+describe("cache invalidation after mutations", () => {
+  it("afterExpenseCreated updates both month ledgers, then refreshes tab ledgers and dashboards", async () => {
+    const { mutate, calls } = recorder();
+    await afterExpenseCreated(mutate, "2026-10", expense);
+
+    expect(calls.map((call) => [call.keys, call.options])).toEqual([
+      [["/api/expenses?month=2026-10"], NO_REVALIDATE],
+      [["/api/expenses?month=2026-10&context=main"], NO_REVALIDATE],
+      [["/api/expense-tabs/tab-1/expenses?revision=r1", "/api/expense-tabs/tab-2/expenses?revision=r2"], undefined],
+      [["/api/dashboard?period=1m&granularity=day&date=2026-10-14"], undefined],
+    ]);
+    const update = calls[0].data as (current?: ExpensesData) => ExpensesData | undefined;
+    expect(update(undefined)).toBeUndefined();
+    expect(update({ expenses: [{ id: "e-1", amount: 10 }], total: 10, average: 10 } as ExpensesData))
+      .toMatchObject({ expenses: [{ id: "e-2" }, { id: "e-1" }], total: 40, average: 20 });
+  });
+
+  it("afterExpenseDeleted removes the expense from every month ledger, then refreshes derived views", async () => {
+    const { mutate, calls } = recorder();
+    await afterExpenseDeleted(mutate, "e-1");
+
+    expect(calls.map((call) => [call.keys, call.options])).toEqual([
+      [["/api/expenses?month=2026-10", "/api/expenses?month=2026-09&context=main"], NO_REVALIDATE],
+      [["/api/expense-tabs/tab-1/expenses?revision=r1", "/api/expense-tabs/tab-2/expenses?revision=r2"], undefined],
+      [["/api/dashboard?period=1m&granularity=day&date=2026-10-14"], undefined],
+    ]);
+    const update = calls[0].data as (current?: ExpensesData) => ExpensesData | undefined;
+    const untouched = { expenses: [{ id: "e-9", amount: 5 }], total: 5, average: 5 } as ExpensesData;
+    expect(update(untouched)).toBe(untouched);
+    expect(update({ expenses: [{ id: "e-1", amount: 10 }], total: 10, average: 10 } as ExpensesData))
+      .toMatchObject({ expenses: [], total: 0, average: 0 });
+  });
+
+  it("afterTabSaved upserts the tab and refreshes only an edited tab's ledgers", async () => {
+    const created = recorder();
+    await afterTabSaved(created.mutate, tab, { editing: false });
+    expect(created.calls.map((call) => [call.keys, call.options])).toEqual([
+      [["/api/expense-tabs"], NO_REVALIDATE],
+    ]);
+    const append = created.calls[0].data as (current?: { tabs: ExpenseTab[] }) => { tabs: ExpenseTab[] };
+    expect(append(undefined)).toEqual({ tabs: [tab] });
+
+    const edited = recorder();
+    await afterTabSaved(edited.mutate, tab, { editing: true });
+    expect(edited.calls.map((call) => [call.keys, call.options])).toEqual([
+      [["/api/expense-tabs"], NO_REVALIDATE],
+      [["/api/expense-tabs/tab-1/expenses?revision=r1"], undefined],
+    ]);
+    const replace = edited.calls[0].data as (current?: { tabs: ExpenseTab[] }) => { tabs: ExpenseTab[] };
+    expect(replace({ tabs: [{ id: "tab-1", name: "Old" } as ExpenseTab] })).toEqual({ tabs: [tab] });
+  });
+
+  it("afterTabDeleted drops the tab and refreshes its ledgers", async () => {
+    const { mutate, calls } = recorder();
+    await afterTabDeleted(mutate, "tab-1");
+    expect(calls.map((call) => [call.keys, call.options])).toEqual([
+      [["/api/expense-tabs"], NO_REVALIDATE],
+      [["/api/expense-tabs/tab-1/expenses?revision=r1"], undefined],
+    ]);
+    const update = calls[0].data as (current?: { tabs: ExpenseTab[] }) => { tabs: ExpenseTab[] } | undefined;
+    expect(update(undefined)).toBeUndefined();
+    expect(update({ tabs: [tab] })).toEqual({ tabs: [] });
+  });
+
+  it("afterInvestmentChange refreshes investments, net worth and the optional transactions key", async () => {
+    const withDetail = recorder();
+    await afterInvestmentChange(withDetail.mutate, "/api/investment-transactions?accountId=a");
+    expect(withDetail.calls.map((call) => call.keys)).toEqual([
+      ["/api/investments"],
+      ["/api/net-worth"],
+      ["/api/investment-transactions?accountId=a"],
+    ]);
+
+    const without = recorder();
+    await afterInvestmentChange(without.mutate);
+    expect(without.calls.map((call) => call.keys)).toEqual([["/api/investments"], ["/api/net-worth"]]);
+  });
+
+  it("single-key helpers revalidate their key; sign-out clears everything without refetching", async () => {
+    const netWorth = recorder();
+    await afterNetWorthChange(netWorth.mutate);
+    expect(netWorth.calls.map((call) => call.keys)).toEqual([["/api/net-worth"]]);
+
+    const signIn = recorder();
+    await afterSignIn(signIn.mutate);
+    expect(signIn.calls.map((call) => call.keys)).toEqual([["/api/account"]]);
+
+    const signOut = recorder();
+    await afterSignOut(signOut.mutate);
+    expect(signOut.calls).toEqual([{ keys: CACHED_KEYS, data: undefined, options: NO_REVALIDATE }]);
+  });
+});

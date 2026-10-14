@@ -12,7 +12,8 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { INVESTMENTS_API_KEY, investmentTransactionsApiKey, NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { afterInvestmentChange } from "@/lib/api/invalidate";
+import { investmentTransactionsApiKey } from "@/lib/api/keys";
 import {
   INVESTMENT_BROKER_LABELS,
   type InvestmentBrokerId,
@@ -76,7 +77,7 @@ export function AddOrderDialog({
         instrument: asset.instrument,
         currency: asset.currency,
       });
-      await Promise.allSettled([mutate(INVESTMENTS_API_KEY), mutate(NET_WORTH_API_KEY), mutate(detailKey)]);
+      await afterInvestmentChange(mutate, detailKey);
       setOpen(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The order could not be saved.");

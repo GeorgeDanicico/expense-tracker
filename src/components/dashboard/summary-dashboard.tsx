@@ -12,12 +12,11 @@ import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { Stat, StatGroup } from "@/components/ui/stat";
-import { ACCOUNT_API_KEY, dashboardApiKey } from "@/lib/api/keys";
+import { useAccount } from "@/hooks/use-account";
+import { dashboardApiKey } from "@/lib/api/keys";
 import { dashboardHref } from "@/lib/expenses/url-state";
 import { categoryShares } from "@/lib/expenses/analytics";
-import type { AccountData } from "@/lib/account";
 import type { DashboardData } from "@/lib/expenses/types";
-import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
 import { formatMonth, getProcessLocalMonth } from "@/lib/calendar";
 
 export function SummaryDashboard({ params }: { params: URLSearchParams }) {
@@ -29,8 +28,7 @@ export function SummaryDashboard({ params }: { params: URLSearchParams }) {
     }),
     { keepPreviousData: false },
   );
-  const { data: account } = useSWR<AccountData>(ACCOUNT_API_KEY);
-  const currency = account?.currency ?? DEFAULT_CURRENCY;
+  const { currency } = useAccount();
   if (!data)
     return error ? (
       <DataError retry={() => void mutate()} />

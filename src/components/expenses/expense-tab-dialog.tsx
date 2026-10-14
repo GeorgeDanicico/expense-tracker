@@ -10,7 +10,8 @@ import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { EXPENSE_TABS_API_KEY, expenseTabApiKey } from "@/lib/api/keys";
+import { afterTabSaved } from "@/lib/api/invalidate";
+import { EXPENSE_TABS_API_KEY, expenseTabApiKey, type SavedTabResponse } from "@/lib/api/keys";
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_SUBTYPES,
@@ -19,9 +20,6 @@ import {
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-
-type SavedTabResponse = { tab: ExpenseTab };
-type TabsResponse = { tabs: ExpenseTab[] };
 
 export function ExpenseTabDialog({
   open,
@@ -77,23 +75,7 @@ export function ExpenseTabDialog({
         },
       );
       const saved = result.tab;
-      await mutate(
-        EXPENSE_TABS_API_KEY,
-        (current: TabsResponse | undefined) => {
-          const existing = current?.tabs ?? [];
-          const tabs = editing
-            ? existing.map((item) => item.id === saved.id ? saved : item)
-            : [...existing.filter((item) => item.id !== saved.id), saved];
-          return { tabs };
-        },
-        { revalidate: false },
-      );
-      if (editing) {
-        void mutate((key) =>
-          typeof key === "string" &&
-          key.startsWith(`${expenseTabApiKey(saved.id)}/expenses?`),
-        );
-      }
+      await afterTabSaved(mutate, saved, { editing });
       onSaved(saved);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save this tab.");

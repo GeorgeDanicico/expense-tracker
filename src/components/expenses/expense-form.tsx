@@ -7,7 +7,7 @@ import { useSWRConfig } from "swr";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { expensesApiKey, mainExpensesApiKey } from "@/lib/api/keys";
+import { afterExpenseCreated } from "@/lib/api/invalidate";
 import {
   SUBTYPE_LABELS,
   subtypesForCategory,
@@ -17,7 +17,7 @@ import {
   type ExpenseCategory,
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
-import type { Expense, ExpensesData } from "@/lib/expenses/types";
+import type { Expense } from "@/lib/expenses/types";
 import { INITIAL_ACTION_STATE, type ActionState } from "@/lib/forms";
 import { getMonthRange } from "@/lib/calendar";
 
@@ -65,34 +65,7 @@ export function ExpenseForm({
         }),
       });
 
-      await mutate(
-        expensesApiKey(selectedMonth),
-        (current: ExpensesData | undefined) => {
-          if (!current) return current;
-          const expenses = [expense, ...current.expenses];
-          const total = current.total + expense.amount;
-          return { ...current, expenses, total, average: total / expenses.length };
-        },
-        { revalidate: false },
-      );
-      await mutate(
-        mainExpensesApiKey(selectedMonth),
-        (current: ExpensesData | undefined) => {
-          if (!current) return current;
-          const expenses = [expense, ...current.expenses];
-          const total = current.total + expense.amount;
-          return { ...current, expenses, total, average: total / expenses.length };
-        },
-        { revalidate: false },
-      );
-      void mutate((cacheKey) =>
-        typeof cacheKey === "string" &&
-        cacheKey.startsWith("/api/expense-tabs/") &&
-        cacheKey.includes("/expenses?"),
-      );
-      void mutate(
-        (cacheKey) => typeof cacheKey === "string" && cacheKey.startsWith("/api/dashboard?"),
-      );
+      await afterExpenseCreated(mutate, selectedMonth, expense);
       onSuccess();
     } catch (error) {
       setState({

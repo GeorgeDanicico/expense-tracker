@@ -15,11 +15,10 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { EXPENSE_TABS_API_KEY, expenseTabApiKey, expenseTabExpensesApiKey } from "@/lib/api/keys";
+import { afterTabDeleted } from "@/lib/api/invalidate";
+import { expenseTabApiKey, expenseTabExpensesApiKey } from "@/lib/api/keys";
 import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab, ExpenseTabLedgerData } from "@/lib/expenses/tabs";
-
-type TabsResponse = { tabs: ExpenseTab[] };
 
 export function CustomExpenseTab({
   tab,
@@ -57,16 +56,7 @@ export function CustomExpenseTab({
     setDeleteError("");
     try {
       await apiRequest<{ success: true }>(expenseTabApiKey(tab.id), { method: "DELETE" });
-      await mutateCache(
-        EXPENSE_TABS_API_KEY,
-        (current: TabsResponse | undefined) => current
-          ? { tabs: current.tabs.filter((item) => item.id !== tab.id) }
-          : current,
-        { revalidate: false },
-      );
-      void mutateCache((cacheKey) =>
-        typeof cacheKey === "string" && cacheKey.startsWith(`${expenseTabApiKey(tab.id)}/expenses?`),
-      );
+      await afterTabDeleted(mutateCache, tab.id);
       setDeleteOpen(false);
       onDeleted();
     } catch (caught) {

@@ -11,7 +11,7 @@ import { FormActions } from "@/components/ui/form-actions";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { afterNetWorthChange } from "@/lib/api/invalidate";
 import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import { NET_WORTH_SUGGESTED_CATEGORIES, type NetWorthEntry } from "@/lib/net-worth/types";
 
@@ -66,7 +66,7 @@ export function EditNetWorthItemDialog({
             : null,
         }),
       });
-      await mutate(NET_WORTH_API_KEY);
+      await afterNetWorthChange(mutate);
       setOpen(false);
       onSuccess();
     } catch (caught) {
@@ -88,7 +88,7 @@ export function EditNetWorthItemDialog({
         method: "PATCH",
         body: JSON.stringify({ archived: true }),
       });
-      await mutate(NET_WORTH_API_KEY);
+      await afterNetWorthChange(mutate);
       setOpen(false);
       onSuccess();
     } catch (caught) {

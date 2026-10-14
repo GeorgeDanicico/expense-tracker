@@ -2,17 +2,15 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { DataError, DataLoading } from "@/components/ui/data-state";
+import { useAccount } from "@/hooks/use-account";
 import { ApiError } from "@/lib/api/client";
-import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import type { AccountData } from "@/lib/account";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { data, error, isLoading, mutate } = useSWR<AccountData>(ACCOUNT_API_KEY);
+  const { account: data, error, isLoading, mutate } = useAccount();
 
   useEffect(() => {
     if (error instanceof ApiError && error.status === 401) {

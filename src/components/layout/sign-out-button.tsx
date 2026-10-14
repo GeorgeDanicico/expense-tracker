@@ -10,6 +10,7 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { apiRequest } from "@/lib/api/client";
+import { afterSignOut } from "@/lib/api/invalidate";
 
 function useSignOut() {
   const router = useRouter();
@@ -21,7 +22,7 @@ function useSignOut() {
     setError("");
     try {
       await apiRequest<{ success: true }>("/api/auth", { method: "DELETE" });
-      await mutate(() => true, undefined, { revalidate: false });
+      await afterSignOut(mutate);
       router.replace("/login");
     } catch (caught) {
       setError(

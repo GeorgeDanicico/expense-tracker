@@ -11,7 +11,7 @@ import { FormField } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { afterNetWorthChange } from "@/lib/api/invalidate";
 import type { NetWorthEntry } from "@/lib/net-worth/types";
 import { formatDate, getUtcToday } from "@/lib/calendar";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
@@ -50,7 +50,7 @@ export function AddNetWorthValuationDialog({
           valuedOn: formData.get("valuedOn"),
         }),
       });
-      await mutate(NET_WORTH_API_KEY);
+      await afterNetWorthChange(mutate);
       setOpen(false);
       onSuccess();
     } catch (caught) {

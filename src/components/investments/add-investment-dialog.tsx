@@ -11,7 +11,7 @@ import { FormField, FormRow } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { INVESTMENTS_API_KEY, NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { afterInvestmentChange } from "@/lib/api/invalidate";
 import {
   INVESTMENT_BROKER_IDS,
   INVESTMENT_BROKER_LABELS,
@@ -72,7 +72,7 @@ function InvestmentForm({
           executedAt: formTimestamp(formData.get("executedAt")),
         }),
       });
-      await Promise.allSettled([mutate(INVESTMENTS_API_KEY), mutate(NET_WORTH_API_KEY)]);
+      await afterInvestmentChange(mutate);
       onSuccess();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The investment could not be saved.");

@@ -11,7 +11,7 @@ import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { ACCOUNT_API_KEY } from "@/lib/api/keys";
+import { afterSignIn } from "@/lib/api/invalidate";
 import { INITIAL_ACTION_STATE, type ActionState } from "@/lib/forms";
 
 type AuthMode = "login" | "signup";
@@ -42,7 +42,7 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
       });
 
       if (result.authenticated) {
-        await mutate(ACCOUNT_API_KEY);
+        await afterSignIn(mutate);
         router.replace("/dashboard");
         return;
       }

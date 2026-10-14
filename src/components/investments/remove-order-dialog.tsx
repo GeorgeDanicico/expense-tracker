@@ -8,7 +8,8 @@ import { useSWRConfig } from "swr";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { INVESTMENTS_API_KEY, investmentTransactionsApiKey, NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { afterInvestmentChange } from "@/lib/api/invalidate";
+import { investmentTransactionsApiKey } from "@/lib/api/keys";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
 import { formatDateTime } from "@/lib/calendar";
@@ -42,7 +43,7 @@ export function RemoveOrderDialog({
       });
 
       const detailKey = investmentTransactionsApiKey({ accountId, instrument, currency });
-      await Promise.allSettled([mutate(INVESTMENTS_API_KEY), mutate(NET_WORTH_API_KEY), mutate(detailKey)]);
+      await afterInvestmentChange(mutate, detailKey);
       setOpen(false);
       onDeleted();
     } catch (caught) {
