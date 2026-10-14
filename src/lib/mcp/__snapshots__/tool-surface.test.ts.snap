@@ -1,0 +1,832 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MCP tool surface > lists the same tools, schemas and annotations 1`] = `
+[
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Account email, currency, today's date and the expense categories with their subtypes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {},
+      "type": "object",
+    },
+    "name": "get_account",
+    "title": "Get account",
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Expenses for one month (default: current month) with total, count and average.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "month": {
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "list_expenses",
+    "title": "List expenses",
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Current-month totals and recent expenses, plus category and monthly totals for a period.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "date": {
+          "description": "custom only: YYYY-MM for month, YYYY-MM-DD for day",
+          "type": "string",
+        },
+        "granularity": {
+          "default": "month",
+          "enum": [
+            "month",
+            "day",
+          ],
+          "type": "string",
+        },
+        "period": {
+          "default": "3m",
+          "enum": [
+            "3m",
+            "6m",
+            "1y",
+            "2y",
+            "custom",
+          ],
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "get_spending_summary",
+    "title": "Get spending summary",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Record an expense. expenseDate defaults to today; subtype must belong to the category.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "amount": {
+          "exclusiveMinimum": 0,
+          "maximum": 9999999999.99,
+          "type": "number",
+        },
+        "category": {
+          "enum": [
+            "housing",
+            "groceries",
+            "transport",
+            "car",
+            "utilities",
+            "health",
+            "entertainment",
+            "shopping",
+            "education",
+            "travel",
+            "other",
+          ],
+          "type": "string",
+        },
+        "description": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string",
+        },
+        "expenseDate": {
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+          "type": "string",
+        },
+        "notes": {
+          "maxLength": 500,
+          "type": "string",
+        },
+        "subtype": {
+          "anyOf": [
+            {
+              "enum": [
+                "car_maintenance",
+                "car_fuel",
+                "car_repairs",
+              ],
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+      },
+      "required": [
+        "description",
+        "amount",
+        "category",
+      ],
+      "type": "object",
+    },
+    "name": "add_expense",
+    "title": "Add expense",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Change fields of an expense. Changing the category clears a subtype that no longer fits.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "amount": {
+          "exclusiveMinimum": 0,
+          "maximum": 9999999999.99,
+          "type": "number",
+        },
+        "category": {
+          "enum": [
+            "housing",
+            "groceries",
+            "transport",
+            "car",
+            "utilities",
+            "health",
+            "entertainment",
+            "shopping",
+            "education",
+            "travel",
+            "other",
+          ],
+          "type": "string",
+        },
+        "description": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string",
+        },
+        "expenseDate": {
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+          "type": "string",
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "subtype": {
+          "anyOf": [
+            {
+              "enum": [
+                "car_maintenance",
+                "car_fuel",
+                "car_repairs",
+              ],
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "update_expense",
+    "title": "Update expense",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Permanently delete an expense.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "delete_expense",
+    "title": "Delete expense",
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Saved expense tabs, each grouping categories and subtypes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {},
+      "type": "object",
+    },
+    "name": "list_expense_tabs",
+    "title": "List expense tabs",
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Expenses in a tab with total, count and average. Filters default to all time.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "filters": {
+          "properties": {
+            "category": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "housing",
+                    "groceries",
+                    "transport",
+                    "car",
+                    "utilities",
+                    "health",
+                    "entertainment",
+                    "shopping",
+                    "education",
+                    "travel",
+                    "other",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "endDate": {
+              "type": "string",
+            },
+            "scope": {
+              "description": "year needs year; range needs startDate and endDate (YYYY-MM-DD)",
+              "enum": [
+                "all",
+                "year",
+                "range",
+              ],
+              "type": "string",
+            },
+            "search": {
+              "type": "string",
+            },
+            "startDate": {
+              "type": "string",
+            },
+            "subtype": {
+              "enum": [
+                "all",
+                "none",
+                "car_maintenance",
+                "car_fuel",
+                "car_repairs",
+              ],
+              "type": "string",
+            },
+            "year": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+          },
+          "type": "object",
+        },
+        "tabId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "tabId",
+      ],
+      "type": "object",
+    },
+    "name": "get_expense_tab_expenses",
+    "title": "Get expense tab expenses",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Save a tab of categories and/or subtypes (at least one).",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "categoryKeys": {
+          "default": [],
+          "items": {
+            "enum": [
+              "housing",
+              "groceries",
+              "transport",
+              "car",
+              "utilities",
+              "health",
+              "entertainment",
+              "shopping",
+              "education",
+              "travel",
+              "other",
+            ],
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "name": {
+          "type": "string",
+        },
+        "subtypeKeys": {
+          "default": [],
+          "items": {
+            "enum": [
+              "car_maintenance",
+              "car_fuel",
+              "car_repairs",
+            ],
+            "type": "string",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "name",
+      ],
+      "type": "object",
+    },
+    "name": "create_expense_tab",
+    "title": "Create expense tab",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Replace a tab's name, categories and subtypes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "categoryKeys": {
+          "default": [],
+          "items": {
+            "enum": [
+              "housing",
+              "groceries",
+              "transport",
+              "car",
+              "utilities",
+              "health",
+              "entertainment",
+              "shopping",
+              "education",
+              "travel",
+              "other",
+            ],
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "name": {
+          "type": "string",
+        },
+        "subtypeKeys": {
+          "default": [],
+          "items": {
+            "enum": [
+              "car_maintenance",
+              "car_fuel",
+              "car_repairs",
+            ],
+            "type": "string",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "id",
+        "name",
+      ],
+      "type": "object",
+    },
+    "name": "update_expense_tab",
+    "title": "Update expense tab",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Permanently delete a saved tab. Its expenses are kept.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "delete_expense_tab",
+    "title": "Delete expense tab",
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Investment accounts, positions and current valuation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {},
+      "type": "object",
+    },
+    "name": "get_investments",
+    "title": "Get investments",
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Orders for one instrument and currency in an investment account.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "accountId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "currency": {
+          "pattern": "^[A-Za-z]{3}$",
+          "type": "string",
+        },
+        "instrument": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "accountId",
+        "instrument",
+        "currency",
+      ],
+      "type": "object",
+    },
+    "name": "list_investment_transactions",
+    "title": "List investment transactions",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Record a buy or sell order. Decimals are strings; executedAt is an ISO date-time.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "amount": {
+          "pattern": "^\\d+(?:\\.\\d+)?$",
+          "type": "string",
+        },
+        "brokerId": {
+          "enum": [
+            "xtb",
+            "banca_transilvania",
+          ],
+          "type": "string",
+        },
+        "currency": {
+          "pattern": "^[A-Za-z]{3}$",
+          "type": "string",
+        },
+        "executedAt": {
+          "type": "string",
+        },
+        "instrument": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$",
+          "type": "string",
+        },
+        "quantity": {
+          "pattern": "^\\d+(?:\\.\\d+)?$",
+          "type": "string",
+        },
+        "side": {
+          "enum": [
+            "buy",
+            "sell",
+          ],
+          "type": "string",
+        },
+        "unitPrice": {
+          "pattern": "^\\d+(?:\\.\\d+)?$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "brokerId",
+        "instrument",
+        "currency",
+        "side",
+        "amount",
+        "quantity",
+        "unitPrice",
+        "executedAt",
+      ],
+      "type": "object",
+    },
+    "name": "add_investment_transaction",
+    "title": "Add investment transaction",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Permanently delete an investment order.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "delete_investment_transaction",
+    "title": "Delete investment transaction",
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Net worth with investments and manual assets and liabilities.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {},
+      "type": "object",
+    },
+    "name": "get_net_worth",
+    "title": "Get net worth",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Create an asset or liability with its first valuation. Decimals are strings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "category": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string",
+        },
+        "currency": {
+          "pattern": "^[A-Za-z]{3}$",
+          "type": "string",
+        },
+        "kind": {
+          "enum": [
+            "asset",
+            "liability",
+          ],
+          "type": "string",
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string",
+        },
+        "purchaseAmount": {
+          "anyOf": [
+            {
+              "pattern": "^\\d+(?:\\.\\d+)?$",
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "value": {
+          "pattern": "^\\d+(?:\\.\\d+)?$",
+          "type": "string",
+        },
+        "valuedOn": {
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "name",
+        "kind",
+        "category",
+        "currency",
+        "value",
+        "valuedOn",
+      ],
+      "type": "object",
+    },
+    "name": "add_net_worth_item",
+    "title": "Add net worth item",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Rename, recategorize, set the purchase amount or archive an item.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "archived": {
+          "type": "boolean",
+        },
+        "category": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string",
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string",
+        },
+        "purchaseAmount": {
+          "anyOf": [
+            {
+              "pattern": "^\\d+(?:\\.\\d+)?$",
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "update_net_worth_item",
+    "title": "Update net worth item",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Set an item's value on a date, replacing any value already on that date.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "itemId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "value": {
+          "pattern": "^\\d+(?:\\.\\d+)?$",
+          "type": "string",
+        },
+        "valuedOn": {
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "itemId",
+        "value",
+        "valuedOn",
+      ],
+      "type": "object",
+    },
+    "name": "add_net_worth_valuation",
+    "title": "Add net worth valuation",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Correct the value or date of an existing valuation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "value": {
+          "pattern": "^\\d+(?:\\.\\d+)?$",
+          "type": "string",
+        },
+        "valuedOn": {
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "value",
+        "valuedOn",
+      ],
+      "type": "object",
+    },
+    "name": "update_net_worth_valuation",
+    "title": "Update net worth valuation",
+  },
+]
+`;

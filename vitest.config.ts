@@ -9,4 +9,7 @@ export default defineConfig({
       "server-only": fileURLToPath(new URL("./node_modules/server-only/empty.js", import.meta.url)),
     },
   },
+  test: {
+    include: ["src/**/*.test.{ts,tsx}"],
+  },
 });
