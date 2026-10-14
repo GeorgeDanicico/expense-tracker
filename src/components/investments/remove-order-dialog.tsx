@@ -11,7 +11,7 @@ import { ApiError, apiRequest } from "@/lib/api/client";
 import { INVESTMENTS_API_KEY, investmentTransactionsApiKey, NET_WORTH_API_KEY } from "@/lib/api/keys";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
-import { formatDateTime } from "@/lib/utils/dates";
+import { formatDateTime } from "@/lib/calendar";
 
 export function RemoveOrderDialog({
   accountId,

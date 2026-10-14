@@ -3,20 +3,26 @@ import type {
   AnalyticsPeriod,
   CustomGranularity,
 } from "@/lib/types";
-import { getCurrentMonth, isValidDate, isValidMonth } from "@/lib/utils/dates";
+import {
+  ANALYTICS_PERIODS,
+  getProcessLocalMonth,
+  getUtcToday,
+  isValidDate,
+  isValidMonth,
+} from "@/lib/calendar";
 
 type SearchParamsReader = { get(name: string): string | null };
 
 export function parseAnalyticsFilters(params: SearchParamsReader): AnalyticsFilters {
   const rawPeriod = params.get("period");
-  const period: AnalyticsPeriod = ["3m", "6m", "1y", "2y", "custom"].includes(
+  const period: AnalyticsPeriod = (ANALYTICS_PERIODS as readonly string[]).includes(
     rawPeriod ?? "",
   )
     ? (rawPeriod as AnalyticsPeriod)
     : "3m";
   const granularity: CustomGranularity = params.get("granularity") === "day" ? "day" : "month";
   const rawDate = params.get("date") ?? "";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getUtcToday();
   const customDate =
     granularity === "day"
       ? isValidDate(rawDate)
@@ -24,7 +30,7 @@ export function parseAnalyticsFilters(params: SearchParamsReader): AnalyticsFilt
         : today
       : isValidMonth(rawDate)
         ? rawDate
-        : getCurrentMonth();
+        : getProcessLocalMonth();
 
   return { period, granularity, customDate };
 }

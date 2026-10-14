@@ -17,14 +17,14 @@ import { dashboardHref } from "@/lib/frontend/dashboard-state";
 import { categoryShares } from "@/lib/frontend/expense-analytics";
 import type { AccountData, DashboardData } from "@/lib/types";
 import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
-import { formatMonth, getCurrentMonth } from "@/lib/utils/dates";
+import { formatMonth, getProcessLocalMonth } from "@/lib/calendar";
 
 export function SummaryDashboard({ params }: { params: URLSearchParams }) {
   const { data, error, isValidating, mutate } = useSWR<DashboardData>(
     dashboardApiKey({
       period: "3m",
       granularity: "month",
-      customDate: getCurrentMonth(),
+      customDate: getProcessLocalMonth(),
     }),
     { keepPreviousData: false },
   );

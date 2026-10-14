@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { createExpenseForUser, getMonthlyExpensesForUser } from "@/lib/data/expenses";
 import { summarizeExpenses } from "@/lib/expenses/summary";
 import { HttpError, json, parseInput, readJson, withUser } from "@/lib/http/route";
-import { getCurrentMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/utils/dates";
+import { getProcessLocalMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
 
 export const GET = withUser(async (request: NextRequest, user) => {
@@ -11,7 +11,7 @@ export const GET = withUser(async (request: NextRequest, user) => {
   const isMainLedger = request.nextUrl.searchParams.get("context") === "main";
   const month = isMainLedger
     ? resolveMainExpenseMonth(requestedMonth)
-    : isValidMonth(requestedMonth) ? requestedMonth : getCurrentMonth();
+    : isValidMonth(requestedMonth) ? requestedMonth : getProcessLocalMonth();
 
   const expenses = await getMonthlyExpensesForUser(user.id, month);
   const { total, average } = summarizeExpenses(expenses);

@@ -13,13 +13,10 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { getUtcToday } from "@/lib/calendar";
 import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import { type NetWorthItemKind } from "@/lib/net-worth/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
-
-function currentDateValue() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function categoryOptions(kind: NetWorthItemKind) {
   return kind === "liability"
@@ -171,7 +168,7 @@ export function AddNetWorthItemDialog({
               <Input name="value" type="number" inputMode="decimal" min="0" step="any" placeholder="0.00" required />
             </FormField>
             <FormField flex="1" label="Valued on" error={fieldError("valuedOn")}>
-              <Input name="valuedOn" type="date" defaultValue={currentDateValue()} required />
+              <Input name="valuedOn" type="date" defaultValue={getUtcToday()} required />
             </FormField>
           </FormRow>
 

@@ -4,7 +4,7 @@ import { AmountComparison } from "@/components/dashboard/amount-comparison";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { categoryComparisons, type monthAnalytics } from "@/lib/frontend/expense-analytics";
-import { formatMonth } from "@/lib/utils/dates";
+import { formatMonth } from "@/lib/calendar";
 
 type MonthAnalytics = ReturnType<typeof monthAnalytics>;
 

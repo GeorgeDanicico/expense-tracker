@@ -32,7 +32,7 @@ import { expenseTabHref, readExpenseTabFilters } from "@/lib/frontend/expense-ta
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { AccountData } from "@/lib/types";
 import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
-import { resolveMainExpenseMonth } from "@/lib/utils/dates";
+import { resolveMainExpenseMonth } from "@/lib/calendar";
 
 type TabsResponse = { tabs: ExpenseTab[] };
 type DialogTarget = { mode: "create" } | { mode: "edit"; tab: ExpenseTab };

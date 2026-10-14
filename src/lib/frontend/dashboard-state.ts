@@ -1,4 +1,4 @@
-import { getCurrentMonth, isValidMonth } from "@/lib/utils/dates";
+import { getProcessLocalMonth, isValidMonth } from "@/lib/calendar";
 
 export type DashboardView = "summary" | "monthly" | "history";
 type Params = { get(name: string): string | null };
@@ -17,7 +17,7 @@ export function dashboardView(params: Params): DashboardView {
 
 export function dashboardMonth(
   params: Params,
-  currentMonth = getCurrentMonth(),
+  currentMonth = getProcessLocalMonth(),
 ) {
   const month = params.get("month") ?? "";
   return isValidMonth(month) ? month : currentMonth;

@@ -15,19 +15,21 @@ import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type {
   Analytics,
   AnalyticsFilters,
-  AnalyticsPeriod,
   DashboardData,
   Expense,
 } from "@/lib/types";
 import {
+  addDays,
+  ANALYTICS_PERIOD_MONTHS,
   formatDate,
   formatMonth,
-  getCurrentMonth,
+  getProcessLocalMonth,
   getMonthRange,
   isValidDate,
   isValidMonth,
+  monthKeysBetween,
   shiftMonth,
-} from "@/lib/utils/dates";
+} from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
 
 const EXPENSE_COLUMNS = "id, description, amount, category, subtype, expense_date, notes";
@@ -63,13 +65,6 @@ type DashboardSummary = {
   monthlyTotals: { key: string; total: number | string }[];
 };
 
-const PERIOD_MONTHS: Record<Exclude<AnalyticsPeriod, "custom">, number> = {
-  "3m": 3,
-  "6m": 6,
-  "1y": 12,
-  "2y": 24,
-};
-
 function toExpense(row: ExpenseRow): Expense {
   return {
     id: row.id,
@@ -82,17 +77,11 @@ function toExpense(row: ExpenseRow): Expense {
   };
 }
 
-function nextDate(value: string) {
-  const date = new Date(`${value}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
-}
-
 function getAnalyticsRange(filters: AnalyticsFilters) {
-  const currentMonth = getCurrentMonth();
+  const currentMonth = getProcessLocalMonth();
 
   if (filters.period !== "custom") {
-    const numberOfMonths = PERIOD_MONTHS[filters.period];
+    const numberOfMonths = ANALYTICS_PERIOD_MONTHS[filters.period];
     return {
       start: `${shiftMonth(currentMonth, -numberOfMonths)}-01`,
       endExclusive: `${currentMonth}-01`,
@@ -105,7 +94,7 @@ function getAnalyticsRange(filters: AnalyticsFilters) {
   if (filters.granularity === "day" && isValidDate(filters.customDate)) {
     return {
       start: filters.customDate,
-      endExclusive: nextDate(filters.customDate),
+      endExclusive: addDays(filters.customDate, 1),
       label: formatDate(filters.customDate),
       monthCount: 1,
       granularity: "day" as const,
@@ -125,19 +114,6 @@ function getAnalyticsRange(filters: AnalyticsFilters) {
   };
 }
 
-function buildMonthKeys(start: string, endExclusive: string) {
-  const keys: string[] = [];
-  let cursor = start.slice(0, 7);
-  const last = endExclusive.slice(0, 7);
-
-  while (cursor < last) {
-    keys.push(cursor);
-    cursor = shiftMonth(cursor, 1);
-  }
-
-  return keys;
-}
-
 function analyticsFromSummary(
   summary: DashboardSummary,
   range: ReturnType<typeof getAnalyticsRange>,
@@ -154,7 +130,7 @@ function analyticsFromSummary(
   const series =
     range.granularity === "day"
       ? [{ key: range.start, label: formatDate(range.start), total }]
-      : buildMonthKeys(range.start, range.endExclusive).map((key) => ({
+      : monthKeysBetween(range.start, range.endExclusive).map((key) => ({
           key,
           label: new Intl.DateTimeFormat("en-US", {
             month: "short",
@@ -241,7 +217,7 @@ export async function getDashboardDataForUser(
   userId: string,
   filters: AnalyticsFilters,
 ): Promise<DashboardData> {
-  const currentMonth = getCurrentMonth();
+  const currentMonth = getProcessLocalMonth();
   const currentRange = getMonthRange(currentMonth);
   const analyticsRange = getAnalyticsRange(filters);
 

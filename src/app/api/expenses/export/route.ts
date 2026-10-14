@@ -4,7 +4,7 @@ import { getAccountCurrencyForUser } from "@/lib/data/account";
 import { getMonthlyExpensesForUser } from "@/lib/data/expenses";
 import { buildExpenseWorkbook } from "@/lib/export/xlsx";
 import { HttpError, PRIVATE_HEADERS, withUser } from "@/lib/http/route";
-import { isValidMonth, resolveMainExpenseMonth } from "@/lib/utils/dates";
+import { isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 
 export const runtime = "nodejs";
 

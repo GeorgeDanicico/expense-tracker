@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isValidDate } from "@/lib/utils/dates";
+import { isValidDate } from "@/lib/calendar";
 
 /** A UUID identifier; `message` replaces zod's default error text. */
 export const idSchema = (message?: string) => z.uuid(message);

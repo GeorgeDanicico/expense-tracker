@@ -23,7 +23,7 @@ import {
   type Expense,
   type ExpensesData,
 } from "@/lib/types";
-import { getMonthRange } from "@/lib/utils/dates";
+import { getMonthRange } from "@/lib/calendar";
 
 /** Add-expense form body. Submits to `/api/expenses` and updates the SWR caches. */
 export function ExpenseForm({

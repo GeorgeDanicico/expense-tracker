@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
+import { addDays, toIsoDate } from "@/lib/calendar";
 import { calendarDate } from "@/lib/validation/primitives";
 
 const common = {
@@ -26,11 +27,8 @@ export const DEFAULT_EXPENSE_TAB_FILTERS: ExpenseTabFilters = {
 export function expenseTabDateBounds(filters: ExpenseTabFilters) {
   if (filters.scope === "all") return {};
   if (filters.scope === "year") {
-    return { start: `${String(filters.year).padStart(4, "0")}-01-01`,
+    return { start: toIsoDate(filters.year, 1, 1),
       endExclusive: `${filters.year + 1}-01-01` };
   }
-  const end = new Date(`${filters.endDate}T00:00:00Z`);
-  end.setUTCDate(end.getUTCDate() + 1);
-  const endExclusive = `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, "0")}-${String(end.getUTCDate()).padStart(2, "0")}`;
-  return { start: filters.startDate, endExclusive };
+  return { start: filters.startDate, endExclusive: addDays(filters.endDate, 1) };
 }

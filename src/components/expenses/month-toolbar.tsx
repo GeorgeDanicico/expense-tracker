@@ -8,7 +8,7 @@ import { type FormEvent } from "react";
 
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
-import { formatMonth, isMonthAllowed, shiftMonth } from "@/lib/utils/dates";
+import { formatMonth, isMonthAllowed, shiftMonth } from "@/lib/calendar";
 
 /** One 32px row: ‹ Month › stepper and a compact jump-to-month form. */
 export function MonthToolbar({

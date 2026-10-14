@@ -7,12 +7,20 @@ import type {
 } from "@/lib/types";
 import type { ExpenseTabFilters } from "@/lib/expenses/tab-filters";
 import {
+  addDays,
+  addMonths,
+  ANALYTICS_PERIOD_MONTHS,
+  dateInMonth,
+  daysInMonth,
   formatDate,
   formatMonth,
-  getCurrentMonth,
+  getProcessLocalMonth,
   getMonthRange,
+  lastDayOfMonth,
+  monthsBetween,
   shiftMonth,
-} from "@/lib/utils/dates";
+  toIsoMonth,
+} from "@/lib/calendar";
 
 export function compareAmounts(current: number, previous: number) {
   return {
@@ -51,22 +59,6 @@ function monthKey(date: string) {
   return date.slice(0, 7);
 }
 
-function monthIndex(month: string) {
-  const [year, number] = month.split("-").map(Number);
-  return year * 12 + number - 1;
-}
-
-function monthFromIndex(index: number) {
-  const year = Math.floor(index / 12);
-  const month = (index % 12) + 1;
-  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
-}
-
-function daysInMonth(month: string) {
-  const [year, monthNumber] = month.split("-").map(Number);
-  return new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-}
-
 function periodLabel(
   label: string,
   actualStart: string,
@@ -86,7 +78,7 @@ function makeTimeSeries(
 ): ExpenseTabSeriesBucket[] {
   if (filters.scope === "year") {
     return Array.from({ length: 12 }, (_, index) => {
-      const key = `${String(filters.year).padStart(4, "0")}-${String(index + 1).padStart(2, "0")}`;
+      const key = toIsoMonth(filters.year, index + 1);
       return {
         key,
         label: formatMonth(key),
@@ -128,12 +120,10 @@ function makeTimeSeries(
 
   const firstMonth = monthKey(filters.startDate);
   const lastMonth = monthKey(filters.endDate);
-  const firstIndex = monthIndex(firstMonth);
-  const lastIndex = monthIndex(lastMonth);
-  return Array.from({ length: lastIndex - firstIndex + 1 }, (_, index) => {
-    const key = monthFromIndex(firstIndex + index);
+  return Array.from({ length: monthsBetween(firstMonth, lastMonth) + 1 }, (_, index) => {
+    const key = addMonths(firstMonth, index);
     const periodStart = `${key}-01`;
-    const periodEnd = `${key}-${String(daysInMonth(key)).padStart(2, "0")}`;
+    const periodEnd = lastDayOfMonth(key);
     const actualStart = filters.startDate > periodStart ? filters.startDate : periodStart;
     const actualEnd = filters.endDate < periodEnd ? filters.endDate : periodEnd;
     return {
@@ -146,7 +136,7 @@ function makeTimeSeries(
 
 /** Use yearly buckets for date ranges longer than two calendar years. */
 function rangeUsesYears(filters: Extract<ExpenseTabFilters, { scope: "range" }>) {
-  return monthIndex(monthKey(filters.endDate)) - monthIndex(monthKey(filters.startDate)) + 1 > 24;
+  return monthsBetween(monthKey(filters.startDate), monthKey(filters.endDate)) + 1 > 24;
 }
 
 function breakdownGroup(expense: Expense): { groupKey: string; label: string } {
@@ -227,11 +217,9 @@ export function monthAnalytics(expenses: Expense[], month: string) {
       (days.get(expense.expenseDate) ?? 0) + expense.amount,
     );
   }
-  const { month: safeMonth, endExclusive } = getMonthRange(month);
-  const end = new Date(`${endExclusive}T12:00:00`);
-  end.setDate(0);
-  const daily = Array.from({ length: end.getDate() }, (_, i) => {
-    const key = `${safeMonth}-${String(i + 1).padStart(2, "0")}`;
+  const { month: safeMonth } = getMonthRange(month);
+  const daily = Array.from({ length: daysInMonth(safeMonth) }, (_, i) => {
+    const key = dateInMonth(safeMonth, i + 1);
     return { key, label: String(i + 1), total: days.get(key) ?? 0 };
   });
   const categories = categoryShares(
@@ -304,23 +292,17 @@ export function seriesInsights(series: Analytics["series"]) {
 
 export function historyBoundaries(
   filters: AnalyticsFilters,
-  currentMonth = getCurrentMonth(),
+  currentMonth = getProcessLocalMonth(),
 ) {
   if (filters.period === "custom" && filters.granularity === "day")
     return { start: filters.customDate, end: filters.customDate };
-  const months = { "3m": 3, "6m": 6, "1y": 12, "2y": 24 };
   const startMonth =
     filters.period === "custom"
       ? filters.customDate
-      : shiftMonth(currentMonth, -months[filters.period]);
+      : shiftMonth(currentMonth, -ANALYTICS_PERIOD_MONTHS[filters.period]);
   const endExclusive =
     filters.period === "custom"
       ? getMonthRange(startMonth).endExclusive
       : `${currentMonth}-01`;
-  const end = new Date(`${endExclusive}T12:00:00`);
-  end.setDate(end.getDate() - 1);
-  return {
-    start: `${startMonth}-01`,
-    end: `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`,
-  };
+  return { start: `${startMonth}-01`, end: addDays(endExclusive, -1) };
 }

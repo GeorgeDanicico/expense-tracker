@@ -12,7 +12,7 @@ import type {
   Expense,
   ExpensesData,
 } from "@/lib/types";
-import { getCurrentMonth, shiftMonth } from "@/lib/utils/dates";
+import { dateInMonth, daysInMonth, getProcessLocalMonth, shiftMonth } from "@/lib/calendar";
 
 /** Deterministic sample data for the development screen preview. */
 const TEMPLATE: [string, number, ExpenseCategory, string | null][] = [
@@ -33,9 +33,8 @@ const TEMPLATE: [string, number, ExpenseCategory, string | null][] = [
 ];
 
 function expensesFor(month: string, scale = 1): Expense[] {
-  const [year, monthIndex] = month.split("-").map(Number);
-  const days = new Date(year, monthIndex, 0).getDate();
-  const isCurrent = month === getCurrentMonth();
+  const days = daysInMonth(month);
+  const isCurrent = month === getProcessLocalMonth();
   const lastDay = isCurrent ? new Date().getDate() : days;
   return TEMPLATE.map(([description, amount, category, notes], index) => ({
     id: `${month}-${index}`,
@@ -43,7 +42,7 @@ function expensesFor(month: string, scale = 1): Expense[] {
     amount: Math.round(amount * scale * 100) / 100,
     category,
     subtype: category === "car" ? (index === 2 ? "car_fuel" : "car_maintenance") : null,
-    expenseDate: `${month}-${String(Math.max(1, lastDay - index * 2)).padStart(2, "0")}`,
+    expenseDate: dateInMonth(month, Math.max(1, lastDay - index * 2)),
     notes,
   }));
 }
@@ -55,7 +54,7 @@ function ledger(month: string, scale = 1): ExpensesData {
 }
 
 function dashboard(): DashboardData {
-  const currentMonth = getCurrentMonth();
+  const currentMonth = getProcessLocalMonth();
   const current = ledger(currentMonth);
   const months = [3, 2, 1].map((offset) => shiftMonth(currentMonth, -offset));
   const series = months.map((key, index) => ({ key, label: "", total: [1840.2, 2215.75, 1967.4][index] }));
@@ -99,7 +98,7 @@ const CAR_TAB: ExpenseTab = {
 
 function carLedger(): ExpenseTabLedgerData {
   const expenses = [0, 1, 2, 3].flatMap((offset) =>
-    expensesFor(shiftMonth(getCurrentMonth(), -offset)).filter((expense) => expense.category === "car"),
+    expensesFor(shiftMonth(getProcessLocalMonth(), -offset)).filter((expense) => expense.category === "car"),
   );
   const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   return {
@@ -235,8 +234,8 @@ export function fixtureFor(key: string): unknown {
   if (path === "/api/account") return ACCOUNT;
   if (path === "/api/dashboard") return dashboard();
   if (path === "/api/expenses") {
-    const month = params.get("month") ?? getCurrentMonth();
-    return ledger(month, month === getCurrentMonth() ? 1 : 0.92);
+    const month = params.get("month") ?? getProcessLocalMonth();
+    return ledger(month, month === getProcessLocalMonth() ? 1 : 0.92);
   }
   if (path === "/api/expense-tabs") return { tabs: [CAR_TAB] };
   if (path.startsWith("/api/expense-tabs/") && path.endsWith("/expenses")) return carLedger();

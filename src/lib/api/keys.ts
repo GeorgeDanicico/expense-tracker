@@ -1,5 +1,5 @@
 import type { AnalyticsFilters } from "@/lib/types";
-import { resolveMainExpenseMonth } from "@/lib/utils/dates";
+import { resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseTabFilterParams } from "@/lib/frontend/expense-tab-state";
 import type { ExpenseTabFilters } from "@/lib/expenses/tab-filters";
 

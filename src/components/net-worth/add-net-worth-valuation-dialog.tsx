@@ -13,12 +13,8 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { NET_WORTH_API_KEY } from "@/lib/api/keys";
 import type { NetWorthEntry } from "@/lib/net-worth/types";
+import { formatDate, getUtcToday } from "@/lib/calendar";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
-import { formatDate } from "@/lib/utils/dates";
-
-function currentDateValue() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export function AddNetWorthValuationDialog({
   entry,
@@ -103,7 +99,7 @@ export function AddNetWorthValuationDialog({
             error={fieldError("valuedOn")}
             hint={entry.valuedOn ? `Latest observation: ${formatDate(entry.valuedOn)}` : "Use the date you observed or estimated this value."}
           >
-            <Input name="valuedOn" defaultValue={entry.valuedOn ?? currentDateValue()} type="date" required />
+            <Input name="valuedOn" defaultValue={entry.valuedOn ?? getUtcToday()} type="date" required />
           </FormField>
 
           {error ? <InlineAlert status="error">{error}</InlineAlert> : null}

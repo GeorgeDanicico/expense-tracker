@@ -5,7 +5,7 @@ import { DeleteExpenseButton } from "@/components/expenses/delete-expense-button
 import { Amount } from "@/components/ui/amount";
 import { CategoryBadge } from "@/components/ui/status-badge";
 import type { Expense } from "@/lib/types";
-import { formatDate } from "@/lib/utils/dates";
+import { formatDate } from "@/lib/calendar";
 
 /** Desktop expense table: 40px rows, numeric amounts, quiet row actions. */
 export function ExpenseTable({

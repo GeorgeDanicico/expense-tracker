@@ -15,7 +15,7 @@ import { ACCOUNT_API_KEY, dashboardApiKey } from "@/lib/api/keys";
 import { historyBoundaries, seriesInsights } from "@/lib/frontend/expense-analytics";
 import type { AccountData, AnalyticsFilters, DashboardData } from "@/lib/types";
 import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
-import { formatDate } from "@/lib/utils/dates";
+import { formatDate } from "@/lib/calendar";
 
 export function HistoryDashboard({ filters }: { filters: AnalyticsFilters }) {
   const { data, error, isValidating, mutate } = useSWR<DashboardData>(

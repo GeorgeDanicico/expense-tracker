@@ -18,7 +18,7 @@ import { dashboardHref } from "@/lib/frontend/dashboard-state";
 import { monthAnalytics } from "@/lib/frontend/expense-analytics";
 import type { AccountData, ExpensesData } from "@/lib/types";
 import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
-import { getCurrentMonth, shiftMonth } from "@/lib/utils/dates";
+import { getProcessLocalMonth, shiftMonth } from "@/lib/calendar";
 
 export function MonthlyDashboard({
   month,
@@ -41,7 +41,7 @@ export function MonthlyDashboard({
     previous.data?.month === previousMonth
       ? monthAnalytics(previous.data.expenses, previousMonth)
       : null;
-  const completed = month < getCurrentMonth();
+  const completed = month < getProcessLocalMonth();
   const analytics = matching ? monthAnalytics(matching.expenses, month) : null;
   return (
     <Stack gap="4">
