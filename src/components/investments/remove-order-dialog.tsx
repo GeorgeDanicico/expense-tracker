@@ -7,7 +7,8 @@ import { useSWRConfig } from "swr";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
-import { ApiError, apiRequest } from "@/lib/api/client";
+import { useApiForm } from "@/hooks/use-api-form";
+import { apiRequest } from "@/lib/api/client";
 import { afterInvestmentChange } from "@/lib/api/invalidate";
 import { investmentTransactionsApiKey } from "@/lib/api/keys";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
@@ -29,15 +30,10 @@ export function RemoveOrderDialog({
 }) {
   const { mutate } = useSWRConfig();
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const form = useApiForm();
 
-  async function remove() {
-    if (pending) return;
-    setPending(true);
-    setError("");
-
-    try {
+  function remove() {
+    void form.submit(async () => {
       await apiRequest<Record<string, never>>(`/api/investment-transactions/${encodeURIComponent(transaction.id)}`, {
         method: "DELETE",
       });
@@ -46,11 +42,7 @@ export function RemoveOrderDialog({
       await afterInvestmentChange(mutate, detailKey);
       setOpen(false);
       onDeleted();
-    } catch (caught) {
-      setError(caught instanceof ApiError || caught instanceof Error ? caught.message : "Unable to remove this order.");
-    } finally {
-      setPending(false);
-    }
+    }, { fallback: "Unable to remove this order." });
   }
 
   const side = transaction.side === "buy" ? "Buy" : "Sell";
@@ -74,9 +66,9 @@ export function RemoveOrderDialog({
       description="This permanently removes the recorded order. Totals and cost basis will be recalculated from the remaining history."
       cancelLabel="Keep order"
       confirmLabel="Remove order"
-      pending={pending}
-      error={error}
-      onConfirm={() => void remove()}
+      pending={form.pending}
+      error={form.error}
+      onConfirm={remove}
     >
       <Stack gap="0.5" px="3" py="2.5" borderRadius="control" bg="bg.subtle">
         <Text textStyle="bodySm" fontWeight="medium">{side} · {instrument}</Text>
@@ -84,7 +76,7 @@ export function RemoveOrderDialog({
         <Text textStyle="caption">Executed {formatDateTime(transaction.executedAt)}</Text>
       </Stack>
       <Text className="sr-only" role="status" aria-live="polite">
-        {pending ? "Removing order…" : ""}
+        {form.pending ? "Removing order…" : ""}
       </Text>
     </ConfirmDialog>
   );

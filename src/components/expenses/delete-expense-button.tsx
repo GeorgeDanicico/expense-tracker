@@ -8,30 +8,23 @@ import { useSWRConfig } from "swr";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
+import { useApiForm } from "@/hooks/use-api-form";
 import { apiRequest } from "@/lib/api/client";
 import { afterExpenseDeleted } from "@/lib/api/invalidate";
 
 export function DeleteExpenseButton({ id, description }: { id: string; description: string }) {
   const { mutate } = useSWRConfig();
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const form = useApiForm();
 
-  async function remove() {
-    setPending(true);
-    setError("");
-
-    try {
+  function remove() {
+    void form.submit(async () => {
       await apiRequest<{ success: true }>(`/api/expenses/${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
       await afterExpenseDeleted(mutate, id);
       setOpen(false);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to delete expense.");
-    } finally {
-      setPending(false);
-    }
+    }, { fallback: "Unable to delete expense." });
   }
 
   return (
@@ -51,9 +44,9 @@ export function DeleteExpenseButton({ id, description }: { id: string; descripti
       }
       cancelLabel="Keep it"
       confirmLabel="Delete expense"
-      pending={pending}
-      error={error}
-      onConfirm={() => void remove()}
+      pending={form.pending}
+      error={form.error}
+      onConfirm={remove}
     />
   );
 }

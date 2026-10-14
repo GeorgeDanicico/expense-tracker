@@ -10,7 +10,8 @@ import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { ApiError, apiRequest } from "@/lib/api/client";
+import { useApiForm } from "@/hooks/use-api-form";
+import { apiRequest } from "@/lib/api/client";
 import { afterNetWorthChange } from "@/lib/api/invalidate";
 import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import { NET_WORTH_SUGGESTED_CATEGORIES, type NetWorthEntry } from "@/lib/net-worth/types";
@@ -32,30 +33,24 @@ export function EditNetWorthItemDialog({
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState(initialCategory(entry));
   const [customCategory, setCustomCategory] = useState(entry.category);
-  const [pending, setPending] = useState(false);
-  const [archiving, setArchiving] = useState(false);
-  const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
+  const form = useApiForm();
   const formId = useId();
 
   if (entry.itemId === null) return null;
   const itemId = entry.itemId;
+  const saving = form.pendingAction === "save";
+  const archiving = form.pendingAction === "archive";
 
   const suggestedCategories = entry.kind === "liability"
     ? ["debt"]
     : ["cash", "property", "jewelry"];
 
-  async function save(event: FormEvent<HTMLFormElement>) {
+  function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending || archiving) return;
 
     const formData = new FormData(event.currentTarget);
     const selectedCategory = category === "custom" ? customCategory : category;
-    setPending(true);
-    setError("");
-    setFieldErrors(undefined);
-
-    try {
+    void form.submit(async () => {
       await apiRequest<{ success: true }>(`/api/net-worth/items/${encodeURIComponent(itemId)}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -69,21 +64,11 @@ export function EditNetWorthItemDialog({
       await afterNetWorthChange(mutate);
       setOpen(false);
       onSuccess();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The item could not be updated.");
-      setFieldErrors(caught instanceof ApiError ? caught.fieldErrors : undefined);
-    } finally {
-      setPending(false);
-    }
+    }, { fallback: "The item could not be updated.", action: "save" });
   }
 
-  async function archive() {
-    if (pending || archiving) return;
-    setArchiving(true);
-    setError("");
-    setFieldErrors(undefined);
-
-    try {
+  function archive() {
+    void form.submit(async () => {
       await apiRequest<{ success: true }>(`/api/net-worth/items/${encodeURIComponent(itemId)}`, {
         method: "PATCH",
         body: JSON.stringify({ archived: true }),
@@ -91,16 +76,7 @@ export function EditNetWorthItemDialog({
       await afterNetWorthChange(mutate);
       setOpen(false);
       onSuccess();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The item could not be archived.");
-      setFieldErrors(caught instanceof ApiError ? caught.fieldErrors : undefined);
-    } finally {
-      setArchiving(false);
-    }
-  }
-
-  function fieldError(name: string) {
-    return fieldErrors?.[name]?.[0];
+    }, { fallback: "The item could not be archived.", action: "archive" });
   }
 
   return (
@@ -114,7 +90,7 @@ export function EditNetWorthItemDialog({
         <FormActions
           form={formId}
           closesDialog
-          pending={pending}
+          pending={saving}
           disabled={archiving}
           submitLabel="Save changes"
           leading={
@@ -124,8 +100,8 @@ export function EditNetWorthItemDialog({
               colorPalette="danger"
               size={{ base: "md", sm: "sm" }}
               loading={archiving}
-              disabled={pending}
-              onClick={() => void archive()}
+              disabled={saving}
+              onClick={archive}
             >
               <Archive size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Archive item
             </Button>
@@ -133,7 +109,7 @@ export function EditNetWorthItemDialog({
         />
       }
     >
-      <form id={formId} onSubmit={save} aria-busy={pending || archiving}>
+      <form id={formId} onSubmit={save} aria-busy={form.pending}>
         <Stack gap="3">
           <NetWorthItemFields
             kind={entry.kind}
@@ -145,12 +121,12 @@ export function EditNetWorthItemDialog({
             ]}
             customCategory={customCategory}
             onCustomCategoryChange={setCustomCategory}
-            fieldError={fieldError}
+            fieldError={form.fieldError}
             defaultName={entry.name}
             defaultPurchaseAmount={entry.purchaseAmount ?? ""}
           />
 
-          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
+          {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
 
           <Text textStyle="caption">
             Archiving hides this item from current totals but preserves its valuation history.

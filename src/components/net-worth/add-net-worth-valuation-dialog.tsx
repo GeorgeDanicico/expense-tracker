@@ -10,7 +10,8 @@ import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { ApiError, apiRequest } from "@/lib/api/client";
+import { useApiForm } from "@/hooks/use-api-form";
+import { apiRequest } from "@/lib/api/client";
 import { afterNetWorthChange } from "@/lib/api/invalidate";
 import type { NetWorthEntry } from "@/lib/net-worth/types";
 import { formatDate, getUtcToday } from "@/lib/calendar";
@@ -25,24 +26,17 @@ export function AddNetWorthValuationDialog({
 }) {
   const { mutate } = useSWRConfig();
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
+  const form = useApiForm();
   const formId = useId();
 
   if (entry.itemId === null) return null;
   const itemId = entry.itemId;
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
 
     const formData = new FormData(event.currentTarget);
-    setPending(true);
-    setError("");
-    setFieldErrors(undefined);
-
-    try {
+    void form.submit(async () => {
       await apiRequest<{ valuation: unknown }>(`/api/net-worth/items/${encodeURIComponent(itemId)}/valuations`, {
         method: "POST",
         body: JSON.stringify({
@@ -53,17 +47,10 @@ export function AddNetWorthValuationDialog({
       await afterNetWorthChange(mutate);
       setOpen(false);
       onSuccess();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The value could not be saved.");
-      setFieldErrors(caught instanceof ApiError ? caught.fieldErrors : undefined);
-    } finally {
-      setPending(false);
-    }
+    }, { fallback: "The value could not be saved." });
   }
 
-  function fieldError(name: string) {
-    return fieldErrors?.[name]?.[0];
-  }
+  const { fieldError } = form;
 
   return (
     <AppDialog
@@ -76,9 +63,9 @@ export function AddNetWorthValuationDialog({
           <Plus size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add value
         </Button>
       }
-      footer={<FormActions form={formId} closesDialog pending={pending} submitLabel="Save value" />}
+      footer={<FormActions form={formId} closesDialog pending={form.pending} submitLabel="Save value" />}
     >
-      <form id={formId} onSubmit={submit} aria-busy={pending}>
+      <form id={formId} onSubmit={submit} aria-busy={form.pending}>
         <Stack gap="3">
           <Flex align="center" justify="space-between" gap="3" px="3" py="2.5" borderRadius="control" bg="bg.subtle">
             <Stack minW="0" gap="0">
@@ -102,7 +89,7 @@ export function AddNetWorthValuationDialog({
             <Input name="valuedOn" defaultValue={entry.valuedOn ?? getUtcToday()} type="date" required />
           </FormField>
 
-          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
+          {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
         </Stack>
       </form>
     </AppDialog>
