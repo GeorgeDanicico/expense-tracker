@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Center } from "@chakra-ui/react";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { AuthForm } from "@/components/auth/auth-form";
@@ -32,7 +32,9 @@ export default function LoginPage() {
       py={{ base: "6", md: "10" }}
       bg="bg.canvas"
     >
-      <AuthForm />
+      <Suspense>
+        <AuthForm />
+      </Suspense>
     </Center>
   );
 }
