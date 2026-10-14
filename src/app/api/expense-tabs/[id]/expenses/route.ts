@@ -1,8 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { getExpenseTabForUser } from "@/lib/data/expense-tabs";
-import { getExpenseTabExpensesForUser } from "@/lib/data/expenses";
-import { summarizeExpenses } from "@/lib/expenses/summary";
+import { getExpenseTabLedgerForUser } from "@/lib/data/ledgers";
 import type { ExpenseTabLedgerData } from "@/lib/expenses/tabs";
 import { parseExpenseTabFilters } from "@/lib/expenses/filters";
 import { HttpError, json, notFound, parseId, withUser } from "@/lib/http/route";
@@ -15,11 +13,10 @@ export const GET = withUser(async (request: NextRequest, user, context: TabRoute
   if (!parsed.success) {
     throw new HttpError(422, "Check the expense filters and try again.", parsed.error.flatten().fieldErrors);
   }
-  const tab = await getExpenseTabForUser(user.id, id) ?? notFound("Expense tab not found.");
-  const expenses = await getExpenseTabExpensesForUser(user.id, tab, parsed.data);
-  const { total, count, average } = summarizeExpenses(expenses);
+  const { tab, filters, expenses, total, count, average } =
+    await getExpenseTabLedgerForUser(user.id, id, parsed.data) ?? notFound("Expense tab not found.");
   const response: ExpenseTabLedgerData = {
-    tab, tabId: tab.id, tabRevision: tab.updatedAt, filters: parsed.data, expenses,
+    tab, tabId: tab.id, tabRevision: tab.updatedAt, filters, expenses,
     total, count, average,
   };
   return json(response);

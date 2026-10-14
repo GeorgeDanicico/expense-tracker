@@ -4,11 +4,10 @@ import {
   createExpenseForUser,
   deleteExpenseForUser,
   getDashboardDataForUser,
-  getMonthlyExpensesForUser,
   updateExpenseForUser,
 } from "@/lib/data/expenses";
+import { getMonthlyLedgerForUser } from "@/lib/data/ledgers";
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
-import { summarizeExpenses } from "@/lib/expenses/summary";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
 import { parseAnalyticsFilters } from "@/lib/expenses/url-state";
 import {
@@ -58,10 +57,7 @@ export const expenseTools = [
     description: "Expenses for one month (default: current month) with total, count and average.",
     schema: z.object({ month: z.string().refine(isValidMonth, "Use YYYY-MM.").optional() }),
     annotations: READ,
-    run: async ({ month = getBucharestMonth() }, { userId }) => {
-      const expenses = await getMonthlyExpensesForUser(userId, month);
-      return { month, expenses, ...summarizeExpenses(expenses) };
-    },
+    run: ({ month = getBucharestMonth() }, { userId }) => getMonthlyLedgerForUser(userId, month),
   }),
   defineTool({
     name: "get_spending_summary",

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
-import { createExpenseForUser, getMonthlyExpensesForUser } from "@/lib/data/expenses";
-import { summarizeExpenses } from "@/lib/expenses/summary";
+import { createExpenseForUser } from "@/lib/data/expenses";
+import { getMonthlyLedgerForUser } from "@/lib/data/ledgers";
 import { HttpError, json, parseInput, readJson, withUser } from "@/lib/http/route";
 import { getProcessLocalMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
@@ -13,8 +13,7 @@ export const GET = withUser(async (request: NextRequest, user) => {
     ? resolveMainExpenseMonth(requestedMonth)
     : isValidMonth(requestedMonth) ? requestedMonth : getProcessLocalMonth();
 
-  const expenses = await getMonthlyExpensesForUser(user.id, month);
-  const { total, average } = summarizeExpenses(expenses);
+  const { expenses, total, average } = await getMonthlyLedgerForUser(user.id, month);
   return json({
     month,
     ...(isMainLedger ? { effectiveMonth: month } : {}),
