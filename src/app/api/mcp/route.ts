@@ -1,6 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
-import { NextResponse } from "next/server";
 
+import { json, PRIVATE_HEADERS } from "@/lib/http/route";
 import { getMcpSession, parseBasicCredentials } from "@/lib/mcp/auth";
 import { createMcpServer } from "@/lib/mcp/server";
 import { runWithSupabaseClient } from "@/lib/supabase/server";
@@ -8,7 +8,6 @@ import { runWithSupabaseClient } from "@/lib/supabase/server";
 // AsyncLocalStorage (runWithSupabaseClient) and node:crypto (auth) need the Node runtime.
 export const runtime = "nodejs";
 
-const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 const LOCALHOST_NAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 function isAllowedOrigin(origin: string) {
@@ -50,27 +49,27 @@ async function handle(request: Request) {
   // MCP spec DNS-rebinding guard. Claude Code and mcp-remote send no Origin.
   const origin = request.headers.get("origin");
   if (origin !== null && !isAllowedOrigin(origin)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: PRIVATE_HEADERS });
+    return json({ error: "Forbidden" }, 403);
   }
 
   const credentials = parseBasicCredentials(request);
   const auth = credentials ? await getMcpSession(credentials, clientIp(request)) : { status: "unauthorized" as const };
   if (auth.status === "throttled") {
-    return NextResponse.json({ error: "Too many failed attempts. Try again later." }, { status: 429, headers: PRIVATE_HEADERS });
+    return json({ error: "Too many failed attempts. Try again later." }, 429);
   }
   if (auth.status !== "ok") {
-    return NextResponse.json(
+    return json(
       { error: "Unauthorized" },
-      { status: 401, headers: { ...PRIVATE_HEADERS, "WWW-Authenticate": 'Basic realm="expense-tracker"' } },
+      { status: 401, headers: { "WWW-Authenticate": 'Basic realm="expense-tracker"' } },
     );
   }
 
   // Stateless mode has no standalone SSE stream or session to delete. The raw transport would
   // otherwise hold a GET stream open indefinitely, so answer like the SDK's stateless fallback.
   if (request.method !== "POST") {
-    return NextResponse.json(
+    return json(
       { jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed." }, id: null },
-      { status: 405, headers: { ...PRIVATE_HEADERS, Allow: "POST" } },
+      { status: 405, headers: { Allow: "POST" } },
     );
   }
 

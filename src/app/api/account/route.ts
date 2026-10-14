@@ -1,41 +1,21 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
-import { getAuthenticatedUser } from "@/lib/auth";
 import { getAccountCurrencyForUser } from "@/lib/data/account";
+import { HttpError, json, readJson, withUser } from "@/lib/http/route";
 import { createClient } from "@/lib/supabase/server";
 import { isSupportedCurrency } from "@/lib/utils/currency";
 
-const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
+export const GET = withUser(async (_request, user) => {
+  const currency = await getAccountCurrencyForUser(user.id);
+  return json({ email: user.email, currency });
+}, { failure: "Unable to load account settings." });
 
-export async function GET() {
-  const user = await getAuthenticatedUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: PRIVATE_HEADERS });
-  }
+const SAVE_FAILURE = "The currency could not be saved. Please try again.";
 
-  try {
-    const currency = await getAccountCurrencyForUser(user.id);
-    return NextResponse.json({ email: user.email, currency }, { headers: PRIVATE_HEADERS });
-  } catch {
-    return NextResponse.json(
-      { error: "Unable to load account settings." },
-      { status: 500, headers: PRIVATE_HEADERS },
-    );
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  const user = await getAuthenticatedUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: PRIVATE_HEADERS });
-  }
-
-  const payload = (await request.json().catch(() => null)) as { currency?: unknown } | null;
+export const PATCH = withUser(async (request: NextRequest, user) => {
+  const payload = (await readJson(request)) as { currency?: unknown } | null;
   if (!isSupportedCurrency(payload?.currency)) {
-    return NextResponse.json(
-      { error: "Choose a supported currency." },
-      { status: 422, headers: PRIVATE_HEADERS },
-    );
+    throw new HttpError(422, "Choose a supported currency.");
   }
 
   const supabase = await createClient();
@@ -49,14 +29,8 @@ export async function PATCH(request: NextRequest) {
   );
 
   if (error) {
-    return NextResponse.json(
-      { error: "The currency could not be saved. Please try again." },
-      { status: 500, headers: PRIVATE_HEADERS },
-    );
+    return json({ error: SAVE_FAILURE }, 500);
   }
 
-  return NextResponse.json(
-    { email: user.email, currency: payload.currency },
-    { headers: PRIVATE_HEADERS },
-  );
-}
+  return json({ email: user.email, currency: payload.currency });
+}, { failure: SAVE_FAILURE });
