@@ -1,4 +1,4 @@
-import type { AnalyticsPeriod } from "@/lib/types";
+import type { AnalyticsPeriod } from "@/lib/expenses/types";
 
 /**
  * Calendar dates (`YYYY-MM-DD`) and months (`YYYY-MM`) as plain strings.

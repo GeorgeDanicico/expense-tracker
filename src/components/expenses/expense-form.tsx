@@ -17,12 +17,8 @@ import {
   type ExpenseCategory,
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
-import {
-  INITIAL_ACTION_STATE,
-  type ActionState,
-  type Expense,
-  type ExpensesData,
-} from "@/lib/types";
+import type { Expense, ExpensesData } from "@/lib/expenses/types";
+import { INITIAL_ACTION_STATE, type ActionState } from "@/lib/forms";
 import { getMonthRange } from "@/lib/calendar";
 
 /** Add-expense form body. Submits to `/api/expenses` and updates the SWR caches. */

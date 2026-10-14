@@ -14,8 +14,12 @@ import {
   type ExpenseCategory,
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
-import { expenseTabHref } from "@/lib/frontend/expense-tab-state";
-import { DEFAULT_EXPENSE_TAB_FILTERS, expenseTabFiltersSchema, type ExpenseTabFilters } from "@/lib/expenses/tab-filters";
+import {
+  DEFAULT_EXPENSE_TAB_FILTERS,
+  expenseTabFiltersSchema,
+  expenseTabHref,
+  type ExpenseTabFilters,
+} from "@/lib/expenses/filters";
 
 type Scope = "all" | "year" | "range";
 type FilterDraft = {

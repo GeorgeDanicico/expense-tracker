@@ -16,7 +16,7 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { EXPENSE_TABS_API_KEY, expenseTabApiKey, expenseTabExpensesApiKey } from "@/lib/api/keys";
-import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/frontend/expense-tab-state";
+import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab, ExpenseTabLedgerData } from "@/lib/expenses/tabs";
 
 type TabsResponse = { tabs: ExpenseTab[] };

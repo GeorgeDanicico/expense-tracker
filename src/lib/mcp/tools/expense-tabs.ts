@@ -10,7 +10,7 @@ import {
 import { getExpenseTabExpensesForUser } from "@/lib/data/expenses";
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
 import { summarizeExpenses } from "@/lib/expenses/summary";
-import { DEFAULT_EXPENSE_TAB_FILTERS, expenseTabFiltersSchema } from "@/lib/expenses/tab-filters";
+import { DEFAULT_EXPENSE_TAB_FILTERS, expenseTabFiltersSchema } from "@/lib/expenses/filters";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
 import { expenseTabSchema } from "@/lib/validation/expense-tab";
 import { idSchema } from "@/lib/validation/primitives";

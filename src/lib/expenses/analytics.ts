@@ -1,11 +1,15 @@
 import Decimal from "decimal.js";
-import { CATEGORY_LABELS, SUBTYPE_LABELS } from "@/lib/expenses/categories";
+import {
+  CATEGORY_LABELS,
+  SUBTYPE_LABELS,
+  type ExpenseCategory,
+} from "@/lib/expenses/categories";
+import type { ExpenseTabFilters } from "@/lib/expenses/filters";
 import type {
   Analytics,
   AnalyticsFilters,
   Expense,
-} from "@/lib/types";
-import type { ExpenseTabFilters } from "@/lib/expenses/tab-filters";
+} from "@/lib/expenses/types";
 import {
   addDays,
   addMonths,
@@ -16,7 +20,10 @@ import {
   formatMonth,
   getProcessLocalMonth,
   getMonthRange,
+  isValidDate,
+  isValidMonth,
   lastDayOfMonth,
+  monthKeysBetween,
   monthsBetween,
   shiftMonth,
   toIsoMonth,
@@ -290,19 +297,108 @@ export function seriesInsights(series: Analytics["series"]) {
   };
 }
 
+/**
+ * The analytics date range for the dashboard filters, shared by the dashboard
+ * query (server) and the history view's boundary caption (client).
+ */
+export function resolveAnalyticsRange(filters: AnalyticsFilters, currentMonth: string) {
+  if (filters.period !== "custom") {
+    const numberOfMonths = ANALYTICS_PERIOD_MONTHS[filters.period];
+    return {
+      start: `${shiftMonth(currentMonth, -numberOfMonths)}-01`,
+      endExclusive: `${currentMonth}-01`,
+      label: `Previous ${numberOfMonths} months`,
+      monthCount: numberOfMonths,
+      granularity: "month" as const,
+    };
+  }
+
+  if (filters.granularity === "day" && isValidDate(filters.customDate)) {
+    return {
+      start: filters.customDate,
+      endExclusive: addDays(filters.customDate, 1),
+      label: formatDate(filters.customDate),
+      monthCount: 1,
+      granularity: "day" as const,
+    };
+  }
+
+  const customMonth = isValidMonth(filters.customDate)
+    ? filters.customDate
+    : currentMonth;
+  const range = getMonthRange(customMonth);
+  return {
+    start: range.start,
+    endExclusive: range.endExclusive,
+    label: formatMonth(customMonth),
+    monthCount: 1,
+    granularity: "month" as const,
+  };
+}
+
+export type AnalyticsRange = ReturnType<typeof resolveAnalyticsRange>;
+
+/** The inclusive first and last dates of the analytics range. */
 export function historyBoundaries(
   filters: AnalyticsFilters,
   currentMonth = getProcessLocalMonth(),
 ) {
-  if (filters.period === "custom" && filters.granularity === "day")
+  // Unlike resolveAnalyticsRange, an invalid custom date is echoed rather than replaced by
+  // the current month. parseAnalyticsFilters never produces one; kept to preserve behavior.
+  if (filters.period === "custom" && filters.granularity === "day" && !isValidDate(filters.customDate))
     return { start: filters.customDate, end: filters.customDate };
-  const startMonth =
-    filters.period === "custom"
-      ? filters.customDate
-      : shiftMonth(currentMonth, -ANALYTICS_PERIOD_MONTHS[filters.period]);
-  const endExclusive =
-    filters.period === "custom"
-      ? getMonthRange(startMonth).endExclusive
-      : `${currentMonth}-01`;
-  return { start: `${startMonth}-01`, end: addDays(endExclusive, -1) };
+  if (filters.period === "custom" && filters.granularity !== "day" && !isValidMonth(filters.customDate))
+    return {
+      start: `${filters.customDate}-01`,
+      end: addDays(getMonthRange(filters.customDate).endExclusive, -1),
+    };
+  const range = resolveAnalyticsRange(filters, currentMonth);
+  return { start: range.start, end: addDays(range.endExclusive, -1) };
+}
+
+/** The `get_expense_dashboard` RPC payload; numeric columns may arrive as strings. */
+export type DashboardSummary = {
+  currentTotal: number | string;
+  currentCount: number;
+  currentLargest: number | string;
+  analyticsTotal: number | string;
+  analyticsCount: number;
+  categoryTotals: { category: ExpenseCategory; total: number | string }[];
+  monthlyTotals: { key: string; total: number | string }[];
+};
+
+export function analyticsFromSummary(
+  summary: DashboardSummary,
+  range: AnalyticsRange,
+): Analytics {
+  const total = Number(summary.analyticsTotal);
+  const categoryTotals = summary.categoryTotals.map((item) => ({
+    category: item.category,
+    label: CATEGORY_LABELS[item.category],
+    total: Number(item.total),
+  }));
+  const monthMap = new Map(
+    summary.monthlyTotals.map((item) => [item.key, Number(item.total)]),
+  );
+  const series =
+    range.granularity === "day"
+      ? [{ key: range.start, label: formatDate(range.start), total }]
+      : monthKeysBetween(range.start, range.endExclusive).map((key) => ({
+          key,
+          label: new Intl.DateTimeFormat("en-US", {
+            month: "short",
+            year: range.monthCount > 12 ? "2-digit" : undefined,
+          }).format(new Date(`${key}-01T12:00:00`)),
+          total: monthMap.get(key) ?? 0,
+        }));
+
+  return {
+    label: range.label,
+    total,
+    count: Number(summary.analyticsCount),
+    monthlyAverage: total / range.monthCount,
+    topCategory: categoryTotals[0]?.label ?? "No data",
+    categoryTotals,
+    series,
+  };
 }

@@ -3,7 +3,7 @@ import { SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import { AmountComparison } from "@/components/dashboard/amount-comparison";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
-import type { seriesInsights } from "@/lib/frontend/expense-analytics";
+import type { seriesInsights } from "@/lib/expenses/analytics";
 import { formatMonth } from "@/lib/calendar";
 
 type Insights = ReturnType<typeof seriesInsights>;

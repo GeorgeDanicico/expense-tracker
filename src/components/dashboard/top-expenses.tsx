@@ -2,7 +2,7 @@ import { Flex, Stack, Text } from "@chakra-ui/react";
 
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
-import type { Expense } from "@/lib/types";
+import type { Expense } from "@/lib/expenses/types";
 import { formatDate } from "@/lib/calendar";
 
 /** Ranked list of the month's largest expenses. */

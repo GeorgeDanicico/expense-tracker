@@ -7,7 +7,7 @@ import { FormEvent, useState, useTransition } from "react";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Toolbar } from "@/components/ui/toolbar";
 import { getUtcMonth, getUtcToday } from "@/lib/calendar";
-import type { AnalyticsPeriod, CustomGranularity } from "@/lib/types";
+import type { AnalyticsPeriod, CustomGranularity } from "@/lib/expenses/types";
 
 const PERIODS = [
   { value: "3m", label: "3M", ariaLabel: "Previous 3 completed months" },

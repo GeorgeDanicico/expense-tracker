@@ -14,9 +14,10 @@ import { MonthToolbar } from "@/components/expenses/month-toolbar";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { ACCOUNT_API_KEY, expensesApiKey } from "@/lib/api/keys";
-import { dashboardHref } from "@/lib/frontend/dashboard-state";
-import { monthAnalytics } from "@/lib/frontend/expense-analytics";
-import type { AccountData, ExpensesData } from "@/lib/types";
+import { dashboardHref } from "@/lib/expenses/url-state";
+import { monthAnalytics } from "@/lib/expenses/analytics";
+import type { AccountData } from "@/lib/account";
+import type { ExpensesData } from "@/lib/expenses/types";
 import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
 import { getProcessLocalMonth, shiftMonth } from "@/lib/calendar";
 

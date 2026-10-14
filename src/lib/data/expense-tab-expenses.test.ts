@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/tab-filters";
+import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/filters";
 
 const mocks = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => mocks);

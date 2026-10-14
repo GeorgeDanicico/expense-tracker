@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
 import { apiRequest } from "@/lib/api/client";
-import type { ExpensesData } from "@/lib/types";
+import type { ExpensesData } from "@/lib/expenses/types";
 
 export function DeleteExpenseButton({ id, description }: { id: string; description: string }) {
   const { mutate } = useSWRConfig();

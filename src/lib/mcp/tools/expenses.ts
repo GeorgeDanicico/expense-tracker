@@ -10,7 +10,7 @@ import {
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
 import { summarizeExpenses } from "@/lib/expenses/summary";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
-import { parseAnalyticsFilters } from "@/lib/utils/analytics";
+import { parseAnalyticsFilters } from "@/lib/expenses/url-state";
 import {
   ANALYTICS_PERIODS,
   getBucharestMonth,

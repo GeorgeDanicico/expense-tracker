@@ -1,6 +1,6 @@
 import type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
-import type { ExpenseTabFilters } from "@/lib/expenses/tab-filters";
-import type { Expense } from "@/lib/types";
+import type { ExpenseTabFilters } from "@/lib/expenses/filters";
+import type { Expense } from "@/lib/expenses/types";
 
 export type ExpenseTab = {
   id: string;

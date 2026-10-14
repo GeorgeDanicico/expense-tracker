@@ -12,7 +12,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import { INITIAL_ACTION_STATE, type ActionState } from "@/lib/types";
+import { INITIAL_ACTION_STATE, type ActionState } from "@/lib/forms";
 
 type AuthMode = "login" | "signup";
 

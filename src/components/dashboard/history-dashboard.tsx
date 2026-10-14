@@ -12,8 +12,9 @@ import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { Stat, StatGroup } from "@/components/ui/stat";
 import { ACCOUNT_API_KEY, dashboardApiKey } from "@/lib/api/keys";
-import { historyBoundaries, seriesInsights } from "@/lib/frontend/expense-analytics";
-import type { AccountData, AnalyticsFilters, DashboardData } from "@/lib/types";
+import { historyBoundaries, seriesInsights } from "@/lib/expenses/analytics";
+import type { AccountData } from "@/lib/account";
+import type { AnalyticsFilters, DashboardData } from "@/lib/expenses/types";
 import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
 import { formatDate } from "@/lib/calendar";
 

@@ -4,7 +4,7 @@ import { getExpenseTabForUser } from "@/lib/data/expense-tabs";
 import { getExpenseTabExpensesForUser } from "@/lib/data/expenses";
 import { summarizeExpenses } from "@/lib/expenses/summary";
 import type { ExpenseTabLedgerData } from "@/lib/expenses/tabs";
-import { parseExpenseTabFilters } from "@/lib/frontend/expense-tab-state";
+import { parseExpenseTabFilters } from "@/lib/expenses/filters";
 import { HttpError, json, notFound, parseId, withUser } from "@/lib/http/route";
 
 type TabRouteContext = { params: Promise<{ id: string }> };

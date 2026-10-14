@@ -8,7 +8,7 @@ import useSWR from "swr";
 import { AuthForm } from "@/components/auth/auth-form";
 import { DataLoading } from "@/components/ui/data-state";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import type { AccountData } from "@/lib/types";
+import type { AccountData } from "@/lib/account";
 
 export default function LoginPage() {
   const router = useRouter();

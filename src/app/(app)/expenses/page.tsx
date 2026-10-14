@@ -28,9 +28,9 @@ import {
   EXPENSE_TABS_API_KEY,
   mainExpensesExportUrl,
 } from "@/lib/api/keys";
-import { expenseTabHref, readExpenseTabFilters } from "@/lib/frontend/expense-tab-state";
+import { expenseTabHref, readExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-import type { AccountData } from "@/lib/types";
+import type { AccountData } from "@/lib/account";
 import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
 import { resolveMainExpenseMonth } from "@/lib/calendar";
 

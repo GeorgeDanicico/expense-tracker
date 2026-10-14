@@ -8,7 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { ApiError } from "@/lib/api/client";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import type { AccountData } from "@/lib/types";
+import type { AccountData } from "@/lib/account";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();

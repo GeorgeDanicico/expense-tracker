@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { Stat, StatGroup } from "@/components/ui/stat";
 import { mainExpensesApiKey } from "@/lib/api/keys";
-import type { ExpensesData } from "@/lib/types";
+import type { ExpensesData } from "@/lib/expenses/types";
 import { getBucharestMonth } from "@/lib/calendar";
 
 /** The main ledger tab: month toolbar, month metrics and the expense list. */

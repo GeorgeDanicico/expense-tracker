@@ -3,9 +3,9 @@ import {
   dashboardHref,
   dashboardMonth,
   dashboardView,
-} from "@/lib/frontend/dashboard-state";
+  parseAnalyticsFilters,
+} from "@/lib/expenses/url-state";
 import { dashboardApiKey } from "@/lib/api/keys";
-import { parseAnalyticsFilters } from "@/lib/utils/analytics";
 
 describe("Home URL state", () => {
   it("defaults missing and invalid views to Summary", () => {

@@ -10,26 +10,19 @@ import {
   type ExpenseCategory,
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
-import { expenseTabDateBounds, type ExpenseTabFilters } from "@/lib/expenses/tab-filters";
+import {
+  analyticsFromSummary,
+  resolveAnalyticsRange,
+  type DashboardSummary,
+} from "@/lib/expenses/analytics";
+import { expenseTabDateBounds, type ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type {
-  Analytics,
   AnalyticsFilters,
   DashboardData,
   Expense,
-} from "@/lib/types";
-import {
-  addDays,
-  ANALYTICS_PERIOD_MONTHS,
-  formatDate,
-  formatMonth,
-  getProcessLocalMonth,
-  getMonthRange,
-  isValidDate,
-  isValidMonth,
-  monthKeysBetween,
-  shiftMonth,
-} from "@/lib/calendar";
+} from "@/lib/expenses/types";
+import { getProcessLocalMonth, getMonthRange } from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
 
 const EXPENSE_COLUMNS = "id, description, amount, category, subtype, expense_date, notes";
@@ -55,16 +48,6 @@ type ExpenseRow = {
   notes: string | null;
 };
 
-type DashboardSummary = {
-  currentTotal: number | string;
-  currentCount: number;
-  currentLargest: number | string;
-  analyticsTotal: number | string;
-  analyticsCount: number;
-  categoryTotals: { category: ExpenseCategory; total: number | string }[];
-  monthlyTotals: { key: string; total: number | string }[];
-};
-
 function toExpense(row: ExpenseRow): Expense {
   return {
     id: row.id,
@@ -74,79 +57,6 @@ function toExpense(row: ExpenseRow): Expense {
     subtype: row.subtype,
     expenseDate: row.expense_date,
     notes: row.notes,
-  };
-}
-
-function getAnalyticsRange(filters: AnalyticsFilters) {
-  const currentMonth = getProcessLocalMonth();
-
-  if (filters.period !== "custom") {
-    const numberOfMonths = ANALYTICS_PERIOD_MONTHS[filters.period];
-    return {
-      start: `${shiftMonth(currentMonth, -numberOfMonths)}-01`,
-      endExclusive: `${currentMonth}-01`,
-      label: `Previous ${numberOfMonths} months`,
-      monthCount: numberOfMonths,
-      granularity: "month" as const,
-    };
-  }
-
-  if (filters.granularity === "day" && isValidDate(filters.customDate)) {
-    return {
-      start: filters.customDate,
-      endExclusive: addDays(filters.customDate, 1),
-      label: formatDate(filters.customDate),
-      monthCount: 1,
-      granularity: "day" as const,
-    };
-  }
-
-  const customMonth = isValidMonth(filters.customDate)
-    ? filters.customDate
-    : currentMonth;
-  const range = getMonthRange(customMonth);
-  return {
-    start: range.start,
-    endExclusive: range.endExclusive,
-    label: formatMonth(customMonth),
-    monthCount: 1,
-    granularity: "month" as const,
-  };
-}
-
-function analyticsFromSummary(
-  summary: DashboardSummary,
-  range: ReturnType<typeof getAnalyticsRange>,
-): Analytics {
-  const total = Number(summary.analyticsTotal);
-  const categoryTotals = summary.categoryTotals.map((item) => ({
-    category: item.category,
-    label: CATEGORY_LABELS[item.category],
-    total: Number(item.total),
-  }));
-  const monthMap = new Map(
-    summary.monthlyTotals.map((item) => [item.key, Number(item.total)]),
-  );
-  const series =
-    range.granularity === "day"
-      ? [{ key: range.start, label: formatDate(range.start), total }]
-      : monthKeysBetween(range.start, range.endExclusive).map((key) => ({
-          key,
-          label: new Intl.DateTimeFormat("en-US", {
-            month: "short",
-            year: range.monthCount > 12 ? "2-digit" : undefined,
-          }).format(new Date(`${key}-01T12:00:00`)),
-          total: monthMap.get(key) ?? 0,
-        }));
-
-  return {
-    label: range.label,
-    total,
-    count: Number(summary.analyticsCount),
-    monthlyAverage: total / range.monthCount,
-    topCategory: categoryTotals[0]?.label ?? "No data",
-    categoryTotals,
-    series,
   };
 }
 
@@ -219,7 +129,7 @@ export async function getDashboardDataForUser(
 ): Promise<DashboardData> {
   const currentMonth = getProcessLocalMonth();
   const currentRange = getMonthRange(currentMonth);
-  const analyticsRange = getAnalyticsRange(filters);
+  const analyticsRange = resolveAnalyticsRange(filters, getProcessLocalMonth());
 
   const supabase = await createClient();
   const [recentResult, summaryResult] = await Promise.all([

@@ -6,7 +6,7 @@ vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser 
 vi.mock("@/lib/data/expense-tabs", () => ({ getExpenseTabForUser: mocks.getExpenseTabForUser }));
 vi.mock("@/lib/data/expenses", () => ({ getExpenseTabExpensesForUser: mocks.getExpenseTabExpensesForUser }));
 import { GET } from "./route";
-import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/tab-filters";
+import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/filters";
 
 const id = "40000000-0000-4000-8000-000000000041";
 const context = { params: Promise.resolve({ id }) };

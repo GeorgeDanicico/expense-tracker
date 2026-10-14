@@ -16,9 +16,9 @@ import {
   dashboardHref,
   dashboardMonth,
   dashboardView,
+  parseAnalyticsFilters,
   type DashboardView,
-} from "@/lib/frontend/dashboard-state";
-import { parseAnalyticsFilters } from "@/lib/utils/analytics";
+} from "@/lib/expenses/url-state";
 
 const VIEWS = [
   { value: "summary", label: "Summary" },

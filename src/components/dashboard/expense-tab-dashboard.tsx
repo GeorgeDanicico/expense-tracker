@@ -8,7 +8,7 @@ import { MonthlyBarChart } from "@/components/dashboard/monthly-bar-chart";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
 import { Stat, StatGroup } from "@/components/ui/stat";
-import { expenseTabAnalytics } from "@/lib/frontend/expense-analytics";
+import { expenseTabAnalytics } from "@/lib/expenses/analytics";
 import type { ExpenseTabLedgerData } from "@/lib/expenses/tabs";
 import { normalizeCurrency } from "@/lib/utils/currency";
 

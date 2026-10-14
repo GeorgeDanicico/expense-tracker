@@ -39,25 +39,9 @@ export type DashboardData = {
   analytics: Analytics;
 };
 
-export type AccountData = {
-  email: string;
-  currency: string;
-};
-
 export type ExpensesData = {
   month: string;
   expenses: Expense[];
   total: number;
   average: number;
-};
-
-export type ActionState = {
-  status: "idle" | "success" | "error";
-  message: string;
-  fieldErrors?: Record<string, string[]>;
-};
-
-export const INITIAL_ACTION_STATE: ActionState = {
-  status: "idle",
-  message: "",
 };

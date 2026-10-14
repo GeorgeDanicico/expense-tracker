@@ -1,7 +1,6 @@
-import type { AnalyticsFilters } from "@/lib/types";
+import type { AnalyticsFilters } from "@/lib/expenses/types";
 import { resolveMainExpenseMonth } from "@/lib/calendar";
-import { expenseTabFilterParams } from "@/lib/frontend/expense-tab-state";
-import type { ExpenseTabFilters } from "@/lib/expenses/tab-filters";
+import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/filters";
 
 export const ACCOUNT_API_KEY = "/api/account";
 export const INVESTMENTS_API_KEY = "/api/investments";

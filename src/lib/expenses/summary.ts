@@ -1,4 +1,4 @@
-import type { Expense } from "@/lib/types";
+import type { Expense } from "@/lib/expenses/types";
 
 export function summarizeExpenses(expenses: Pick<Expense, "amount">[]) {
   const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);

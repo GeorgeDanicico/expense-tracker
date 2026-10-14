@@ -1,17 +1,13 @@
 import type { ExpenseTab, ExpenseTabLedgerData } from "@/lib/expenses/tabs";
-import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/tab-filters";
+import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/filters";
 import type {
   InvestmentsOverview,
   InvestmentTransactionsResponse,
 } from "@/lib/investments/types";
 import type { NetWorthOverview } from "@/lib/net-worth/types";
 import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
-import type {
-  AccountData,
-  DashboardData,
-  Expense,
-  ExpensesData,
-} from "@/lib/types";
+import type { AccountData } from "@/lib/account";
+import type { DashboardData, Expense, ExpensesData } from "@/lib/expenses/types";
 import { dateInMonth, daysInMonth, getProcessLocalMonth, shiftMonth } from "@/lib/calendar";
 
 /** Deterministic sample data for the development screen preview. */

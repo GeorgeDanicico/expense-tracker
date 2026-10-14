@@ -1,6 +1,6 @@
 import { Text } from "@chakra-ui/react";
 import { formatCurrency } from "@/lib/utils/currency";
-import { compareAmounts } from "@/lib/frontend/expense-analytics";
+import { compareAmounts } from "@/lib/expenses/analytics";
 
 export function AmountComparison({
   current,

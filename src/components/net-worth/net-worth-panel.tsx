@@ -18,7 +18,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { apiFetcher } from "@/lib/api/client";
 import { ACCOUNT_API_KEY, NET_WORTH_API_KEY } from "@/lib/api/keys";
 import type { NetWorthEntry, NetWorthOverview } from "@/lib/net-worth/types";
-import type { AccountData } from "@/lib/types";
+import type { AccountData } from "@/lib/account";
 
 function groupedEntries(entries: NetWorthEntry[]) {
   const groups = new Map<string, NetWorthEntry[]>();

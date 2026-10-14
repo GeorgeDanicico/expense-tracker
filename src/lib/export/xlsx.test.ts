@@ -2,7 +2,7 @@ import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 
 import { buildExpenseWorkbook } from "@/lib/export/xlsx";
-import type { Expense } from "@/lib/types";
+import type { Expense } from "@/lib/expenses/types";
 
 describe("expense workbook", () => {
   it("exports subtype labels while preserving numeric amount cells and the total formula", () => {
