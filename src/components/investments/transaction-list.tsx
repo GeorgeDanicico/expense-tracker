@@ -5,7 +5,7 @@ import { Amount } from "@/components/ui/amount";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
-import { formatDateTime } from "@/lib/utils/dates";
+import { formatDateTime } from "@/lib/calendar";
 
 function SideBadge({ side }: { side: InvestmentTransactionDto["side"] }) {
   return <StatusBadge tone={side === "buy" ? "info" : "warning"}>{side === "buy" ? "Buy" : "Sell"}</StatusBadge>;

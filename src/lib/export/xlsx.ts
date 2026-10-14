@@ -2,8 +2,8 @@ import "server-only";
 
 import { strToU8, zipSync } from "fflate";
 
-import { CATEGORY_LABELS, type Expense } from "@/lib/types";
-import { SUBTYPE_LABELS } from "@/lib/expenses/categories";
+import { CATEGORY_LABELS, SUBTYPE_LABELS } from "@/lib/expenses/categories";
+import type { Expense } from "@/lib/expenses/types";
 
 function escapeXml(value: string) {
   return value

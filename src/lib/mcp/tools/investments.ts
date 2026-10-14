@@ -8,6 +8,7 @@ import {
 } from "@/lib/data/investments";
 import { CREATE, defineTool, DELETE, READ } from "@/lib/mcp/define-tool";
 import { investmentTransactionQuerySchema, investmentTransactionSchema } from "@/lib/validation/investment";
+import { idSchema } from "@/lib/validation/primitives";
 
 export const investmentTools = [
   defineTool({
@@ -39,7 +40,7 @@ export const investmentTools = [
     name: "delete_investment_transaction",
     title: "Delete investment transaction",
     description: "Permanently delete an investment order.",
-    schema: z.object({ id: z.uuid() }),
+    schema: z.object({ id: idSchema() }),
     annotations: DELETE,
     notFound: "Investment order not found.",
     run: async ({ id }, { userId }) => (await deleteInvestmentTransactionForUser(userId, id)) && { deleted: true, id },

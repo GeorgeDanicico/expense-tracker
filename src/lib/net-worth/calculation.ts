@@ -15,9 +15,9 @@ const NetWorthDecimal = Decimal.clone({
   rounding: Decimal.ROUND_HALF_UP,
 });
 
-export const NET_WORTH_DECIMAL_PLACES = 10;
+const NET_WORTH_DECIMAL_PLACES = 10;
 
-export function formatNetWorthDecimal(value: string | number | InstanceType<typeof NetWorthDecimal>) {
+function formatNetWorthDecimal(value: string | number | InstanceType<typeof NetWorthDecimal>) {
   const rounded = new NetWorthDecimal(value).toDecimalPlaces(
     NET_WORTH_DECIMAL_PLACES,
     NetWorthDecimal.ROUND_HALF_UP,

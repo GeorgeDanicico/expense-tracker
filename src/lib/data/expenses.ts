@@ -1,33 +1,31 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
 
+import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
-import { SUBTYPE_LABELS, subtypeForCategory } from "@/lib/expenses/categories";
-import { expenseTabDateBounds, type ExpenseTabFilters } from "@/lib/expenses/tab-filters";
-import type { ExpenseTab } from "@/lib/expenses/tabs";
 import {
+  SUBTYPE_LABELS,
+  subtypeForCategory,
   CATEGORY_LABELS,
-  type Analytics,
-  type AnalyticsFilters,
-  type AnalyticsPeriod,
-  type DashboardData,
-  type Expense,
   type ExpenseCategory,
   type ExpenseSubtype,
-} from "@/lib/types";
+} from "@/lib/expenses/categories";
 import {
-  formatDate,
-  formatMonth,
-  getCurrentMonth,
-  getMonthRange,
-  isValidDate,
-  isValidMonth,
-  shiftMonth,
-} from "@/lib/utils/dates";
+  analyticsFromSummary,
+  resolveAnalyticsRange,
+  type DashboardSummary,
+} from "@/lib/expenses/analytics";
+import { expenseTabDateBounds, type ExpenseTabFilters } from "@/lib/expenses/filters";
+import type { ExpenseTab } from "@/lib/expenses/tabs";
+import type {
+  AnalyticsFilters,
+  DashboardData,
+  Expense,
+} from "@/lib/expenses/types";
+import { getBucharestMonth, getMonthRange } from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
-
-export { summarizeExpenses } from "@/lib/expenses/summary";
 
 const EXPENSE_COLUMNS = "id, description, amount, category, subtype, expense_date, notes";
 
@@ -42,134 +40,21 @@ export type ExpensePatch = Partial<{
   notes: string | null;
 }>;
 
-type ExpenseRow = {
-  id: string;
-  description: string;
-  amount: number | string;
-  category: ExpenseCategory;
-  subtype: ExpenseSubtype | null;
-  expense_date: string;
-  notes: string | null;
-};
-
-type DashboardSummary = {
-  currentTotal: number | string;
-  currentCount: number;
-  currentLargest: number | string;
-  analyticsTotal: number | string;
-  analyticsCount: number;
-  categoryTotals: { category: ExpenseCategory; total: number | string }[];
-  monthlyTotals: { key: string; total: number | string }[];
-};
-
-const PERIOD_MONTHS: Record<Exclude<AnalyticsPeriod, "custom">, number> = {
-  "3m": 3,
-  "6m": 6,
-  "1y": 12,
-  "2y": 24,
-};
+type ExpenseRow = Pick<
+  Database["public"]["Tables"]["expenses"]["Row"],
+  "id" | "description" | "amount" | "category" | "subtype" | "expense_date" | "notes"
+>;
 
 function toExpense(row: ExpenseRow): Expense {
   return {
     id: row.id,
     description: row.description,
     amount: Number(row.amount),
-    category: row.category,
-    subtype: row.subtype,
+    // The table's check constraints limit both columns to the known keys.
+    category: row.category as ExpenseCategory,
+    subtype: row.subtype as ExpenseSubtype | null,
     expenseDate: row.expense_date,
     notes: row.notes,
-  };
-}
-
-function nextDate(value: string) {
-  const date = new Date(`${value}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
-}
-
-function getAnalyticsRange(filters: AnalyticsFilters) {
-  const currentMonth = getCurrentMonth();
-
-  if (filters.period !== "custom") {
-    const numberOfMonths = PERIOD_MONTHS[filters.period];
-    return {
-      start: `${shiftMonth(currentMonth, -numberOfMonths)}-01`,
-      endExclusive: `${currentMonth}-01`,
-      label: `Previous ${numberOfMonths} months`,
-      monthCount: numberOfMonths,
-      granularity: "month" as const,
-    };
-  }
-
-  if (filters.granularity === "day" && isValidDate(filters.customDate)) {
-    return {
-      start: filters.customDate,
-      endExclusive: nextDate(filters.customDate),
-      label: formatDate(filters.customDate),
-      monthCount: 1,
-      granularity: "day" as const,
-    };
-  }
-
-  const customMonth = isValidMonth(filters.customDate)
-    ? filters.customDate
-    : currentMonth;
-  const range = getMonthRange(customMonth);
-  return {
-    start: range.start,
-    endExclusive: range.endExclusive,
-    label: formatMonth(customMonth),
-    monthCount: 1,
-    granularity: "month" as const,
-  };
-}
-
-function buildMonthKeys(start: string, endExclusive: string) {
-  const keys: string[] = [];
-  let cursor = start.slice(0, 7);
-  const last = endExclusive.slice(0, 7);
-
-  while (cursor < last) {
-    keys.push(cursor);
-    cursor = shiftMonth(cursor, 1);
-  }
-
-  return keys;
-}
-
-function analyticsFromSummary(
-  summary: DashboardSummary,
-  range: ReturnType<typeof getAnalyticsRange>,
-): Analytics {
-  const total = Number(summary.analyticsTotal);
-  const categoryTotals = summary.categoryTotals.map((item) => ({
-    category: item.category,
-    label: CATEGORY_LABELS[item.category],
-    total: Number(item.total),
-  }));
-  const monthMap = new Map(
-    summary.monthlyTotals.map((item) => [item.key, Number(item.total)]),
-  );
-  const series =
-    range.granularity === "day"
-      ? [{ key: range.start, label: formatDate(range.start), total }]
-      : buildMonthKeys(range.start, range.endExclusive).map((key) => ({
-          key,
-          label: new Intl.DateTimeFormat("en-US", {
-            month: "short",
-            year: range.monthCount > 12 ? "2-digit" : undefined,
-          }).format(new Date(`${key}-01T12:00:00`)),
-          total: monthMap.get(key) ?? 0,
-        }));
-
-  return {
-    label: range.label,
-    total,
-    count: Number(summary.analyticsCount),
-    monthlyAverage: total / range.monthCount,
-    topCategory: categoryTotals[0]?.label ?? "No data",
-    categoryTotals,
-    series,
   };
 }
 
@@ -182,48 +67,72 @@ type ExpenseQuery = {
 
 const EXPENSE_PAGE_SIZE = 500;
 
-async function queryExpensesForUser(userId: string, options: ExpenseQuery) {
-  const supabase = await createClient();
-  const expenses: Expense[] = [];
+type ExpenseFilterQuery = ReturnType<typeof selectOwnedExpensePage>;
+
+function selectOwnedExpensePage(supabase: SupabaseClient<Database>, userId: string) {
+  return supabase.from("expenses")
+    .select(EXPENSE_COLUMNS, { count: "exact" })
+    .eq("user_id", userId);
+}
+
+/** Narrows an owner-scoped query by tab membership, date bounds, category and subtype. */
+function applyExpenseScope(query: ExpenseFilterQuery, options: ExpenseQuery) {
+  if (options.tab) {
+    const membership: string[] = [];
+    if (options.tab.categoryKeys.length) membership.push(`category.in.(${options.tab.categoryKeys.join(",")})`);
+    if (options.tab.subtypeKeys.length) membership.push(`subtype.in.(${options.tab.subtypeKeys.join(",")})`);
+    query = query.or(membership.join(","));
+  }
+  if (options.start) query = query.gte("expense_date", options.start);
+  if (options.endExclusive) query = query.lt("expense_date", options.endExclusive);
+  if (options.filters?.category) query = query.eq("category", options.filters.category);
+  if (options.filters?.subtype === "none") query = query.is("subtype", null);
+  else if (options.filters?.subtype && options.filters.subtype !== "all") query = query.eq("subtype", options.filters.subtype);
+  return query;
+}
+
+type Page<Row> = { data: Row[] | null; error: unknown; count: number | null };
+
+/** Reads every page, failing the whole read when any page errors or the total comes up short. */
+async function fetchAllPages<Row>(fetchPage: (from: number, to: number) => PromiseLike<Page<Row>>) {
+  const rows: Row[] = [];
   let offset = 0;
-  // An empty selection must never turn into an unrestricted expense query.
-  if (options.tab && !options.tab.categoryKeys.length && !options.tab.subtypeKeys.length) return [];
   while (true) {
-    let query = supabase.from("expenses")
-      .select(EXPENSE_COLUMNS, { count: "exact" })
-      .eq("user_id", userId);
-    if (options.tab) {
-      const membership: string[] = [];
-      if (options.tab.categoryKeys.length) membership.push(`category.in.(${options.tab.categoryKeys.join(",")})`);
-      if (options.tab.subtypeKeys.length) membership.push(`subtype.in.(${options.tab.subtypeKeys.join(",")})`);
-      query = query.or(membership.join(","));
-    }
-    if (options.start) query = query.gte("expense_date", options.start);
-    if (options.endExclusive) query = query.lt("expense_date", options.endExclusive);
-    if (options.filters?.category) query = query.eq("category", options.filters.category);
-    if (options.filters?.subtype === "none") query = query.is("subtype", null);
-    else if (options.filters?.subtype && options.filters.subtype !== "all") query = query.eq("subtype", options.filters.subtype);
-    const { data, error, count } = await query
-      .order("expense_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(offset, offset + EXPENSE_PAGE_SIZE - 1);
+    const { data, error, count } = await fetchPage(offset, offset + EXPENSE_PAGE_SIZE - 1);
     if (error) throw new Error("Unable to load expenses.");
-    const page = (data ?? []) as ExpenseRow[];
+    const page = data ?? [];
     if (!page.length) {
       if (count !== null && offset < count) throw new Error("Unable to load complete expenses.");
       break;
     }
-    expenses.push(...page.map(toExpense));
+    rows.push(...page);
     offset += page.length;
     // Advance by actual rows, so a server cap smaller than our page size cannot truncate history.
     if (count !== null && offset >= count) break;
   }
+  return rows;
+}
+
+/** `term` is already lower-cased. */
+function matchesSearch(expense: Expense, term: string) {
+  return [expense.description, expense.notes ?? "", CATEGORY_LABELS[expense.category],
+    expense.subtype ? SUBTYPE_LABELS[expense.subtype] : "No subtype"]
+    .some((value) => value.toLowerCase().includes(term));
+}
+
+async function queryExpensesForUser(userId: string, options: ExpenseQuery) {
+  const supabase = await createClient();
+  // An empty selection must never turn into an unrestricted expense query.
+  if (options.tab && !options.tab.categoryKeys.length && !options.tab.subtypeKeys.length) return [];
+  const rows = await fetchAllPages((from, to) =>
+    applyExpenseScope(selectOwnedExpensePage(supabase, userId), options)
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to));
+  const expenses = rows.map(toExpense);
   const search = options.filters?.search.toLowerCase() ?? "";
-  return search ? expenses.filter((expense) =>
-    [expense.description, expense.notes ?? "", CATEGORY_LABELS[expense.category],
-      expense.subtype ? SUBTYPE_LABELS[expense.subtype] : "No subtype"]
-      .some((value) => value.toLowerCase().includes(search))) : expenses;
+  return search ? expenses.filter((expense) => matchesSearch(expense, search)) : expenses;
 }
 
 export async function getMonthlyExpensesForUser(userId: string, month: string) {
@@ -240,9 +149,9 @@ export async function getDashboardDataForUser(
   userId: string,
   filters: AnalyticsFilters,
 ): Promise<DashboardData> {
-  const currentMonth = getCurrentMonth();
+  const currentMonth = getBucharestMonth();
   const currentRange = getMonthRange(currentMonth);
-  const analyticsRange = getAnalyticsRange(filters);
+  const analyticsRange = resolveAnalyticsRange(filters, currentMonth);
 
   const supabase = await createClient();
   const [recentResult, summaryResult] = await Promise.all([
@@ -267,7 +176,7 @@ export async function getDashboardDataForUser(
     throw new Error("Unable to load dashboard data.");
   }
 
-  const currentExpenses = (recentResult.data as ExpenseRow[]).map(toExpense);
+  const currentExpenses = recentResult.data.map(toExpense);
   const summary = summaryResult.data as unknown as DashboardSummary;
   const currentTotal = Number(summary.currentTotal);
   const currentCount = Number(summary.currentCount);
@@ -304,7 +213,7 @@ export async function createExpenseForUser(userId: string, input: ExpenseInput):
     .select(EXPENSE_COLUMNS)
     .single();
   if (error || !data) throw new Error("The expense could not be saved.");
-  return toExpense(data as ExpenseRow);
+  return toExpense(data);
 }
 
 /** Resolves to whether an owned row was deleted. */
@@ -340,7 +249,7 @@ export async function updateExpenseForUser(
   if (loadError) throw new Error("Unable to load expense.");
   if (!existing) return null;
 
-  const current = toExpense(existing as ExpenseRow);
+  const current = toExpense(existing);
   const category = patch.category ?? current.category;
   const subtype = patch.subtype !== undefined
     ? patch.subtype
@@ -363,5 +272,5 @@ export async function updateExpenseForUser(
     .select(EXPENSE_COLUMNS)
     .maybeSingle();
   if (error) throw new Error("The expense could not be saved.");
-  return data ? toExpense(data as ExpenseRow) : null;
+  return data ? toExpense(data) : null;
 }

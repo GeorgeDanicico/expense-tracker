@@ -11,14 +11,13 @@ import { FormActions } from "@/components/ui/form-actions";
 import { FormField, FormRow } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { ApiError, apiRequest } from "@/lib/api/client";
-import { NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { useApiForm } from "@/hooks/use-api-form";
+import { apiRequest } from "@/lib/api/client";
+import { afterNetWorthChange } from "@/lib/api/invalidate";
+import { getBucharestToday } from "@/lib/calendar";
+import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import { type NetWorthItemKind } from "@/lib/net-worth/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
-
-function currentDateValue() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function categoryOptions(kind: NetWorthItemKind) {
   return kind === "liability"
@@ -46,17 +45,14 @@ export function AddNetWorthItemDialog({
   const [kind, setKind] = useState<NetWorthItemKind>("asset");
   const [category, setCategory] = useState("cash");
   const [customCategory, setCustomCategory] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
+  const form = useApiForm();
   const formId = useId();
 
   function resetForm() {
     setKind("asset");
     setCategory("cash");
     setCustomCategory("");
-    setError("");
-    setFieldErrors(undefined);
+    form.reset();
   }
 
   function changeKind(nextKind: NetWorthItemKind) {
@@ -65,17 +61,12 @@ export function AddNetWorthItemDialog({
     setCustomCategory("");
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
 
     const formData = new FormData(event.currentTarget);
     const selectedCategory = category === "custom" ? customCategory : category;
-    setPending(true);
-    setError("");
-    setFieldErrors(undefined);
-
-    try {
+    void form.submit(async () => {
       await apiRequest<{ itemId: string }>("/api/net-worth/items", {
         method: "POST",
         body: JSON.stringify({
@@ -83,27 +74,20 @@ export function AddNetWorthItemDialog({
           kind,
           category: selectedCategory,
           currency: formData.get("currency"),
-          purchaseAmount: kind === "asset" && category !== "cash"
+          purchaseAmount: purchaseAmountAllowed(kind, category)
             ? formData.get("purchaseAmount") || null
             : null,
           value: formData.get("value"),
           valuedOn: formData.get("valuedOn"),
         }),
       });
-      await mutate(NET_WORTH_API_KEY);
+      await afterNetWorthChange(mutate);
       setOpen(false);
       onSuccess();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The item could not be saved.");
-      setFieldErrors(caught instanceof ApiError ? caught.fieldErrors : undefined);
-    } finally {
-      setPending(false);
-    }
+    }, { fallback: "The item could not be saved." });
   }
 
-  function fieldError(name: string) {
-    return fieldErrors?.[name]?.[0];
-  }
+  const { fieldError } = form;
 
   return (
     <AppDialog
@@ -119,9 +103,9 @@ export function AddNetWorthItemDialog({
           <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add item
         </Button>
       }
-      footer={<FormActions form={formId} closesDialog pending={pending} submitLabel="Save item" />}
+      footer={<FormActions form={formId} closesDialog pending={form.pending} submitLabel="Save item" />}
     >
-      <form id={formId} onSubmit={submit} aria-busy={pending}>
+      <form id={formId} onSubmit={submit} aria-busy={form.pending}>
         <Stack gap="3">
           <NetWorthItemFields
             kind={kind}
@@ -170,14 +154,14 @@ export function AddNetWorthItemDialog({
               <Input name="value" type="number" inputMode="decimal" min="0" step="any" placeholder="0.00" required />
             </FormField>
             <FormField flex="1" label="Valued on" error={fieldError("valuedOn")}>
-              <Input name="valuedOn" type="date" defaultValue={currentDateValue()} required />
+              <Input name="valuedOn" type="date" defaultValue={getBucharestToday()} required />
             </FormField>
           </FormRow>
 
-          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
+          {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
 
           <Text className="sr-only" role="status" aria-live="polite">
-            {pending ? "Saving net-worth item…" : ""}
+            {form.pending ? "Saving net-worth item…" : ""}
           </Text>
         </Stack>
       </form>

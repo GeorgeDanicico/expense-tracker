@@ -1,8 +1,8 @@
 import { Flex, Stack, Text } from "@chakra-ui/react";
 
 import { ChartBar } from "@/components/dashboard/chart-bar";
-import { categoryShares } from "@/lib/frontend/expense-analytics";
-import type { Analytics } from "@/lib/types";
+import { categoryShares } from "@/lib/expenses/analytics";
+import type { Analytics } from "@/lib/expenses/types";
 import { formatCurrency } from "@/lib/utils/currency";
 
 export function CategoryBreakdown({

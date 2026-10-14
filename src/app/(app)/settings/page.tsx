@@ -3,7 +3,6 @@
 import { Button, NativeSelect, Stack } from "@chakra-ui/react";
 import { Save } from "lucide-react";
 import { FormEvent, useState } from "react";
-import useSWR from "swr";
 
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { Card } from "@/components/ui/card";
@@ -11,15 +10,16 @@ import { FormField } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { useAccount } from "@/hooks/use-account";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { apiRequest } from "@/lib/api/client";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import type { AccountData } from "@/lib/types";
+import type { AccountData } from "@/lib/account";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
 
 export default function SettingsPage() {
   useDocumentTitle("Settings");
-  const { data, error, isLoading, mutate } = useSWR<AccountData>(ACCOUNT_API_KEY);
+  const { account: data, error, isLoading, mutate } = useAccount();
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");

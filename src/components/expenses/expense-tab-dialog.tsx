@@ -9,18 +9,18 @@ import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { ApiError, apiRequest } from "@/lib/api/client";
-import { EXPENSE_TABS_API_KEY, expenseTabApiKey } from "@/lib/api/keys";
-import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/types";
+import { useApiForm } from "@/hooks/use-api-form";
+import { apiRequest } from "@/lib/api/client";
+import { afterTabSaved } from "@/lib/api/invalidate";
+import { EXPENSE_TABS_API_KEY, expenseTabApiKey, type SavedTabResponse } from "@/lib/api/keys";
 import {
+  EXPENSE_CATEGORIES,
   EXPENSE_SUBTYPES,
   SUBTYPE_CATEGORIES,
+  type ExpenseCategory,
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-
-type SavedTabResponse = { tab: ExpenseTab };
-type TabsResponse = { tabs: ExpenseTab[] };
 
 export function ExpenseTabDialog({
   open,
@@ -37,9 +37,7 @@ export function ExpenseTabDialog({
   const [name, setName] = useState(tab?.name ?? "");
   const [categories, setCategories] = useState<ExpenseCategory[]>(tab?.categoryKeys ?? []);
   const [subtypes, setSubtypes] = useState<ExpenseSubtype[]>(tab?.subtypeKeys ?? []);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
+  const form = useApiForm();
   const editing = Boolean(tab);
 
   function toggleCategory(category: ExpenseCategory, checked: boolean) {
@@ -57,17 +55,14 @@ export function ExpenseTabDialog({
       : current.filter((value) => value !== subtype));
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
-    setError("");
-    setFieldErrors(undefined);
     const payload = {
       name: name.trim(),
       categoryKeys: EXPENSE_CATEGORIES.filter((category) => categories.includes(category)),
       subtypeKeys: EXPENSE_SUBTYPES.filter((subtype) => subtypes.includes(subtype)),
     };
-    try {
+    void form.submit(async () => {
       const result = await apiRequest<SavedTabResponse>(
         editing ? expenseTabApiKey(tab!.id) : EXPENSE_TABS_API_KEY,
         {
@@ -76,30 +71,9 @@ export function ExpenseTabDialog({
         },
       );
       const saved = result.tab;
-      await mutate(
-        EXPENSE_TABS_API_KEY,
-        (current: TabsResponse | undefined) => {
-          const existing = current?.tabs ?? [];
-          const tabs = editing
-            ? existing.map((item) => item.id === saved.id ? saved : item)
-            : [...existing.filter((item) => item.id !== saved.id), saved];
-          return { tabs };
-        },
-        { revalidate: false },
-      );
-      if (editing) {
-        void mutate((key) =>
-          typeof key === "string" &&
-          key.startsWith(`${expenseTabApiKey(saved.id)}/expenses?`),
-        );
-      }
+      await afterTabSaved(mutate, saved, { editing });
       onSaved(saved);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save this tab.");
-      setFieldErrors(caught instanceof ApiError ? caught.fieldErrors : undefined);
-    } finally {
-      setPending(false);
-    }
+    }, { fallback: "Unable to save this tab." });
   }
 
   return (
@@ -113,14 +87,14 @@ export function ExpenseTabDialog({
         <FormActions
           form="expense-tab-form"
           closesDialog
-          pending={pending}
+          pending={form.pending}
           submitLabel={editing ? "Save changes" : "Create tab"}
         />
       }
     >
       <form id="expense-tab-form" onSubmit={submit}>
         <Stack gap="4">
-          <FormField label="Tab name" error={fieldErrors?.name?.[0]}>
+          <FormField label="Tab name" error={form.fieldError("name")}>
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -136,10 +110,10 @@ export function ExpenseTabDialog({
             subtypes={subtypes}
             onToggleCategory={toggleCategory}
             onToggleSubtype={toggleSubtype}
-            error={fieldErrors?.categoryKeys?.[0] ?? fieldErrors?.subtypeKeys?.[0]}
+            error={form.fieldError("categoryKeys") ?? form.fieldError("subtypeKeys")}
           />
 
-          {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
+          {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
         </Stack>
       </form>
     </AppDialog>

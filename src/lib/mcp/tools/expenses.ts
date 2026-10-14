@@ -4,21 +4,27 @@ import {
   createExpenseForUser,
   deleteExpenseForUser,
   getDashboardDataForUser,
-  getMonthlyExpensesForUser,
   updateExpenseForUser,
 } from "@/lib/data/expenses";
+import { getMonthlyLedgerForUser } from "@/lib/data/ledgers";
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
-import { summarizeExpenses } from "@/lib/expenses/summary";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
-import { parseAnalyticsFilters } from "@/lib/utils/analytics";
-import { getApplicationCurrentMonth, getApplicationToday, isValidDate, isValidMonth } from "@/lib/utils/dates";
+import { parseAnalyticsFilters } from "@/lib/expenses/url-state";
+import {
+  ANALYTICS_PERIODS,
+  getBucharestMonth,
+  getBucharestToday,
+  isValidDate,
+  isValidMonth,
+} from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
+import { idSchema } from "@/lib/validation/primitives";
 
 const fields = expenseSchema.shape;
-const idSchema = z.object({ id: z.uuid() });
+const idInput = z.object({ id: idSchema() });
 
 const spendingSummarySchema = z.object({
-  period: z.enum(["3m", "6m", "1y", "2y", "custom"]).default("3m"),
+  period: z.enum(ANALYTICS_PERIODS).default("3m"),
   granularity: z.enum(["month", "day"]).default("month"),
   date: z.string().optional().describe("custom only: YYYY-MM for month, YYYY-MM-DD for day"),
 }).superRefine((value, context) => {
@@ -29,13 +35,13 @@ const spendingSummarySchema = z.object({
 
 const addExpenseSchema = z.preprocess(
   (value) => value && typeof value === "object" && !("expenseDate" in value && value.expenseDate !== undefined)
-    ? { ...value, expenseDate: getApplicationToday() }
+    ? { ...value, expenseDate: getBucharestToday() }
     : value,
   expenseSchema,
 );
 
 const updateExpenseSchema = z.object({
-  id: z.uuid(),
+  id: idSchema(),
   description: fields.description.optional(),
   amount: fields.amount.optional(),
   category: z.enum(EXPENSE_CATEGORIES).optional(),
@@ -51,10 +57,7 @@ export const expenseTools = [
     description: "Expenses for one month (default: current month) with total, count and average.",
     schema: z.object({ month: z.string().refine(isValidMonth, "Use YYYY-MM.").optional() }),
     annotations: READ,
-    run: async ({ month = getApplicationCurrentMonth() }, { userId }) => {
-      const expenses = await getMonthlyExpensesForUser(userId, month);
-      return { month, expenses, ...summarizeExpenses(expenses) };
-    },
+    run: ({ month = getBucharestMonth() }, { userId }) => getMonthlyLedgerForUser(userId, month),
   }),
   defineTool({
     name: "get_spending_summary",
@@ -94,7 +97,7 @@ export const expenseTools = [
     name: "delete_expense",
     title: "Delete expense",
     description: "Permanently delete an expense.",
-    schema: idSchema,
+    schema: idInput,
     annotations: DELETE,
     notFound: "Expense not found.",
     run: async ({ id }, { userId }) => (await deleteExpenseForUser(userId, id)) && { deleted: true, id },

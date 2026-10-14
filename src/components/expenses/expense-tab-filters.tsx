@@ -9,11 +9,17 @@ import { Toolbar } from "@/components/ui/toolbar";
 import {
   CATEGORY_LABELS,
   EXPENSE_CATEGORIES,
+  EXPENSE_SUBTYPES,
+  SUBTYPE_LABELS,
   type ExpenseCategory,
-} from "@/lib/types";
-import { EXPENSE_SUBTYPES, SUBTYPE_LABELS, type ExpenseSubtype } from "@/lib/expenses/categories";
-import { expenseTabHref } from "@/lib/frontend/expense-tab-state";
-import { DEFAULT_EXPENSE_TAB_FILTERS, expenseTabFiltersSchema, type ExpenseTabFilters } from "@/lib/expenses/tab-filters";
+  type ExpenseSubtype,
+} from "@/lib/expenses/categories";
+import {
+  DEFAULT_EXPENSE_TAB_FILTERS,
+  expenseTabFiltersSchema,
+  expenseTabHref,
+  type ExpenseTabFilters,
+} from "@/lib/expenses/filters";
 
 type Scope = "all" | "year" | "range";
 type FilterDraft = {

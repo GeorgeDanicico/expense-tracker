@@ -6,7 +6,8 @@ import { FormEvent, useState, useTransition } from "react";
 
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Toolbar } from "@/components/ui/toolbar";
-import type { AnalyticsPeriod, CustomGranularity } from "@/lib/types";
+import { getBucharestMonth, getBucharestToday } from "@/lib/calendar";
+import type { AnalyticsPeriod, CustomGranularity } from "@/lib/expenses/types";
 
 const PERIODS = [
   { value: "3m", label: "3M", ariaLabel: "Previous 3 completed months" },
@@ -50,8 +51,8 @@ export function StatsFilter({
     setGranularity(value);
     setCustomDate(
       value === "day"
-        ? new Date().toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 7),
+        ? getBucharestToday()
+        : getBucharestMonth(),
     );
   }
 

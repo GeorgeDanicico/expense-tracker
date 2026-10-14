@@ -1,24 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getAuthenticatedUser } from "@/lib/auth";
 import { getAccountCurrencyForUser } from "@/lib/data/account";
 import { getMonthlyExpensesForUser } from "@/lib/data/expenses";
 import { buildExpenseWorkbook } from "@/lib/export/xlsx";
-import { isValidMonth, resolveMainExpenseMonth } from "@/lib/utils/dates";
+import { HttpError, PRIVATE_HEADERS, withUser } from "@/lib/http/route";
+import { isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 
 export const runtime = "nodejs";
 
-const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
-
-export async function GET(request: NextRequest) {
-  const user = await getAuthenticatedUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: PRIVATE_HEADERS });
-  }
-
+// No `failure`: unexpected errors keep Next's default response instead of a JSON body.
+export const GET = withUser(async (request: NextRequest, user) => {
   const requestedMonth = request.nextUrl.searchParams.get("month") ?? "";
   if (!isValidMonth(requestedMonth)) {
-    return NextResponse.json({ error: "Invalid month. Use YYYY-MM." }, { status: 400, headers: PRIVATE_HEADERS });
+    throw new HttpError(400, "Invalid month. Use YYYY-MM.");
   }
   const month = resolveMainExpenseMonth(requestedMonth);
 
@@ -32,9 +26,9 @@ export async function GET(request: NextRequest) {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="expenses-${month}.xlsx"`,
-      "Cache-Control": "private, no-store, max-age=0",
+      ...PRIVATE_HEADERS,
       "X-Content-Type-Options": "nosniff",
       "X-Expense-Month": month,
     },
   });
-}
+});

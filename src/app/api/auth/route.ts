@@ -1,9 +1,9 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { z } from "zod";
 
+import { json } from "@/lib/http/route";
 import { createClient } from "@/lib/supabase/server";
 
-const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 const authSchema = z.object({
   mode: z.enum(["login", "signup"]),
   email: z.email("Enter a valid email address."),
@@ -27,12 +27,12 @@ export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
   const parsed = authSchema.safeParse(payload);
   if (!parsed.success) {
-    return NextResponse.json(
+    return json(
       {
         error: "Check the highlighted details and try again.",
         fieldErrors: parsed.error.flatten().fieldErrors,
       },
-      { status: 422, headers: PRIVATE_HEADERS },
+      422,
     );
   }
 
@@ -43,12 +43,9 @@ export async function POST(request: NextRequest) {
       password: parsed.data.password,
     });
     if (error) {
-      return NextResponse.json(
-        { error: "Email or password is incorrect." },
-        { status: 401, headers: PRIVATE_HEADERS },
-      );
+      return json({ error: "Email or password is incorrect." }, 401);
     }
-    return NextResponse.json({ authenticated: true }, { headers: PRIVATE_HEADERS });
+    return json({ authenticated: true });
   }
 
   const confirmationUrl = new URL("/auth/confirm", confirmationOrigin(request));
@@ -60,14 +57,13 @@ export async function POST(request: NextRequest) {
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400, headers: PRIVATE_HEADERS });
+    return json({ error: error.message }, 400);
   }
 
-  return NextResponse.json(
+  return json(
     data.session
       ? { authenticated: true }
       : { authenticated: false, message: "Check your inbox to confirm your email, then sign in." },
-    { headers: PRIVATE_HEADERS },
   );
 }
 
@@ -75,10 +71,7 @@ export async function DELETE() {
   const supabase = await createClient();
   const { error } = await supabase.auth.signOut();
   if (error) {
-    return NextResponse.json(
-      { error: "Unable to sign out. Please try again." },
-      { status: 500, headers: PRIVATE_HEADERS },
-    );
+    return json({ error: "Unable to sign out. Please try again." }, 500);
   }
-  return NextResponse.json({ success: true }, { headers: PRIVATE_HEADERS });
+  return json({ success: true });
 }

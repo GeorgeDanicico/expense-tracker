@@ -5,8 +5,8 @@ import { DeleteExpenseButton } from "@/components/expenses/delete-expense-button
 import { Amount } from "@/components/ui/amount";
 import { ListRow } from "@/components/ui/list-row";
 import { expenseClassificationLabel } from "@/lib/expenses/categories";
-import type { Expense } from "@/lib/types";
-import { formatDate } from "@/lib/utils/dates";
+import type { Expense } from "@/lib/expenses/types";
+import { formatDate } from "@/lib/calendar";
 
 /** Mobile expense rows: icon, description, date · category, amount. */
 export function ExpenseMobileList({

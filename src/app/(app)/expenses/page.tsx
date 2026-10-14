@@ -9,8 +9,8 @@ import {
 } from "@chakra-ui/react";
 import { Download } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { Suspense } from "react";
 import useSWR from "swr";
 
@@ -22,32 +22,24 @@ import { MainExpensesPanel } from "@/components/expenses/main-expenses-panel";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
+import { useAccount } from "@/hooks/use-account";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useExpenseTabRouting } from "@/hooks/use-expense-tab-routing";
 import {
-  ACCOUNT_API_KEY,
   EXPENSE_TABS_API_KEY,
   mainExpensesExportUrl,
+  type TabsResponse,
 } from "@/lib/api/keys";
-import { expenseTabHref, readExpenseTabFilters } from "@/lib/frontend/expense-tab-state";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-import type { AccountData } from "@/lib/types";
-import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
-import { resolveMainExpenseMonth } from "@/lib/utils/dates";
+import { resolveMainExpenseMonth } from "@/lib/calendar";
 
-type TabsResponse = { tabs: ExpenseTab[] };
 type DialogTarget = { mode: "create" } | { mode: "edit"; tab: ExpenseTab };
 
 function ExpensesContent() {
   useDocumentTitle("Expenses");
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const queryString = searchParams.toString();
-  const params = new URLSearchParams(queryString);
-  const activeTabId = searchParams.get("tab") || null;
-  const activeTab = activeTabId ?? MAIN_EXPENSE_TAB;
   const requestedMonth = searchParams.get("month");
   const month = resolveMainExpenseMonth(requestedMonth);
-  const { data: account } = useSWR<AccountData>(ACCOUNT_API_KEY);
   const {
     data: tabsResult,
     error: tabsError,
@@ -55,29 +47,15 @@ function ExpensesContent() {
     mutate: mutateTabs,
   } = useSWR<TabsResponse>(EXPENSE_TABS_API_KEY);
   const tabs = tabsResult?.tabs ?? [];
-  const currency = account?.currency ?? DEFAULT_CURRENCY;
+  const { currency } = useAccount();
   const [dialogTarget, setDialogTarget] = useState<DialogTarget | null>(null);
 
-  useEffect(() => {
-    if (!activeTabId || !tabsResult) return;
-    if (tabsResult.tabs.some((tab) => tab.id === activeTabId)) return;
-    router.replace(expenseTabHref(new URLSearchParams(queryString), null), { scroll: false });
-  }, [activeTabId, queryString, router, tabsResult]);
+  const { activeTabId, activeTab, changeTab, saveTab, returnToMain } = useExpenseTabRouting(tabsResult);
 
-  function changeTab(value: string) {
-    const tabId = value === MAIN_EXPENSE_TAB ? null : value;
-    router.push(expenseTabHref(new URLSearchParams(queryString), tabId), { scroll: false });
-  }
-
-  function saveTab(tab: ExpenseTab) {
+  function openSavedTab(tab: ExpenseTab) {
     const target = dialogTarget;
     setDialogTarget(null);
-    const filters = target?.mode === "edit" ? readExpenseTabFilters(params) : undefined;
-    router.push(expenseTabHref(new URLSearchParams(queryString), tab.id, filters), { scroll: false });
-  }
-
-  function returnToMain() {
-    router.push(expenseTabHref(new URLSearchParams(queryString), null), { scroll: false });
+    saveTab(tab, { keepFilters: target?.mode === "edit" });
   }
 
   return (
@@ -142,7 +120,7 @@ function ExpensesContent() {
           open
           onOpenChange={(open) => { if (!open) setDialogTarget(null); }}
           tab={dialogTarget.mode === "edit" ? dialogTarget.tab : undefined}
-          onSaved={saveTab}
+          onSaved={openSavedTab}
         />
       ) : null}
     </Stack>

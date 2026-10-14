@@ -14,12 +14,12 @@ import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { SectionHeader } from "@/components/ui/section-header";
-import { ApiError, apiRequest } from "@/lib/api/client";
-import { EXPENSE_TABS_API_KEY, expenseTabApiKey, expenseTabExpensesApiKey } from "@/lib/api/keys";
-import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/frontend/expense-tab-state";
+import { useApiForm } from "@/hooks/use-api-form";
+import { apiRequest } from "@/lib/api/client";
+import { afterTabDeleted } from "@/lib/api/invalidate";
+import { expenseTabApiKey, expenseTabExpensesApiKey } from "@/lib/api/keys";
+import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab, ExpenseTabLedgerData } from "@/lib/expenses/tabs";
-
-type TabsResponse = { tabs: ExpenseTab[] };
 
 export function CustomExpenseTab({
   tab,
@@ -42,38 +42,22 @@ export function CustomExpenseTab({
     { keepPreviousData: false },
   );
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deletePending, setDeletePending] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const deleteForm = useApiForm();
   const { mutate: mutateCache } = useSWRConfig();
   const filtersMatch = data &&
     expenseTabFilterParams(data.filters).toString() === expenseTabFilterParams(filters).toString();
-  const matching = active && data?.tabId === tab.id && data.tabRevision === tab.updatedAt &&
+  const matching = active && data?.tab.id === tab.id && data.tab.updatedAt === tab.updatedAt &&
     filtersMatch
     ? data
     : undefined;
 
-  async function deleteTab() {
-    setDeletePending(true);
-    setDeleteError("");
-    try {
+  function deleteTab() {
+    void deleteForm.submit(async () => {
       await apiRequest<{ success: true }>(expenseTabApiKey(tab.id), { method: "DELETE" });
-      await mutateCache(
-        EXPENSE_TABS_API_KEY,
-        (current: TabsResponse | undefined) => current
-          ? { tabs: current.tabs.filter((item) => item.id !== tab.id) }
-          : current,
-        { revalidate: false },
-      );
-      void mutateCache((cacheKey) =>
-        typeof cacheKey === "string" && cacheKey.startsWith(`${expenseTabApiKey(tab.id)}/expenses?`),
-      );
+      await afterTabDeleted(mutateCache, tab.id);
       setDeleteOpen(false);
       onDeleted();
-    } catch (caught) {
-      setDeleteError(caught instanceof ApiError ? caught.message : "Unable to delete this tab.");
-    } finally {
-      setDeletePending(false);
-    }
+    }, { fallback: "Unable to delete this tab." });
   }
 
   return (
@@ -132,9 +116,9 @@ export function CustomExpenseTab({
         description={`“${tab.name}” will be removed from your saved tabs. Your expenses stay in the main ledger.`}
         cancelLabel="Keep tab"
         confirmLabel="Delete tab"
-        pending={deletePending}
-        error={deleteError}
-        onConfirm={() => void deleteTab()}
+        pending={deleteForm.pending}
+        error={deleteForm.error}
+        onConfirm={deleteTab}
       />
     </Stack>
   );

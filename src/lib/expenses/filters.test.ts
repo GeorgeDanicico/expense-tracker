@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_EXPENSE_TAB_FILTERS, expenseTabDateBounds } from "@/lib/expenses/tab-filters";
 import { expenseTabExpensesApiKey } from "@/lib/api/keys";
-import { expenseTabFilterParams, expenseTabHref, parseExpenseTabFilters, readExpenseTabFilters } from "./expense-tab-state";
+import {
+  DEFAULT_EXPENSE_TAB_FILTERS,
+  expenseTabDateBounds,
+  expenseTabFilterParams,
+  expenseTabHref,
+  parseExpenseTabFilters,
+  readExpenseTabFilters,
+} from "@/lib/expenses/filters";
 
 const params = (query: string) => new URLSearchParams(query);
 

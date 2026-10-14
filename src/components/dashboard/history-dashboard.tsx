@@ -11,19 +11,18 @@ import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { Stat, StatGroup } from "@/components/ui/stat";
-import { ACCOUNT_API_KEY, dashboardApiKey } from "@/lib/api/keys";
-import { historyBoundaries, seriesInsights } from "@/lib/frontend/expense-analytics";
-import type { AccountData, AnalyticsFilters, DashboardData } from "@/lib/types";
-import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
-import { formatDate } from "@/lib/utils/dates";
+import { useAccount } from "@/hooks/use-account";
+import { dashboardApiKey } from "@/lib/api/keys";
+import { historyBoundaries, seriesInsights } from "@/lib/expenses/analytics";
+import type { AnalyticsFilters, DashboardData } from "@/lib/expenses/types";
+import { formatDate } from "@/lib/calendar";
 
 export function HistoryDashboard({ filters }: { filters: AnalyticsFilters }) {
   const { data, error, isValidating, mutate } = useSWR<DashboardData>(
     dashboardApiKey(filters),
     { keepPreviousData: false },
   );
-  const { data: account } = useSWR<AccountData>(ACCOUNT_API_KEY);
-  const currency = account?.currency ?? DEFAULT_CURRENCY;
+  const { currency } = useAccount();
   const boundaries = historyBoundaries(filters, data?.currentMonth);
   const single = filters.period === "custom";
   const day = single && filters.granularity === "day";

@@ -23,7 +23,7 @@ import type {
 } from "@/lib/investments/types";
 import { getInvestmentGainPresentation, type InvestmentGainPresentation } from "@/lib/investments/presentation";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
-import { formatDateTime } from "@/lib/utils/dates";
+import { formatDateTime } from "@/lib/calendar";
 
 function quoteStatus(asset: InvestmentOverviewAsset) {
   if (asset.priceStatus === "current" && asset.priceAsOf) {

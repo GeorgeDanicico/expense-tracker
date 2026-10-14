@@ -2,18 +2,32 @@ import Decimal from "decimal.js";
 import {
   CATEGORY_LABELS,
   SUBTYPE_LABELS,
-  type Analytics,
-  type AnalyticsFilters,
-  type Expense,
-} from "@/lib/types";
-import type { ExpenseTabFilters } from "@/lib/expenses/tab-filters";
+  type ExpenseCategory,
+} from "@/lib/expenses/categories";
+import type { ExpenseTabFilters } from "@/lib/expenses/filters";
+import type {
+  Analytics,
+  AnalyticsFilters,
+  Expense,
+} from "@/lib/expenses/types";
 import {
+  addDays,
+  addMonths,
+  ANALYTICS_PERIOD_MONTHS,
+  dateInMonth,
+  daysInMonth,
   formatDate,
   formatMonth,
-  getCurrentMonth,
+  getBucharestMonth,
   getMonthRange,
+  isValidDate,
+  isValidMonth,
+  lastDayOfMonth,
+  monthKeysBetween,
+  monthsBetween,
   shiftMonth,
-} from "@/lib/utils/dates";
+  toIsoMonth,
+} from "@/lib/calendar";
 
 export function compareAmounts(current: number, previous: number) {
   return {
@@ -52,22 +66,6 @@ function monthKey(date: string) {
   return date.slice(0, 7);
 }
 
-function monthIndex(month: string) {
-  const [year, number] = month.split("-").map(Number);
-  return year * 12 + number - 1;
-}
-
-function monthFromIndex(index: number) {
-  const year = Math.floor(index / 12);
-  const month = (index % 12) + 1;
-  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
-}
-
-function daysInMonth(month: string) {
-  const [year, monthNumber] = month.split("-").map(Number);
-  return new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-}
-
 function periodLabel(
   label: string,
   actualStart: string,
@@ -87,7 +85,7 @@ function makeTimeSeries(
 ): ExpenseTabSeriesBucket[] {
   if (filters.scope === "year") {
     return Array.from({ length: 12 }, (_, index) => {
-      const key = `${String(filters.year).padStart(4, "0")}-${String(index + 1).padStart(2, "0")}`;
+      const key = toIsoMonth(filters.year, index + 1);
       return {
         key,
         label: formatMonth(key),
@@ -129,12 +127,10 @@ function makeTimeSeries(
 
   const firstMonth = monthKey(filters.startDate);
   const lastMonth = monthKey(filters.endDate);
-  const firstIndex = monthIndex(firstMonth);
-  const lastIndex = monthIndex(lastMonth);
-  return Array.from({ length: lastIndex - firstIndex + 1 }, (_, index) => {
-    const key = monthFromIndex(firstIndex + index);
+  return Array.from({ length: monthsBetween(firstMonth, lastMonth) + 1 }, (_, index) => {
+    const key = addMonths(firstMonth, index);
     const periodStart = `${key}-01`;
-    const periodEnd = `${key}-${String(daysInMonth(key)).padStart(2, "0")}`;
+    const periodEnd = lastDayOfMonth(key);
     const actualStart = filters.startDate > periodStart ? filters.startDate : periodStart;
     const actualEnd = filters.endDate < periodEnd ? filters.endDate : periodEnd;
     return {
@@ -147,7 +143,7 @@ function makeTimeSeries(
 
 /** Use yearly buckets for date ranges longer than two calendar years. */
 function rangeUsesYears(filters: Extract<ExpenseTabFilters, { scope: "range" }>) {
-  return monthIndex(monthKey(filters.endDate)) - monthIndex(monthKey(filters.startDate)) + 1 > 24;
+  return monthsBetween(monthKey(filters.startDate), monthKey(filters.endDate)) + 1 > 24;
 }
 
 function breakdownGroup(expense: Expense): { groupKey: string; label: string } {
@@ -228,11 +224,9 @@ export function monthAnalytics(expenses: Expense[], month: string) {
       (days.get(expense.expenseDate) ?? 0) + expense.amount,
     );
   }
-  const { month: safeMonth, endExclusive } = getMonthRange(month);
-  const end = new Date(`${endExclusive}T12:00:00`);
-  end.setDate(0);
-  const daily = Array.from({ length: end.getDate() }, (_, i) => {
-    const key = `${safeMonth}-${String(i + 1).padStart(2, "0")}`;
+  const { month: safeMonth } = getMonthRange(month);
+  const daily = Array.from({ length: daysInMonth(safeMonth) }, (_, i) => {
+    const key = dateInMonth(safeMonth, i + 1);
     return { key, label: String(i + 1), total: days.get(key) ?? 0 };
   });
   const categories = categoryShares(
@@ -303,25 +297,108 @@ export function seriesInsights(series: Analytics["series"]) {
   };
 }
 
+/**
+ * The analytics date range for the dashboard filters, shared by the dashboard
+ * query (server) and the history view's boundary caption (client).
+ */
+export function resolveAnalyticsRange(filters: AnalyticsFilters, currentMonth: string) {
+  if (filters.period !== "custom") {
+    const numberOfMonths = ANALYTICS_PERIOD_MONTHS[filters.period];
+    return {
+      start: `${shiftMonth(currentMonth, -numberOfMonths)}-01`,
+      endExclusive: `${currentMonth}-01`,
+      label: `Previous ${numberOfMonths} months`,
+      monthCount: numberOfMonths,
+      granularity: "month" as const,
+    };
+  }
+
+  if (filters.granularity === "day" && isValidDate(filters.customDate)) {
+    return {
+      start: filters.customDate,
+      endExclusive: addDays(filters.customDate, 1),
+      label: formatDate(filters.customDate),
+      monthCount: 1,
+      granularity: "day" as const,
+    };
+  }
+
+  const customMonth = isValidMonth(filters.customDate)
+    ? filters.customDate
+    : currentMonth;
+  const range = getMonthRange(customMonth);
+  return {
+    start: range.start,
+    endExclusive: range.endExclusive,
+    label: formatMonth(customMonth),
+    monthCount: 1,
+    granularity: "month" as const,
+  };
+}
+
+export type AnalyticsRange = ReturnType<typeof resolveAnalyticsRange>;
+
+/** The inclusive first and last dates of the analytics range. */
 export function historyBoundaries(
   filters: AnalyticsFilters,
-  currentMonth = getCurrentMonth(),
+  currentMonth = getBucharestMonth(),
 ) {
-  if (filters.period === "custom" && filters.granularity === "day")
+  // Unlike resolveAnalyticsRange, an invalid custom date is echoed rather than replaced by
+  // the current month. parseAnalyticsFilters never produces one; kept to preserve behavior.
+  if (filters.period === "custom" && filters.granularity === "day" && !isValidDate(filters.customDate))
     return { start: filters.customDate, end: filters.customDate };
-  const months = { "3m": 3, "6m": 6, "1y": 12, "2y": 24 };
-  const startMonth =
-    filters.period === "custom"
-      ? filters.customDate
-      : shiftMonth(currentMonth, -months[filters.period]);
-  const endExclusive =
-    filters.period === "custom"
-      ? getMonthRange(startMonth).endExclusive
-      : `${currentMonth}-01`;
-  const end = new Date(`${endExclusive}T12:00:00`);
-  end.setDate(end.getDate() - 1);
+  if (filters.period === "custom" && filters.granularity !== "day" && !isValidMonth(filters.customDate))
+    return {
+      start: `${filters.customDate}-01`,
+      end: addDays(getMonthRange(filters.customDate).endExclusive, -1),
+    };
+  const range = resolveAnalyticsRange(filters, currentMonth);
+  return { start: range.start, end: addDays(range.endExclusive, -1) };
+}
+
+/** The `get_expense_dashboard` RPC payload; numeric columns may arrive as strings. */
+export type DashboardSummary = {
+  currentTotal: number | string;
+  currentCount: number;
+  currentLargest: number | string;
+  analyticsTotal: number | string;
+  analyticsCount: number;
+  categoryTotals: { category: ExpenseCategory; total: number | string }[];
+  monthlyTotals: { key: string; total: number | string }[];
+};
+
+export function analyticsFromSummary(
+  summary: DashboardSummary,
+  range: AnalyticsRange,
+): Analytics {
+  const total = Number(summary.analyticsTotal);
+  const categoryTotals = summary.categoryTotals.map((item) => ({
+    category: item.category,
+    label: CATEGORY_LABELS[item.category],
+    total: Number(item.total),
+  }));
+  const monthMap = new Map(
+    summary.monthlyTotals.map((item) => [item.key, Number(item.total)]),
+  );
+  const series =
+    range.granularity === "day"
+      ? [{ key: range.start, label: formatDate(range.start), total }]
+      : monthKeysBetween(range.start, range.endExclusive).map((key) => ({
+          key,
+          label: new Intl.DateTimeFormat("en-US", {
+            month: "short",
+            year: range.monthCount > 12 ? "2-digit" : undefined,
+          }).format(new Date(`${key}-01T12:00:00`)),
+          total: monthMap.get(key) ?? 0,
+        }));
+
   return {
-    start: `${startMonth}-01`,
-    end: `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`,
+    label: range.label,
+    total,
+    count: Number(summary.analyticsCount),
+    monthlyAverage: total / range.monthCount,
+    topCategory: categoryTotals[0]?.label ?? "No data",
+    categoryTotals,
+    series,
   };
 }

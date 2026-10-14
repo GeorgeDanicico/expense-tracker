@@ -1,67 +1,50 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { aTab } from "@/test/builders";
+import { callRoute, signedInAs } from "@/test/route";
+
 const mocks = vi.hoisted(() => ({
-  getAuthenticatedUser: vi.fn(), getExpenseTabsForUser: vi.fn(),
-  createExpenseTabForUser: vi.fn(), updateExpenseTabForUser: vi.fn(), deleteExpenseTabForUser: vi.fn(),
+  getExpenseTabsForUser: vi.fn(), createExpenseTabForUser: vi.fn(),
+  updateExpenseTabForUser: vi.fn(), deleteExpenseTabForUser: vi.fn(),
 }));
-vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
+vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
 vi.mock("@/lib/data/expense-tabs", () => mocks);
 
 import { GET, POST } from "@/app/api/expense-tabs/route";
 import { PATCH, DELETE } from "@/app/api/expense-tabs/[id]/route";
 
-const user = { id: "10000000-0000-4000-8000-000000000031" };
-const id = "40000000-0000-4000-8000-000000000031";
-const context = { params: Promise.resolve({ id }) };
-const input = { name: "Car", categoryKeys: ["car"], subtypeKeys: [] };
-const tab = { id, ...input, createdAt: "2026-10-03T12:00:00Z", updatedAt: "2026-10-03T12:00:00Z" };
-function request(method: string, body: unknown = input) {
-  return new Request(`http://localhost/api/expense-tabs/${id}`, {
-    method, body: method === "DELETE" ? undefined : JSON.stringify(body),
-    headers: { "content-type": "application/json" },
-  });
-}
-function expectPrivate(response: Response) {
-  expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
-}
+const input = { name: "Car", categoryKeys: ["car" as const], subtypeKeys: [] };
+const tab = aTab(input);
+const params = { id: tab.id };
+const url = `/api/expense-tabs/${tab.id}`;
 
-describe("owner-scoped expense tab routes", () => {
+describe("expense tab routes", () => {
+  let user: ReturnType<typeof signedInAs>;
+
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.getAuthenticatedUser.mockResolvedValue(user);
+    user = signedInAs();
   });
 
-  it.each(["GET", "POST", "PATCH", "DELETE"])("requires authentication for %s", async (method) => {
-    mocks.getAuthenticatedUser.mockResolvedValue(null);
-    const response = method === "GET" ? await GET()
-      : method === "POST" ? await POST(request(method))
-      : method === "PATCH" ? await PATCH(request(method), context)
-      : await DELETE(request(method), context);
-    expect(response.status).toBe(401);
-    expectPrivate(response);
-    expect(mocks.getExpenseTabsForUser).not.toHaveBeenCalled();
-    expect(mocks.createExpenseTabForUser).not.toHaveBeenCalled();
-    expect(mocks.updateExpenseTabForUser).not.toHaveBeenCalled();
-    expect(mocks.deleteExpenseTabForUser).not.toHaveBeenCalled();
-  });
-
-  it("reloads owner configurations", async () => {
+  it("lists the signed-in user's tabs", async () => {
     mocks.getExpenseTabsForUser.mockResolvedValue([tab]);
-    const response = await GET();
-    expect(await response.json()).toEqual({ tabs: [tab] });
+
+    const response = await callRoute(GET);
+
+    expect(response.body).toEqual({ tabs: [tab] });
     expect(mocks.getExpenseTabsForUser).toHaveBeenCalledWith(user.id);
-    expectPrivate(response);
   });
 
-  it("creates normalized selections using authenticated ownership", async () => {
+  it("creates a tab from normalized selections, owned by the signed-in user", async () => {
     mocks.createExpenseTabForUser.mockResolvedValue(tab);
-    const response = await POST(request("POST", {
-      name: "  Car  ", categoryKeys: ["car", "car"], subtypeKeys: ["car_fuel"], user_id: "another-user",
-    }));
-    expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ tab });
+
+    const response = await callRoute(POST, {
+      method: "POST",
+      body: { name: "  Car  ", categoryKeys: ["car", "car"], subtypeKeys: ["car_fuel"], user_id: "another-user" },
+    });
+
+    expect(response).toMatchObject({ status: 201, body: { tab } });
     expect(mocks.createExpenseTabForUser).toHaveBeenCalledWith(user.id, input);
-    expectPrivate(response);
   });
 
   it.each([
@@ -69,71 +52,72 @@ describe("owner-scoped expense tab routes", () => {
     { ...input, categoryKeys: [] },
     { ...input, subtypeKeys: ["unknown"] },
     { ...input, categoryKeys: [null] },
-  ])("rejects invalid create requests", async (body) => {
-    const response = await POST(request("POST", body));
+  ])("rejects an invalid new tab: %j", async (body) => {
+    const response = await callRoute(POST, { method: "POST", body });
+
     expect(response.status).toBe(422);
-    expectPrivate(response);
     expect(mocks.createExpenseTabForUser).not.toHaveBeenCalled();
   });
 
-  it("rejects malformed JSON", async () => {
-    const response = await POST(new Request("http://localhost/api/expense-tabs", { method: "POST", body: "{" }));
-    expect(response.status).toBe(422);
-  });
-
-  it("edits selections while preserving identity", async () => {
+  it("edits a tab's selections and keeps its identity", async () => {
     const edited = { ...tab, name: "Fuel", categoryKeys: [], subtypeKeys: ["car_fuel"] };
     mocks.updateExpenseTabForUser.mockResolvedValue(edited);
-    const response = await PATCH(request("PATCH", edited), context);
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ tab: edited });
-    expect(mocks.updateExpenseTabForUser).toHaveBeenCalledWith(user.id, id, {
-      name: "Fuel", categoryKeys: [], subtypeKeys: ["car_fuel"],
-    });
-    expectPrivate(response);
+
+    const response = await callRoute(PATCH, { method: "PATCH", url, params, body: edited });
+
+    expect(response).toMatchObject({ status: 200, body: { tab: edited } });
+    expect(mocks.updateExpenseTabForUser).toHaveBeenCalledWith(user.id, tab.id, { name: "Fuel", categoryKeys: [], subtypeKeys: ["car_fuel"] });
   });
 
-  it("rejects invalid edits before writing", async () => {
-    const response = await PATCH(request("PATCH", { ...input, subtypeKeys: [null] }), context);
+  it("rejects an invalid edit before writing", async () => {
+    const response = await callRoute(PATCH, { method: "PATCH", url, params, body: { ...input, subtypeKeys: [null] } });
+
     expect(response.status).toBe(422);
     expect(mocks.updateExpenseTabForUser).not.toHaveBeenCalled();
   });
 
-  it.each(["PATCH", "DELETE"])("returns 404 for inaccessible %s IDs", async (method) => {
-    mocks.updateExpenseTabForUser.mockResolvedValue(null);
-    mocks.deleteExpenseTabForUser.mockResolvedValue(false);
-    const response = method === "PATCH" ? await PATCH(request(method), context) : await DELETE(request(method), context);
-    expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: "Expense tab not found." });
-    expectPrivate(response);
+  it("deletes the signed-in user's addressed tab", async () => {
+    mocks.deleteExpenseTabForUser.mockResolvedValue(true);
+
+    const response = await callRoute(DELETE, { method: "DELETE", url, params });
+
+    expect(response.body).toEqual({ success: true });
+    expect(mocks.deleteExpenseTabForUser).toHaveBeenCalledWith(user.id, tab.id);
   });
 
-  it.each(["PATCH", "DELETE"])("rejects malformed %s IDs", async (method) => {
-    const invalidContext = { params: Promise.resolve({ id: "invalid" }) };
-    const response = method === "PATCH" ? await PATCH(request(method), invalidContext) : await DELETE(request(method), invalidContext);
+  it.each([
+    { method: "PATCH", handler: PATCH, body: input },
+    { method: "DELETE", handler: DELETE, body: undefined },
+  ])("returns 404 when $method addresses a missing or foreign tab", async ({ method, handler, body }) => {
+    mocks.updateExpenseTabForUser.mockResolvedValue(null);
+    mocks.deleteExpenseTabForUser.mockResolvedValue(false);
+
+    const response = await callRoute(handler, { method, url, params, body });
+
+    expect(response).toMatchObject({ status: 404, body: { error: "Expense tab not found." } });
+  });
+
+  it.each([
+    { method: "PATCH", handler: PATCH, body: input },
+    { method: "DELETE", handler: DELETE, body: undefined },
+  ])("rejects a malformed id for $method before touching data", async ({ method, handler, body }) => {
+    const response = await callRoute(handler, { method, url, params: { id: "invalid" }, body });
+
     expect(response.status).toBe(400);
     expect(mocks.updateExpenseTabForUser).not.toHaveBeenCalled();
     expect(mocks.deleteExpenseTabForUser).not.toHaveBeenCalled();
   });
 
-  it("deletes only the addressed owner configuration", async () => {
-    mocks.deleteExpenseTabForUser.mockResolvedValue(true);
-    const response = await DELETE(request("DELETE"), context);
-    expect(await response.json()).toEqual({ success: true });
-    expect(mocks.deleteExpenseTabForUser).toHaveBeenCalledWith(user.id, id);
-    expectPrivate(response);
-  });
+  it.each([
+    { method: "GET", handler: GET, message: "Unable to load expense tabs." },
+    { method: "POST", handler: POST, message: "Unable to save expense tab." },
+    { method: "PATCH", handler: PATCH, message: "Unable to save expense tab." },
+    { method: "DELETE", handler: DELETE, message: "Unable to delete expense tab." },
+  ])("reports a $method data failure as its route message", async ({ method, handler, message }) => {
+    for (const mock of Object.values(mocks)) mock.mockRejectedValue(new Error("private database details"));
 
-  it.each(["GET", "POST", "PATCH", "DELETE"])("reports %s data errors without leaking internals", async (method) => {
-    for (const mock of [mocks.getExpenseTabsForUser, mocks.createExpenseTabForUser, mocks.updateExpenseTabForUser, mocks.deleteExpenseTabForUser]) {
-      mock.mockRejectedValue(new Error("private database details"));
-    }
-    const response = method === "GET" ? await GET()
-      : method === "POST" ? await POST(request(method))
-      : method === "PATCH" ? await PATCH(request(method), context)
-      : await DELETE(request(method), context);
-    expect(response.status).toBe(500);
-    expect(JSON.stringify(await response.json())).not.toContain("private database details");
-    expectPrivate(response);
+    const response = await callRoute(handler, { method, url, params, body: ["POST", "PATCH"].includes(method) ? input : undefined });
+
+    expect(response).toMatchObject({ status: 500, body: { error: message } });
   });
 });

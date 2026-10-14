@@ -2,16 +2,14 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
 
 import { DataError, DataLoading } from "@/components/ui/data-state";
+import { useAccount } from "@/hooks/use-account";
 import { ApiError } from "@/lib/api/client";
-import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import type { AccountData } from "@/lib/types";
 
 export default function HomePage() {
   const router = useRouter();
-  const { data, error, mutate } = useSWR<AccountData>(ACCOUNT_API_KEY);
+  const { account: data, error, mutate } = useAccount();
 
   useEffect(() => {
     if (data) router.replace("/dashboard");

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { ChartBar } from "@/components/dashboard/chart-bar";
 import { formatCurrency } from "@/lib/utils/currency";
-import { formatDate, formatMonth } from "@/lib/utils/dates";
+import { formatDate, formatMonth } from "@/lib/calendar";
 
 function formatSeriesLabel(key: string) {
   if (/^\d{4}-\d{2}$/.test(key)) return formatMonth(key);

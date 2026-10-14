@@ -6,7 +6,7 @@ import { EditNetWorthItemDialog } from "@/components/net-worth/edit-net-worth-it
 import { NetWorthValue } from "@/components/net-worth/net-worth-value";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import type { NetWorthEntry } from "@/lib/net-worth/types";
-import { formatDate, formatDateTime } from "@/lib/utils/dates";
+import { formatDate, formatDateTime } from "@/lib/calendar";
 
 export function entryAnchor(id: string) {
   return `net-worth-entry-${id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;

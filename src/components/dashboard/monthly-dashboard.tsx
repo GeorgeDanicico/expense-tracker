@@ -13,12 +13,12 @@ import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
 import { MonthToolbar } from "@/components/expenses/month-toolbar";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
-import { ACCOUNT_API_KEY, expensesApiKey } from "@/lib/api/keys";
-import { dashboardHref } from "@/lib/frontend/dashboard-state";
-import { monthAnalytics } from "@/lib/frontend/expense-analytics";
-import type { AccountData, ExpensesData } from "@/lib/types";
-import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
-import { getCurrentMonth, shiftMonth } from "@/lib/utils/dates";
+import { useAccount } from "@/hooks/use-account";
+import { expensesApiKey } from "@/lib/api/keys";
+import { dashboardHref } from "@/lib/expenses/url-state";
+import { monthAnalytics } from "@/lib/expenses/analytics";
+import type { ExpensesData } from "@/lib/expenses/types";
+import { getBucharestMonth, shiftMonth } from "@/lib/calendar";
 
 export function MonthlyDashboard({
   month,
@@ -34,14 +34,13 @@ export function MonthlyDashboard({
   const previous = useSWR<ExpensesData>(expensesApiKey(previousMonth), {
     keepPreviousData: false,
   });
-  const { data: account } = useSWR<AccountData>(ACCOUNT_API_KEY);
-  const currency = account?.currency ?? DEFAULT_CURRENCY;
+  const { currency } = useAccount();
   const matching = current.data?.month === month ? current.data : undefined;
   const before =
     previous.data?.month === previousMonth
       ? monthAnalytics(previous.data.expenses, previousMonth)
       : null;
-  const completed = month < getCurrentMonth();
+  const completed = month < getBucharestMonth();
   const analytics = matching ? monthAnalytics(matching.expenses, month) : null;
   return (
     <Stack gap="4">

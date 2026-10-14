@@ -3,16 +3,14 @@
 import { Box, Center } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
 
 import { AuthForm } from "@/components/auth/auth-form";
 import { DataLoading } from "@/components/ui/data-state";
-import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import type { AccountData } from "@/lib/types";
+import { useAccount } from "@/hooks/use-account";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { data, isLoading } = useSWR<AccountData>(ACCOUNT_API_KEY);
+  const { account: data, isLoading } = useAccount();
 
   useEffect(() => {
     if (data) router.replace("/dashboard");

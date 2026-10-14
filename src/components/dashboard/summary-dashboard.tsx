@@ -12,24 +12,23 @@ import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { Stat, StatGroup } from "@/components/ui/stat";
-import { ACCOUNT_API_KEY, dashboardApiKey } from "@/lib/api/keys";
-import { dashboardHref } from "@/lib/frontend/dashboard-state";
-import { categoryShares } from "@/lib/frontend/expense-analytics";
-import type { AccountData, DashboardData } from "@/lib/types";
-import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
-import { formatMonth, getCurrentMonth } from "@/lib/utils/dates";
+import { useAccount } from "@/hooks/use-account";
+import { dashboardApiKey } from "@/lib/api/keys";
+import { dashboardHref } from "@/lib/expenses/url-state";
+import { categoryShares } from "@/lib/expenses/analytics";
+import type { DashboardData } from "@/lib/expenses/types";
+import { formatMonth, getBucharestMonth } from "@/lib/calendar";
 
 export function SummaryDashboard({ params }: { params: URLSearchParams }) {
   const { data, error, isValidating, mutate } = useSWR<DashboardData>(
     dashboardApiKey({
       period: "3m",
       granularity: "month",
-      customDate: getCurrentMonth(),
+      customDate: getBucharestMonth(),
     }),
     { keepPreviousData: false },
   );
-  const { data: account } = useSWR<AccountData>(ACCOUNT_API_KEY);
-  const currency = account?.currency ?? DEFAULT_CURRENCY;
+  const { currency } = useAccount();
   if (!data)
     return error ? (
       <DataError retry={() => void mutate()} />

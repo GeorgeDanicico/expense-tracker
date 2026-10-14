@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { aTab } from "@/test/builders";
+import { fakeSupabase, type FakeSupabaseOptions } from "@/test/fake-supabase";
+
 const mocks = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => mocks);
 
@@ -11,77 +14,89 @@ import {
 const userId = "10000000-0000-4000-8000-000000000031";
 const id = "40000000-0000-4000-8000-000000000031";
 const input = { name: "Fuel", categoryKeys: [], subtypeKeys: ["car_fuel" as const] };
-const row = {
-  id, name: "Fuel", category_keys: [], subtype_keys: ["car_fuel"],
-  created_at: "2026-10-03T12:00:00Z", updated_at: "2026-10-03T12:00:00Z",
-};
-const tab = { id, ...input, createdAt: row.created_at, updatedAt: row.updated_at };
+const tab = aTab({ id, ...input, createdAt: "2026-10-03T12:00:00Z", updatedAt: "2026-10-03T12:00:00Z" });
+const ownedRow = () => ({
+  id, user_id: userId, name: "Fuel", category_keys: [], subtype_keys: ["car_fuel"],
+  created_at: tab.createdAt, updated_at: tab.updatedAt,
+});
+const foreignRow = () => ({ ...ownedRow(), id: "40000000-0000-4000-8000-000000000032", user_id: "someone-else" });
 
-function mockQuery(data: unknown, error: unknown = null) {
-  const result = { data, error };
-  const builder = {
-    select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(), update: vi.fn().mockReturnThis(), delete: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue(result), maybeSingle: vi.fn().mockResolvedValue(result),
-    then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
-  };
-  const from = vi.fn().mockReturnValue(builder);
-  mocks.createClient.mockResolvedValue({ from });
-  return { builder, from };
+function useDatabase(rows: Record<string, unknown>[], options?: FakeSupabaseOptions) {
+  const database = fakeSupabase({ expense_tabs: rows }, options);
+  mocks.createClient.mockResolvedValue(database.client);
+  return database;
 }
 
-describe("expense tab data ownership", () => {
+const ownerAndId = [["eq", "user_id", userId], ["eq", "id", id]];
+
+describe("expense tab data access", () => {
   beforeEach(() => vi.resetAllMocks());
 
-  it("loads and maps only the owner's configurations", async () => {
-    const { builder, from } = mockQuery([row]);
-    expect(await getExpenseTabsForUser(userId)).toEqual([tab]);
-    expect(from).toHaveBeenCalledWith("expense_tabs");
-    expect(builder.eq).toHaveBeenCalledWith("user_id", userId);
-    expect(builder.order.mock.calls).toEqual([["created_at"], ["id"]]);
+  it("loads only the owner's tabs, oldest first", async () => {
+    const { queries } = useDatabase([foreignRow(), ownedRow()]);
+
+    const tabs = await getExpenseTabsForUser(userId);
+
+    expect(tabs).toEqual([tab]);
+    expect(queries[0]).toMatchObject({ table: "expense_tabs", filters: [["eq", "user_id", userId]], orders: ["created_at", "id"] });
   });
 
-  it("resolves configuration membership with both owner and stable ID predicates", async () => {
-    const { builder } = mockQuery(row);
-    expect(await getExpenseTabForUser(userId, id)).toEqual(tab);
-    expect(builder.eq.mock.calls).toEqual([["user_id", userId], ["id", id]]);
+  it("loads a single tab by both owner and id", async () => {
+    const { queries } = useDatabase([ownedRow()]);
+
+    const loaded = await getExpenseTabForUser(userId, id);
+
+    expect(loaded).toEqual(tab);
+    expect(queries[0].filters).toEqual(ownerAndId);
   });
 
-  it("derives the insert owner from the authenticated caller", async () => {
-    const { builder } = mockQuery(row);
-    expect(await createExpenseTabForUser(userId, input)).toEqual(tab);
-    expect(builder.insert).toHaveBeenCalledWith({
-      user_id: userId, name: "Fuel", category_keys: [], subtype_keys: ["car_fuel"],
-    });
+  it("takes the new tab's owner from the caller", async () => {
+    const { tables } = useDatabase([], { trigger: (row) => ({ created_at: tab.createdAt, updated_at: tab.updatedAt, ...row }) });
+
+    const created = await createExpenseTabForUser(userId, input);
+
+    expect(created).toMatchObject(input);
+    expect(tables.expense_tabs).toEqual([expect.objectContaining({ user_id: userId, name: "Fuel", category_keys: [], subtype_keys: ["car_fuel"] })]);
   });
 
-  it("updates only tab selections and guards both owner and ID", async () => {
-    const { builder } = mockQuery(row);
-    expect(await updateExpenseTabForUser(userId, id, input)).toEqual(tab);
-    expect(builder.update).toHaveBeenCalledWith({ name: "Fuel", category_keys: [], subtype_keys: ["car_fuel"] });
-    expect(builder.eq.mock.calls).toEqual([["user_id", userId], ["id", id]]);
+  it("updates only the tab's selections, guarded by owner and id", async () => {
+    const { queries } = useDatabase([ownedRow()]);
+
+    const updated = await updateExpenseTabForUser(userId, id, { ...input, name: "Car fuel" });
+
+    expect(updated).toEqual({ ...tab, name: "Car fuel" });
+    expect(queries[0]).toMatchObject({ values: { name: "Car fuel", category_keys: [], subtype_keys: ["car_fuel"] }, filters: ownerAndId });
   });
 
-  it("deletes only from the configurations table with owner and ID predicates", async () => {
-    const { builder, from } = mockQuery({ id });
-    expect(await deleteExpenseTabForUser(userId, id)).toBe(true);
-    expect(from.mock.calls).toEqual([["expense_tabs"]]);
-    expect(builder.eq.mock.calls).toEqual([["user_id", userId], ["id", id]]);
+  it("deletes only the owner's addressed tab", async () => {
+    const { queries, tables } = useDatabase([ownedRow(), foreignRow()]);
+
+    const deleted = await deleteExpenseTabForUser(userId, id);
+
+    expect(deleted).toBe(true);
+    expect(queries[0].filters).toEqual(ownerAndId);
+    expect(tables.expense_tabs).toEqual([foreignRow()]);
   });
 
-  it("treats missing or inaccessible tab rows consistently", async () => {
-    mockQuery(null);
-    expect(await getExpenseTabForUser(userId, id)).toBeNull();
-    expect(await updateExpenseTabForUser(userId, id, input)).toBeNull();
-    expect(await deleteExpenseTabForUser(userId, id)).toBe(false);
+  it.each([
+    ["getExpenseTabForUser", () => getExpenseTabForUser(userId, id), null],
+    ["updateExpenseTabForUser", () => updateExpenseTabForUser(userId, id, input), null],
+    ["deleteExpenseTabForUser", () => deleteExpenseTabForUser(userId, id), false],
+  ] as const)("%s treats another user's tab as missing", async (_name, call, missing) => {
+    useDatabase([foreignRow()]);
+
+    expect(await call()).toBe(missing);
   });
 
-  it("does not turn database errors into successful empty results", async () => {
-    mockQuery(null, { message: "Internal database error" });
-    await expect(getExpenseTabsForUser(userId)).rejects.toThrow("Unable to load expense tabs.");
-    await expect(getExpenseTabForUser(userId, id)).rejects.toThrow("Unable to load expense tab.");
-    await expect(createExpenseTabForUser(userId, input)).rejects.toThrow("Unable to save expense tab.");
-    await expect(updateExpenseTabForUser(userId, id, input)).rejects.toThrow("Unable to save expense tab.");
-    await expect(deleteExpenseTabForUser(userId, id)).rejects.toThrow("Unable to delete expense tab.");
+  it.each([
+    ["getExpenseTabsForUser", "Unable to load expense tabs.", () => getExpenseTabsForUser(userId)],
+    ["getExpenseTabForUser", "Unable to load expense tab.", () => getExpenseTabForUser(userId, id)],
+    ["createExpenseTabForUser", "Unable to save expense tab.", () => createExpenseTabForUser(userId, input)],
+    ["updateExpenseTabForUser", "Unable to save expense tab.", () => updateExpenseTabForUser(userId, id, input)],
+    ["deleteExpenseTabForUser", "Unable to delete expense tab.", () => deleteExpenseTabForUser(userId, id)],
+  ] as const)("%s turns a database error into '%s'", async (_name, message, call) => {
+    useDatabase([ownedRow()], { fail: () => true });
+
+    await expect(call()).rejects.toThrow(message);
   });
 });

@@ -3,24 +3,23 @@ import { z } from "zod";
 import {
   createExpenseTabForUser,
   deleteExpenseTabForUser,
-  getExpenseTabForUser,
   getExpenseTabsForUser,
   updateExpenseTabForUser,
 } from "@/lib/data/expense-tabs";
-import { getExpenseTabExpensesForUser } from "@/lib/data/expenses";
+import { getExpenseTabLedgerForUser } from "@/lib/data/ledgers";
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
-import { summarizeExpenses } from "@/lib/expenses/summary";
-import { DEFAULT_EXPENSE_TAB_FILTERS, expenseTabFiltersSchema } from "@/lib/expenses/tab-filters";
+import { DEFAULT_EXPENSE_TAB_FILTERS, expenseTabFiltersSchema } from "@/lib/expenses/filters";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
 import { expenseTabSchema } from "@/lib/validation/expense-tab";
+import { idSchema } from "@/lib/validation/primitives";
 
 const tabFields = {
   name: z.string(),
   categoryKeys: z.array(z.enum(EXPENSE_CATEGORIES)).default([]),
   subtypeKeys: z.array(z.enum(EXPENSE_SUBTYPES)).default([]),
 };
-const idSchema = z.object({ id: z.uuid() });
-const updateTabSchema = z.object({ id: z.uuid(), ...tabFields });
+const idInput = z.object({ id: idSchema() });
+const updateTabSchema = z.object({ id: idSchema(), ...tabFields });
 
 // The filters union is advertised flat; the real discriminated schema validates it in the handler.
 const flatFilters = z.object({
@@ -33,7 +32,7 @@ const flatFilters = z.object({
   search: z.string().optional(),
 });
 const tabExpensesSchema = z.object({
-  tabId: z.uuid(),
+  tabId: idSchema(),
   filters: z.preprocess(
     (value) => value && typeof value === "object" ? { scope: "all", ...value } : value,
     expenseTabFiltersSchema,
@@ -54,15 +53,10 @@ export const expenseTabTools = [
     title: "Get expense tab expenses",
     description: "Expenses in a tab with total, count and average. Filters default to all time.",
     schema: tabExpensesSchema,
-    shape: { tabId: z.uuid(), filters: flatFilters.optional() },
+    shape: { tabId: idSchema(), filters: flatFilters.optional() },
     annotations: READ,
     notFound: "Expense tab not found.",
-    run: async ({ tabId, filters }, { userId }) => {
-      const tab = await getExpenseTabForUser(userId, tabId);
-      if (!tab) return null;
-      const expenses = await getExpenseTabExpensesForUser(userId, tab, filters);
-      return { tab, filters, expenses, ...summarizeExpenses(expenses) };
-    },
+    run: ({ tabId, filters }, { userId }) => getExpenseTabLedgerForUser(userId, tabId, filters),
   }),
   defineTool({
     name: "create_expense_tab",
@@ -89,7 +83,7 @@ export const expenseTabTools = [
     name: "delete_expense_tab",
     title: "Delete expense tab",
     description: "Permanently delete a saved tab. Its expenses are kept.",
-    schema: idSchema,
+    schema: idInput,
     annotations: DELETE,
     notFound: "Expense tab not found.",
     run: async ({ id }, { userId }) => (await deleteExpenseTabForUser(userId, id)) && { deleted: true, id },

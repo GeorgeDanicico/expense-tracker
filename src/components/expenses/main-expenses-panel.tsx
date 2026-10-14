@@ -10,8 +10,8 @@ import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { Stat, StatGroup } from "@/components/ui/stat";
 import { mainExpensesApiKey } from "@/lib/api/keys";
-import type { ExpensesData } from "@/lib/types";
-import { getApplicationCurrentMonth } from "@/lib/utils/dates";
+import type { ExpensesData } from "@/lib/expenses/types";
+import { getBucharestMonth } from "@/lib/calendar";
 
 /** The main ledger tab: month toolbar, month metrics and the expense list. */
 export function MainExpensesPanel({ month, currency }: { month: string; currency: string }) {
@@ -25,7 +25,7 @@ export function MainExpensesPanel({ month, currency }: { month: string; currency
     <Stack gap="4">
       <MonthToolbar
         month={month}
-        maxMonth={getApplicationCurrentMonth()}
+        maxMonth={getBucharestMonth()}
         href={(value) => `/expenses?month=${value}`}
       />
       {!matching ? (

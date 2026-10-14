@@ -4,6 +4,7 @@ import { Input, NativeSelect } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import { FormField, FormRow } from "@/components/ui/form-field";
+import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import type { NetWorthItemKind } from "@/lib/net-worth/types";
 
 export type CategoryOption = { value: string; label: string };
@@ -84,7 +85,7 @@ export function NetWorthItemFields({
 
       {beforePurchase}
 
-      {kind === "asset" && category !== "cash" ? (
+      {purchaseAmountAllowed(kind, category) ? (
         <FormField
           label="Optional purchase amount"
           error={fieldError("purchaseAmount")}

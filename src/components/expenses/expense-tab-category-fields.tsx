@@ -6,9 +6,11 @@ import {
   EXPENSE_SUBTYPES,
   SUBTYPE_CATEGORIES,
   SUBTYPE_LABELS,
+  CATEGORY_LABELS,
+  EXPENSE_CATEGORIES,
   type ExpenseSubtype,
+  type ExpenseCategory,
 } from "@/lib/expenses/categories";
-import { CATEGORY_LABELS, EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/types";
 
 /** Category/subtype checklist for an expense tab. Parent categories include all subtypes. */
 export function ExpenseTabCategoryFields({

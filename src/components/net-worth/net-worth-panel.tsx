@@ -14,11 +14,11 @@ import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state"
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
+import { useAccount } from "@/hooks/use-account";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { apiFetcher } from "@/lib/api/client";
-import { ACCOUNT_API_KEY, NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { NET_WORTH_API_KEY } from "@/lib/api/keys";
 import type { NetWorthEntry, NetWorthOverview } from "@/lib/net-worth/types";
-import type { AccountData } from "@/lib/types";
 
 function groupedEntries(entries: NetWorthEntry[]) {
   const groups = new Map<string, NetWorthEntry[]>();
@@ -47,7 +47,7 @@ function groupedEntries(entries: NetWorthEntry[]) {
 export function NetWorthPanel() {
   useDocumentTitle("Net worth");
   const { data, error, isLoading, isValidating, mutate } = useSWR<NetWorthOverview>(NET_WORTH_API_KEY, apiFetcher);
-  const { data: account } = useSWR<AccountData>(ACCOUNT_API_KEY);
+  const { currency } = useAccount();
   const grouped = useMemo(() => groupedEntries(data?.entries ?? []), [data?.entries]);
 
   if (isLoading && !data) return <DataLoading label="Loading your net worth…" />;
@@ -56,7 +56,7 @@ export function NetWorthPanel() {
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>
-      <PageHeader title="Net worth" actions={<AddNetWorthItemDialog defaultCurrency={account?.currency ?? "EUR"} onSuccess={() => undefined} />} />
+      <PageHeader title="Net worth" actions={<AddNetWorthItemDialog defaultCurrency={currency} onSuccess={() => undefined} />} />
       <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
 
       <NetWorthAttention overview={data} />

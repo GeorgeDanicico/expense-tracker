@@ -1,7 +1,7 @@
 import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 
 import { formatCurrency } from "@/lib/utils/currency";
-import { formatDate } from "@/lib/utils/dates";
+import { formatDate } from "@/lib/calendar";
 
 export function DailySpendingChart({
   days,
