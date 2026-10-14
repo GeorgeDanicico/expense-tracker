@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
+import { siteOrigin } from "@/lib/http/origin";
 import { json } from "@/lib/http/route";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,19 +10,6 @@ const authSchema = z.object({
   email: z.email("Enter a valid email address."),
   password: z.string().min(8, "Password must contain at least 8 characters.").max(128),
 });
-
-function confirmationOrigin(request: NextRequest) {
-  const configuredOrigin = process.env.SITE_URL;
-  const candidate = process.env.NODE_ENV === "production"
-    ? configuredOrigin || request.nextUrl.origin
-    : request.nextUrl.origin || configuredOrigin;
-
-  try {
-    return new URL(candidate || "http://localhost:3000").origin;
-  } catch {
-    return "http://localhost:3000";
-  }
-}
 
 export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
@@ -48,7 +36,7 @@ export async function POST(request: NextRequest) {
     return json({ authenticated: true });
   }
 
-  const confirmationUrl = new URL("/auth/confirm", confirmationOrigin(request));
+  const confirmationUrl = new URL("/auth/confirm", siteOrigin(request));
   confirmationUrl.searchParams.set("next", "/dashboard");
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,

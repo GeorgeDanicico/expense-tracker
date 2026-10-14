@@ -14,7 +14,7 @@ const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
 const HTTP_METHODS = ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"];
 
 // Routes that authenticate in their own way and are covered by their own tests.
-const PUBLIC_ROUTES = ["auth", "mcp"];
+const PUBLIC_ROUTES = ["auth", "auth/google", "mcp"];
 
 // Every other route handler must reject anonymous requests. Adding a route
 // under src/app/api means adding it here, so a route without auth fails below.

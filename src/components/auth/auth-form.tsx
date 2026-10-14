@@ -1,8 +1,8 @@
 "use client";
 
-import { Button, Heading, Input, Stack } from "@chakra-ui/react";
+import { Button, Heading, HStack, Image, Input, Separator, Stack, Text } from "@chakra-ui/react";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSWRConfig } from "swr";
 
 import { Brand } from "@/components/layout/brand";
@@ -105,8 +105,14 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
   );
 }
 
+const CALLBACK_ERRORS: Record<string, string> = {
+  "oauth-failed": "Google sign-in failed. Please try again.",
+  "confirmation-failed": "We couldn't sign you in from that link. Please try again.",
+};
+
 export function AuthForm() {
   const [mode, setMode] = useState<AuthMode>("login");
+  const callbackError = CALLBACK_ERRORS[useSearchParams().get("message") ?? ""];
   return (
     <Card width="full" maxW="360px">
       <Card.Body p={{ base: "5", md: "6" }}>
@@ -126,7 +132,23 @@ export function AuthForm() {
               { value: "signup", label: "Create account" },
             ]}
           />
+          {callbackError ? (
+            <InlineAlert status="error">{callbackError}</InlineAlert>
+          ) : null}
           <AuthModeForm key={mode} mode={mode} />
+          <HStack gap="3">
+            <Separator flex="1" />
+            <Text flexShrink="0" textStyle="xs" color="fg.muted">
+              or continue with
+            </Text>
+            <Separator flex="1" />
+          </HStack>
+          <Button asChild variant="outline" size="md" width="full">
+            <a href="/api/auth/google">
+              <Image src="/google-logo.svg" alt="" boxSize="18px" />
+              Google
+            </a>
+          </Button>
         </Stack>
       </Card.Body>
     </Card>
