@@ -1,5 +1,7 @@
 # Net worth and XTB investments: implementation plan
 
+> Historical research draft. The current implementation plans are [Net Worth](../net-worth-plan.md) and [Investments](investments-panel-plan.md); use those for new work.
+
 Prepared 7 September 2026. Planning only; no application or database changes made.
 
 ## Recommendation
