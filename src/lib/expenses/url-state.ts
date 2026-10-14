@@ -1,7 +1,7 @@
 import {
   ANALYTICS_PERIODS,
-  getProcessLocalMonth,
-  getUtcToday,
+  getBucharestMonth,
+  getBucharestToday,
   isValidDate,
   isValidMonth,
 } from "@/lib/calendar";
@@ -28,7 +28,7 @@ export function dashboardView(params: Params): DashboardView {
 
 export function dashboardMonth(
   params: Params,
-  currentMonth = getProcessLocalMonth(),
+  currentMonth = getBucharestMonth(),
 ) {
   const month = params.get("month") ?? "";
   return isValidMonth(month) ? month : currentMonth;
@@ -52,7 +52,7 @@ export function parseAnalyticsFilters(params: Params): AnalyticsFilters {
     : "3m";
   const granularity: CustomGranularity = params.get("granularity") === "day" ? "day" : "month";
   const rawDate = params.get("date") ?? "";
-  const today = getUtcToday();
+  const today = getBucharestToday();
   const customDate =
     granularity === "day"
       ? isValidDate(rawDate)
@@ -60,7 +60,7 @@ export function parseAnalyticsFilters(params: Params): AnalyticsFilters {
         : today
       : isValidMonth(rawDate)
         ? rawDate
-        : getProcessLocalMonth();
+        : getBucharestMonth();
 
   return { period, granularity, customDate };
 }

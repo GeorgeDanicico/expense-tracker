@@ -8,7 +8,7 @@ import type { NetWorthOverview } from "@/lib/net-worth/types";
 import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
 import type { AccountData } from "@/lib/account";
 import type { DashboardData, Expense, ExpensesData } from "@/lib/expenses/types";
-import { dateInMonth, daysInMonth, getProcessLocalMonth, shiftMonth } from "@/lib/calendar";
+import { dateInMonth, daysInMonth, getBucharestMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
 
 /** Deterministic sample data for the development screen preview. */
 const TEMPLATE: [string, number, ExpenseCategory, string | null][] = [
@@ -30,8 +30,8 @@ const TEMPLATE: [string, number, ExpenseCategory, string | null][] = [
 
 function expensesFor(month: string, scale = 1): Expense[] {
   const days = daysInMonth(month);
-  const isCurrent = month === getProcessLocalMonth();
-  const lastDay = isCurrent ? new Date().getDate() : days;
+  const isCurrent = month === getBucharestMonth();
+  const lastDay = isCurrent ? Number(getBucharestToday().slice(8)) : days;
   return TEMPLATE.map(([description, amount, category, notes], index) => ({
     id: `${month}-${index}`,
     description,
@@ -50,7 +50,7 @@ function ledger(month: string, scale = 1): ExpensesData {
 }
 
 function dashboard(): DashboardData {
-  const currentMonth = getProcessLocalMonth();
+  const currentMonth = getBucharestMonth();
   const current = ledger(currentMonth);
   const months = [3, 2, 1].map((offset) => shiftMonth(currentMonth, -offset));
   const series = months.map((key, index) => ({ key, label: "", total: [1840.2, 2215.75, 1967.4][index] }));
@@ -94,7 +94,7 @@ const CAR_TAB: ExpenseTab = {
 
 function carLedger(): ExpenseTabLedgerData {
   const expenses = [0, 1, 2, 3].flatMap((offset) =>
-    expensesFor(shiftMonth(getProcessLocalMonth(), -offset)).filter((expense) => expense.category === "car"),
+    expensesFor(shiftMonth(getBucharestMonth(), -offset)).filter((expense) => expense.category === "car"),
   );
   const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   return {
@@ -230,8 +230,8 @@ export function fixtureFor(key: string): unknown {
   if (path === "/api/account") return ACCOUNT;
   if (path === "/api/dashboard") return dashboard();
   if (path === "/api/expenses") {
-    const month = params.get("month") ?? getProcessLocalMonth();
-    return ledger(month, month === getProcessLocalMonth() ? 1 : 0.92);
+    const month = params.get("month") ?? getBucharestMonth();
+    return ledger(month, month === getBucharestMonth() ? 1 : 0.92);
   }
   if (path === "/api/expense-tabs") return { tabs: [CAR_TAB] };
   if (path.startsWith("/api/expense-tabs/") && path.endsWith("/expenses")) return carLedger();

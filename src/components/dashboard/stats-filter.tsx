@@ -6,7 +6,7 @@ import { FormEvent, useState, useTransition } from "react";
 
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Toolbar } from "@/components/ui/toolbar";
-import { getUtcMonth, getUtcToday } from "@/lib/calendar";
+import { getBucharestMonth, getBucharestToday } from "@/lib/calendar";
 import type { AnalyticsPeriod, CustomGranularity } from "@/lib/expenses/types";
 
 const PERIODS = [
@@ -51,8 +51,8 @@ export function StatsFilter({
     setGranularity(value);
     setCustomDate(
       value === "day"
-        ? getUtcToday()
-        : getUtcMonth(),
+        ? getBucharestToday()
+        : getBucharestMonth(),
     );
   }
 

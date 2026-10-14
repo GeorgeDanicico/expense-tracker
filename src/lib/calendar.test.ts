@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addDays,
   addMonths,
@@ -7,8 +7,8 @@ import {
   APPLICATION_TIMEZONE,
   dateInMonth,
   daysInMonth,
-  getUtcMonth,
-  getUtcToday,
+  formatMonth,
+  getMonthRange,
   lastDayOfMonth,
   monthKeysBetween,
   monthsBetween,
@@ -106,9 +106,44 @@ describe("calendar arithmetic", () => {
     expect(ANALYTICS_PERIOD_MONTHS).toEqual({ "3m": 3, "6m": 6, "1y": 12, "2y": 24 });
   });
 
-  it("reads today and the current month from the UTC calendar", () => {
-    const lateBucharestNight = new Date("2026-12-31T22:30:00Z");
-    expect(getUtcToday(lateBucharestNight)).toBe("2026-12-31");
-    expect(getUtcMonth(lateBucharestNight)).toBe("2026-12");
+  it("computes month ranges without the process time zone", () => {
+    expect(getMonthRange("2026-12")).toEqual({ month: "2026-12", start: "2026-12-01", endExclusive: "2027-01-01" });
+    expect(getMonthRange("2026-03")).toEqual({ month: "2026-03", start: "2026-03-01", endExclusive: "2026-04-01" });
+    expect(shiftMonth("2026-10", 1)).toBe("2026-11");
+    expect(shiftMonth("2026-03", -14)).toBe("2025-01");
+    expect(formatMonth("2026-01")).toBe("January 2026");
+    expect(formatMonth("2026-12")).toBe("December 2026");
+  });
+});
+
+describe("the application clock", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is already in the next Bucharest month and day while UTC is still in the previous one", () => {
+    const instant = new Date("2026-10-31T22:30:00Z");
+    expect(getBucharestMonth(instant)).toBe("2026-11");
+    expect(getBucharestToday(instant)).toBe("2026-11-01");
+  });
+
+  it("stays on New Year's Eve until midnight in Bucharest", () => {
+    const instant = new Date("2026-12-31T21:59:59Z");
+    expect(getBucharestMonth(instant)).toBe("2026-12");
+    expect(getBucharestToday(instant)).toBe("2026-12-31");
+  });
+
+  it("falls back to the Bucharest month for invalid months", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-31T22:30:00Z"));
+    expect(getBucharestMonth()).toBe("2026-11");
+    expect(getBucharestToday()).toBe("2026-11-01");
+    expect(getMonthRange("bad")).toEqual({ month: "2026-11", start: "2026-11-01", endExclusive: "2026-12-01" });
+    expect(shiftMonth("2026-13", -1)).toBe("2026-10");
+    expect(formatMonth("")).toBe("November 2026");
+
+    vi.setSystemTime(new Date("2026-12-31T21:59:59Z"));
+    expect(getMonthRange("").month).toBe("2026-12");
+    expect(shiftMonth("bad", 1)).toBe("2027-01");
   });
 });

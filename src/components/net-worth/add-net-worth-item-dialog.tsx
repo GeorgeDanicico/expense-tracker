@@ -14,7 +14,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
 import { apiRequest } from "@/lib/api/client";
 import { afterNetWorthChange } from "@/lib/api/invalidate";
-import { getUtcToday } from "@/lib/calendar";
+import { getBucharestToday } from "@/lib/calendar";
 import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import { type NetWorthItemKind } from "@/lib/net-worth/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
@@ -154,7 +154,7 @@ export function AddNetWorthItemDialog({
               <Input name="value" type="number" inputMode="decimal" min="0" step="any" placeholder="0.00" required />
             </FormField>
             <FormField flex="1" label="Valued on" error={fieldError("valuedOn")}>
-              <Input name="valuedOn" type="date" defaultValue={getUtcToday()} required />
+              <Input name="valuedOn" type="date" defaultValue={getBucharestToday()} required />
             </FormField>
           </FormRow>
 

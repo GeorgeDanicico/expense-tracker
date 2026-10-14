@@ -17,14 +17,14 @@ import { dashboardApiKey } from "@/lib/api/keys";
 import { dashboardHref } from "@/lib/expenses/url-state";
 import { categoryShares } from "@/lib/expenses/analytics";
 import type { DashboardData } from "@/lib/expenses/types";
-import { formatMonth, getProcessLocalMonth } from "@/lib/calendar";
+import { formatMonth, getBucharestMonth } from "@/lib/calendar";
 
 export function SummaryDashboard({ params }: { params: URLSearchParams }) {
   const { data, error, isValidating, mutate } = useSWR<DashboardData>(
     dashboardApiKey({
       period: "3m",
       granularity: "month",
-      customDate: getProcessLocalMonth(),
+      customDate: getBucharestMonth(),
     }),
     { keepPreviousData: false },
   );

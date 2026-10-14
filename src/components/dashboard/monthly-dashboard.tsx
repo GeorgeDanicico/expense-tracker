@@ -18,7 +18,7 @@ import { expensesApiKey } from "@/lib/api/keys";
 import { dashboardHref } from "@/lib/expenses/url-state";
 import { monthAnalytics } from "@/lib/expenses/analytics";
 import type { ExpensesData } from "@/lib/expenses/types";
-import { getProcessLocalMonth, shiftMonth } from "@/lib/calendar";
+import { getBucharestMonth, shiftMonth } from "@/lib/calendar";
 
 export function MonthlyDashboard({
   month,
@@ -40,7 +40,7 @@ export function MonthlyDashboard({
     previous.data?.month === previousMonth
       ? monthAnalytics(previous.data.expenses, previousMonth)
       : null;
-  const completed = month < getProcessLocalMonth();
+  const completed = month < getBucharestMonth();
   const analytics = matching ? monthAnalytics(matching.expenses, month) : null;
   return (
     <Stack gap="4">

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   dashboardHref,
   dashboardMonth,
@@ -49,5 +49,30 @@ describe("Home URL state", () => {
     expect(dashboardApiKey(parseAnalyticsFilters(params))).toBe(
       "/api/dashboard?period=custom&granularity=day&date=2026-08-17",
     );
+  });
+});
+
+describe("Home URL state defaults on the Bucharest calendar", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("defaults to the Bucharest month and day while UTC is still in the previous one", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-31T22:30:00Z"));
+    expect(dashboardMonth(new URLSearchParams())).toBe("2026-11");
+    expect(parseAnalyticsFilters(new URLSearchParams("period=custom&date=bad")).customDate).toBe("2026-11");
+    expect(
+      parseAnalyticsFilters(new URLSearchParams("period=custom&granularity=day")).customDate,
+    ).toBe("2026-11-01");
+  });
+
+  it("stays on New Year's Eve until midnight in Bucharest", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-12-31T21:59:59Z"));
+    expect(dashboardMonth(new URLSearchParams())).toBe("2026-12");
+    expect(
+      parseAnalyticsFilters(new URLSearchParams("period=custom&granularity=day")).customDate,
+    ).toBe("2026-12-31");
   });
 });

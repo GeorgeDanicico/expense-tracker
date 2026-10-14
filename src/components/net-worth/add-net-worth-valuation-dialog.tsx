@@ -14,7 +14,7 @@ import { useApiForm } from "@/hooks/use-api-form";
 import { apiRequest } from "@/lib/api/client";
 import { afterNetWorthChange } from "@/lib/api/invalidate";
 import type { NetWorthEntry } from "@/lib/net-worth/types";
-import { formatDate, getUtcToday } from "@/lib/calendar";
+import { formatDate, getBucharestToday } from "@/lib/calendar";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
 
 export function AddNetWorthValuationDialog({
@@ -86,7 +86,7 @@ export function AddNetWorthValuationDialog({
             error={fieldError("valuedOn")}
             hint={entry.valuedOn ? `Latest observation: ${formatDate(entry.valuedOn)}` : "Use the date you observed or estimated this value."}
           >
-            <Input name="valuedOn" defaultValue={entry.valuedOn ?? getUtcToday()} type="date" required />
+            <Input name="valuedOn" defaultValue={entry.valuedOn ?? getBucharestToday()} type="date" required />
           </FormField>
 
           {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}

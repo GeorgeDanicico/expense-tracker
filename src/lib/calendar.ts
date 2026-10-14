@@ -3,10 +3,10 @@ import type { AnalyticsPeriod } from "@/lib/expenses/types";
 /**
  * Calendar dates (`YYYY-MM-DD`) and months (`YYYY-MM`) as plain strings.
  *
- * "Now" sources are named after the clock they read, because the app still mixes three:
- * - process-local: `getProcessLocalMonth` (and the `getMonthRange` fallback built on it)
- * - UTC: `getUtcToday`, `getUtcMonth`
- * - Europe/Bucharest (the application calendar): `getBucharestMonth`, `getBucharestToday`
+ * Every "now" — the current month and today, on server and client — reads the
+ * Europe/Bucharest application calendar: `getBucharestMonth`, `getBucharestToday`.
+ * Month and day arithmetic is pure string/UTC math and never depends on the process time zone.
+ * Only `formatMonth`/`formatDate`/`formatDateTime` touch the runtime's zone, for display.
  */
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -89,16 +89,6 @@ export function monthKeysBetween(start: string, endExclusive: string) {
   return keys;
 }
 
-/** Today's date on the UTC calendar. */
-export function getUtcToday(now = new Date()) {
-  return now.toISOString().slice(0, 10);
-}
-
-/** The current month on the UTC calendar. */
-export function getUtcMonth(now = new Date()) {
-  return now.toISOString().slice(0, 7);
-}
-
 const applicationMonthFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: APPLICATION_TIMEZONE,
   year: "numeric",
@@ -141,14 +131,8 @@ export function isMonthAllowed(month: string, maxMonth?: string) {
   return isValidMonth(month) && (!maxMonth || (isValidMonth(maxMonth) && month <= maxMonth));
 }
 
-/** The current month in the server's or browser's own time zone. */
-export function getProcessLocalMonth() {
-  const now = new Date();
-  return toIsoMonth(now.getFullYear(), now.getMonth() + 1);
-}
-
 export function isValidMonth(value: string) {
-  return MONTH_PATTERN.test(value) && !Number.isNaN(new Date(`${value}-01T00:00:00`).valueOf());
+  return MONTH_PATTERN.test(value);
 }
 
 export function isValidDate(value: string) {
@@ -162,29 +146,26 @@ export function isValidDate(value: string) {
   );
 }
 
+/** An invalid `month` falls back to the current application (Europe/Bucharest) month. */
 export function getMonthRange(month: string) {
-  const safeMonth = isValidMonth(month) ? month : getProcessLocalMonth();
-  const [year, monthNumber] = safeMonth.split("-").map(Number);
-  const next = new Date(year, monthNumber, 1);
+  const safeMonth = isValidMonth(month) ? month : getBucharestMonth();
 
   return {
     month: safeMonth,
     start: `${safeMonth}-01`,
-    endExclusive: toIsoDate(next.getFullYear(), next.getMonth() + 1, 1),
+    endExclusive: `${addMonths(safeMonth, 1)}-01`,
   };
 }
 
+/** Like `addMonths`, but an invalid `month` falls back to the current application month. */
 export function shiftMonth(month: string, amount: number) {
-  const { month: safeMonth } = getMonthRange(month);
-  const [year, monthNumber] = safeMonth.split("-").map(Number);
-  const shifted = new Date(year, monthNumber - 1 + amount, 1);
-  return toIsoMonth(shifted.getFullYear(), shifted.getMonth() + 1);
+  return addMonths(getMonthRange(month).month, amount);
 }
 
 export function formatMonth(month: string, locale = "en-US") {
   const { month: safeMonth } = getMonthRange(month);
-  return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(
-    new Date(`${safeMonth}-01T12:00:00`),
+  return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${safeMonth}-01T12:00:00Z`),
   );
 }
 

@@ -24,7 +24,7 @@ import type {
   DashboardData,
   Expense,
 } from "@/lib/expenses/types";
-import { getProcessLocalMonth, getMonthRange } from "@/lib/calendar";
+import { getBucharestMonth, getMonthRange } from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
 
 const EXPENSE_COLUMNS = "id, description, amount, category, subtype, expense_date, notes";
@@ -149,9 +149,9 @@ export async function getDashboardDataForUser(
   userId: string,
   filters: AnalyticsFilters,
 ): Promise<DashboardData> {
-  const currentMonth = getProcessLocalMonth();
+  const currentMonth = getBucharestMonth();
   const currentRange = getMonthRange(currentMonth);
-  const analyticsRange = resolveAnalyticsRange(filters, getProcessLocalMonth());
+  const analyticsRange = resolveAnalyticsRange(filters, currentMonth);
 
   const supabase = await createClient();
   const [recentResult, summaryResult] = await Promise.all([

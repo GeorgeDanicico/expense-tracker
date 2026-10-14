@@ -18,7 +18,7 @@ import {
   daysInMonth,
   formatDate,
   formatMonth,
-  getProcessLocalMonth,
+  getBucharestMonth,
   getMonthRange,
   isValidDate,
   isValidMonth,
@@ -341,7 +341,7 @@ export type AnalyticsRange = ReturnType<typeof resolveAnalyticsRange>;
 /** The inclusive first and last dates of the analytics range. */
 export function historyBoundaries(
   filters: AnalyticsFilters,
-  currentMonth = getProcessLocalMonth(),
+  currentMonth = getBucharestMonth(),
 ) {
   // Unlike resolveAnalyticsRange, an invalid custom date is echoed rather than replaced by
   // the current month. parseAnalyticsFilters never produces one; kept to preserve behavior.
