@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Heading, Input, Separator, Stack } from "@chakra-ui/react";
+import { Button, Heading, HStack, Image, Input, Separator, Stack, Text } from "@chakra-ui/react";
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSWRConfig } from "swr";
@@ -135,11 +135,20 @@ export function AuthForm() {
           {callbackError ? (
             <InlineAlert status="error">{callbackError}</InlineAlert>
           ) : null}
-          <Button asChild variant="outline" size="md" width="full">
-            <a href="/api/auth/google">Continue with Google</a>
-          </Button>
-          <Separator />
           <AuthModeForm key={mode} mode={mode} />
+          <HStack gap="3">
+            <Separator flex="1" />
+            <Text flexShrink="0" textStyle="xs" color="fg.muted">
+              or continue with
+            </Text>
+            <Separator flex="1" />
+          </HStack>
+          <Button asChild variant="outline" size="md" width="full">
+            <a href="/api/auth/google">
+              <Image src="/google-logo.svg" alt="" boxSize="18px" />
+              Google
+            </a>
+          </Button>
         </Stack>
       </Card.Body>
     </Card>
