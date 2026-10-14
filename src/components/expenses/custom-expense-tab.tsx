@@ -14,7 +14,8 @@ import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { SectionHeader } from "@/components/ui/section-header";
-import { ApiError, apiRequest } from "@/lib/api/client";
+import { useApiForm } from "@/hooks/use-api-form";
+import { apiRequest } from "@/lib/api/client";
 import { afterTabDeleted } from "@/lib/api/invalidate";
 import { expenseTabApiKey, expenseTabExpensesApiKey } from "@/lib/api/keys";
 import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/expenses/filters";
@@ -41,8 +42,7 @@ export function CustomExpenseTab({
     { keepPreviousData: false },
   );
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deletePending, setDeletePending] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const deleteForm = useApiForm();
   const { mutate: mutateCache } = useSWRConfig();
   const filtersMatch = data &&
     expenseTabFilterParams(data.filters).toString() === expenseTabFilterParams(filters).toString();
@@ -51,19 +51,13 @@ export function CustomExpenseTab({
     ? data
     : undefined;
 
-  async function deleteTab() {
-    setDeletePending(true);
-    setDeleteError("");
-    try {
+  function deleteTab() {
+    void deleteForm.submit(async () => {
       await apiRequest<{ success: true }>(expenseTabApiKey(tab.id), { method: "DELETE" });
       await afterTabDeleted(mutateCache, tab.id);
       setDeleteOpen(false);
       onDeleted();
-    } catch (caught) {
-      setDeleteError(caught instanceof ApiError ? caught.message : "Unable to delete this tab.");
-    } finally {
-      setDeletePending(false);
-    }
+    }, { fallback: "Unable to delete this tab." });
   }
 
   return (
@@ -122,9 +116,9 @@ export function CustomExpenseTab({
         description={`“${tab.name}” will be removed from your saved tabs. Your expenses stay in the main ledger.`}
         cancelLabel="Keep tab"
         confirmLabel="Delete tab"
-        pending={deletePending}
-        error={deleteError}
-        onConfirm={() => void deleteTab()}
+        pending={deleteForm.pending}
+        error={deleteForm.error}
+        onConfirm={deleteTab}
       />
     </Stack>
   );

@@ -10,25 +10,25 @@ import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { ApiError, apiRequest } from "@/lib/api/client";
+import { useApiForm } from "@/hooks/use-api-form";
+import { apiRequest } from "@/lib/api/client";
 import { afterSignIn } from "@/lib/api/invalidate";
-import { INITIAL_ACTION_STATE, type ActionState } from "@/lib/forms";
 
 type AuthMode = "login" | "signup";
 
 function AuthModeForm({ mode }: { mode: AuthMode }) {
   const router = useRouter();
   const { mutate } = useSWRConfig();
-  const [state, setState] = useState<ActionState>(INITIAL_ACTION_STATE);
-  const [pending, setPending] = useState(false);
+  const form = useApiForm();
+  const [notice, setNotice] = useState("");
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
-    setState(INITIAL_ACTION_STATE);
+    if (form.pending) return;
+    setNotice("");
     const formData = new FormData(event.currentTarget);
 
-    try {
+    void form.submit(async () => {
       const result = await apiRequest<{
         authenticated: boolean;
         message?: string;
@@ -47,28 +47,14 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
         return;
       }
 
-      setState({
-        status: "success",
-        message: result.message || "Check your inbox to continue.",
-      });
-    } catch (error) {
-      setState({
-        status: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to continue. Please try again.",
-        fieldErrors: error instanceof ApiError ? error.fieldErrors : undefined,
-      });
-    } finally {
-      setPending(false);
-    }
+      setNotice(result.message || "Check your inbox to continue.");
+    }, { fallback: "Unable to continue. Please try again." });
   }
 
   return (
     <form onSubmit={submit}>
       <Stack gap="3">
-        <FormField label="Email address" error={state.fieldErrors?.email?.[0]}>
+        <FormField label="Email address" error={form.fieldError("email")}>
           <Input
             name="email"
             type="email"
@@ -81,7 +67,7 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
 
         <FormField
           label="Password"
-          error={state.fieldErrors?.password?.[0]}
+          error={form.fieldError("password")}
           hint={mode === "signup" ? "Use at least 8 characters." : undefined}
         >
           <Input
@@ -97,9 +83,9 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
           />
         </FormField>
 
-        {state.message ? (
-          <InlineAlert status={state.status === "error" ? "error" : "success"}>
-            {state.message}
+        {form.error || notice ? (
+          <InlineAlert status={form.error ? "error" : "success"}>
+            {form.error || notice}
           </InlineAlert>
         ) : null}
 
@@ -110,7 +96,7 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
           size="md"
           width="full"
           mt="1"
-          loading={pending}
+          loading={form.pending}
         >
           {mode === "login" ? "Sign in" : "Create account"}
         </Button>

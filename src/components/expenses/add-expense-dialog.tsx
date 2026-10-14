@@ -8,6 +8,7 @@ import { ExpenseForm } from "@/components/expenses/expense-form";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { useApiForm } from "@/hooks/use-api-form";
 
 export function AddExpenseDialog({
   selectedMonth,
@@ -17,14 +18,17 @@ export function AddExpenseDialog({
   currency: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
+  const form = useApiForm();
   const formId = useId();
 
   return (
     <AppDialog
       title="Add expense"
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) form.reset();
+      }}
       trigger={
         <Button
           variant="solid"
@@ -35,13 +39,13 @@ export function AddExpenseDialog({
           <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add expense
         </Button>
       }
-      footer={<FormActions form={formId} submitLabel="Save expense" closesDialog pending={pending} />}
+      footer={<FormActions form={formId} submitLabel="Save expense" closesDialog pending={form.pending} />}
     >
       <ExpenseForm
         id={formId}
         selectedMonth={selectedMonth}
         currency={currency}
-        onPendingChange={setPending}
+        form={form}
         onSuccess={() => setOpen(false)}
       />
     </AppDialog>

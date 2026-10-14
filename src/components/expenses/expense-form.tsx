@@ -6,7 +6,8 @@ import { useSWRConfig } from "swr";
 
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { ApiError, apiRequest } from "@/lib/api/client";
+import type { ApiForm } from "@/hooks/use-api-form";
+import { apiRequest } from "@/lib/api/client";
 import { afterExpenseCreated } from "@/lib/api/invalidate";
 import {
   SUBTYPE_LABELS,
@@ -18,7 +19,6 @@ import {
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
 import type { Expense } from "@/lib/expenses/types";
-import { INITIAL_ACTION_STATE, type ActionState } from "@/lib/forms";
 import { getMonthRange } from "@/lib/calendar";
 
 /** Add-expense form body. Submits to `/api/expenses` and updates the SWR caches. */
@@ -26,17 +26,17 @@ export function ExpenseForm({
   id,
   selectedMonth,
   currency,
+  form,
   onSuccess,
-  onPendingChange,
 }: {
   id: string;
   selectedMonth: string;
   currency: string;
+  /** Owned by the dialog so its submit button can show the pending state. */
+  form: ApiForm;
   onSuccess: () => void;
-  onPendingChange: (pending: boolean) => void;
 }) {
   const { mutate } = useSWRConfig();
-  const [state, setState] = useState<ActionState>(INITIAL_ACTION_STATE);
   const [category, setCategory] = useState<ExpenseCategory>("groceries");
   const [subtype, setSubtype] = useState<ExpenseSubtype | null>(null);
   const availableSubtypes = subtypesForCategory(category);
@@ -45,13 +45,11 @@ export function ExpenseForm({
   endDate.setDate(endDate.getDate() - 1);
   const maxDate = endDate.toISOString().slice(0, 10);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onPendingChange(true);
-    setState(INITIAL_ACTION_STATE);
-
     const formData = new FormData(event.currentTarget);
-    try {
+
+    void form.submit(async () => {
       const { expense } = await apiRequest<{ expense: Expense }>("/api/expenses", {
         method: "POST",
         body: JSON.stringify({
@@ -67,18 +65,10 @@ export function ExpenseForm({
 
       await afterExpenseCreated(mutate, selectedMonth, expense);
       onSuccess();
-    } catch (error) {
-      setState({
-        status: "error",
-        message: error instanceof Error ? error.message : "The expense could not be saved.",
-        fieldErrors: error instanceof ApiError ? error.fieldErrors : undefined,
-      });
-    } finally {
-      onPendingChange(false);
-    }
+    }, { fallback: "The expense could not be saved." });
   }
 
-  const fieldError = (name: string) => state.fieldErrors?.[name]?.[0];
+  const { fieldError } = form;
 
   return (
     <form id={id} onSubmit={submit}>
@@ -135,7 +125,7 @@ export function ExpenseForm({
           <Textarea name="notes" maxLength={500} rows={3} placeholder="Add an optional note" resize="vertical" />
         </FormField>
 
-        {state.status === "error" ? <InlineAlert status="error">{state.message}</InlineAlert> : null}
+        {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
       </Stack>
     </form>
   );

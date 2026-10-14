@@ -5,94 +5,55 @@ import { Plus } from "lucide-react";
 import { FormEvent, useId, useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { OrderFields, submitInvestmentOrder } from "@/components/investments/order-fields";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
-import { FormField, FormRow } from "@/components/ui/form-field";
+import { FormField } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { ApiError, apiRequest } from "@/lib/api/client";
+import { useApiForm, type ApiForm } from "@/hooks/use-api-form";
 import { afterInvestmentChange } from "@/lib/api/invalidate";
-import {
-  INVESTMENT_BROKER_IDS,
-  INVESTMENT_BROKER_LABELS,
-  type InvestmentTransactionMutationResponse,
-} from "@/lib/investments/types";
+import { INVESTMENT_BROKER_IDS, INVESTMENT_BROKER_LABELS } from "@/lib/investments/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
-
-function localDateTimeValue() {
-  const now = new Date();
-  const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return localTime.toISOString().slice(0, 16);
-}
-
-function formTimestamp(value: FormDataEntryValue | null) {
-  if (typeof value !== "string" || !value) return value;
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : date.toISOString();
-}
 
 function InvestmentForm({
   id,
+  form,
   onSuccess,
-  onPendingChange,
 }: {
   id: string;
+  form: ApiForm;
   onSuccess: () => void;
-  onPendingChange: (pending: boolean) => void;
 }) {
   const { mutate } = useSWRConfig();
-  const [pending, setPendingState] = useState(false);
-  function setPending(next: boolean) {
-    setPendingState(next);
-    onPendingChange(next);
-  }
-  const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
   const [instrument, setInstrument] = useState("");
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
-    setPending(true);
-    setError("");
-    setFieldErrors(undefined);
-
     const formData = new FormData(event.currentTarget);
-    try {
-      await apiRequest<InvestmentTransactionMutationResponse>("/api/investment-transactions", {
-        method: "POST",
-        body: JSON.stringify({
+    void form.submit(async () => {
+      await submitInvestmentOrder(
+        {
           brokerId: formData.get("brokerId"),
           instrument: formData.get("instrument"),
           currency: formData.get("currency"),
           side: "buy",
-          amount: formData.get("amount"),
-          quantity: formData.get("quantity"),
-          unitPrice: formData.get("unitPrice"),
-          executedAt: formTimestamp(formData.get("executedAt")),
-        }),
-      });
+        },
+        formData,
+      );
       await afterInvestmentChange(mutate);
       onSuccess();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The investment could not be saved.");
-      setFieldErrors(caught instanceof ApiError ? caught.fieldErrors : undefined);
-    } finally {
-      setPending(false);
-    }
+    }, { fallback: "The investment could not be saved." });
   }
 
   const instrumentCode = instrument.trim().toUpperCase();
   const instrumentHint = instrumentCode
     ? "The latest price will be requested from the configured price service."
     : "Use a listing code such as VWCE.DE or AAPL.US.";
-
-  function fieldError(name: string) {
-    return fieldErrors?.[name]?.[0];
-  }
+  const { fieldError } = form;
 
   return (
-    <form id={id} onSubmit={submit} aria-busy={pending}>
+    <form id={id} onSubmit={submit} aria-busy={form.pending}>
       <Stack gap="3">
         <FormField label="Broker" error={fieldError("brokerId")}>
           <NativeSelect.Root>
@@ -134,28 +95,17 @@ function InvestmentForm({
 
         <Stack gap="3" pt="3" borderTopWidth="1px" borderColor="border">
           <Text textStyle="label" color="fg.muted">First buy order</Text>
-          <FormRow>
-            <FormField flex="1" label="Quantity" error={fieldError("quantity")}>
-              <Input name="quantity" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
-            </FormField>
-            <FormField flex="1" label="Unit price" error={fieldError("unitPrice")}>
-              <Input name="unitPrice" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
-            </FormField>
-          </FormRow>
-
-          <FormField label="Order amount" error={fieldError("amount")} hint="Total order value in the selected currency.">
-            <Input name="amount" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
-          </FormField>
-
-          <FormField label="Execution date and time" error={fieldError("executedAt")}>
-            <Input name="executedAt" type="datetime-local" defaultValue={localDateTimeValue()} required />
-          </FormField>
+          <OrderFields
+            fieldError={fieldError}
+            amountLabel="Order amount"
+            amountHint="Total order value in the selected currency."
+          />
         </Stack>
 
-        {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
+        {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
 
         <Text className="sr-only" role="status" aria-live="polite">
-          {pending ? "Saving investment…" : ""}
+          {form.pending ? "Saving investment…" : ""}
         </Text>
       </Stack>
     </form>
@@ -164,13 +114,16 @@ function InvestmentForm({
 
 export function AddInvestmentDialog() {
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
+  const form = useApiForm();
   const formId = useId();
 
   return (
     <AppDialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) form.reset();
+      }}
       title="Add investment"
       description="The first recorded order creates the investment under its broker."
       trigger={
@@ -178,9 +131,9 @@ export function AddInvestmentDialog() {
           <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add investment
         </Button>
       }
-      footer={<FormActions form={formId} closesDialog pending={pending} submitLabel="Save investment" />}
+      footer={<FormActions form={formId} closesDialog pending={form.pending} submitLabel="Save investment" />}
     >
-      <InvestmentForm id={formId} onPendingChange={setPending} onSuccess={() => setOpen(false)} />
+      <InvestmentForm id={formId} form={form} onSuccess={() => setOpen(false)} />
     </AppDialog>
   );
 }
