@@ -4,8 +4,8 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import {
   createInvestmentTransactionForUser,
   getInvestmentTransactionsForUser,
-  InvestmentMutationError,
 } from "@/lib/data/investments";
+import { DomainError } from "@/lib/errors";
 import {
   investmentTransactionQuerySchema,
   investmentTransactionSchema,
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     const result = await createInvestmentTransactionForUser(user.id, parsed.data);
     return NextResponse.json(result, { status: 201, headers: PRIVATE_HEADERS });
   } catch (error) {
-    if (error instanceof InvestmentMutationError) {
+    if (error instanceof DomainError) {
       return NextResponse.json(
         { error: error.message, fieldErrors: error.fieldErrors },
         { status: error.status, headers: PRIVATE_HEADERS },

@@ -1,29 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const mocks = vi.hoisted(() => {
-  class NetWorthMutationError extends Error {
-    status: 404 | 409 | 422;
-    fieldErrors?: Record<string, string[]>;
-
-    constructor(message: string, status: 404 | 409 | 422, fieldErrors?: Record<string, string[]>) {
-      super(message);
-      this.name = "NetWorthMutationError";
-      this.status = status;
-      this.fieldErrors = fieldErrors;
-    }
-  }
-
-  return {
-    getAuthenticatedUser: vi.fn(),
-    getNetWorthOverviewForUser: vi.fn(),
-    createNetWorthItemForUser: vi.fn(),
-    updateNetWorthItemForUser: vi.fn(),
-    addNetWorthValuationForUser: vi.fn(),
-    updateNetWorthValuationForUser: vi.fn(),
-    NetWorthMutationError,
-  };
-});
+const mocks = vi.hoisted(() => ({
+  getAuthenticatedUser: vi.fn(),
+  getNetWorthOverviewForUser: vi.fn(),
+  createNetWorthItemForUser: vi.fn(),
+  updateNetWorthItemForUser: vi.fn(),
+  addNetWorthValuationForUser: vi.fn(),
+  updateNetWorthValuationForUser: vi.fn(),
+}));
 
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
 vi.mock("@/lib/data/net-worth", () => ({
@@ -32,7 +17,6 @@ vi.mock("@/lib/data/net-worth", () => ({
   updateNetWorthItemForUser: mocks.updateNetWorthItemForUser,
   addNetWorthValuationForUser: mocks.addNetWorthValuationForUser,
   updateNetWorthValuationForUser: mocks.updateNetWorthValuationForUser,
-  NetWorthMutationError: mocks.NetWorthMutationError,
 }));
 
 import { GET as getOverview } from "@/app/api/net-worth/route";

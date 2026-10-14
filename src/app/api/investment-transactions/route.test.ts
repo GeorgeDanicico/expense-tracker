@@ -1,34 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const mocks = vi.hoisted(() => {
-  class InvestmentMutationError extends Error {
-    status: 404 | 409 | 422;
-    fieldErrors?: Record<string, string[]>;
+import { DomainError } from "@/lib/errors";
 
-    constructor(message: string, status: 404 | 409 | 422, fieldErrors?: Record<string, string[]>) {
-      super(message);
-      this.name = "InvestmentMutationError";
-      this.status = status;
-      this.fieldErrors = fieldErrors;
-    }
-  }
-
-  return {
-    getAuthenticatedUser: vi.fn(),
-    getInvestmentTransactionsForUser: vi.fn(),
-    createInvestmentTransactionForUser: vi.fn(),
-    deleteInvestmentTransactionForUser: vi.fn(),
-    InvestmentMutationError,
-  };
-});
+const mocks = vi.hoisted(() => ({
+  getAuthenticatedUser: vi.fn(),
+  getInvestmentTransactionsForUser: vi.fn(),
+  createInvestmentTransactionForUser: vi.fn(),
+  deleteInvestmentTransactionForUser: vi.fn(),
+}));
 
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
 vi.mock("@/lib/data/investments", () => ({
   createInvestmentTransactionForUser: mocks.createInvestmentTransactionForUser,
   deleteInvestmentTransactionForUser: mocks.deleteInvestmentTransactionForUser,
   getInvestmentTransactionsForUser: mocks.getInvestmentTransactionsForUser,
-  InvestmentMutationError: mocks.InvestmentMutationError,
 }));
 
 import { DELETE } from "@/app/api/investment-transactions/[id]/route";
@@ -126,7 +112,7 @@ describe("investment transaction routes", () => {
   it("surfaces chronological oversell errors from the data layer", async () => {
     mocks.getAuthenticatedUser.mockResolvedValue(user);
     mocks.createInvestmentTransactionForUser.mockRejectedValue(
-      new mocks.InvestmentMutationError("Sell quantity exceeds the available VWCE.DE position.", 422, {
+      new DomainError("Sell quantity exceeds the available VWCE.DE position.", 422, {
         quantity: ["Sell quantity exceeds the available VWCE.DE position."],
       }),
     );
@@ -214,7 +200,7 @@ describe("investment transaction deletion route", () => {
 
   it("surfaces a deletion conflict without deleting", async () => {
     mocks.deleteInvestmentTransactionForUser.mockRejectedValue(
-      new mocks.InvestmentMutationError("This order would invalidate the later history.", 409),
+      new DomainError("This order would invalidate the later history.", 409),
     );
 
     const response = await DELETE(

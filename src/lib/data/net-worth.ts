@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getInvestmentsOverviewForUser } from "@/lib/data/investments";
+import { DomainError } from "@/lib/errors";
 import { buildNetWorthOverview } from "@/lib/net-worth/calculation";
 import {
   NET_WORTH_ITEM_KINDS,
@@ -58,22 +59,6 @@ export type NetWorthValuationInput = {
   value: string;
   valuedOn: string;
 };
-
-export class NetWorthMutationError extends Error {
-  readonly status: 404 | 409 | 422;
-  readonly fieldErrors?: Record<string, string[]>;
-
-  constructor(
-    message: string,
-    status: 404 | 409 | 422,
-    fieldErrors?: Record<string, string[]>,
-  ) {
-    super(message);
-    this.name = "NetWorthMutationError";
-    this.status = status;
-    this.fieldErrors = fieldErrors;
-  }
-}
 
 function parseItemKind(value: string): NetWorthItemKind {
   if (!NET_WORTH_ITEM_KINDS.includes(value as NetWorthItemKind)) {
@@ -170,7 +155,7 @@ export async function createNetWorthItemForUser(
 
   if (error || !data) {
     if (error?.code === "42501") {
-      throw new NetWorthMutationError("The net-worth item could not be created.", 422);
+      throw new DomainError("The net-worth item could not be created.", 422);
     }
     throw new Error("The net-worth item could not be created.");
   }
@@ -191,7 +176,7 @@ export async function updateNetWorthItemForUser(
     && input.purchaseAmount !== undefined
     && input.purchaseAmount !== null
   ) {
-    throw new NetWorthMutationError(
+    throw new DomainError(
       "Purchase amount is only available for non-cash assets.",
       422,
       { purchaseAmount: ["Purchase amount is only available for non-cash assets."] },
@@ -233,7 +218,7 @@ export async function addNetWorthValuationForUser(
   const item = await queryOwnedItem(userId, itemId);
   if (!item) return null;
   if (item.archived_at) {
-    throw new NetWorthMutationError("Archived items cannot receive new values.", 409);
+    throw new DomainError("Archived items cannot receive new values.", 409);
   }
 
   const supabase = await createClient();
@@ -248,7 +233,7 @@ export async function addNetWorthValuationForUser(
 
   if (error || !data) {
     if (error?.code === "23505") {
-      throw new NetWorthMutationError("A valuation for this date already exists.", 409);
+      throw new DomainError("A valuation for this date already exists.", 409);
     }
     throw new Error("The valuation could not be saved.");
   }
@@ -283,7 +268,7 @@ export async function updateNetWorthValuationForUser(
 
   if (error || !data) {
     if (error?.code === "23505") {
-      throw new NetWorthMutationError("A valuation for this date already exists.", 409);
+      throw new DomainError("A valuation for this date already exists.", 409);
     }
     throw new Error("The valuation could not be corrected.");
   }

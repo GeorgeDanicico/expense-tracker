@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedUser } from "@/lib/auth";
-import {
-  deleteInvestmentTransactionForUser,
-  InvestmentMutationError,
-} from "@/lib/data/investments";
+import { deleteInvestmentTransactionForUser } from "@/lib/data/investments";
+import { DomainError } from "@/lib/errors";
 
 const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 const transactionIdSchema = z.uuid("Order identifier is invalid.");
@@ -42,7 +40,7 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204, headers: PRIVATE_HEADERS });
   } catch (error) {
-    if (error instanceof InvestmentMutationError) {
+    if (error instanceof DomainError) {
       return NextResponse.json(
         { error: error.message, fieldErrors: error.fieldErrors },
         { status: error.status, headers: PRIVATE_HEADERS },

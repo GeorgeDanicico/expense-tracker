@@ -1,5 +1,6 @@
 import "server-only";
 
+import { DomainError } from "@/lib/errors";
 import {
   aggregateInvestments,
   calculateInvestmentPosition,
@@ -44,22 +45,6 @@ type InvestmentAccountRow = {
   id: string;
   broker_id: string;
 };
-
-export class InvestmentMutationError extends Error {
-  readonly status: 404 | 409 | 422;
-  readonly fieldErrors?: Record<string, string[]>;
-
-  constructor(
-    message: string,
-    status: 404 | 409 | 422,
-    fieldErrors?: Record<string, string[]>,
-  ) {
-    super(message);
-    this.name = "InvestmentMutationError";
-    this.status = status;
-    this.fieldErrors = fieldErrors;
-  }
-}
 
 function toTransaction(row: InvestmentTransactionRow): InvestmentTransaction {
   return {
@@ -244,7 +229,7 @@ function throwMutationCalculationError(error: unknown, prefix = "") {
   if (!(error instanceof InvestmentCalculationError)) throw error;
 
   const message = `${prefix}${error.message}`;
-  throw new InvestmentMutationError(
+  throw new DomainError(
     message,
     error.issue.code === "oversell" ? 422 : 409,
     error.issue.code === "oversell" ? { quantity: [message] } : undefined,

@@ -2,10 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedUser } from "@/lib/auth";
-import {
-  NetWorthMutationError,
-  updateNetWorthValuationForUser,
-} from "@/lib/data/net-worth";
+import { updateNetWorthValuationForUser } from "@/lib/data/net-worth";
+import { DomainError } from "@/lib/errors";
 import { netWorthValuationSchema } from "@/lib/validation/net-worth";
 
 const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
@@ -55,7 +53,7 @@ export async function PATCH(
 
     return NextResponse.json({ valuation }, { headers: PRIVATE_HEADERS });
   } catch (error) {
-    if (error instanceof NetWorthMutationError) {
+    if (error instanceof DomainError) {
       return NextResponse.json(
         { error: error.message, fieldErrors: error.fieldErrors },
         { status: error.status, headers: PRIVATE_HEADERS },

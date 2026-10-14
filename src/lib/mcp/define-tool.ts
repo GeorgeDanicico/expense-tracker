@@ -1,8 +1,7 @@
 import type { CallToolResult, McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
-import { InvestmentMutationError } from "@/lib/data/investments";
-import { NetWorthMutationError } from "@/lib/data/net-worth";
+import { DomainError } from "@/lib/errors";
 
 export type ToolContext = { userId: string; email: string };
 type ToolRegistrar = (server: McpServer, ctx: ToolContext) => void;
@@ -35,7 +34,7 @@ function toolError(error: unknown, name: string): CallToolResult {
     const { formErrors, fieldErrors } = z.flattenError(error);
     return result({ error: formErrors[0] ?? "Check the highlighted fields and try again.", fieldErrors }, true);
   }
-  if (error instanceof InvestmentMutationError || error instanceof NetWorthMutationError) {
+  if (error instanceof DomainError) {
     return result({ error: error.message, fieldErrors: error.fieldErrors }, true);
   }
   // Log only the tool name and error; arguments and credentials stay out of the server log.
