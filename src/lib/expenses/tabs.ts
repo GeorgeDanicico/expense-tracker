@@ -15,8 +15,6 @@ export type ExpenseTabInput = Pick<ExpenseTab, "name" | "categoryKeys" | "subtyp
 
 export type ExpenseTabLedgerData = {
   tab: ExpenseTab;
-  tabId: string;
-  tabRevision: string;
   filters: ExpenseTabFilters;
   expenses: Expense[];
   total: number;

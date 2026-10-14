@@ -33,8 +33,7 @@ describe("custom ledger GET", () => {
   it("loads saved owner membership and returns identifying normalized metadata", async () => {
     const response = await GET(request("month=2026-10&categoryKeys=transport&revision=stale"), context);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ tab, tabId: id, tabRevision: tab.updatedAt,
-      filters: DEFAULT_EXPENSE_TAB_FILTERS, expenses, total: 12.50, count: 1, average: 12.50 });
+    expect(await response.json()).toEqual({ tab, filters: DEFAULT_EXPENSE_TAB_FILTERS, expenses, total: 12.50, count: 1, average: 12.50 });
     expect(mocks.getExpenseTabForUser).toHaveBeenCalledWith("owner", id);
     expect(mocks.getExpenseTabExpensesForUser).toHaveBeenCalledWith("owner", tab, DEFAULT_EXPENSE_TAB_FILTERS);
     expectPrivate(response);

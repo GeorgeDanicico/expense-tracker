@@ -46,7 +46,7 @@ export function CustomExpenseTab({
   const { mutate: mutateCache } = useSWRConfig();
   const filtersMatch = data &&
     expenseTabFilterParams(data.filters).toString() === expenseTabFilterParams(filters).toString();
-  const matching = active && data?.tabId === tab.id && data.tabRevision === tab.updatedAt &&
+  const matching = active && data?.tab.id === tab.id && data.tab.updatedAt === tab.updatedAt &&
     filtersMatch
     ? data
     : undefined;

@@ -13,11 +13,7 @@ export const GET = withUser(async (request: NextRequest, user, context: TabRoute
   if (!parsed.success) {
     throw new HttpError(422, "Check the expense filters and try again.", parsed.error.flatten().fieldErrors);
   }
-  const { tab, filters, expenses, total, count, average } =
+  const ledger: ExpenseTabLedgerData =
     await getExpenseTabLedgerForUser(user.id, id, parsed.data) ?? notFound("Expense tab not found.");
-  const response: ExpenseTabLedgerData = {
-    tab, tabId: tab.id, tabRevision: tab.updatedAt, filters, expenses,
-    total, count, average,
-  };
-  return json(response);
+  return json(ledger);
 }, { failure: "Unable to load expense tab." });

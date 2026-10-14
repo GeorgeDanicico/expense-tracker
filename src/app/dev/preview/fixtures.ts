@@ -99,8 +99,6 @@ function carLedger(): ExpenseTabLedgerData {
   const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   return {
     tab: CAR_TAB,
-    tabId: CAR_TAB.id,
-    tabRevision: CAR_TAB.updatedAt,
     filters: DEFAULT_EXPENSE_TAB_FILTERS,
     expenses,
     total,
