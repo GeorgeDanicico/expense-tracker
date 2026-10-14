@@ -1,3 +1,5 @@
+import { CURRENCY_CODE_PATTERN } from "@/lib/validation/primitives";
+
 export const INVESTMENT_BROKER_IDS = ["xtb", "banca_transilvania"] as const;
 export type InvestmentBrokerId = (typeof INVESTMENT_BROKER_IDS)[number];
 
@@ -21,7 +23,7 @@ export type InvestmentTransactionSide = (typeof INVESTMENT_TRANSACTION_SIDES)[nu
 export type InvestmentCurrency = string;
 
 export function isInvestmentCurrency(value: string) {
-  return /^[A-Z]{3}$/.test(value);
+  return CURRENCY_CODE_PATTERN.test(value) && value === value.toUpperCase();
 }
 
 export type InvestmentAccount = {

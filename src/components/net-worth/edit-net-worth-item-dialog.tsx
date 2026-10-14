@@ -12,6 +12,7 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import { NET_WORTH_SUGGESTED_CATEGORIES, type NetWorthEntry } from "@/lib/net-worth/types";
 
 function initialCategory(entry: NetWorthEntry) {
@@ -60,7 +61,7 @@ export function EditNetWorthItemDialog({
         body: JSON.stringify({
           name: formData.get("name"),
           category: selectedCategory,
-          purchaseAmount: entry.kind === "asset" && category !== "cash"
+          purchaseAmount: purchaseAmountAllowed(entry.kind, category)
             ? formData.get("purchaseAmount") || null
             : null,
         }),

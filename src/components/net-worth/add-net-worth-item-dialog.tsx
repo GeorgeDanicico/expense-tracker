@@ -13,6 +13,7 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import { type NetWorthItemKind } from "@/lib/net-worth/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
 
@@ -83,7 +84,7 @@ export function AddNetWorthItemDialog({
           kind,
           category: selectedCategory,
           currency: formData.get("currency"),
-          purchaseAmount: kind === "asset" && category !== "cash"
+          purchaseAmount: purchaseAmountAllowed(kind, category)
             ? formData.get("purchaseAmount") || null
             : null,
           value: formData.get("value"),

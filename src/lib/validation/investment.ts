@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { INVESTMENT_BROKER_IDS } from "@/lib/investments/types";
+import { currencyCode, decimalString, idSchema } from "@/lib/validation/primitives";
 
 const instrumentQuerySchema = z
   .string()
@@ -8,21 +9,7 @@ const instrumentQuerySchema = z
   .regex(/^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/, "Use a valid instrument symbol (up to 20 letters, numbers, dots or hyphens).")
   .transform((value) => value.toUpperCase());
 
-const currencyQuerySchema = z
-  .string()
-  .trim()
-  .regex(/^[A-Za-z]{3}$/, "Currency must be a three-letter code.")
-  .transform((value) => value.toUpperCase());
-
-const decimalInputSchema = (label: string) => z
-  .string()
-  .trim()
-  .regex(/^\d+(?:\.\d+)?$/, `${label} must be a positive decimal.`)
-  .refine((value) => {
-    const [integerPart, fractionalPart = ""] = value.split(".");
-    return integerPart.length <= 18 && fractionalPart.length <= 10;
-  }, `${label} must have at most 18 integer digits and 10 decimal places.`)
-  .refine((value) => Number(value) > 0, `${label} must be greater than zero.`);
+const positiveDecimal = (label: string) => decimalString({ label, kind: "positive" });
 
 const executedAtSchema = z
   .string()
@@ -31,9 +18,9 @@ const executedAtSchema = z
   .transform((value) => new Date(value).toISOString());
 
 export const investmentTransactionQuerySchema = z.object({
-  accountId: z.uuid("Account identifier is invalid."),
+  accountId: idSchema("Account identifier is invalid."),
   instrument: instrumentQuerySchema,
-  currency: currencyQuerySchema,
+  currency: currencyCode,
 });
 
 const investmentBrokerIdSchema = z.enum(INVESTMENT_BROKER_IDS);
@@ -41,10 +28,10 @@ const investmentBrokerIdSchema = z.enum(INVESTMENT_BROKER_IDS);
 export const investmentTransactionSchema = z.object({
   brokerId: investmentBrokerIdSchema,
   instrument: instrumentQuerySchema,
-  currency: currencyQuerySchema,
+  currency: currencyCode,
   side: z.enum(["buy", "sell"]),
-  amount: decimalInputSchema("Amount"),
-  quantity: decimalInputSchema("Quantity"),
-  unitPrice: decimalInputSchema("Unit price"),
+  amount: positiveDecimal("Amount"),
+  quantity: positiveDecimal("Quantity"),
+  unitPrice: positiveDecimal("Unit price"),
   executedAt: executedAtSchema,
 });

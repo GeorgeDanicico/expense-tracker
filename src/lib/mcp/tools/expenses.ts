@@ -13,9 +13,10 @@ import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool"
 import { parseAnalyticsFilters } from "@/lib/utils/analytics";
 import { getApplicationCurrentMonth, getApplicationToday, isValidDate, isValidMonth } from "@/lib/utils/dates";
 import { expenseSchema } from "@/lib/validation/expense";
+import { idSchema } from "@/lib/validation/primitives";
 
 const fields = expenseSchema.shape;
-const idSchema = z.object({ id: z.uuid() });
+const idInput = z.object({ id: idSchema() });
 
 const spendingSummarySchema = z.object({
   period: z.enum(["3m", "6m", "1y", "2y", "custom"]).default("3m"),
@@ -35,7 +36,7 @@ const addExpenseSchema = z.preprocess(
 );
 
 const updateExpenseSchema = z.object({
-  id: z.uuid(),
+  id: idSchema(),
   description: fields.description.optional(),
   amount: fields.amount.optional(),
   category: z.enum(EXPENSE_CATEGORIES).optional(),
@@ -94,7 +95,7 @@ export const expenseTools = [
     name: "delete_expense",
     title: "Delete expense",
     description: "Permanently delete an expense.",
-    schema: idSchema,
+    schema: idInput,
     annotations: DELETE,
     notFound: "Expense not found.",
     run: async ({ id }, { userId }) => (await deleteExpenseForUser(userId, id)) && { deleted: true, id },

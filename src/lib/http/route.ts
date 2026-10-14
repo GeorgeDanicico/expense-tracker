@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getAuthenticatedUser, type AuthenticatedUser } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
+import { idSchema } from "@/lib/validation/primitives";
 
 /** Every API response is per-user data and must never be cached by browsers or proxies. */
 export const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" } as const;
@@ -44,11 +45,9 @@ export function notFound(message: string): never {
   throw new HttpError(404, message);
 }
 
-const idSchema = z.uuid();
-
 /** Validates a route identifier, throwing a 400 with `message` when it is not a UUID. */
 export function parseId(id: string, message: string) {
-  if (!idSchema.safeParse(id).success) throw new HttpError(400, message);
+  if (!idSchema().safeParse(id).success) throw new HttpError(400, message);
   return id;
 }
 

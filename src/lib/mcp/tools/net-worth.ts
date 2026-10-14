@@ -9,8 +9,9 @@ import {
 } from "@/lib/data/net-worth";
 import { CREATE, defineTool, READ, UPDATE } from "@/lib/mcp/define-tool";
 import { netWorthItemPatchSchema, netWorthItemSchema, netWorthValuationSchema } from "@/lib/validation/net-worth";
+import { idSchema } from "@/lib/validation/primitives";
 
-const updateItemSchema = z.object({ id: z.uuid(), ...netWorthItemPatchSchema.shape });
+const updateItemSchema = z.object({ id: idSchema(), ...netWorthItemPatchSchema.shape });
 
 export const netWorthTools = [
   defineTool({
@@ -43,7 +44,7 @@ export const netWorthTools = [
     name: "add_net_worth_valuation",
     title: "Add net worth valuation",
     description: "Set an item's value on a date, replacing any value already on that date.",
-    schema: z.object({ itemId: z.uuid(), ...netWorthValuationSchema.shape }),
+    schema: z.object({ itemId: idSchema(), ...netWorthValuationSchema.shape }),
     annotations: UPDATE,
     notFound: "Net-worth item not found.",
     run: async ({ itemId, ...input }, { userId }) => {
@@ -55,7 +56,7 @@ export const netWorthTools = [
     name: "update_net_worth_valuation",
     title: "Update net worth valuation",
     description: "Correct the value or date of an existing valuation.",
-    schema: z.object({ id: z.uuid(), ...netWorthValuationSchema.shape }),
+    schema: z.object({ id: idSchema(), ...netWorthValuationSchema.shape }),
     annotations: UPDATE,
     notFound: "Valuation not found.",
     run: async ({ id, ...input }, { userId }) => {

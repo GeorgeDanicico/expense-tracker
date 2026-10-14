@@ -1,24 +1,12 @@
 import { z } from "zod";
 
+import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import { NET_WORTH_ITEM_KINDS } from "@/lib/net-worth/types";
+import { currencyCode, decimalString } from "@/lib/validation/primitives";
 
 const categoryPattern = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 
-const decimalInputSchema = (label: string, allowZero = false) => z
-  .string()
-  .trim()
-  .regex(/^\d+(?:\.\d+)?$/, `${label} must be a nonnegative decimal.`)
-  .refine((value) => {
-    const [integerPart, fractionalPart = ""] = value.split(".");
-    return integerPart.length <= 18 && fractionalPart.length <= 10;
-  }, `${label} must have at most 18 integer digits and 10 decimal places.`)
-  .refine((value) => allowZero || Number(value) > 0, `${label} must be greater than zero.`);
-
-const currencySchema = z
-  .string()
-  .trim()
-  .regex(/^[A-Za-z]{3}$/, "Currency must be a three-letter code.")
-  .transform((value) => value.toUpperCase());
+const nonnegativeDecimal = (label: string) => decimalString({ label, allowZero: true, kind: "nonnegative" });
 
 const categorySchema = z
   .string()
@@ -28,18 +16,18 @@ const categorySchema = z
   .transform((value) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""))
   .refine((value) => categoryPattern.test(value), "Use letters, numbers, spaces or hyphens for the category.");
 
-const purchaseAmountSchema = decimalInputSchema("Purchase amount", true);
+const purchaseAmountSchema = nonnegativeDecimal("Purchase amount");
 
 export const netWorthItemSchema = z.object({
   name: z.string().trim().min(1, "Enter an item name.").max(120),
   kind: z.enum(NET_WORTH_ITEM_KINDS),
   category: categorySchema,
-  currency: currencySchema,
+  currency: currencyCode,
   purchaseAmount: purchaseAmountSchema.nullable().optional(),
-  value: decimalInputSchema("Value", true),
+  value: nonnegativeDecimal("Value"),
   valuedOn: z.iso.date("Choose a valid valuation date."),
 }).superRefine((value, context) => {
-  if ((value.kind === "liability" || value.category === "cash") && value.purchaseAmount !== undefined && value.purchaseAmount !== null) {
+  if (!purchaseAmountAllowed(value.kind, value.category) && value.purchaseAmount !== undefined && value.purchaseAmount !== null) {
     context.addIssue({
       code: "custom",
       path: ["purchaseAmount"],
@@ -56,6 +44,6 @@ export const netWorthItemPatchSchema = z.object({
 }).refine((value) => Object.keys(value).length > 0, "Provide at least one item change.");
 
 export const netWorthValuationSchema = z.object({
-  value: decimalInputSchema("Value", true),
+  value: nonnegativeDecimal("Value"),
   valuedOn: z.iso.date("Choose a valid valuation date."),
 });

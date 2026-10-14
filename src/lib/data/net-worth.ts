@@ -1,8 +1,11 @@
 import "server-only";
 
+import type { z } from "zod";
+
 import { getInvestmentsOverviewForUser } from "@/lib/data/investments";
 import { DomainError } from "@/lib/errors";
 import { buildNetWorthOverview } from "@/lib/net-worth/calculation";
+import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import {
   NET_WORTH_ITEM_KINDS,
   type NetWorthItemKind,
@@ -10,6 +13,7 @@ import {
   type NetWorthValuation,
 } from "@/lib/net-worth/types";
 import { createClient } from "@/lib/supabase/server";
+import type { netWorthItemPatchSchema, netWorthItemSchema, netWorthValuationSchema } from "@/lib/validation/net-worth";
 
 const MAX_ACTIVE_ITEMS = 500;
 
@@ -33,32 +37,18 @@ type NetWorthItemRow = {
 
 type OwnedNetWorthItemRow = {
   id: string;
-  kind: string;
+  /** The table's check constraint limits `kind` to the known kinds. */
+  kind: NetWorthItemKind;
   category: string;
   archived_at: string | null;
 };
 
-export type NetWorthItemCreateInput = {
-  name: string;
-  kind: NetWorthItemKind;
-  category: string;
-  currency: string;
+/** Callers normalize an omitted purchase amount to `null` before creating. */
+export type NetWorthItemCreateInput = Omit<z.output<typeof netWorthItemSchema>, "purchaseAmount"> & {
   purchaseAmount: string | null;
-  value: string;
-  valuedOn: string;
 };
-
-export type NetWorthItemPatchInput = {
-  name?: string;
-  category?: string;
-  purchaseAmount?: string | null;
-  archived?: boolean;
-};
-
-export type NetWorthValuationInput = {
-  value: string;
-  valuedOn: string;
-};
+export type NetWorthItemPatchInput = z.output<typeof netWorthItemPatchSchema>;
+export type NetWorthValuationInput = z.output<typeof netWorthValuationSchema>;
 
 function parseItemKind(value: string): NetWorthItemKind {
   if (!NET_WORTH_ITEM_KINDS.includes(value as NetWorthItemKind)) {
@@ -172,7 +162,7 @@ export async function updateNetWorthItemForUser(
   if (!existing) return false;
 
   if (
-    (existing.kind === "liability" || input.category === "cash" || (input.category === undefined && existing.category === "cash"))
+    !purchaseAmountAllowed(existing.kind, input.category ?? existing.category)
     && input.purchaseAmount !== undefined
     && input.purchaseAmount !== null
   ) {

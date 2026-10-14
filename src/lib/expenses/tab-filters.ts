@@ -1,14 +1,13 @@
 import { z } from "zod";
 
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
-import { isValidDate } from "@/lib/utils/dates";
+import { calendarDate } from "@/lib/validation/primitives";
 
 const common = {
   subtype: z.enum(["all", "none", ...EXPENSE_SUBTYPES]).default("all"),
   category: z.enum(EXPENSE_CATEGORIES).nullable().default(null),
   search: z.string().trim().max(200).default(""),
 };
-const calendarDate = z.string().refine(isValidDate, "Choose a real calendar date.");
 
 export const expenseTabFiltersSchema = z.discriminatedUnion("scope", [
   z.object({ ...common, scope: z.literal("all") }).strict(),

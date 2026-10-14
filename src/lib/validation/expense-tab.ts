@@ -2,8 +2,6 @@ import { z } from "zod";
 
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES, SUBTYPE_CATEGORIES } from "@/lib/expenses/categories";
 
-export const expenseTabIdSchema = z.uuid();
-
 export const expenseTabSchema = z.object({
   name: z.string().trim().min(1, "Enter a tab name.").max(80, "Use at most 80 characters."),
   categoryKeys: z.array(z.enum(EXPENSE_CATEGORIES)),
