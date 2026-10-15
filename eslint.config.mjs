@@ -65,26 +65,24 @@ const SUPABASE_BOUNDARY = [
   "src/proxy.ts",
 ];
 
-/**
- * Temporary: files that still import Supabase directly. Each step 0 task
- * (R02–R09) removes its own files from this list, and R10 deletes the list.
- */
-const TEMPORARY_SUPABASE_IMPORTERS = [
-];
+const BOUNDARY_MESSAGE =
+  'Supabase stays behind the repository and auth interfaces. Use getRepositories() or getAuth() instead; see "Shared names → Repositories and auth" in docs/family-phase-1-tasks.md.';
 
 const supabaseBoundary = {
   files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
-  ignores: [...SUPABASE_BOUNDARY, ...TEMPORARY_SUPABASE_IMPORTERS],
+  ignores: SUPABASE_BOUNDARY,
   rules: {
-    "no-restricted-imports": [
+    // The Supabase packages.
+    "no-restricted-imports": ["error", { patterns: [{ group: ["@supabase/*"], message: BOUNDARY_MESSAGE }] }],
+    // Our Supabase code and the generated types. Matched on the resolved file,
+    // so `@/lib/supabase/server` and `../supabase/server` are both caught.
+    "import/no-restricted-paths": [
       "error",
       {
-        patterns: [
-          {
-            group: ["@supabase/*", "@/lib/supabase", "@/lib/supabase/*", "@/lib/database.types"],
-            message:
-              'Supabase stays behind the repository and auth interfaces. Use getRepositories() or getAuth() instead; see "Shared names → Repositories and auth" in docs/family-phase-1-tasks.md.',
-          },
+        basePath: import.meta.dirname,
+        zones: [
+          { target: ".", from: "./src/lib/supabase", message: BOUNDARY_MESSAGE },
+          { target: ".", from: "./src/lib/database.types.ts", message: BOUNDARY_MESSAGE },
         ],
       },
     ],
