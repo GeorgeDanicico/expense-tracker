@@ -10,6 +10,26 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: "12.2.3 (519615d)" };
   public: {
     Tables: {
+      account_notices: {
+        Row: {
+          created_at: string;
+          family_name: string;
+          id: string;
+          kind: string;
+          seen_at: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          family_name: string;
+          id?: string;
+          kind: string;
+          seen_at?: string | null;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["account_notices"]["Insert"]>;
+        Relationships: [];
+      };
       expense_tabs: {
         Row: {
           id: string;
@@ -255,6 +275,10 @@ export type Database = {
         };
         Returns: string;
       };
+      dismiss_notice: {
+        Args: { p_notice_id: string };
+        Returns: undefined;
+      };
       get_expense_dashboard: {
         Args: {
           p_analytics_end_exclusive: string;
@@ -277,6 +301,15 @@ export type Database = {
           member_id: string;
           permissions: Json;
           role: string;
+        }[];
+      };
+      get_my_notices: {
+        Args: never;
+        Returns: {
+          created_at: string;
+          family_name: string;
+          id: string;
+          kind: string;
         }[];
       };
     };
