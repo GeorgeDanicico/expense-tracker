@@ -68,17 +68,18 @@ The app talks to storage and auth only through these interfaces. They use domain
 | `NetWorthRepository` | `src/lib/net-worth/repository.ts` | `src/lib/supabase/repositories/net-worth.ts` | R09 |
 | `FamilyRepository` | `src/lib/family/repository.ts` | `src/lib/supabase/repositories/family.ts` | F15 (grows in later tasks) |
 | `NoticeRepository` | `src/lib/account/notice-repository.ts` | `src/lib/supabase/repositories/notices.ts` | F36 |
-| `AuthService` | `src/lib/auth/service.ts` | `src/lib/supabase/auth.ts` | R04 (grows in R05, F14, F30, F31, F33) |
+| `AuthService` | `src/lib/auth/service.ts` | `src/lib/supabase/auth.ts` | R04 (grows in R05, F30, F31, F33) |
 | `AuthAdmin` | `src/lib/auth/admin.ts` | `src/lib/supabase/auth-admin.ts` | F28 |
 
 - **Composition roots.** `getRepositories()` in `src/lib/repositories.ts` and `getAuth()` / `getAuthAdmin()` in `src/lib/auth/index.ts` are the only places that choose the Supabase implementations. Switching providers later means new implementation files plus a change in these two files.
-- **Who the caller is.** The Supabase implementations get the request's client from `createClient()` in `src/lib/supabase/server.ts`. That function already returns the scoped client for MCP, and after F14 for bearer requests too. Interfaces never mention clients or sessions:
-  - Finance repositories take the acting `userId` explicitly, as the data functions do today.
+- **Who the caller is.** The Supabase implementations get the request's client from `createClient()` in `src/lib/supabase/server.ts`. It returns, in order: the scoped client inside an `AuthSession.run` (MCP), a client built from an `Authorization: Bearer` token (F14), then the cookie session. Interfaces never mention clients or sessions:
+  - Finance repositories take the acting `userId` explicitly.
   - `FamilyRepository` and `NoticeRepository` act as the signed-in caller, because their SQL functions check the caller themselves.
-- **Use cases.** Logic that combines several repositories or adapters lives in `src/lib/<domain>/service.ts`, for example the ledgers and the investments overview with quotes. Routes and MCP tools call a service when there's logic, and a repository directly when there isn't. No pass-through wrappers.
+  - Outside a request (MCP), `getAuth().startSession(email, password)` returns an `AuthSession` (`{ userId, email, run(fn), isActive() }`, R05). Code inside `run` acts as that user; `isActive()` tells the MCP session cache whether the session can still refresh.
+- **Use cases.** Repositories only load and store. Logic on top of them lives in `src/lib/<domain>/service.ts`: combining repositories or adapters (the expense ledgers, the investments overview with quotes, the net-worth overview), domain rules (the investment limits, the net-worth item patch rules) and derived numbers (`getDashboardData` turns `ExpenseRepository.getDashboard`'s snapshot into the dashboard). Routes and MCP tools call a service when there's logic, and a repository directly when there isn't. No pass-through wrappers.
 - **Errors.** Supabase implementations translate Postgres error codes with `src/lib/supabase/errors.ts` (R02): `42501` → 403, `P0002` → 404, `23514` → 422, `23505` → 409, each as a `DomainError`.
-- **Fakes.** Each interface has an in-memory fake in `src/test/fakes/`. Route and MCP tests use these fakes. `src/test/fake-supabase.ts` is only for testing the Supabase implementations themselves.
-- **Boundary.** ESLint forbids importing `@supabase/*`, `@/lib/supabase/*` or `@/lib/database.types` anywhere except `src/lib/supabase/**`, `src/lib/repositories.ts`, `src/lib/auth/index.ts` and `src/proxy.ts`. R01 adds the rule with a temporary allowlist, and R10 removes the allowlist.
+- **Fakes.** Each interface has an in-memory fake in `src/test/fakes/` (`auth.ts` for `AuthService`). Route and MCP tests use these fakes. `src/test/fake-supabase.ts` is for testing the Supabase implementations themselves; the one other user is the F14 bearer test in `src/lib/http/route.test.ts`, which checks that repository calls go through the token client. Lint doesn't enforce this.
+- **Boundary.** ESLint forbids importing `@supabase/*` (`no-restricted-imports`), or anything that resolves into `src/lib/supabase/` or `src/lib/database.types.ts` (`import/no-restricted-paths`, so `@/` and relative paths alike), anywhere except `src/lib/supabase/**`, `src/lib/repositories.ts`, `src/lib/auth/index.ts` and `src/proxy.ts`. There is no allowlist (R10). `vi.mock("...")` paths aren't imports, so tests can still mock Supabase modules.
 - **SQL.** New SQL identifies the caller with `app_private.current_user_id()` (R03), never with `auth.uid()` directly, so a different auth system only needs that one function redefined.
 
 ### Permission catalogue (`src/lib/permissions.ts`, task F02)
@@ -177,7 +178,7 @@ All of these are `security definer`, granted only to `authenticated`, and identi
 - **Next.js:** this is Next 16. Before writing route or page code, read the relevant guide in `node_modules/next/dist/docs/`, as `AGENTS.md` asks.
 - **Routes:** use `withUser`, `json`, `parseBody`, `parseId` and `HttpError` from `src/lib/http/route.ts`, and `DomainError` from `src/lib/errors.ts`. Routes stay thin:
   - validation goes in `src/lib/validation/`;
-  - data goes through `getRepositories()`, and auth through `getAuth()` or `getAuthAdmin()`;
+  - data goes through a service in `src/lib/<domain>/service.ts` when there's logic, otherwise `getRepositories()`; auth goes through `getAuth()` or `getAuthAdmin()`;
   - every new route is added to `PROTECTED_ROUTES` in `src/app/api/protected-routes.test.ts`.
 - **New data access:** when a task needs a new query or RPC call, add the method to the interface, the Supabase implementation and the in-memory fake, all in the same PR. Test the Supabase implementation with `src/test/fake-supabase.ts`. R02 adds a short "How to add a repository method" note right below this list; follow it.
 - **Route tests:** use `signedInAs` and `callRoute` from `src/test/route.ts`, the in-memory fakes in `src/test/fakes/`, and the builders in `src/test/builders.ts`. One behaviour per test, with sentence-style names.
@@ -209,7 +210,7 @@ All of these are `security definer`, granted only to `authenticated`, and identi
 The account repository is the worked example: `src/lib/account/repository.ts`, `src/lib/supabase/repositories/account.ts` and `src/test/fakes/account.ts`. A new method changes these three places in the same PR:
 
 1. **Interface** (`src/lib/<domain>/repository.ts`): the method, with domain types only. Finance methods take the acting `userId` first.
-2. **Supabase implementation** (`src/lib/supabase/repositories/<domain>.ts`): `const supabase = await createClient()`, map rows to domain types, and on failure `throw translateDatabaseError(error, "<generic message>")` from `src/lib/supabase/errors.ts`. A refactor (R06–R09) keeps the exact errors the old `src/lib/data/` function threw instead. Test it in `<domain>.test.ts` beside it, mocking `createClient` with `fakeSupabase` as `account.test.ts` does; add any builder method the fake lacks to `src/test/fake-supabase.ts`.
+2. **Supabase implementation** (`src/lib/supabase/repositories/<domain>.ts`): `const supabase = await createClient()`, map rows to domain types, and on failure `throw translateDatabaseError(error, "<generic message>")` from `src/lib/supabase/errors.ts`. The repositories moved out of the old `src/lib/data/` (R06–R09) keep the exact errors they threw before. Test it in `<domain>.test.ts` beside it, mocking `createClient` with `fakeSupabase` as `account.test.ts` does; add any builder method the fake lacks to `src/test/fake-supabase.ts`.
 3. **Fake** (`src/test/fakes/<domain>.ts`): the same method on plain in-memory state (`Map`s or arrays) that tests seed and read directly.
 
 A new repository also adds its key to `Repositories` and `getRepositories()` in `src/lib/repositories.ts`, and to `FakeRepositories` and `resetFakeRepositories()` in `src/test/fakes/repositories.ts`. Code calls `getRepositories().<key>.<method>(...)` inside the handler or tool, never at module level.
