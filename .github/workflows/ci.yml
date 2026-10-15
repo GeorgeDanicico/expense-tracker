@@ -22,6 +22,7 @@ jobs:
       SUPABASE_URL: https://ci-placeholder.supabase.co
       SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
       SITE_URL: http://localhost:3000
+      FAMILY_ENABLED: "false"
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
