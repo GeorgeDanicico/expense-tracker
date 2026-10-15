@@ -1,11 +1,13 @@
 import "server-only";
 
 import type { AccountRepository } from "@/lib/account/repository";
+import type { ExpenseRepository } from "@/lib/expenses/repository";
 import type { ExpenseTabRepository } from "@/lib/expenses/tab-repository";
 import type { InvestmentRepository } from "@/lib/investments/repository";
 import type { NetWorthRepository } from "@/lib/net-worth/repository";
 import { supabaseAccountRepository } from "@/lib/supabase/repositories/account";
 import { supabaseExpenseTabRepository } from "@/lib/supabase/repositories/expense-tabs";
+import { supabaseExpenseRepository } from "@/lib/supabase/repositories/expenses";
 import { supabaseInvestmentRepository } from "@/lib/supabase/repositories/investments";
 import { supabaseNetWorthRepository } from "@/lib/supabase/repositories/net-worth";
 
@@ -14,6 +16,7 @@ export type Repositories = {
   account: AccountRepository;
   expenseTabs: ExpenseTabRepository;
   investments: InvestmentRepository;
+  expenses: ExpenseRepository;
   netWorth: NetWorthRepository;
 };
 
@@ -28,6 +31,7 @@ export function getRepositories(): Repositories {
     account: supabaseAccountRepository,
     expenseTabs: supabaseExpenseTabRepository,
     investments: supabaseInvestmentRepository,
+    expenses: supabaseExpenseRepository,
     netWorth: supabaseNetWorthRepository,
   };
 }

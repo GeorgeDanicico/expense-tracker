@@ -1,15 +1,10 @@
 import { z } from "zod";
 
-import {
-  createExpenseForUser,
-  deleteExpenseForUser,
-  getDashboardDataForUser,
-  updateExpenseForUser,
-} from "@/lib/data/expenses";
-import { getMonthlyLedgerForUser } from "@/lib/data/ledgers";
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
+import { getDashboardData, getMonthlyLedger } from "@/lib/expenses/service";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
 import { parseAnalyticsFilters } from "@/lib/expenses/url-state";
+import { getRepositories } from "@/lib/repositories";
 import {
   ANALYTICS_PERIODS,
   getBucharestMonth,
@@ -57,7 +52,7 @@ export const expenseTools = [
     description: "Expenses for one month (default: current month) with total, count and average.",
     schema: z.object({ month: z.string().refine(isValidMonth, "Use YYYY-MM.").optional() }),
     annotations: READ,
-    run: ({ month = getBucharestMonth() }, { userId }) => getMonthlyLedgerForUser(userId, month),
+    run: ({ month = getBucharestMonth() }, { userId }) => getMonthlyLedger(userId, month),
   }),
   defineTool({
     name: "get_spending_summary",
@@ -66,7 +61,7 @@ export const expenseTools = [
     schema: spendingSummarySchema,
     shape: spendingSummarySchema.shape,
     annotations: READ,
-    run: ({ period, granularity, date }, { userId }) => getDashboardDataForUser(
+    run: ({ period, granularity, date }, { userId }) => getDashboardData(
       userId,
       parseAnalyticsFilters(new URLSearchParams({ period, granularity, ...(date && { date }) })),
     ),
@@ -78,7 +73,7 @@ export const expenseTools = [
     schema: addExpenseSchema,
     shape: { ...fields, expenseDate: fields.expenseDate.optional() },
     annotations: CREATE,
-    run: async (input, { userId }) => ({ expense: await createExpenseForUser(userId, input) }),
+    run: async (input, { userId }) => ({ expense: await getRepositories().expenses.create(userId, input) }),
   }),
   defineTool({
     name: "update_expense",
@@ -89,7 +84,7 @@ export const expenseTools = [
     annotations: UPDATE,
     notFound: "Expense not found.",
     run: async ({ id, ...patch }, { userId }) => {
-      const expense = await updateExpenseForUser(userId, id, patch);
+      const expense = await getRepositories().expenses.update(userId, id, patch);
       return expense && { expense };
     },
   }),
@@ -100,6 +95,6 @@ export const expenseTools = [
     schema: idInput,
     annotations: DELETE,
     notFound: "Expense not found.",
-    run: async ({ id }, { userId }) => (await deleteExpenseForUser(userId, id)) && { deleted: true, id },
+    run: async ({ id }, { userId }) => (await getRepositories().expenses.delete(userId, id)) && { deleted: true, id },
   }),
 ];

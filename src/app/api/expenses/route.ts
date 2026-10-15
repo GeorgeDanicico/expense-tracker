@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 
-import { createExpenseForUser } from "@/lib/data/expenses";
-import { getMonthlyLedgerForUser } from "@/lib/data/ledgers";
+import { getMonthlyLedger } from "@/lib/expenses/service";
 import { HttpError, json, parseInput, readJson, withUser } from "@/lib/http/route";
+import { getRepositories } from "@/lib/repositories";
 import { getBucharestMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
 
@@ -13,7 +13,7 @@ export const GET = withUser(async (request: NextRequest, user) => {
     ? resolveMainExpenseMonth(requestedMonth)
     : isValidMonth(requestedMonth) ? requestedMonth : getBucharestMonth();
 
-  const { expenses, total, average } = await getMonthlyLedgerForUser(user.id, month);
+  const { expenses, total, average } = await getMonthlyLedger(user.id, month);
   return json({
     month,
     ...(isMainLedger ? { effectiveMonth: month } : {}),
@@ -34,5 +34,5 @@ export const POST = withUser(async (request: NextRequest, user) => {
     });
   }
 
-  return json({ expense: await createExpenseForUser(user.id, input) }, 201);
+  return json({ expense: await getRepositories().expenses.create(user.id, input) }, 201);
 }, { failure: "The expense could not be saved." });

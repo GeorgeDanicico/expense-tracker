@@ -1,24 +1,10 @@
 import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport } from "@modelcontextprotocol/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  createExpenseForUser: vi.fn(),
-  updateExpenseForUser: vi.fn(),
-  deleteExpenseForUser: vi.fn(),
-  getMonthlyExpensesForUser: vi.fn(),
-  getExpenseTabExpensesForUser: vi.fn(),
-}));
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
-vi.mock("@/lib/data/expenses", () => ({
-  createExpenseForUser: mocks.createExpenseForUser,
-  updateExpenseForUser: mocks.updateExpenseForUser,
-  deleteExpenseForUser: mocks.deleteExpenseForUser,
-  getMonthlyExpensesForUser: mocks.getMonthlyExpensesForUser,
-  getDashboardDataForUser: vi.fn(),
-  getExpenseTabExpensesForUser: mocks.getExpenseTabExpensesForUser,
-}));
 
+import type { ExpenseRepository } from "@/lib/expenses/repository";
 import { createMcpServer } from "@/lib/mcp/server";
 import { aManualItem, aTab, aTransaction, anExpense } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
@@ -45,10 +31,19 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 describe("MCP server", () => {
   let repositories: FakeRepositories;
 
+  let expenses: { [Method in "create" | "update" | "delete" | "listMonth" | "listForTab"]: MockInstance<ExpenseRepository[Method]> };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, "error").mockImplementation(() => {});
     repositories = resetFakeRepositories();
+    expenses = {
+      create: vi.spyOn(repositories.expenses, "create"),
+      update: vi.spyOn(repositories.expenses, "update"),
+      delete: vi.spyOn(repositories.expenses, "delete"),
+      listMonth: vi.spyOn(repositories.expenses, "listMonth"),
+      listForTab: vi.spyOn(repositories.expenses, "listForTab"),
+    };
   });
   afterEach(() => vi.useRealTimers());
 
@@ -117,12 +112,12 @@ describe("MCP server", () => {
   describe("add_expense", () => {
     const fuel = { description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel" };
 
-    beforeEach(() => mocks.createExpenseForUser.mockResolvedValue(stored));
+    beforeEach(() => expenses.create.mockResolvedValue(stored));
 
     it("adds the expense for the session user, ignoring user ids in the arguments", async () => {
       await call("add_expense", { ...fuel, user_id: "someone-else", userId: "someone-else" });
 
-      const [userId, input] = mocks.createExpenseForUser.mock.calls[0];
+      const [userId, input] = expenses.create.mock.calls[0];
       expect(userId).toBe("owner");
       expect(input).not.toHaveProperty("user_id");
       expect(input).not.toHaveProperty("userId");
@@ -134,7 +129,7 @@ describe("MCP server", () => {
 
       await call("add_expense", fuel);
 
-      expect(mocks.createExpenseForUser).toHaveBeenCalledWith("owner", expect.objectContaining({ expenseDate: "2026-10-04" }));
+      expect(expenses.create).toHaveBeenCalledWith("owner", expect.objectContaining({ expenseDate: "2026-10-04" }));
     });
 
     it("returns the stored expense", async () => {
@@ -149,33 +144,33 @@ describe("MCP server", () => {
     const result = await call("add_expense", { description: "Fuel", amount: 10, category: "groceries", subtype: "car_fuel" });
     expect(result.isError).toBe(true);
     expect(result.body.fieldErrors.subtype).toHaveLength(1);
-    expect(mocks.createExpenseForUser).not.toHaveBeenCalled();
+    expect(expenses.create).not.toHaveBeenCalled();
   });
 
   it("deletes expenses through the data layer", async () => {
-    mocks.deleteExpenseForUser.mockResolvedValue(true);
+    repositories.expenses.expenses.set("owner", [stored]);
     const result = await call("delete_expense", { id: ID });
-    expect(mocks.deleteExpenseForUser).toHaveBeenCalledWith("owner", ID);
+    expect(expenses.delete).toHaveBeenCalledWith("owner", ID);
     expect(result.structuredContent).toEqual({ deleted: true, id: ID });
+    expect(repositories.expenses.expenses.get("owner")).toEqual([]);
   });
 
   it("rejects ids that are not UUIDs", async () => {
     const result = await call("delete_expense", { id: "nope" });
     expect(result.isError).toBe(true);
     expect(result.text).toContain("Input validation error");
-    expect(mocks.deleteExpenseForUser).not.toHaveBeenCalled();
+    expect(expenses.delete).not.toHaveBeenCalled();
   });
 
   it("reports a missing expense on update", async () => {
-    mocks.updateExpenseForUser.mockResolvedValue(null);
     const result = await call("update_expense", { id: ID, amount: 12 });
-    expect(mocks.updateExpenseForUser).toHaveBeenCalledWith("owner", ID, { amount: 12 });
+    expect(expenses.update).toHaveBeenCalledWith("owner", ID, { amount: 12 });
     expect(result.isError).toBe(true);
     expect(result.body.error).toBe("Expense not found.");
   });
 
   it("hides unexpected errors behind a generic message", async () => {
-    mocks.getMonthlyExpensesForUser.mockRejectedValue(new Error("connection string leaked"));
+    expenses.listMonth.mockRejectedValue(new Error("connection string leaked"));
     const result = await call("list_expenses", { month: "2026-09" });
     expect(result.isError).toBe(true);
     expect(result.body.error).toBe("The request could not be completed. Try again later.");
@@ -191,7 +186,7 @@ describe("MCP server", () => {
   });
 
   it("summarizes a month of expenses", async () => {
-    mocks.getMonthlyExpensesForUser.mockResolvedValue([stored, { ...stored, amount: 4.5 }]);
+    repositories.expenses.expenses.set("owner", [stored, { ...stored, id: "second", amount: 4.5 }]);
     const result = await call("list_expenses", { month: "2026-10" });
     expect(result.structuredContent).toMatchObject({ month: "2026-10", total: 15, count: 2, average: 7.5 });
   });
@@ -224,26 +219,25 @@ describe("MCP server", () => {
 
     beforeEach(() => {
       repositories.expenseTabs.tabs.set("owner", [tab]);
-      mocks.getExpenseTabExpensesForUser.mockResolvedValue([]);
     });
 
     it("defaults to all of the tab's expenses", async () => {
       await call("get_expense_tab_expenses", { tabId: ID });
 
-      expect(mocks.getExpenseTabExpensesForUser).toHaveBeenCalledWith("owner", tab, { scope: "all", subtype: "all", category: null, search: "" });
+      expect(expenses.listForTab).toHaveBeenCalledWith("owner", tab, { scope: "all", subtype: "all", category: null, search: "" });
     });
 
     it("passes the given filters through", async () => {
       await call("get_expense_tab_expenses", { tabId: ID, filters: { scope: "year", year: 2025 } });
 
-      expect(mocks.getExpenseTabExpensesForUser).toHaveBeenCalledWith("owner", tab, expect.objectContaining({ scope: "year", year: 2025 }));
+      expect(expenses.listForTab).toHaveBeenCalledWith("owner", tab, expect.objectContaining({ scope: "year", year: 2025 }));
     });
 
     it("rejects an inverted date range without reading expenses", async () => {
       const result = await call("get_expense_tab_expenses", { tabId: ID, filters: { scope: "range", startDate: "2026-02-01", endDate: "2026-01-01" } });
 
       expect(result.isError).toBe(true);
-      expect(mocks.getExpenseTabExpensesForUser).not.toHaveBeenCalled();
+      expect(expenses.listForTab).not.toHaveBeenCalled();
     });
   });
 });
