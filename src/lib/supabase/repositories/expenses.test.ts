@@ -287,10 +287,10 @@ describe("getDashboard", () => {
       orders: ["expense_date", "created_at"],
       limits: ["5"],
     });
-    // The RPC filters by auth.uid() in SQL and takes no user until F42.
     expect(rpcs).toEqual([{ fn: "get_expense_dashboard", args: {
       p_current_start: "2026-10-01", p_current_end_exclusive: "2026-11-01",
       p_analytics_start: "2026-07-01", p_analytics_end_exclusive: "2026-10-01",
+      p_user_id: "owner",
     } }]);
   });
 

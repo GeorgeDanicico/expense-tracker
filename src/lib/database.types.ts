@@ -291,6 +291,7 @@ export type Database = {
           p_analytics_start: string;
           p_current_end_exclusive: string;
           p_current_start: string;
+          p_user_id?: string;
         };
         Returns: Json;
       };
