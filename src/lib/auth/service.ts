@@ -1,7 +1,7 @@
 /**
  * The app's view of the auth provider. Routes reach it through `getAuth()` in
  * `@/lib/auth`; only `src/lib/supabase/auth.ts` knows it is Supabase.
- * Every method acts on the current request's session.
+ * Every method except `startSession` acts on the current request's session.
  */
 
 export type AuthenticatedUser = {
@@ -30,6 +30,19 @@ export type EmailLink =
   | { tokenHash: string; type: EmailLinkType }
   | { email: string; token: string; type: "email" };
 
+/**
+ * A session signed in outside the browser, for example by an MCP client. It lives
+ * beyond a single request, so the caller decides how long to keep it.
+ */
+export type AuthSession = {
+  userId: string;
+  email: string;
+  /** Runs `fn` as this user: `getAuth()` and the repositories inside it act for this session. */
+  run<T>(fn: () => T): T;
+  /** Whether the session can still be used, refreshing it if the provider needs to. */
+  isActive(): Promise<boolean>;
+};
+
 export interface AuthService {
   /** The signed-in user, or null. */
   getCurrentUser(): Promise<AuthenticatedUser | null>;
@@ -42,4 +55,6 @@ export interface AuthService {
   oauthSignInUrl(provider: OAuthProvider, callbackUrl: string): Promise<OAuthUrlResult>;
   /** Verifies a link sent by email and stores the resulting session for this request. */
   completeEmailLink(link: EmailLink): Promise<AuthResult>;
+  /** Signs in without touching the request's session. Null when the credentials are rejected or the provider fails. */
+  startSession(email: string, password: string): Promise<AuthSession | null>;
 }

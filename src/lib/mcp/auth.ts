@@ -2,16 +2,13 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import type { Database } from "@/lib/database.types";
-import { getSupabaseConfig } from "@/lib/supabase/config";
+import { type AuthSession, getAuth } from "@/lib/auth";
 
 type McpCredentials = { email: string; password: string };
-type McpSession = { client: SupabaseClient<Database>; userId: string; email: string };
 type McpAuthResult =
-  | { status: "ok"; session: McpSession }
+  | { status: "ok"; session: AuthSession }
   | { status: "unauthorized" }
   | { status: "throttled" };
 
@@ -25,7 +22,7 @@ const credentialsSchema = z.object({
   password: z.string().min(8).max(128),
 });
 
-const sessions = new Map<string, Promise<McpSession | null>>();
+const sessions = new Map<string, Promise<AuthSession | null>>();
 const failures = new Map<string, number[]>();
 
 export function parseBasicCredentials(request: Request): McpCredentials | null {
@@ -64,41 +61,18 @@ function recordFailure(keys: string[]) {
   for (const key of keys) failures.set(key, [...(failures.get(key) ?? []), now]);
 }
 
-async function signIn(credentials: McpCredentials): Promise<McpSession | null> {
-  try {
-    const { url, publishableKey } = getSupabaseConfig();
-    const client = createClient<Database>(url, publishableKey, {
-      auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
-    });
-    const { data, error } = await client.auth.signInWithPassword(credentials);
-    if (error || !data.user) return null;
-    return { client, userId: data.user.id, email: data.user.email ?? credentials.email };
-  } catch {
-    return null;
-  }
-}
-
 function startSignIn(key: string, credentials: McpCredentials) {
   while (sessions.size >= MAX_SESSIONS) {
     const oldest = sessions.keys().next().value;
     if (oldest === undefined) break;
     sessions.delete(oldest);
   }
-  const pending = signIn(credentials);
+  const pending = getAuth().startSession(credentials.email, credentials.password);
   sessions.set(key, pending);
   void pending.then((session) => {
     if (!session && sessions.get(key) === pending) sessions.delete(key);
   });
   return pending;
-}
-
-async function isSessionValid(session: McpSession) {
-  try {
-    const { data, error } = await session.client.auth.getSession();
-    return !error && Boolean(data.session);
-  } catch {
-    return false;
-  }
 }
 
 export async function getMcpSession(
@@ -112,7 +86,7 @@ export async function getMcpSession(
   const cached = sessions.get(key);
   let pending = cached ?? startSignIn(key, credentials);
   const cachedSession = cached && (await cached);
-  if (cachedSession && !(await isSessionValid(cachedSession))) {
+  if (cachedSession && !(await cachedSession.isActive())) {
     // Refresh failed: drop the stale entry and sign in once more (shared with concurrent callers).
     if (sessions.get(key) === pending) sessions.delete(key);
     pending = sessions.get(key) ?? startSignIn(key, credentials);

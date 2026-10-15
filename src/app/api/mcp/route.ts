@@ -3,9 +3,8 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { json, PRIVATE_HEADERS } from "@/lib/http/route";
 import { getMcpSession, parseBasicCredentials } from "@/lib/mcp/auth";
 import { createMcpServer } from "@/lib/mcp/server";
-import { runWithSupabaseClient } from "@/lib/supabase/server";
 
-// AsyncLocalStorage (runWithSupabaseClient) and node:crypto (auth) need the Node runtime.
+// AsyncLocalStorage (the session's run) and node:crypto (auth) need the Node runtime.
 export const runtime = "nodejs";
 
 const LOCALHOST_NAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -78,7 +77,7 @@ async function handle(request: Request) {
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
 
-  const response = await runWithSupabaseClient(session.client, () => transport.handleRequest(request));
+  const response = await session.run(() => transport.handleRequest(request));
   return withPrivateHeaders(response);
 }
 
