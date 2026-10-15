@@ -197,4 +197,50 @@ describe("Supabase family repository", () => {
       await expect(family.getFamily()).rejects.toThrow(new Error("Unable to load the family."));
     });
   });
+
+  describe("createFamily", () => {
+    it("calls create_family with the name as the request's caller", async () => {
+      const { rpcs } = useRpc(() => ({ data: familyId, error: null }));
+
+      await family.createFamily("The Smiths");
+
+      expect(rpcs).toEqual([{ fn: "create_family", args: { p_name: "The Smiths" } }]);
+    });
+
+    it("returns the new family's id", async () => {
+      useRpc(() => ({ data: familyId, error: null }));
+
+      expect(await family.createFamily("The Smiths")).toBe(familyId);
+    });
+
+    it("translates being already in a family into a 409", async () => {
+      useRpc(() => ({ data: null, error: { code: "23505", message: "You're already in a family." } }));
+
+      await expect(family.createFamily("The Smiths")).rejects.toThrow(new DomainError("You're already in a family.", 409));
+    });
+
+    it("translates an invalid name into a 422 with the database's message", async () => {
+      useRpc(() => ({ data: null, error: { code: "23514", message: "Use at most 60 characters." } }));
+
+      await expect(family.createFamily("x".repeat(61))).rejects.toThrow(new DomainError("Use at most 60 characters.", 422));
+    });
+
+    it("translates a missing caller into a 403", async () => {
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Sign in to create a family." } }));
+
+      await expect(family.createFamily("The Smiths")).rejects.toThrow(new DomainError("Sign in to create a family.", 403));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.createFamily("The Smiths")).rejects.toThrow(new Error("Unable to create the family."));
+    });
+
+    it("treats a missing id as a failure", async () => {
+      useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.createFamily("The Smiths")).rejects.toThrow(new Error("Unable to create the family."));
+    });
+  });
 });

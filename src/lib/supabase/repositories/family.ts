@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const MEMBERSHIP_ERROR = "Unable to load your family membership.";
 const FAMILY_ERROR = "Unable to load the family.";
+const CREATE_FAMILY_ERROR = "Unable to create the family.";
 
 /** A member entry of `get_family()`; `lastActiveAt` and `permissions` are absent when hidden. */
 type FamilyMemberJson = {
@@ -109,5 +110,14 @@ export const supabaseFamilyRepository: FamilyRepository = {
       family: { id: family.id, name: family.name, createdAt: family.createdAt },
       members: members.map(toMember),
     };
+  },
+
+  async createFamily(name: string): Promise<string> {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("create_family", { p_name: name });
+
+    if (error) throw translateDatabaseError(error, CREATE_FAMILY_ERROR);
+    if (!data) throw new Error(CREATE_FAMILY_ERROR);
+    return data;
   },
 };

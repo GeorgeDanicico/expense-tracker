@@ -27,6 +27,7 @@ const PROTECTED_ROUTES: Record<string, string[]> = {
   expenses: ["GET", "POST"],
   "expenses/[id]": ["DELETE"],
   "expenses/export": ["GET"],
+  family: ["GET", "POST"],
   investments: ["GET"],
   "investment-transactions": ["GET", "POST"],
   "investment-transactions/[id]": ["DELETE"],

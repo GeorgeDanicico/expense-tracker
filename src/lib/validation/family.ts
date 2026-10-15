@@ -22,6 +22,9 @@ export const familyNameSchema = z
   .min(1, "Enter a family name.")
   .max(60, "Use at most 60 characters.");
 
+/** The body of `POST /api/family`. */
+export const createFamilySchema = z.object({ name: familyNameSchema });
+
 /** Lowercase; starts with a letter or digit, then letters, digits, dots, underscores or hyphens; 3–30 characters. */
 export const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,29}$/;
 
