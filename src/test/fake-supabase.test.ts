@@ -62,6 +62,23 @@ describe("fakeSupabase", () => {
     expect(tables.people.map((row) => row.team)).toEqual(["red", "green", "red"]);
   });
 
+  it("upserts by merging into the row that matches on the conflict column", async () => {
+    const { client, tables } = fakeSupabase({ people: people() });
+
+    await client.from("people").upsert({ id: "b", team: "green" }, { onConflict: "id" });
+
+    expect(tables.people[1]).toEqual({ ...people()[1], team: "green" });
+    expect(tables.people).toHaveLength(3);
+  });
+
+  it("upserts by inserting when no row matches on the conflict column", async () => {
+    const { client, tables } = fakeSupabase({ people: people() });
+
+    await client.from("people").upsert({ id: "d", name: "Dan" }, { onConflict: "id" });
+
+    expect(tables.people.map((row) => row.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
   it("deletes only the matching rows and returns them", async () => {
     const { client, tables } = fakeSupabase({ people: people() });
 

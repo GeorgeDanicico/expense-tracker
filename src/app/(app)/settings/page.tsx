@@ -14,7 +14,7 @@ import { useAccount } from "@/hooks/use-account";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { apiRequest } from "@/lib/api/client";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import type { AccountData } from "@/lib/account";
+import type { AccountData } from "@/lib/account/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
 
 export default function SettingsPage() {

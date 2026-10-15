@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-import { getAccountCurrencyForUser } from "@/lib/data/account";
 import { CATEGORY_LABELS, EXPENSE_CATEGORIES, SUBTYPE_LABELS, subtypesForCategory } from "@/lib/expenses/categories";
 import { defineTool, READ } from "@/lib/mcp/define-tool";
 import { getBucharestToday } from "@/lib/calendar";
+import { getRepositories } from "@/lib/repositories";
 
 export const accountTools = [
   defineTool({
@@ -14,7 +14,7 @@ export const accountTools = [
     annotations: READ,
     run: async (_input, { userId, email }) => ({
       email,
-      currency: await getAccountCurrencyForUser(userId),
+      currency: await getRepositories().account.getCurrency(userId),
       today: getBucharestToday(),
       categories: EXPENSE_CATEGORIES.map((category) => ({
         key: category,

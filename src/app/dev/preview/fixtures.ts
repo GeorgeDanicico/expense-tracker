@@ -6,7 +6,7 @@ import type {
 } from "@/lib/investments/types";
 import type { NetWorthOverview } from "@/lib/net-worth/types";
 import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
-import type { AccountData } from "@/lib/account";
+import type { AccountData } from "@/lib/account/types";
 import type { DashboardData, Expense, ExpensesData } from "@/lib/expenses/types";
 import { dateInMonth, daysInMonth, getBucharestMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
 

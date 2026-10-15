@@ -6,7 +6,7 @@ import type { ExpenseTab } from "@/lib/expenses/tabs";
 // Each key notes the response type its GET returns. Types owned by a domain
 // module are referenced there; wrapper shapes that only exist on the wire live here.
 
-/** GET → `AccountData` (`@/lib/account`); PATCH returns the updated `AccountData`. */
+/** GET → `AccountData` (`@/lib/account/types`); PATCH returns the updated `AccountData`. */
 export const ACCOUNT_API_KEY = "/api/account";
 /** GET → `InvestmentsOverview` (`@/lib/investments/types`). */
 export const INVESTMENTS_API_KEY = "/api/investments";

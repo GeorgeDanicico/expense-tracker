@@ -72,7 +72,6 @@ const SUPABASE_BOUNDARY = [
 const TEMPORARY_SUPABASE_IMPORTERS = [
   "src/app/api/mcp/route.ts",
   "src/lib/mcp/auth.ts",
-  "src/lib/data/account.ts",
   "src/lib/data/expense-tabs.ts",
   "src/lib/data/expenses.ts",
   "src/lib/data/investments.ts",

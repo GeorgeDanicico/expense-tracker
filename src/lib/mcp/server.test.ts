@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   getExpenseTabExpensesForUser: vi.fn(),
   addNetWorthValuationForUser: vi.fn(),
 }));
-vi.mock("@/lib/data/account", () => ({ getAccountCurrencyForUser: vi.fn() }));
+vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 vi.mock("@/lib/data/expenses", () => ({
   createExpenseForUser: mocks.createExpenseForUser,
   updateExpenseForUser: mocks.updateExpenseForUser,
@@ -44,6 +44,7 @@ vi.mock("@/lib/data/net-worth", () => ({
 import { DomainError } from "@/lib/errors";
 import { createMcpServer } from "@/lib/mcp/server";
 import { aTab, anExpense } from "@/test/builders";
+import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 
 const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
 const stored = anExpense({ id: ID, description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel", expenseDate: "2026-10-04" });
@@ -65,11 +66,33 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 }
 
 describe("MCP server", () => {
+  let repositories: FakeRepositories;
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, "error").mockImplementation(() => {});
+    repositories = resetFakeRepositories();
   });
   afterEach(() => vi.useRealTimers());
+
+  describe("get_account", () => {
+    it("returns the session user's email, saved currency, today and the categories", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-04T10:00:00Z"));
+      repositories.account.currencies.set("owner", "RON");
+
+      const { body } = await call("get_account");
+
+      expect(body).toMatchObject({ email: "owner@example.com", currency: "RON", today: "2026-10-04" });
+      expect(body.categories).toContainEqual(expect.objectContaining({ key: "car", subtypes: expect.arrayContaining([expect.objectContaining({ key: "car_fuel" })]) }));
+    });
+
+    it("returns the default currency when the user has not chosen one", async () => {
+      const { body } = await call("get_account");
+
+      expect(body.currency).toBe("EUR");
+    });
+  });
 
   describe("tool list", () => {
     const listTools = async () => (await (await connect()).listTools()).tools;

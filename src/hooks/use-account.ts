@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 
-import type { AccountData } from "@/lib/account";
+import type { AccountData } from "@/lib/account/types";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
 

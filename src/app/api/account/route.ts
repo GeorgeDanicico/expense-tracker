@@ -1,11 +1,11 @@
 import type { NextRequest } from "next/server";
 
-import { getAccountCurrencyForUser, updateAccountCurrencyForUser } from "@/lib/data/account";
 import { HttpError, json, readJson, withUser } from "@/lib/http/route";
+import { getRepositories } from "@/lib/repositories";
 import { isSupportedCurrency } from "@/lib/utils/currency";
 
 export const GET = withUser(async (_request, user) => {
-  const currency = await getAccountCurrencyForUser(user.id);
+  const currency = await getRepositories().account.getCurrency(user.id);
   return json({ email: user.email, currency });
 }, { failure: "Unable to load account settings." });
 
@@ -15,7 +15,7 @@ export const PATCH = withUser(async (request: NextRequest, user) => {
     throw new HttpError(422, "Choose a supported currency.");
   }
 
-  await updateAccountCurrencyForUser(user, payload.currency);
+  await getRepositories().account.updateCurrency(user, payload.currency);
 
   return json({ email: user.email, currency: payload.currency });
 }, { failure: "The currency could not be saved. Please try again." });
