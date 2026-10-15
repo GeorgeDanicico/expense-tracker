@@ -1,0 +1,79 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`permission catalogue > lists the same modules, levels, labels and defaults 1`] = `
+{
+  "levels": [
+    "off",
+    "view",
+    "edit",
+  ],
+  "modules": [
+    {
+      "defaultForNewKid": "edit",
+      "label": "Expenses",
+      "levelLabels": {
+        "edit": "On",
+        "off": "Off",
+      },
+      "levels": [
+        "off",
+        "edit",
+      ],
+      "module": "expenses",
+    },
+    {
+      "defaultForNewKid": "off",
+      "label": "Investments",
+      "levelLabels": {
+        "edit": "On",
+        "off": "Off",
+      },
+      "levels": [
+        "off",
+        "edit",
+      ],
+      "module": "investments",
+    },
+    {
+      "defaultForNewKid": "off",
+      "label": "Net worth",
+      "levelLabels": {
+        "edit": "On",
+        "off": "Off",
+      },
+      "levels": [
+        "off",
+        "edit",
+      ],
+      "module": "net_worth",
+    },
+    {
+      "defaultForNewKid": "off",
+      "label": "Family finance",
+      "levelLabels": {
+        "off": "Off",
+        "view": "Can see",
+      },
+      "levels": [
+        "off",
+        "view",
+      ],
+      "module": "family_finance",
+    },
+  ],
+  "presets": {
+    "teen": {
+      "expenses": "edit",
+      "family_finance": "off",
+      "investments": "edit",
+      "net_worth": "edit",
+    },
+    "young_kid": {
+      "expenses": "edit",
+      "family_finance": "off",
+      "investments": "off",
+      "net_worth": "off",
+    },
+  },
+}
+`;
