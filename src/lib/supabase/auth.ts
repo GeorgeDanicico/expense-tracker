@@ -14,20 +14,28 @@ import type {
 } from "@/lib/auth/service";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
-import { createClient, runWithSupabaseClient } from "@/lib/supabase/server";
+import { createClient, getBearerToken, runWithSupabaseClient } from "@/lib/supabase/server";
 
 function result(error: { message: string } | null): AuthResult {
   return error ? { ok: false, reason: error.message } : { ok: true };
 }
 
 /**
- * `AuthService` on Supabase Auth, using the request's client (cookie session, or the scoped MCP client).
+ * `AuthService` on Supabase Auth, using the request's client: the scoped MCP client, the
+ * `Authorization: Bearer` token's client, or the cookie session (see `createClient`).
  * `startSession` is the exception: it signs in with its own client, which `run` scopes over its callback.
  */
 export const supabaseAuth: AuthService = {
+  /**
+   * A bearer request is decided by its token alone: an invalid, expired or empty token gives
+   * null (a 401), even when the request also carries a valid cookie session.
+   */
   async getCurrentUser(): Promise<AuthenticatedUser | null> {
+    const token = await getBearerToken();
+    if (token === "") return null;
+
     const supabase = await createClient();
-    const { data, error } = await supabase.auth.getClaims();
+    const { data, error } = token === null ? await supabase.auth.getClaims() : await supabase.auth.getClaims(token);
 
     if (error || !data?.claims?.sub) {
       return null;
