@@ -1,10 +1,12 @@
 import type { MetadataRoute } from "next";
 
+import { BRAND } from "@/lib/brand";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Simple Ledger Expense Tracker",
-    short_name: "Simple Ledger",
-    description: "A private, modern expense tracker that makes spending easy to understand.",
+    name: BRAND.name,
+    short_name: BRAND.name,
+    description: BRAND.description,
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",

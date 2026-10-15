@@ -2,6 +2,7 @@ import { Flex, Icon, Text } from "@chakra-ui/react";
 import { Landmark } from "lucide-react";
 
 import { ICON } from "@/components/ui/icon";
+import { BRAND } from "@/lib/brand";
 
 export function Brand() {
   return (
@@ -10,7 +11,7 @@ export function Brand() {
         <Landmark strokeWidth={1.75} />
       </Icon>
       <Text textStyle="sectionTitle" truncate>
-        Simple Ledger
+        {BRAND.name}
       </Text>
     </Flex>
   );

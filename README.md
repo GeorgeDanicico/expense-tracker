@@ -1,6 +1,6 @@
-# Simple Ledger
+# iFam
 
-A private, mobile-first expense tracker built with Next.js 16, React 19, Chakra UI 3, and Supabase. It uses CSS files and Chakra styling—there is no Tailwind configuration or dependency.
+A private, mobile-first family app, starting with an expense tracker. Built with Next.js 16, React 19, Chakra UI 3, and Supabase. It uses CSS files and Chakra styling—there is no Tailwind configuration or dependency.
 
 ## Included
 
@@ -45,7 +45,7 @@ Recommended confirmation-template link:
 
 ```html
 <a href="{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=email">
-  Confirm your Simple Ledger account
+  Confirm your iFam account
 </a>
 ```
 
@@ -68,7 +68,7 @@ Migrations live in `supabase/migrations`. They add or upgrade the expense ledger
 The app exposes its ledger to Claude as a remote [MCP](https://modelcontextprotocol.io) server, so Claude Code or Claude Desktop can read and record expenses, tabs, net worth, and investments on your behalf. Every tool runs as the signed-in user under the same Supabase RLS policies as the web app.
 
 - **Endpoint:** `/api/mcp`, stateless Streamable HTTP. Only `POST` is served; `GET` and `DELETE` return 405.
-- **Auth:** every request carries `Authorization: Basic base64(email:password)` for your Simple Ledger account. Missing or wrong credentials return 401 with `WWW-Authenticate`.
+- **Auth:** every request carries `Authorization: Basic base64(email:password)` for your iFam account. Missing or wrong credentials return 401 with `WWW-Authenticate`.
 
 Tools (the destructive ones carry the MCP `destructiveHint` annotation):
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useAccount } from "@/hooks/use-account";
 import { ApiError } from "@/lib/api/client";
+import { BRAND } from "@/lib/brand";
 
 export default function HomePage() {
   const router = useRouter();
@@ -20,5 +21,5 @@ export default function HomePage() {
     return <DataError message={error.message} retry={() => void mutate()} />;
   }
 
-  return <DataLoading layout="screen" label="Opening Simple Ledger…" />;
+  return <DataLoading layout="screen" label={`Opening ${BRAND.name}…`} />;
 }

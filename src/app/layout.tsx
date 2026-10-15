@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import { PwaRegistration } from "@/components/pwa/pwa-registration";
 import { Provider } from "@/components/ui/provider";
+import { BRAND } from "@/lib/brand";
 
 import "./globals.css";
 
@@ -18,15 +19,15 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Simple Ledger",
-    template: "%s · Simple Ledger",
+    default: BRAND.name,
+    template: `%s · ${BRAND.name}`,
   },
-  description: "A private, modern expense tracker that makes spending easy to understand.",
-  applicationName: "Simple Ledger",
+  description: BRAND.description,
+  applicationName: BRAND.name,
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Simple Ledger",
+    title: BRAND.name,
   },
   formatDetection: { telephone: false },
 };
