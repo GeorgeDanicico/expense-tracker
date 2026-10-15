@@ -281,6 +281,10 @@ export type Database = {
         };
         Returns: string;
       };
+      delete_family: {
+        Args: { p_confirm_name: string };
+        Returns: undefined;
+      };
       dismiss_notice: {
         Args: { p_notice_id: string };
         Returns: undefined;
@@ -318,6 +322,10 @@ export type Database = {
           id: string;
           kind: string;
         }[];
+      };
+      remove_family_member: {
+        Args: { p_member_id: string };
+        Returns: undefined;
       };
       set_member_permissions: {
         Args: {
