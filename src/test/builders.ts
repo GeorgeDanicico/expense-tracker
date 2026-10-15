@@ -1,7 +1,9 @@
 import type { Expense } from "@/lib/expenses/types";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
+import { PARENT_PERMISSIONS, type CurrentMember } from "@/lib/family/repository";
 import type { InvestmentTransaction } from "@/lib/investments/types";
 import type { NetWorthManualItemSource, NetWorthValuation } from "@/lib/net-worth/types";
+import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
 
 /** Test fixtures with readable defaults; override only what a test is about. */
 
@@ -61,6 +63,32 @@ export function aManualItem(overrides: Partial<NetWorthManualItemSource> = {}): 
     purchaseAmount: null,
     archivedAt: null,
     valuations: [aValuation({ id: `${id}-valuation`, itemId: id })],
+    ...overrides,
+  };
+}
+
+/** A parent's membership, as `getCurrentMember()` returns it. Seed it on `repositories.family.membership`. */
+export function aParent(overrides: Partial<CurrentMember> = {}): CurrentMember {
+  return {
+    memberId: "60000000-0000-4000-8000-000000000001",
+    familyId: "70000000-0000-4000-8000-000000000001",
+    familyName: "The Smiths",
+    role: "parent",
+    isCreator: true,
+    permissions: PARENT_PERMISSIONS,
+    ...overrides,
+  };
+}
+
+/** A kid's membership with the default kid permissions; override `permissions` for what a test is about. */
+export function aKid(overrides: Partial<CurrentMember> = {}): CurrentMember {
+  return {
+    memberId: "60000000-0000-4000-8000-000000000002",
+    familyId: "70000000-0000-4000-8000-000000000001",
+    familyName: "The Smiths",
+    role: "kid",
+    isCreator: false,
+    permissions: DEFAULT_KID_PERMISSIONS,
     ...overrides,
   };
 }
