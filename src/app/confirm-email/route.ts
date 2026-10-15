@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { createClient } from "@/lib/supabase/server";
+import { getAuth } from "@/lib/auth";
 
 const confirmationSchema = z.object({
   email: z.email(),
@@ -23,10 +23,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.verifyOtp(parsed.data);
+  const { ok } = await getAuth().completeEmailLink(parsed.data);
 
-  redirectUrl.pathname = error ? "/login" : "/dashboard";
-  redirectUrl.search = error ? "message=confirmation-failed" : "";
+  redirectUrl.pathname = ok ? "/dashboard" : "/login";
+  redirectUrl.search = ok ? "" : "message=confirmation-failed";
   return NextResponse.redirect(redirectUrl);
 }

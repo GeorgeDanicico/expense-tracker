@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
+import { getAuth } from "@/lib/auth";
 import { siteOrigin } from "@/lib/http/origin";
 import { json } from "@/lib/http/route";
-import { createClient } from "@/lib/supabase/server";
 
 const authSchema = z.object({
   mode: z.enum(["login", "signup"]),
@@ -24,13 +24,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = await createClient();
+  const auth = getAuth();
   if (parsed.data.mode === "login") {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: parsed.data.email,
-      password: parsed.data.password,
-    });
-    if (error) {
+    const signIn = await auth.signInWithPassword(parsed.data.email, parsed.data.password);
+    if (!signIn.ok) {
       return json({ error: "Email or password is incorrect." }, 401);
     }
     return json({ authenticated: true });
@@ -38,27 +35,22 @@ export async function POST(request: NextRequest) {
 
   const confirmationUrl = new URL("/auth/confirm", siteOrigin(request));
   confirmationUrl.searchParams.set("next", "/dashboard");
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: { emailRedirectTo: confirmationUrl.toString() },
-  });
+  const signUp = await auth.signUp(parsed.data.email, parsed.data.password, confirmationUrl.toString());
 
-  if (error) {
-    return json({ error: error.message }, 400);
+  if (!signUp.ok) {
+    return json({ error: signUp.reason }, 400);
   }
 
   return json(
-    data.session
+    signUp.signedIn
       ? { authenticated: true }
       : { authenticated: false, message: "Check your inbox to confirm your email, then sign in." },
   );
 }
 
 export async function DELETE() {
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signOut();
-  if (error) {
+  const signOut = await getAuth().signOut();
+  if (!signOut.ok) {
     return json({ error: "Unable to sign out. Please try again." }, 500);
   }
   return json({ success: true });

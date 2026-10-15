@@ -276,7 +276,7 @@ This task sets the pattern every other repository follows, so keep it small and 
 - `signUp(email, password, confirmationUrl)`
 - `signOut()`
 - `oauthSignInUrl("google", callbackUrl)`
-- `completeEmailLink({ code, tokenHash, type })`
+- `completeEmailLink(link)`, where `link` is `{ code }`, `{ tokenHash, type }` (`/auth/confirm`) or `{ email, token, type: "email" }` (the 6-digit code in `/confirm-email`)
 
 Results are plain domain objects, such as `{ ok: true }` or `{ ok: false, reason }`, with no Supabase types.
 
