@@ -318,6 +318,17 @@ export type Database = {
           kind: string;
         }[];
       };
+      set_member_permissions: {
+        Args: {
+          p_member_id: string;
+          p_permissions: Json;
+        };
+        Returns: undefined;
+      };
+      touch_last_active: {
+        Args: never;
+        Returns: undefined;
+      };
     };
     Enums: { Role: "USER" | "ADMIN" };
     CompositeTypes: { [_ in never]: never };
