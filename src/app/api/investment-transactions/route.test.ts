@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { aTransaction } from "@/test/builders";
+import { aKid, aParent, aTransaction } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
@@ -139,5 +139,46 @@ describe("DELETE /api/investment-transactions/[id]", () => {
       body: { error: "This order cannot be removed because it would invalidate the later history: executedAt must be a valid timestamp." },
     });
     expect(repositories.investments.transactions).toHaveLength(2);
+  });
+});
+
+describe("investment transactions in a family", () => {
+  beforeEach(() => vi.stubEnv("FAMILY_ENABLED", "true"));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("refuses a kid with investments off and saves nothing", async () => {
+    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off" } });
+
+    const response = await createOrder(order);
+
+    expect(response).toMatchObject({ status: 403, body: { error: "You don't have access to this." } });
+    expect(repositories.investments.transactions).toEqual([]);
+  });
+
+  it("refuses a kid with investments off when deleting an order", async () => {
+    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off" } });
+    seedAccount(user.id);
+
+    const response = await deleteOrder(transaction.id);
+
+    expect(response.status).toBe(403);
+    expect(repositories.investments.transactions).toEqual([transaction]);
+  });
+
+  it("saves the order for a kid with investments on", async () => {
+    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "off", family_finance: "off" } });
+
+    expect((await createOrder(order)).status).toBe(201);
+  });
+
+  it("saves the order for a parent, as before", async () => {
+    repositories.family.membership = aParent();
+
+    expect((await createOrder(order)).status).toBe(201);
+  });
+
+  it("saves the order for a user without a family, as before", async () => {
+    expect((await createOrder(order)).status).toBe(201);
+    expect(repositories.family.calls).toEqual(["getMembership"]);
   });
 });

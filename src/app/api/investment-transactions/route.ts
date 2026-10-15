@@ -1,13 +1,14 @@
 import type { NextRequest } from "next/server";
 
-import { json, notFound, parseBody, parseInput, withUser } from "@/lib/http/route";
+import { withPermission } from "@/lib/http/permission";
+import { json, notFound, parseBody, parseInput } from "@/lib/http/route";
 import { createInvestmentTransaction, getInvestmentTransactions } from "@/lib/investments/service";
 import {
   investmentTransactionQuerySchema,
   investmentTransactionSchema,
 } from "@/lib/validation/investment";
 
-export const GET = withUser(async (request: NextRequest, user) => {
+export const GET = withPermission("investments", "edit", async (request: NextRequest, user) => {
   const query = parseInput({
     accountId: request.nextUrl.searchParams.get("accountId") ?? undefined,
     instrument: request.nextUrl.searchParams.get("instrument") ?? undefined,
@@ -19,7 +20,7 @@ export const GET = withUser(async (request: NextRequest, user) => {
   return json(transactions);
 }, { failure: "Unable to load investment transactions." });
 
-export const POST = withUser(async (request: NextRequest, user) => {
+export const POST = withPermission("investments", "edit", async (request: NextRequest, user) => {
   const input = await parseBody(
     request,
     investmentTransactionSchema,

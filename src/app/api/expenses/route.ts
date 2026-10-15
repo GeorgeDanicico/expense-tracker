@@ -1,12 +1,13 @@
 import type { NextRequest } from "next/server";
 
 import { getMonthlyLedger } from "@/lib/expenses/service";
-import { HttpError, json, parseInput, readJson, withUser } from "@/lib/http/route";
+import { withPermission } from "@/lib/http/permission";
+import { HttpError, json, parseInput, readJson } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { getBucharestMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
 
-export const GET = withUser(async (request: NextRequest, user) => {
+export const GET = withPermission("expenses", "edit", async (request: NextRequest, user) => {
   const requestedMonth = request.nextUrl.searchParams.get("month") ?? "";
   const isMainLedger = request.nextUrl.searchParams.get("context") === "main";
   const month = isMainLedger
@@ -23,7 +24,7 @@ export const GET = withUser(async (request: NextRequest, user) => {
   });
 }, { failure: "Unable to load expenses." });
 
-export const POST = withUser(async (request: NextRequest, user) => {
+export const POST = withPermission("expenses", "edit", async (request: NextRequest, user) => {
   const payload = (await readJson(request)) as Record<string, unknown> | null;
   const selectedMonth = typeof payload?.selectedMonth === "string" ? payload.selectedMonth : "";
   const input = parseInput(payload, expenseSchema, "Check the highlighted details and try again.");

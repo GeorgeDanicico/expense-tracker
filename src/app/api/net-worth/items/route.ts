@@ -1,8 +1,9 @@
-import { json, parseBody, withUser } from "@/lib/http/route";
+import { withPermission } from "@/lib/http/permission";
+import { json, parseBody } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { netWorthItemSchema } from "@/lib/validation/net-worth";
 
-export const POST = withUser(async (request, user) => {
+export const POST = withPermission("net_worth", "edit", async (request, user) => {
   const input = await parseBody(request, netWorthItemSchema, "Check the highlighted item details and try again.");
   const result = await getRepositories().netWorth.createItem(user.id, {
     ...input,

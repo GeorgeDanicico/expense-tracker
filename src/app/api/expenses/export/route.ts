@@ -1,14 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { buildExpenseWorkbook } from "@/lib/export/xlsx";
-import { HttpError, PRIVATE_HEADERS, withUser } from "@/lib/http/route";
+import { withPermission } from "@/lib/http/permission";
+import { HttpError, PRIVATE_HEADERS } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 
 export const runtime = "nodejs";
 
 // No `failure`: unexpected errors keep Next's default response instead of a JSON body.
-export const GET = withUser(async (request: NextRequest, user) => {
+export const GET = withPermission("expenses", "edit", async (request: NextRequest, user) => {
   const requestedMonth = request.nextUrl.searchParams.get("month") ?? "";
   if (!isValidMonth(requestedMonth)) {
     throw new HttpError(400, "Invalid month. Use YYYY-MM.");
