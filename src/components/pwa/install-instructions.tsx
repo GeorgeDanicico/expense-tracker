@@ -12,6 +12,8 @@ import {
   useSyncExternalStore,
 } from "react";
 
+import { BRAND } from "@/lib/brand";
+
 type InstallEvent = Event & {
   prompt(): Promise<void>;
   userChoice: Promise<{ outcome: string }>;
@@ -93,12 +95,12 @@ export function InstallInstructions() {
             dismiss();
           }}
         >
-          <Download size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Install Simple Ledger
+          <Download size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Install {BRAND.name}
         </Button>
       ) : (
         <>
           <Text textStyle="bodySm" fontWeight="medium">
-            Install Simple Ledger
+            Install {BRAND.name}
           </Text>
           <Text textStyle="caption">
             {platform === "ios"

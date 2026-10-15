@@ -22,5 +22,5 @@ for test_file in supabase/tests/*.sql; do
   echo "Test $test_file"
   test_output="$(sql -At < "$test_file")"
   echo "$test_output"
-  if echo "$test_output" | rg -q '^not ok|^# (Looks like|No tests run)|^Bail out!'; then exit 1; fi
+  if echo "$test_output" | grep -Eq '^not ok|^# (Looks like|No tests run)|^Bail out!'; then exit 1; fi
 done

@@ -3,8 +3,8 @@
 import { Box, Flex, Separator, Stack, Text } from "@chakra-ui/react";
 
 import { Brand } from "@/components/layout/brand";
-import { NavItem } from "@/components/layout/nav-item";
-import { NAV_ITEMS } from "@/components/layout/nav-items";
+import { NavItem, NavSectionGroup } from "@/components/layout/nav-item";
+import { NAV_ITEMS, NAV_SECTIONS } from "@/components/layout/nav-items";
 import { SignOutIconButton } from "@/components/layout/sign-out-button";
 
 function AccountRow({ email }: { email: string }) {
@@ -32,7 +32,7 @@ function AccountRow({ email }: { email: string }) {
   );
 }
 
-/** Desktop sidebar: brand, primary navigation, settings and the account row. */
+/** Desktop sidebar: brand, Home, the grouped sections, settings and the account row. */
 export function SidebarNav({ email }: { email: string }) {
   return (
     <Box
@@ -56,10 +56,9 @@ export function SidebarNav({ email }: { email: string }) {
       </Box>
       <Stack as="nav" aria-label="Primary navigation" gap="0.5" mt="6">
         <NavItem item={NAV_ITEMS.home} compact />
-        <NavItem item={NAV_ITEMS.expenses} compact />
-        <Separator my="2" />
-        <NavItem item={NAV_ITEMS.investments} compact />
-        <NavItem item={NAV_ITEMS.netWorth} compact />
+        {NAV_SECTIONS.map((section) => (
+          <NavSectionGroup key={section.label} section={section} compact />
+        ))}
       </Stack>
       <Stack mt="auto" gap="1">
         <NavItem item={NAV_ITEMS.settings} compact />
