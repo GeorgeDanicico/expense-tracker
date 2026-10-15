@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ createClient: vi.fn(), createSupabaseClient: vi.fn(), runWithSupabaseClient: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  createClient: vi.fn(),
+  createSupabaseClient: vi.fn(),
+  getBearerToken: vi.fn(),
+  runWithSupabaseClient: vi.fn(),
+}));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: mocks.createClient,
+  getBearerToken: mocks.getBearerToken,
   runWithSupabaseClient: mocks.runWithSupabaseClient,
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
@@ -23,13 +29,37 @@ function mockAuth(methods: Record<string, unknown>) {
 describe("supabaseAuth", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.getBearerToken.mockResolvedValue(null);
   });
 
   describe("getCurrentUser", () => {
     it("returns the user from the session claims", async () => {
-      mockAuth({ getClaims: { data: { claims: { sub: "user-1", email: "a@example.test" } }, error: null } });
+      const auth = mockAuth({ getClaims: { data: { claims: { sub: "user-1", email: "a@example.test" } }, error: null } });
 
       expect(await supabaseAuth.getCurrentUser()).toEqual({ id: "user-1", email: "a@example.test" });
+      expect(auth.getClaims).toHaveBeenCalledWith();
+    });
+
+    it("validates a bearer token with the request's client", async () => {
+      mocks.getBearerToken.mockResolvedValue("token-1");
+      const auth = mockAuth({ getClaims: { data: { claims: { sub: "user-2", email: "b@example.test" } }, error: null } });
+
+      expect(await supabaseAuth.getCurrentUser()).toEqual({ id: "user-2", email: "b@example.test" });
+      expect(auth.getClaims).toHaveBeenCalledExactlyOnceWith("token-1");
+    });
+
+    it("returns null for an expired or invalid bearer token", async () => {
+      mocks.getBearerToken.mockResolvedValue("expired-token");
+      mockAuth({ getClaims: { data: null, error: { message: "JWT has expired" } } });
+
+      expect(await supabaseAuth.getCurrentUser()).toBeNull();
+    });
+
+    it("returns null for a bearer header without a token, without asking the provider", async () => {
+      mocks.getBearerToken.mockResolvedValue("");
+
+      expect(await supabaseAuth.getCurrentUser()).toBeNull();
+      expect(mocks.createClient).not.toHaveBeenCalled();
     });
 
     it("uses an empty email when the claims have none", async () => {
