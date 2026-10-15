@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-import { getExpenseTabLedgerForUser } from "@/lib/data/ledgers";
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
 import { DEFAULT_EXPENSE_TAB_FILTERS, expenseTabFiltersSchema } from "@/lib/expenses/filters";
+import { getExpenseTabLedger } from "@/lib/expenses/service";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
 import { getRepositories } from "@/lib/repositories";
 import { expenseTabSchema } from "@/lib/validation/expense-tab";
@@ -51,7 +51,7 @@ export const expenseTabTools = [
     shape: { tabId: idSchema(), filters: flatFilters.optional() },
     annotations: READ,
     notFound: "Expense tab not found.",
-    run: ({ tabId, filters }, { userId }) => getExpenseTabLedgerForUser(userId, tabId, filters),
+    run: ({ tabId, filters }, { userId }) => getExpenseTabLedger(userId, tabId, filters),
   }),
   defineTool({
     name: "create_expense_tab",

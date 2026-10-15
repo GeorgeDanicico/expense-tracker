@@ -70,7 +70,6 @@ const SUPABASE_BOUNDARY = [
  * (R02–R09) removes its own files from this list, and R10 deletes the list.
  */
 const TEMPORARY_SUPABASE_IMPORTERS = [
-  "src/lib/data/expenses.ts",
 ];
 
 const supabaseBoundary = {

@@ -1,11 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+
+import type { ExpenseRepository } from "@/lib/expenses/repository";
 
 import { anExpense } from "@/test/builders";
+import { resetFakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
-const mocks = vi.hoisted(() => ({ getMonthlyExpensesForUser: vi.fn(), createExpenseForUser: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
-vi.mock("@/lib/data/expenses", () => mocks);
+vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
 import { POST } from "@/app/api/expenses/route";
 
@@ -15,25 +17,26 @@ const post = (data: unknown) => callRoute(POST, { method: "POST", url: "/api/exp
 
 describe("POST /api/expenses", () => {
   let user: ReturnType<typeof signedInAs>;
+  let create: MockInstance<ExpenseRepository["create"]>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     user = signedInAs();
-    mocks.createExpenseForUser.mockResolvedValue(stored);
+    create = vi.spyOn(resetFakeRepositories().expenses, "create").mockResolvedValue(stored);
   });
 
   it("creates the expense for the signed-in user, ignoring a user_id in the body", async () => {
     const response = await post({ ...body, user_id: "someone-else" });
 
     expect(response.status).toBe(201);
-    expect(mocks.createExpenseForUser).toHaveBeenCalledWith(user.id, expect.objectContaining({ category: "car", subtype: "car_fuel", amount: 10.5 }));
-    expect(mocks.createExpenseForUser.mock.calls[0][1]).not.toHaveProperty("user_id");
+    expect(create).toHaveBeenCalledWith(user.id, expect.objectContaining({ category: "car", subtype: "car_fuel", amount: 10.5 }));
+    expect(create.mock.calls[0][1]).not.toHaveProperty("user_id");
   });
 
   it("writes null for an omitted subtype", async () => {
     await post({ ...body, subtype: undefined });
 
-    expect(mocks.createExpenseForUser).toHaveBeenCalledWith(user.id, expect.objectContaining({ subtype: null }));
+    expect(create).toHaveBeenCalledWith(user.id, expect.objectContaining({ subtype: null }));
   });
 
   it("responds with the expense as stored, not as requested", async () => {
@@ -47,11 +50,11 @@ describe("POST /api/expenses", () => {
 
     expect(response.status).toBe(422);
     expect(response.body.fieldErrors.subtype).toHaveLength(1);
-    expect(mocks.createExpenseForUser).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("reports a storage failure with the route's own message", async () => {
-    mocks.createExpenseForUser.mockRejectedValue(new Error("private failure"));
+    create.mockRejectedValue(new Error("private failure"));
 
     const response = await post(body);
 

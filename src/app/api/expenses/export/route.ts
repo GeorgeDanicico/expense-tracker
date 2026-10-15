@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getMonthlyExpensesForUser } from "@/lib/data/expenses";
 import { buildExpenseWorkbook } from "@/lib/export/xlsx";
 import { HttpError, PRIVATE_HEADERS, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
@@ -16,9 +15,10 @@ export const GET = withUser(async (request: NextRequest, user) => {
   }
   const month = resolveMainExpenseMonth(requestedMonth);
 
+  const repositories = getRepositories();
   const [expenses, currency] = await Promise.all([
-    getMonthlyExpensesForUser(user.id, month),
-    getRepositories().account.getCurrency(user.id),
+    repositories.expenses.listMonth(user.id, month),
+    repositories.account.getCurrency(user.id),
   ]);
   const workbook = buildExpenseWorkbook(expenses, currency);
   return new NextResponse(workbook, {

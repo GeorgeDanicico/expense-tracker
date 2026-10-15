@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
+import {
+  CATEGORY_LABELS,
+  EXPENSE_CATEGORIES,
+  EXPENSE_SUBTYPES,
+  SUBTYPE_LABELS,
+} from "@/lib/expenses/categories";
+import type { Expense } from "@/lib/expenses/types";
 import { addDays, toIsoDate } from "@/lib/calendar";
 import { calendarDate } from "@/lib/validation/primitives";
 
@@ -31,6 +37,13 @@ export function expenseTabDateBounds(filters: ExpenseTabFilters) {
       endExclusive: `${filters.year + 1}-01-01` };
   }
   return { start: filters.startDate, endExclusive: addDays(filters.endDate, 1) };
+}
+
+/** Whether the expense's text, category or subtype contains `term`, which is already lower-cased. */
+export function matchesExpenseSearch(expense: Expense, term: string) {
+  return [expense.description, expense.notes ?? "", CATEGORY_LABELS[expense.category],
+    expense.subtype ? SUBTYPE_LABELS[expense.subtype] : "No subtype"]
+    .some((value) => value.toLowerCase().includes(term));
 }
 
 type SearchParams = { get(name: string): string | null };

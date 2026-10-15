@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 
-import { getExpenseTabLedgerForUser } from "@/lib/data/ledgers";
 import type { ExpenseTabLedgerData } from "@/lib/expenses/tabs";
 import { parseExpenseTabFilters } from "@/lib/expenses/filters";
+import { getExpenseTabLedger } from "@/lib/expenses/service";
 import { HttpError, json, notFound, parseId, withUser } from "@/lib/http/route";
 
 type TabRouteContext = { params: Promise<{ id: string }> };
@@ -14,6 +14,6 @@ export const GET = withUser(async (request: NextRequest, user, context: TabRoute
     throw new HttpError(422, "Check the expense filters and try again.", parsed.error.flatten().fieldErrors);
   }
   const ledger: ExpenseTabLedgerData =
-    await getExpenseTabLedgerForUser(user.id, id, parsed.data) ?? notFound("Expense tab not found.");
+    await getExpenseTabLedger(user.id, id, parsed.data) ?? notFound("Expense tab not found.");
   return json(ledger);
 }, { failure: "Unable to load expense tab." });
