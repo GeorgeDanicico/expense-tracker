@@ -1,36 +1,36 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DomainError } from "@/lib/errors";
 import { aTransaction } from "@/test/builders";
+import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
-const mocks = vi.hoisted(() => ({
-  getInvestmentTransactionsForUser: vi.fn(),
-  createInvestmentTransactionForUser: vi.fn(),
-  deleteInvestmentTransactionForUser: vi.fn(),
-}));
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
-vi.mock("@/lib/data/investments", () => mocks);
+vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
 import { DELETE } from "@/app/api/investment-transactions/[id]/route";
 import { GET, POST } from "@/app/api/investment-transactions/route";
 
-const transaction = {
-  ...aTransaction({
-    id: "30000000-0000-4000-8000-000000000001",
-    investmentAccountId: "20000000-0000-4000-8000-000000000001",
-    executedAt: "2026-01-01T10:00:00.000Z",
-  }),
-  brokerId: "xtb",
-};
+const ACCOUNT_ID = "20000000-0000-4000-8000-000000000001";
+const transaction = aTransaction({
+  id: "30000000-0000-4000-8000-000000000001",
+  investmentAccountId: ACCOUNT_ID,
+  executedAt: "2026-01-01T10:00:00.000Z",
+});
 const order = { brokerId: "xtb", instrument: "VWCE.DE", currency: "EUR", side: "buy", amount: "150", quantity: "1.5", unitPrice: "100", executedAt: "2026-01-01T10:00:00Z" };
 const createOrder = (body: unknown) => callRoute(POST, { method: "POST", url: "/api/investment-transactions", body });
 const deleteOrder = (id: string) => callRoute(DELETE, { method: "DELETE", url: `/api/investment-transactions/${id}`, params: { id } });
 
+let repositories: FakeRepositories;
 let user: ReturnType<typeof signedInAs>;
 
+/** Seeds an XTB account for `userId` holding `transactions`. */
+function seedAccount(userId: string, transactions = [transaction]) {
+  repositories.investments.accounts.push({ id: ACCOUNT_ID, userId, brokerId: "xtb" });
+  repositories.investments.transactions.push(...transactions);
+}
+
 beforeEach(() => {
-  vi.clearAllMocks();
+  repositories = resetFakeRepositories();
   user = signedInAs();
 });
 
@@ -41,30 +41,37 @@ describe("POST /api/investment-transactions", () => {
     expect(response.status).toBe(422);
     expect(response.body.error).toContain("highlighted");
     expect(Object.keys(response.body.fieldErrors)).toEqual(expect.arrayContaining(["amount", "executedAt"]));
-    expect(mocks.createInvestmentTransactionForUser).not.toHaveBeenCalled();
+    expect(repositories.investments.accounts).toEqual([]);
+    expect(repositories.investments.transactions).toEqual([]);
   });
 
   it("normalizes a valid order before saving it for the signed-in user", async () => {
-    mocks.createInvestmentTransactionForUser.mockResolvedValue({ transaction });
-
     await createOrder({ ...order, instrument: " vwce.de ", currency: "eur", amount: "150.0000000000" });
 
-    expect(mocks.createInvestmentTransactionForUser).toHaveBeenCalledWith(user.id, {
-      ...order, instrument: "VWCE.DE", currency: "EUR", amount: "150.0000000000", executedAt: "2026-01-01T10:00:00.000Z",
-    });
+    const [account] = repositories.investments.accounts;
+    expect(account).toMatchObject({ userId: user.id, brokerId: "xtb" });
+    expect(repositories.investments.transactions).toEqual([{
+      id: expect.any(String),
+      investmentAccountId: account.id,
+      instrument: "VWCE.DE",
+      currency: "EUR",
+      side: "buy",
+      amount: "150.0000000000",
+      quantity: "1.5",
+      unitPrice: "100",
+      executedAt: "2026-01-01T10:00:00.000Z",
+    }]);
   });
 
   it("responds 201 with the created transaction", async () => {
-    mocks.createInvestmentTransactionForUser.mockResolvedValue({ transaction });
-
     const response = await createOrder(order);
 
-    expect(response).toMatchObject({ status: 201, body: { transaction } });
+    const [stored] = repositories.investments.transactions;
+    expect(response).toMatchObject({ status: 201, body: { transaction: { ...stored, brokerId: "xtb" } } });
   });
 
   it("passes an oversell rejection from the data layer through with its field errors", async () => {
     const message = "Sell quantity exceeds the available VWCE.DE position.";
-    mocks.createInvestmentTransactionForUser.mockRejectedValue(new DomainError(message, 422, { quantity: [message] }));
 
     const response = await createOrder({ ...order, side: "sell", amount: "100", quantity: "2", unitPrice: "50" });
 
@@ -74,46 +81,63 @@ describe("POST /api/investment-transactions", () => {
 
 describe("GET /api/investment-transactions", () => {
   it("returns the signed-in user's history for one asset", async () => {
+    seedAccount(user.id);
     const asset = { accountId: transaction.investmentAccountId, instrument: transaction.instrument, currency: transaction.currency };
-    mocks.getInvestmentTransactionsForUser.mockResolvedValue({ ...asset, transactions: [transaction] });
 
     const response = await callRoute(GET, { url: `/api/investment-transactions?${new URLSearchParams(asset)}` });
 
-    expect(response).toMatchObject({ status: 200, body: { transactions: [transaction] } });
-    expect(mocks.getInvestmentTransactionsForUser).toHaveBeenCalledWith(user.id, asset);
+    expect(response).toMatchObject({ status: 200, body: { ...asset, transactions: [{ ...transaction, brokerId: "xtb" }] } });
+  });
+
+  it("returns 404 for another user's asset", async () => {
+    seedAccount("someone-else");
+    const asset = { accountId: transaction.investmentAccountId, instrument: transaction.instrument, currency: transaction.currency };
+
+    const response = await callRoute(GET, { url: `/api/investment-transactions?${new URLSearchParams(asset)}` });
+
+    expect(response).toMatchObject({ status: 404, body: { error: "Investment asset not found." } });
   });
 });
 
 describe("DELETE /api/investment-transactions/[id]", () => {
   it("rejects a malformed id before touching the data layer", async () => {
+    const findTransaction = vi.spyOn(repositories.investments, "findTransaction");
+
     const response = await deleteOrder("not-a-uuid");
 
     expect(response.status).toBe(400);
-    expect(mocks.deleteInvestmentTransactionForUser).not.toHaveBeenCalled();
+    expect(findTransaction).not.toHaveBeenCalled();
   });
 
   it("returns 404 for another user's order", async () => {
-    mocks.deleteInvestmentTransactionForUser.mockResolvedValue(false);
+    seedAccount("someone-else");
 
     const response = await deleteOrder(transaction.id);
 
     expect(response.status).toBe(404);
-    expect(mocks.deleteInvestmentTransactionForUser).toHaveBeenCalledWith(user.id, transaction.id);
+    expect(repositories.investments.transactions).toEqual([transaction]);
   });
 
   it("returns an empty 204 after deleting", async () => {
-    mocks.deleteInvestmentTransactionForUser.mockResolvedValue(true);
+    seedAccount(user.id);
 
     const response = await deleteOrder(transaction.id);
 
     expect(response).toMatchObject({ status: 204, body: null });
+    expect(repositories.investments.transactions).toEqual([]);
   });
 
   it("returns 409 when deleting would invalidate later history", async () => {
-    mocks.deleteInvestmentTransactionForUser.mockRejectedValue(new DomainError("This order would invalidate the later history.", 409));
+    // A stored order the calculation cannot read, after the one being removed.
+    const unreadable = aTransaction({ id: "30000000-0000-4000-8000-000000000002", investmentAccountId: ACCOUNT_ID, executedAt: "not-a-date" });
+    seedAccount(user.id, [transaction, unreadable]);
 
     const response = await deleteOrder(transaction.id);
 
-    expect(response).toMatchObject({ status: 409, body: { error: "This order would invalidate the later history." } });
+    expect(response).toMatchObject({
+      status: 409,
+      body: { error: "This order cannot be removed because it would invalidate the later history: executedAt must be a valid timestamp." },
+    });
+    expect(repositories.investments.transactions).toHaveLength(2);
   });
 });

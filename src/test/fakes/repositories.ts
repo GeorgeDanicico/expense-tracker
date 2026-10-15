@@ -2,6 +2,7 @@ import type { Repositories } from "@/lib/repositories";
 
 import { FakeAccountRepository } from "./account";
 import { FakeExpenseTabRepository } from "./expense-tabs";
+import { FakeInvestmentRepository } from "./investments";
 import { FakeNetWorthRepository } from "./net-worth";
 
 /**
@@ -16,6 +17,7 @@ import { FakeNetWorthRepository } from "./net-worth";
 export type FakeRepositories = {
   account: FakeAccountRepository;
   expenseTabs: FakeExpenseTabRepository;
+  investments: FakeInvestmentRepository;
   netWorth: FakeNetWorthRepository;
 };
 
@@ -25,6 +27,7 @@ export function resetFakeRepositories(): FakeRepositories {
   current = {
     account: new FakeAccountRepository(),
     expenseTabs: new FakeExpenseTabRepository(),
+    investments: new FakeInvestmentRepository(),
     netWorth: new FakeNetWorthRepository(),
   };
   return current;

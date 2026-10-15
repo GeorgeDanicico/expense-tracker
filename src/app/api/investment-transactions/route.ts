@@ -1,10 +1,7 @@
 import type { NextRequest } from "next/server";
 
-import {
-  createInvestmentTransactionForUser,
-  getInvestmentTransactionsForUser,
-} from "@/lib/data/investments";
 import { json, notFound, parseBody, parseInput, withUser } from "@/lib/http/route";
+import { createInvestmentTransaction, getInvestmentTransactions } from "@/lib/investments/service";
 import {
   investmentTransactionQuerySchema,
   investmentTransactionSchema,
@@ -17,7 +14,7 @@ export const GET = withUser(async (request: NextRequest, user) => {
     currency: request.nextUrl.searchParams.get("currency") ?? undefined,
   }, investmentTransactionQuerySchema, "Choose a valid investment asset.");
 
-  const transactions = await getInvestmentTransactionsForUser(user.id, query)
+  const transactions = await getInvestmentTransactions(user.id, query)
     ?? notFound("Investment asset not found.");
   return json(transactions);
 }, { failure: "Unable to load investment transactions." });
@@ -28,5 +25,5 @@ export const POST = withUser(async (request: NextRequest, user) => {
     investmentTransactionSchema,
     "Check the highlighted order details and try again.",
   );
-  return json(await createInvestmentTransactionForUser(user.id, input), 201);
+  return json(await createInvestmentTransaction(user.id, input), 201);
 }, { failure: "The investment order could not be saved." });

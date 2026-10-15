@@ -26,6 +26,42 @@ describe("fakeSupabase", () => {
     expect(data?.map((row) => row.id)).toEqual(["b", "c", "a"]);
   });
 
+  it("returns at most the limit", async () => {
+    const { client, queries } = fakeSupabase({ people: people() });
+
+    const { data } = await client.from("people").select().order("id").limit(2);
+
+    expect(data?.map((row) => row.id)).toEqual(["a", "b"]);
+    expect(queries[0]).toMatchObject({ limits: ["2"] });
+  });
+
+  it("filters, orders and limits an embedded list, dropping rows whose list no longer matches", async () => {
+    const teams = [
+      { id: "red", people: people().filter((person) => person.team === "red") },
+      { id: "blue", people: people().filter((person) => person.team === "blue") },
+      { id: "green", people: [{ id: "d", born: "1980-01-01" }] },
+    ];
+    const { client, queries } = fakeSupabase({ teams });
+
+    const { data } = await client.from("teams").select().gte("people.born", "1985-01-01")
+      .order("born", { foreignTable: "people", ascending: false }).limit(1, { foreignTable: "people" });
+
+    expect(data).toEqual([
+      { id: "red", people: [expect.objectContaining({ id: "c" })] },
+      { id: "blue", people: [expect.objectContaining({ id: "b" })] },
+    ]);
+    expect(queries[0]).toMatchObject({ orders: ["people.born"], limits: ["people:1"] });
+    expect(teams[0].people).toHaveLength(2);
+  });
+
+  it("filters on a column of an embedded row", async () => {
+    const { client } = fakeSupabase({ pets: [{ id: "rex", owner: { team: "red" } }, { id: "tom", owner: { team: "blue" } }] });
+
+    const { data } = await client.from("pets").select().eq("owner.team", "blue");
+
+    expect(data?.map((row) => row.id)).toEqual(["tom"]);
+  });
+
   it("returns a range page no larger than the page cap, with the full count", async () => {
     const { client } = fakeSupabase({ people: people() }, { pageCap: 1 });
 

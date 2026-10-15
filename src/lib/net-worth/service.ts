@@ -2,7 +2,7 @@ import "server-only";
 
 import type { z } from "zod";
 
-import { getInvestmentsOverviewForUser } from "@/lib/data/investments";
+import { getInvestmentsOverview } from "@/lib/investments/service";
 import { DomainError } from "@/lib/errors";
 import { buildNetWorthOverview } from "@/lib/net-worth/calculation";
 import type { NetWorthItemChanges, NetWorthValuationInput } from "@/lib/net-worth/repository";
@@ -14,7 +14,7 @@ export type NetWorthItemPatchInput = z.output<typeof netWorthItemPatchSchema>;
 
 /** The user's net worth: their investments combined with their active manual items. */
 export async function getNetWorthOverview(userId: string) {
-  const investmentsPromise = getInvestmentsOverviewForUser(userId);
+  const investmentsPromise = getInvestmentsOverview(userId);
   const manualItemsPromise = getRepositories().netWorth.listActiveItems(userId);
   const [investments, manualItems] = await Promise.all([investmentsPromise, manualItemsPromise]);
 

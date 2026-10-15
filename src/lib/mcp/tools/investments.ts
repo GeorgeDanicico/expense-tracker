@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 import {
-  createInvestmentTransactionForUser,
-  deleteInvestmentTransactionForUser,
-  getInvestmentsOverviewForUser,
-  getInvestmentTransactionsForUser,
-} from "@/lib/data/investments";
+  createInvestmentTransaction,
+  deleteInvestmentTransaction,
+  getInvestmentsOverview,
+  getInvestmentTransactions,
+} from "@/lib/investments/service";
 import { CREATE, defineTool, DELETE, READ } from "@/lib/mcp/define-tool";
 import { investmentTransactionQuerySchema, investmentTransactionSchema } from "@/lib/validation/investment";
 import { idSchema } from "@/lib/validation/primitives";
@@ -17,7 +17,7 @@ export const investmentTools = [
     description: "Investment accounts, positions and current valuation.",
     schema: z.object({}),
     annotations: READ,
-    run: (_input, { userId }) => getInvestmentsOverviewForUser(userId),
+    run: (_input, { userId }) => getInvestmentsOverview(userId),
   }),
   defineTool({
     name: "list_investment_transactions",
@@ -26,7 +26,7 @@ export const investmentTools = [
     schema: investmentTransactionQuerySchema,
     annotations: READ,
     notFound: "Investment position not found.",
-    run: (input, { userId }) => getInvestmentTransactionsForUser(userId, input),
+    run: (input, { userId }) => getInvestmentTransactions(userId, input),
   }),
   defineTool({
     name: "add_investment_transaction",
@@ -34,7 +34,7 @@ export const investmentTools = [
     description: "Record a buy or sell order. Decimals are strings; executedAt is an ISO date-time.",
     schema: investmentTransactionSchema,
     annotations: CREATE,
-    run: (input, { userId }) => createInvestmentTransactionForUser(userId, input),
+    run: (input, { userId }) => createInvestmentTransaction(userId, input),
   }),
   defineTool({
     name: "delete_investment_transaction",
@@ -43,6 +43,6 @@ export const investmentTools = [
     schema: z.object({ id: idSchema() }),
     annotations: DELETE,
     notFound: "Investment order not found.",
-    run: async ({ id }, { userId }) => (await deleteInvestmentTransactionForUser(userId, id)) && { deleted: true, id },
+    run: async ({ id }, { userId }) => (await deleteInvestmentTransaction(userId, id)) && { deleted: true, id },
   }),
 ];
