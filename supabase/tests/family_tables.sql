@@ -27,9 +27,10 @@ select ok(
 );
 select is(
   (select count(*)::integer from pg_catalog.pg_policies
-   where schemaname = 'public' and tablename in ('families', 'family_members', 'member_permissions')),
+   where schemaname = 'public' and tablename in ('families', 'family_members', 'member_permissions')
+     and cmd <> 'SELECT'),
   0,
-  'the three tables have no policies yet'
+  'the three tables have no write policies (F06 adds the read policies)'
 );
 
 -- Setup as the table owner
@@ -144,12 +145,16 @@ select results_eq(
   'the check allows exactly the module and level pairs of the catalogue'
 );
 
--- Direct access as a signed-in member of family B
+-- Direct reads as a signed-in user without a family. What members can read is
+-- tested in family_read_access.sql (F06).
 set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"f0300000-0000-4000-8000-000000000005","role":"authenticated"}', true);
+select is((select count(*)::integer from public.families), 0, 'a user without a family cannot read families');
+select is((select count(*)::integer from public.family_members), 0, 'a user without a family cannot read family_members');
+select is((select count(*)::integer from public.member_permissions), 0, 'a user without a family cannot read member_permissions');
+
+-- Direct writes as a signed-in member of family B
 select set_config('request.jwt.claims', '{"sub":"f0300000-0000-4000-8000-000000000003","role":"authenticated"}', true);
-select is((select count(*)::integer from public.families), 0, 'authenticated cannot read families');
-select is((select count(*)::integer from public.family_members), 0, 'authenticated cannot read family_members');
-select is((select count(*)::integer from public.member_permissions), 0, 'authenticated cannot read member_permissions');
 select throws_ok($$
   insert into public.families (name, creator_id) values ('Mine', 'f0300000-0000-4000-8000-000000000003')
 $$, '42501', null, 'authenticated cannot insert families');

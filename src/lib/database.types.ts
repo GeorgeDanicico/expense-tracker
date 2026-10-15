@@ -264,6 +264,21 @@ export type Database = {
         };
         Returns: Json;
       };
+      get_family: {
+        Args: never;
+        Returns: Json;
+      };
+      get_my_membership: {
+        Args: never;
+        Returns: {
+          family_id: string;
+          family_name: string;
+          is_creator: boolean;
+          member_id: string;
+          permissions: Json;
+          role: string;
+        }[];
+      };
     };
     Enums: { Role: "USER" | "ADMIN" };
     CompositeTypes: { [_ in never]: never };
