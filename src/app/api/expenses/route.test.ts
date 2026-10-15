@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import type { ExpenseRepository } from "@/lib/expenses/repository";
 
-import { anExpense } from "@/test/builders";
-import { resetFakeRepositories } from "@/test/fakes/repositories";
+import { aKid, aParent, anExpense } from "@/test/builders";
+import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
@@ -59,5 +59,37 @@ describe("POST /api/expenses", () => {
     const response = await post(body);
 
     expect(response).toMatchObject({ status: 500, body: { error: "The expense could not be saved." } });
+  });
+});
+
+describe("POST /api/expenses in a family", () => {
+  let repositories: FakeRepositories;
+
+  beforeEach(() => {
+    signedInAs();
+    repositories = resetFakeRepositories();
+    vi.spyOn(repositories.expenses, "create").mockResolvedValue(stored);
+    vi.stubEnv("FAMILY_ENABLED", "true");
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("creates the expense for a kid with expenses on", async () => {
+    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off" } });
+
+    expect(await post(body)).toMatchObject({ status: 201, body: { expense: stored } });
+  });
+
+  it("refuses a kid with expenses off", async () => {
+    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "edit", family_finance: "view" } });
+
+    expect(await post(body)).toMatchObject({ status: 403, body: { error: "You don't have access to this." } });
+    expect(repositories.expenses.create).not.toHaveBeenCalled();
+  });
+
+  it("creates the expense for a parent, as before", async () => {
+    repositories.family.membership = aParent();
+
+    expect((await post(body)).status).toBe(201);
   });
 });

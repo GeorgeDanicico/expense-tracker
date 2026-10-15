@@ -71,7 +71,7 @@ export async function parseBody<S extends z.ZodType>(request: Request, schema: S
  * Next always passes both arguments and type-checks the last signature at build time; the shorter
  * ones let handlers that ignore their arguments be called directly in tests.
  */
-type RouteHandler<Req, Ctx> = {
+export type RouteHandler<Req, Ctx> = {
   (): Promise<Response>;
   (request: Req): Promise<Response>;
   (request: Req, context: Ctx): Promise<Response>;
