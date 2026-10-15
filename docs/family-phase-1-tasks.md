@@ -204,6 +204,18 @@ All of these are `security definer`, granted only to `authenticated`, and identi
 - **Copy:** short, plain sentences. Say "family", "parent" and "kid" in the UI.
 - **Checks:** `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run test:db` for any task with SQL.
 
+### How to add a repository method
+
+The account repository is the worked example: `src/lib/account/repository.ts`, `src/lib/supabase/repositories/account.ts` and `src/test/fakes/account.ts`. A new method changes these three places in the same PR:
+
+1. **Interface** (`src/lib/<domain>/repository.ts`): the method, with domain types only. Finance methods take the acting `userId` first.
+2. **Supabase implementation** (`src/lib/supabase/repositories/<domain>.ts`): `const supabase = await createClient()`, map rows to domain types, and on failure `throw translateDatabaseError(error, "<generic message>")` from `src/lib/supabase/errors.ts`. A refactor (R06–R09) keeps the exact errors the old `src/lib/data/` function threw instead. Test it in `<domain>.test.ts` beside it, mocking `createClient` with `fakeSupabase` as `account.test.ts` does; add any builder method the fake lacks to `src/test/fake-supabase.ts`.
+3. **Fake** (`src/test/fakes/<domain>.ts`): the same method on plain in-memory state (`Map`s or arrays) that tests seed and read directly.
+
+A new repository also adds its key to `Repositories` and `getRepositories()` in `src/lib/repositories.ts`, and to `FakeRepositories` and `resetFakeRepositories()` in `src/test/fakes/repositories.ts`. Code calls `getRepositories().<key>.<method>(...)` inside the handler or tool, never at module level.
+
+A route or MCP test swaps in every fake with one line, `vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));`, then calls `repositories = resetFakeRepositories()` in `beforeEach`, seeds the fakes (`repositories.account.currencies.set(user.id, "RON")`) and asserts on their state. Simulate a storage failure with `vi.spyOn(repositories.account, "getCurrency").mockRejectedValue(new Error("..."))`. See `src/app/api/account/route.test.ts`.
+
 ---
 
 ## Step 0: Storage and auth boundaries

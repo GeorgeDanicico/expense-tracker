@@ -8,10 +8,12 @@ type Result = { data: Row[] | null; error: unknown; count: number | null };
 
 export type RecordedQuery = {
   table: string;
-  operation: "select" | "insert" | "update" | "delete";
+  operation: "select" | "insert" | "upsert" | "update" | "delete";
   filters: Filter[];
   orders: string[];
   values?: Row;
+  /** The column an `upsert` matches existing rows on. */
+  onConflict?: string;
   range?: [number, number];
 };
 
@@ -50,6 +52,10 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
     // Columns and count options are ignored: tests read whole rows.
     select(...columns: unknown[]) { void columns; return this; }
     insert(values: Row) { return this.write("insert", values); }
+    upsert(values: Row, { onConflict = "id" } = {}) {
+      this.query.onConflict = onConflict;
+      return this.write("upsert", values);
+    }
     update(values: Row) { return this.write("update", values); }
     delete() { return this.write("delete"); }
     eq(column: string, value: unknown) { return this.filter("eq", column, value); }
@@ -95,7 +101,7 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
     }
 
     private run(): Result {
-      const { table, operation, filters, orders, values, range } = this.query;
+      const { table, operation, filters, orders, values, onConflict, range } = this.query;
       queries.push(this.query);
       if (options.fail?.(this.query, queries.length - 1)) return { data: null, error: DATABASE_ERROR, count: null };
 
@@ -105,6 +111,13 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
         const inserted = stored({ id: `row-${nextId++}`, ...values });
         rows.push(inserted);
         return { data: [inserted], error: null, count: 1 };
+      }
+      if (operation === "upsert") {
+        const key = onConflict ?? "id";
+        const existing = rows.find((row) => row[key] === values?.[key]);
+        const written = stored({ ...existing, ...values });
+        tables[table] = existing ? rows.map((row) => (row === existing ? written : row)) : [...rows, written];
+        return { data: [written], error: null, count: 1 };
       }
 
       const found = rows.filter((row) => filters.every((filter) => matches(row, filter))).sort((a, b) => {

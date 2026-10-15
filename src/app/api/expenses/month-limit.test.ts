@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetFakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
 const mocks = vi.hoisted(() => ({
   getMonthlyExpensesForUser: vi.fn(),
-  getAccountCurrencyForUser: vi.fn(),
   buildExpenseWorkbook: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
 vi.mock("@/lib/data/expenses", () => ({ getMonthlyExpensesForUser: mocks.getMonthlyExpensesForUser }));
-vi.mock("@/lib/data/account", () => ({ getAccountCurrencyForUser: mocks.getAccountCurrencyForUser }));
+vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 vi.mock("@/lib/export/xlsx", () => ({ buildExpenseWorkbook: mocks.buildExpenseWorkbook }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 
@@ -26,7 +26,7 @@ describe("main Expenses API month limit", () => {
     vi.setSystemTime(new Date("2026-12-31T22:00:00Z"));
     user = signedInAs();
     mocks.getMonthlyExpensesForUser.mockResolvedValue([]);
-    mocks.getAccountCurrencyForUser.mockResolvedValue("RON");
+    resetFakeRepositories().account.currencies.set(user.id, "RON");
     mocks.buildExpenseWorkbook.mockReturnValue(new Uint8Array([1, 2, 3]));
   });
   afterEach(() => vi.useRealTimers());
