@@ -1,13 +1,8 @@
 import { z } from "zod";
 
-import {
-  addNetWorthValuationForUser,
-  createNetWorthItemForUser,
-  getNetWorthOverviewForUser,
-  updateNetWorthItemForUser,
-  updateNetWorthValuationForUser,
-} from "@/lib/data/net-worth";
 import { CREATE, defineTool, READ, UPDATE } from "@/lib/mcp/define-tool";
+import { addNetWorthValuation, getNetWorthOverview, updateNetWorthItem } from "@/lib/net-worth/service";
+import { getRepositories } from "@/lib/repositories";
 import { netWorthItemPatchSchema, netWorthItemSchema, netWorthValuationSchema } from "@/lib/validation/net-worth";
 import { idSchema } from "@/lib/validation/primitives";
 
@@ -20,7 +15,7 @@ export const netWorthTools = [
     description: "Net worth with investments and manual assets and liabilities.",
     schema: z.object({}),
     annotations: READ,
-    run: (_input, { userId }) => getNetWorthOverviewForUser(userId),
+    run: (_input, { userId }) => getNetWorthOverview(userId),
   }),
   defineTool({
     name: "add_net_worth_item",
@@ -28,7 +23,7 @@ export const netWorthTools = [
     description: "Create an asset or liability with its first valuation. Decimals are strings.",
     schema: netWorthItemSchema,
     annotations: CREATE,
-    run: (input, { userId }) => createNetWorthItemForUser(userId, { ...input, purchaseAmount: input.purchaseAmount ?? null }),
+    run: (input, { userId }) => getRepositories().netWorth.createItem(userId, { ...input, purchaseAmount: input.purchaseAmount ?? null }),
   }),
   defineTool({
     name: "update_net_worth_item",
@@ -38,7 +33,7 @@ export const netWorthTools = [
     annotations: UPDATE,
     notFound: "Net-worth item not found.",
     run: async ({ id, ...patch }, { userId }) =>
-      (await updateNetWorthItemForUser(userId, id, netWorthItemPatchSchema.parse(patch))) && { updated: true, id },
+      (await updateNetWorthItem(userId, id, netWorthItemPatchSchema.parse(patch))) && { updated: true, id },
   }),
   defineTool({
     name: "add_net_worth_valuation",
@@ -48,7 +43,7 @@ export const netWorthTools = [
     annotations: UPDATE,
     notFound: "Net-worth item not found.",
     run: async ({ itemId, ...input }, { userId }) => {
-      const valuation = await addNetWorthValuationForUser(userId, itemId, input);
+      const valuation = await addNetWorthValuation(userId, itemId, input);
       return valuation && { valuation };
     },
   }),
@@ -60,7 +55,7 @@ export const netWorthTools = [
     annotations: UPDATE,
     notFound: "Valuation not found.",
     run: async ({ id, ...input }, { userId }) => {
-      const valuation = await updateNetWorthValuationForUser(userId, id, input);
+      const valuation = await getRepositories().netWorth.updateValuation(userId, id, input);
       return valuation && { valuation };
     },
   }),

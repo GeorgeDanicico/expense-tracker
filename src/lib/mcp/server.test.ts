@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   deleteExpenseForUser: vi.fn(),
   getMonthlyExpensesForUser: vi.fn(),
   getExpenseTabExpensesForUser: vi.fn(),
-  addNetWorthValuationForUser: vi.fn(),
 }));
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 vi.mock("@/lib/data/expenses", () => ({
@@ -25,17 +24,9 @@ vi.mock("@/lib/data/investments", () => ({
   createInvestmentTransactionForUser: vi.fn(),
   deleteInvestmentTransactionForUser: vi.fn(),
 }));
-vi.mock("@/lib/data/net-worth", () => ({
-  getNetWorthOverviewForUser: vi.fn(),
-  createNetWorthItemForUser: vi.fn(),
-  updateNetWorthItemForUser: vi.fn(),
-  addNetWorthValuationForUser: mocks.addNetWorthValuationForUser,
-  updateNetWorthValuationForUser: vi.fn(),
-}));
 
-import { DomainError } from "@/lib/errors";
 import { createMcpServer } from "@/lib/mcp/server";
-import { aTab, anExpense } from "@/test/builders";
+import { aManualItem, aTab, anExpense } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 
 const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
@@ -199,7 +190,7 @@ describe("MCP server", () => {
   });
 
   it("passes domain mutation messages through", async () => {
-    mocks.addNetWorthValuationForUser.mockRejectedValue(new DomainError("Archived items cannot receive new values.", 409));
+    repositories.netWorth.seed("owner", aManualItem({ id: ID, archivedAt: "2026-09-30T10:00:00Z" }));
     const result = await call("add_net_worth_valuation", { itemId: ID, value: "10", valuedOn: "2026-10-01" });
     expect(result.isError).toBe(true);
     expect(result.body.error).toBe("Archived items cannot receive new values.");

@@ -12,26 +12,40 @@ export type RecordedQuery = {
   filters: Filter[];
   orders: string[];
   values?: Row;
-  /** The column an `upsert` matches existing rows on. */
+  /** The columns (comma-separated) an `upsert` matches existing rows on. */
   onConflict?: string;
   range?: [number, number];
+  /** `limit` calls, as `"<count>"`, or `"<foreignTable>:<count>"` for an embedded table. */
+  limits?: string[];
 };
+
+export type RecordedRpc = { fn: string; args: Row };
 
 export type FakeSupabaseOptions = {
   /** The most rows a single `range` page returns, like PostgREST's `max-rows`. */
   pageCap?: number;
   /** Rewrites a written row, like a database trigger. */
   trigger?: (row: Row) => Row;
-  /** Returns true for a query (by its position in `queries`) that should fail with a database error. */
-  fail?: (query: RecordedQuery, index: number) => boolean;
+  /**
+   * Returns true for a query (by its position in `queries`) that should fail with a generic database
+   * error, or the error itself, such as `{ code: "23505", message: "..." }`.
+   */
+  fail?: (query: RecordedQuery, index: number) => boolean | { code?: string; message: string };
+  /** Answers `rpc(fn, args)` calls; without it, every call returns `{ data: null, error: null }`. */
+  rpc?: (fn: string, args: Row) => { data: unknown; error: unknown };
 };
 
 const DATABASE_ERROR = { message: "private database failure" };
 
+/** A column's value; a dotted `table.column` reads an embedded row seeded on `row[table]`. */
+function read(row: Row, column: string): unknown {
+  return column.split(".").reduce<unknown>((value, key) => (value as Row | undefined)?.[key], row);
+}
+
 function matches(row: Row, [operator, column, value]: Filter) {
-  if (operator === "eq" || operator === "is") return row[column] === value;
-  if (operator === "gte") return String(row[column]) >= String(value);
-  if (operator === "lt") return String(row[column]) < String(value);
+  if (operator === "eq" || operator === "is") return read(row, column) === value;
+  if (operator === "gte") return String(read(row, column)) >= String(value);
+  if (operator === "lt") return String(read(row, column)) < String(value);
   // `or` holds PostgREST `column.in.(a,b)` predicates; a row matches any of them.
   return [...String(value).matchAll(/(\w+)\.in\.\(([^)]*)\)/g)]
     .some(([, key, list]) => list.split(",").includes(String(row[key])));
@@ -39,6 +53,7 @@ function matches(row: Row, [operator, column, value]: Filter) {
 
 export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSupabaseOptions = {}) {
   const queries: RecordedQuery[] = [];
+  const rpcs: RecordedRpc[] = [];
   let nextId = 1;
 
   class Query {
@@ -64,9 +79,16 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
     lt(column: string, value: string) { return this.filter("lt", column, value); }
     or(predicate: string) { return this.filter("or", "", predicate); }
 
-    order(column: string, { ascending = true } = {}) {
-      this.query.orders.push(column);
+    /** An order on an embedded `foreignTable` is recorded as `table.column` and sorts nothing here. */
+    order(column: string, { ascending = true, foreignTable }: { ascending?: boolean; foreignTable?: string } = {}) {
+      this.query.orders.push(foreignTable ? `${foreignTable}.${column}` : column);
       this.descending.push(!ascending);
+      return this;
+    }
+
+    /** Recorded only: tests seed fewer rows than any limit. */
+    limit(count: number, { foreignTable }: { foreignTable?: string } = {}) {
+      (this.query.limits ??= []).push(foreignTable ? `${foreignTable}:${count}` : String(count));
       return this;
     }
 
@@ -103,7 +125,8 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
     private run(): Result {
       const { table, operation, filters, orders, values, onConflict, range } = this.query;
       queries.push(this.query);
-      if (options.fail?.(this.query, queries.length - 1)) return { data: null, error: DATABASE_ERROR, count: null };
+      const failure = options.fail?.(this.query, queries.length - 1);
+      if (failure) return { data: null, error: failure === true ? DATABASE_ERROR : failure, count: null };
 
       const rows = (tables[table] ??= []);
       const stored = (row: Row) => options.trigger?.(row) ?? row;
@@ -113,8 +136,8 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
         return { data: [inserted], error: null, count: 1 };
       }
       if (operation === "upsert") {
-        const key = onConflict ?? "id";
-        const existing = rows.find((row) => row[key] === values?.[key]);
+        const keys = (onConflict ?? "id").split(",");
+        const existing = rows.find((row) => keys.every((key) => row[key] === values?.[key]));
         const written = stored({ ...existing, ...values });
         tables[table] = existing ? rows.map((row) => (row === existing ? written : row)) : [...rows, written];
         return { data: [written], error: null, count: 1 };
@@ -142,5 +165,10 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
     }
   }
 
-  return { client: { from: (table: string) => new Query(table) }, queries, tables };
+  async function rpc(fn: string, args: Row = {}) {
+    rpcs.push({ fn, args });
+    return options.rpc?.(fn, args) ?? { data: null, error: null };
+  }
+
+  return { client: { from: (table: string) => new Query(table), rpc }, queries, rpcs, tables };
 }
