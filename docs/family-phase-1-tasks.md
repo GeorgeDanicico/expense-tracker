@@ -138,7 +138,7 @@ All of these are `security definer`, granted only to `authenticated`, and identi
 | `delete_family(p_confirm_name)` | F12 | the creator | `void` |
 | `add_managed_kid(p_user_id, p_permissions)` | F13 | parents | `uuid` (member id) |
 | `complete_password_change()` | F13 | anyone, for themselves | `void` |
-| `require_password_change(p_member_id)` | F13 | parents, for kids in their family | `void` |
+| `require_password_change(p_member_id)` | F13 | parents, for kids in their family | `uuid` (the kid's user id) |
 
 ### Invite codes
 
@@ -550,7 +550,7 @@ Add triggers that hold no matter how a row is written:
 
   This stops a parent from adding an arbitrary existing user as their kid.
 - **`complete_password_change()`** sets the caller's own `must_change_password` to false.
-- **`require_password_change(p_member_id)`** sets it to true for a kid in the caller's family. It is for parents only, and F32 uses it as the permission check before resetting a password.
+- **`require_password_change(p_member_id)`** sets it to true for a kid in the caller's family and returns the kid's user id. It is for parents only, and F32 uses it as the permission check before resetting that user's password.
 
 **Done when** the SQL tests cover:
 - `add_managed_kid` with a matching account, an account marked for another family, an unmarked account, an account that's already a member, and a kid caller;
