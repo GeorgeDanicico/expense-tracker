@@ -32,6 +32,56 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["expense_tabs"]["Insert"]>;
         Relationships: [];
       };
+      families: {
+        Row: {
+          created_at: string;
+          creator_id: string;
+          id: string;
+          name: string;
+        };
+        Insert: {
+          created_at?: string;
+          creator_id: string;
+          id?: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["families"]["Insert"]>;
+        Relationships: [];
+      };
+      family_members: {
+        Row: {
+          family_id: string;
+          id: string;
+          joined_at: string;
+          last_active_at: string | null;
+          role: string;
+          user_id: string;
+        };
+        Insert: {
+          family_id: string;
+          id?: string;
+          joined_at?: string;
+          last_active_at?: string | null;
+          role: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["family_members"]["Insert"]>;
+        Relationships: [];
+      };
+      member_permissions: {
+        Row: {
+          level: string;
+          member_id: string;
+          module: string;
+        };
+        Insert: {
+          level: string;
+          member_id: string;
+          module: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["member_permissions"]["Insert"]>;
+        Relationships: [];
+      };
       net_worth_items: {
         Row: {
           archived_at: string | null;
