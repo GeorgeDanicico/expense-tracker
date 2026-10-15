@@ -1,10 +1,11 @@
 "use client";
 
-import { Link as ChakraLink } from "@chakra-ui/react";
+import { Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useId } from "react";
 
-import { isActivePath, type NavItemConfig } from "@/components/layout/nav-items";
+import { isActivePath, type NavItemConfig, type NavSection } from "@/components/layout/nav-items";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 
 /**
@@ -60,5 +61,37 @@ export function NavItem({
         {item.label}
       </Link>
     </ChakraLink>
+  );
+}
+
+/** A labelled group of navigation rows, such as "Finance". */
+export function NavSectionGroup({
+  section,
+  compact = false,
+  onNavigate,
+}: {
+  section: NavSection;
+  compact?: boolean;
+  onNavigate?: () => void;
+}) {
+  const labelId = useId();
+  return (
+    <Stack role="group" aria-labelledby={labelId} gap={compact ? "0.5" : "1"}>
+      <Text
+        id={labelId}
+        px={compact ? "2.5" : "3"}
+        pt="2"
+        pb="1"
+        textStyle="label"
+        color="fg.subtle"
+        textTransform="uppercase"
+        letterSpacing="0.06em"
+      >
+        {section.label}
+      </Text>
+      {section.items.map((item) => (
+        <NavItem key={item.href} item={item} compact={compact} onNavigate={onNavigate} />
+      ))}
+    </Stack>
   );
 }

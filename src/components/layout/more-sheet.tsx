@@ -3,8 +3,8 @@
 import { Separator, Stack, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import { NavItem } from "@/components/layout/nav-item";
-import { MORE_ITEMS } from "@/components/layout/nav-items";
+import { NavItem, NavSectionGroup } from "@/components/layout/nav-item";
+import { MORE_SECTIONS, NAV_ITEMS } from "@/components/layout/nav-items";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { InstallInstructions } from "@/components/pwa/install-instructions";
 import { AppDialog } from "@/components/ui/app-dialog";
@@ -31,10 +31,11 @@ export function MoreSheet({
       closeLabel="Close More"
     >
       <Stack gap="1">
-        {MORE_ITEMS.map((item) => (
-          <NavItem key={item.href} item={item} onNavigate={() => onOpenChange(false)} />
+        {MORE_SECTIONS.map((section) => (
+          <NavSectionGroup key={section.label} section={section} onNavigate={() => onOpenChange(false)} />
         ))}
         <Separator my="2" />
+        <NavItem item={NAV_ITEMS.settings} onNavigate={() => onOpenChange(false)} />
         <Text px="3" textStyle="caption" overflowWrap="anywhere">
           {email}
         </Text>
