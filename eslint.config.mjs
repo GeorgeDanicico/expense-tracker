@@ -71,7 +71,6 @@ const SUPABASE_BOUNDARY = [
  */
 const TEMPORARY_SUPABASE_IMPORTERS = [
   "src/lib/data/expenses.ts",
-  "src/lib/data/investments.ts",
 ];
 
 const supabaseBoundary = {

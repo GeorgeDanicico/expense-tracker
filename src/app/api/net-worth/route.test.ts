@@ -6,10 +6,10 @@ import { aManualItem, aValuation } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
-const mocks = vi.hoisted(() => ({ getInvestmentsOverviewForUser: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getInvestmentsOverview: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
-vi.mock("@/lib/data/investments", () => mocks);
+vi.mock("@/lib/investments/service", () => mocks);
 
 import { GET as getOverview } from "@/app/api/net-worth/route";
 import { POST as createItem } from "@/app/api/net-worth/items/route";
@@ -29,7 +29,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   repositories = resetFakeRepositories();
   user = signedInAs();
-  mocks.getInvestmentsOverviewForUser.mockResolvedValue(noInvestments);
+  mocks.getInvestmentsOverview.mockResolvedValue(noInvestments);
 });
 
 describe("GET /api/net-worth", () => {
@@ -41,7 +41,7 @@ describe("GET /api/net-worth", () => {
     const response = await callRoute(getOverview);
 
     expect(response).toMatchObject({ status: 200, body: buildNetWorthOverview(noInvestments, [own]) });
-    expect(mocks.getInvestmentsOverviewForUser).toHaveBeenCalledWith(user.id);
+    expect(mocks.getInvestmentsOverview).toHaveBeenCalledWith(user.id);
   });
 });
 

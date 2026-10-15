@@ -1,6 +1,11 @@
 /**
  * A small in-memory stand-in for the Supabase query builder, covering only what the data layer uses.
  * Every finished query is recorded in `queries` with its filters, so tests can assert owner scoping.
+ *
+ * Embedded tables are seeded as row fields: one row (`{ id, investment_accounts: { user_id } }`) or a
+ * list of rows (`{ id, investment_transactions: [...] }`). A filter on `table.column` reads that field.
+ * On a list, the query's filters, orders and limits for that table apply to the list, and, like
+ * `!inner`, a filter drops a row whose list no longer has any rows.
  */
 type Row = Record<string, unknown>;
 type Filter = [operator: "eq" | "is" | "gte" | "lt" | "or", column: string, value: unknown];
@@ -42,7 +47,26 @@ function read(row: Row, column: string): unknown {
   return column.split(".").reduce<unknown>((value, key) => (value as Row | undefined)?.[key], row);
 }
 
+/** Splits `table.column`, a column of an embedded table, into its parts. */
+function embeddedColumn(column: string): [table: string, column: string] | null {
+  const dot = column.indexOf(".");
+  return dot < 0 ? null : [column.slice(0, dot), column.slice(dot + 1)];
+}
+
+function compareBy(orders: { column: string; descending: boolean }[]) {
+  return (a: Row, b: Row) => {
+    for (const { column, descending } of orders) {
+      const order = String(a[column]).localeCompare(String(b[column]));
+      if (order) return descending ? -order : order;
+    }
+    return 0;
+  };
+}
+
 function matches(row: Row, [operator, column, value]: Filter) {
+  const embeddedList = row[embeddedColumn(column)?.[0] ?? ""];
+  // An embedded list was already narrowed to the matching rows (see `embed`).
+  if (Array.isArray(embeddedList)) return embeddedList.length > 0;
   if (operator === "eq" || operator === "is") return read(row, column) === value;
   if (operator === "gte") return String(read(row, column)) >= String(value);
   if (operator === "lt") return String(read(row, column)) < String(value);
@@ -58,7 +82,9 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
 
   class Query {
     private readonly query: RecordedQuery;
-    private readonly descending: boolean[] = [];
+    private readonly orderBy: { column: string; descending: boolean }[] = [];
+    /** Limits by table: `""` for this query's table, otherwise an embedded table. */
+    private readonly limitBy = new Map<string, number>();
 
     constructor(table: string) {
       this.query = { table, operation: "select", filters: [], orders: [] };
@@ -79,16 +105,17 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
     lt(column: string, value: string) { return this.filter("lt", column, value); }
     or(predicate: string) { return this.filter("or", "", predicate); }
 
-    /** An order on an embedded `foreignTable` is recorded as `table.column` and sorts nothing here. */
+    /** An order on an embedded `foreignTable` is recorded as `table.column`. */
     order(column: string, { ascending = true, foreignTable }: { ascending?: boolean; foreignTable?: string } = {}) {
-      this.query.orders.push(foreignTable ? `${foreignTable}.${column}` : column);
-      this.descending.push(!ascending);
+      const ordered = foreignTable ? `${foreignTable}.${column}` : column;
+      this.query.orders.push(ordered);
+      this.orderBy.push({ column: ordered, descending: !ascending });
       return this;
     }
 
-    /** Recorded only: tests seed fewer rows than any limit. */
     limit(count: number, { foreignTable }: { foreignTable?: string } = {}) {
       (this.query.limits ??= []).push(foreignTable ? `${foreignTable}:${count}` : String(count));
+      this.limitBy.set(foreignTable ?? "", count);
       return this;
     }
 
@@ -117,13 +144,43 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
       return this;
     }
 
+    /**
+     * Applies this query's filters, orders and limits on an embedded list to a copy of `row`.
+     * Returns `row` itself when the query touches no embedded list, so writes still find the stored row.
+     */
+    private embed(row: Row): Row {
+      const referenced = new Set([
+        ...[...this.query.filters.map(([, column]) => column), ...this.query.orders]
+          .map((column) => embeddedColumn(column)?.[0]),
+        ...this.limitBy.keys(),
+      ]);
+      const lists = Object.keys(row).filter((key) => referenced.has(key) && Array.isArray(row[key]));
+      if (!lists.length) return row;
+
+      const copy = { ...row };
+      for (const table of lists) {
+        const onTable = (column: string) => embeddedColumn(column)?.[0] === table;
+        const filters = this.query.filters
+          .filter(([, column]) => onTable(column))
+          .map(([operator, column, value]): Filter => [operator, embeddedColumn(column)![1], value]);
+        const orders = this.orderBy
+          .filter(({ column }) => onTable(column))
+          .map(({ column, descending }) => ({ column: embeddedColumn(column)![1], descending }));
+        copy[table] = (row[table] as Row[])
+          .filter((embedded) => filters.every((filter) => matches(embedded, filter)))
+          .sort(compareBy(orders))
+          .slice(0, this.limitBy.get(table));
+      }
+      return copy;
+    }
+
     private filter(...filter: Filter) {
       this.query.filters.push(filter);
       return this;
     }
 
     private run(): Result {
-      const { table, operation, filters, orders, values, onConflict, range } = this.query;
+      const { table, operation, filters, values, onConflict, range } = this.query;
       queries.push(this.query);
       const failure = options.fail?.(this.query, queries.length - 1);
       if (failure) return { data: null, error: failure === true ? DATABASE_ERROR : failure, count: null };
@@ -143,13 +200,11 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
         return { data: [written], error: null, count: 1 };
       }
 
-      const found = rows.filter((row) => filters.every((filter) => matches(row, filter))).sort((a, b) => {
-        for (const [index, column] of orders.entries()) {
-          const order = String(a[column]).localeCompare(String(b[column]));
-          if (order) return this.descending[index] ? -order : order;
-        }
-        return 0;
-      });
+      const found = rows
+        .map((row) => this.embed(row))
+        .filter((row) => filters.every((filter) => matches(row, filter)))
+        .sort(compareBy(this.orderBy.filter(({ column }) => !embeddedColumn(column))))
+        .slice(0, this.limitBy.get(""));
       if (operation === "update") {
         const updated = found.map((row) => stored({ ...row, ...values }));
         tables[table] = rows.map((row) => updated[found.indexOf(row)] ?? row);

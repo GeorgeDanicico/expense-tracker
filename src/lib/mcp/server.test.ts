@@ -18,15 +18,9 @@ vi.mock("@/lib/data/expenses", () => ({
   getDashboardDataForUser: vi.fn(),
   getExpenseTabExpensesForUser: mocks.getExpenseTabExpensesForUser,
 }));
-vi.mock("@/lib/data/investments", () => ({
-  getInvestmentsOverviewForUser: vi.fn(),
-  getInvestmentTransactionsForUser: vi.fn(),
-  createInvestmentTransactionForUser: vi.fn(),
-  deleteInvestmentTransactionForUser: vi.fn(),
-}));
 
 import { createMcpServer } from "@/lib/mcp/server";
-import { aManualItem, aTab, anExpense } from "@/test/builders";
+import { aManualItem, aTab, aTransaction, anExpense } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 
 const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
@@ -200,6 +194,29 @@ describe("MCP server", () => {
     mocks.getMonthlyExpensesForUser.mockResolvedValue([stored, { ...stored, amount: 4.5 }]);
     const result = await call("list_expenses", { month: "2026-10" });
     expect(result.structuredContent).toMatchObject({ month: "2026-10", total: 15, count: 2, average: 7.5 });
+  });
+
+  describe("investment tools", () => {
+    const order = { brokerId: "xtb", instrument: "VWCE.DE", currency: "EUR", side: "buy", amount: "150", quantity: "1.5", unitPrice: "100", executedAt: "2026-01-01T10:00:00Z" };
+
+    it("adds an investment order to the session user's account", async () => {
+      const result = await call("add_investment_transaction", order);
+
+      expect(result.isError).toBeFalsy();
+      expect(repositories.investments.accounts).toEqual([expect.objectContaining({ userId: "owner", brokerId: "xtb" })]);
+      expect(result.structuredContent).toEqual({ transaction: { ...repositories.investments.transactions[0], brokerId: "xtb" } });
+    });
+
+    it("reports another user's investment order as not found", async () => {
+      repositories.investments.accounts.push({ id: "account-xtb", userId: "someone-else", brokerId: "xtb" });
+      repositories.investments.transactions.push(aTransaction({ id: ID }));
+
+      const result = await call("delete_investment_transaction", { id: ID });
+
+      expect(result.isError).toBe(true);
+      expect(result.body.error).toBe("Investment order not found.");
+      expect(repositories.investments.transactions).toHaveLength(1);
+    });
   });
 
   describe("get_expense_tab_expenses", () => {
