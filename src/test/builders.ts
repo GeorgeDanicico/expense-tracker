@@ -1,6 +1,6 @@
 import type { Expense } from "@/lib/expenses/types";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-import { PARENT_PERMISSIONS, type CurrentMember } from "@/lib/family/repository";
+import { PARENT_PERMISSIONS, type CurrentMember, type FamilyData } from "@/lib/family/repository";
 import type { InvestmentTransaction } from "@/lib/investments/types";
 import type { NetWorthManualItemSource, NetWorthValuation } from "@/lib/net-worth/types";
 import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
@@ -90,5 +90,30 @@ export function aKid(overrides: Partial<CurrentMember> = {}): CurrentMember {
     isCreator: false,
     permissions: DEFAULT_KID_PERMISSIONS,
     ...overrides,
+  };
+}
+
+/** A family as `getFamily()` returns it to its creator: the family and the creator's own entry. */
+export function aFamily(overrides: Partial<FamilyData["family"]> = {}): FamilyData {
+  return {
+    family: {
+      id: "70000000-0000-4000-8000-000000000001",
+      name: "The Smiths",
+      createdAt: "2026-10-01T09:00:00.000Z",
+      ...overrides,
+    },
+    members: [
+      {
+        memberId: "60000000-0000-4000-8000-000000000001",
+        userId: "10000000-0000-4000-8000-000000000001",
+        role: "parent",
+        isCreator: true,
+        displayName: "owner",
+        username: null,
+        joinedAt: "2026-10-01T09:00:00.000Z",
+        lastActiveAt: null,
+        permissions: PARENT_PERMISSIONS,
+      },
+    ],
   };
 }

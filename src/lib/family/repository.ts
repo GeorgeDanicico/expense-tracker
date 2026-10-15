@@ -65,4 +65,10 @@ export interface FamilyRepository {
   getMembership(): Promise<CurrentMember | null>;
   /** The caller's family with its members, or `null` when they have no family. */
   getFamily(): Promise<FamilyData | null>;
+  /**
+   * Creates a family named `name` (trimmed, 1–60 characters) with the caller as its creator and
+   * parent, and returns the family's id. Throws a 409 `DomainError` when the caller is already in a
+   * family, and a 422 one when the name is invalid.
+   */
+  createFamily(name: string): Promise<string>;
 }
