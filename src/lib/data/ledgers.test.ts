@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/filters";
 import { aTab, anExpense } from "@/test/builders";
+import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 
 const mocks = vi.hoisted(() => ({
-  getExpenseTabForUser: vi.fn(),
   getExpenseTabExpensesForUser: vi.fn(),
   getMonthlyExpensesForUser: vi.fn(),
 }));
-vi.mock("@/lib/data/expense-tabs", () => ({ getExpenseTabForUser: mocks.getExpenseTabForUser }));
+vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 vi.mock("@/lib/data/expenses", () => ({
   getExpenseTabExpensesForUser: mocks.getExpenseTabExpensesForUser,
   getMonthlyExpensesForUser: mocks.getMonthlyExpensesForUser,
@@ -18,7 +18,12 @@ import { getExpenseTabLedgerForUser, getMonthlyLedgerForUser } from "./ledgers";
 const expense = (id: string, amount: number) => anExpense({ id, amount });
 const tab = aTab({ id: "tab" });
 
-beforeEach(() => vi.resetAllMocks());
+let repositories: FakeRepositories;
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  repositories = resetFakeRepositories();
+});
 
 describe("getMonthlyLedgerForUser", () => {
   it("returns the month's expenses with total, count and average in that key order", async () => {
@@ -42,19 +47,20 @@ describe("getMonthlyLedgerForUser", () => {
 describe("getExpenseTabLedgerForUser", () => {
   it("returns the tab's expenses with the applied filters and summary in that key order", async () => {
     const expenses = [expense("a", 3), expense("b", 1)];
-    mocks.getExpenseTabForUser.mockResolvedValue(tab);
+    repositories.expenseTabs.tabs.set("owner", [tab]);
+    const getTab = vi.spyOn(repositories.expenseTabs, "get");
     mocks.getExpenseTabExpensesForUser.mockResolvedValue(expenses);
 
     const ledger = await getExpenseTabLedgerForUser("owner", "tab", DEFAULT_EXPENSE_TAB_FILTERS);
 
-    expect(mocks.getExpenseTabForUser).toHaveBeenCalledWith("owner", "tab");
+    expect(getTab).toHaveBeenCalledWith("owner", "tab");
     expect(mocks.getExpenseTabExpensesForUser).toHaveBeenCalledWith("owner", tab, DEFAULT_EXPENSE_TAB_FILTERS);
     expect(Object.keys(ledger ?? {})).toEqual(["tab", "filters", "expenses", "total", "count", "average"]);
     expect(ledger).toEqual({ tab, filters: DEFAULT_EXPENSE_TAB_FILTERS, expenses, total: 4, count: 2, average: 2 });
   });
 
   it("returns null without querying expenses when the user owns no such tab", async () => {
-    mocks.getExpenseTabForUser.mockResolvedValue(null);
+    repositories.expenseTabs.tabs.set("someone-else", [aTab({ id: "missing" })]);
 
     expect(await getExpenseTabLedgerForUser("owner", "missing", DEFAULT_EXPENSE_TAB_FILTERS)).toBeNull();
     expect(mocks.getExpenseTabExpensesForUser).not.toHaveBeenCalled();

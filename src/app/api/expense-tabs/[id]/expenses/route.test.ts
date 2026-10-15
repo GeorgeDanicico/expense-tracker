@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/filters";
 import { aTab, anExpense } from "@/test/builders";
+import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
-const mocks = vi.hoisted(() => ({ getExpenseTabForUser: vi.fn(), getExpenseTabExpensesForUser: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getExpenseTabExpensesForUser: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
-vi.mock("@/lib/data/expense-tabs", () => ({ getExpenseTabForUser: mocks.getExpenseTabForUser }));
+vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 vi.mock("@/lib/data/expenses", () => ({ getExpenseTabExpensesForUser: mocks.getExpenseTabExpensesForUser }));
 
 import { GET } from "./route";
@@ -16,12 +17,14 @@ const expenses = [anExpense({ description: "Service", amount: 12.5, expenseDate:
 const getLedger = (query = "", id = tab.id) => callRoute(GET, { url: `/api/expense-tabs/${id}/expenses?${query}`, params: { id } });
 
 describe("GET /api/expense-tabs/[id]/expenses", () => {
+  let repositories: FakeRepositories;
   let user: ReturnType<typeof signedInAs>;
 
   beforeEach(() => {
     vi.resetAllMocks();
+    repositories = resetFakeRepositories();
     user = signedInAs();
-    mocks.getExpenseTabForUser.mockResolvedValue(tab);
+    repositories.expenseTabs.tabs.set(user.id, [tab]);
     mocks.getExpenseTabExpensesForUser.mockResolvedValue(expenses);
   });
 
@@ -35,9 +38,11 @@ describe("GET /api/expense-tabs/[id]/expenses", () => {
   });
 
   it("reads the signed-in user's saved tab and its expenses", async () => {
+    const getTab = vi.spyOn(repositories.expenseTabs, "get");
+
     await getLedger();
 
-    expect(mocks.getExpenseTabForUser).toHaveBeenCalledWith(user.id, tab.id);
+    expect(getTab).toHaveBeenCalledWith(user.id, tab.id);
     expect(mocks.getExpenseTabExpensesForUser).toHaveBeenCalledWith(user.id, tab, DEFAULT_EXPENSE_TAB_FILTERS);
   });
 
@@ -50,7 +55,8 @@ describe("GET /api/expense-tabs/[id]/expenses", () => {
   });
 
   it("returns 404 for a missing or foreign tab without reading expenses", async () => {
-    mocks.getExpenseTabForUser.mockResolvedValue(null);
+    repositories.expenseTabs.tabs.delete(user.id);
+    repositories.expenseTabs.tabs.set("10000000-0000-4000-8000-000000000099", [tab]);
 
     const response = await getLedger();
 
@@ -59,10 +65,12 @@ describe("GET /api/expense-tabs/[id]/expenses", () => {
   });
 
   it("rejects a malformed tab id", async () => {
+    const getTab = vi.spyOn(repositories.expenseTabs, "get");
+
     const response = await getLedger("", "invalid");
 
     expect(response.status).toBe(400);
-    expect(mocks.getExpenseTabForUser).not.toHaveBeenCalled();
+    expect(getTab).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -70,10 +78,12 @@ describe("GET /api/expense-tabs/[id]/expenses", () => {
     "scope=range&startDate=2025-02-29&endDate=2025-03-01", "scope=range&startDate=2026-05-01&endDate=2026-04-30",
     "subtype=unknown", "category=unknown",
   ])("rejects invalid filters before reading data: %s", async (query) => {
+    const getTab = vi.spyOn(repositories.expenseTabs, "get");
+
     const response = await getLedger(query);
 
     expect(response.status).toBe(422);
-    expect(mocks.getExpenseTabForUser).not.toHaveBeenCalled();
+    expect(getTab).not.toHaveBeenCalled();
   });
 
   it("returns a zero summary for a tab without expenses", async () => {
