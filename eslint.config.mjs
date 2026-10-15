@@ -70,12 +70,7 @@ const SUPABASE_BOUNDARY = [
  * (R02–R09) removes its own files from this list, and R10 deletes the list.
  */
 const TEMPORARY_SUPABASE_IMPORTERS = [
-  "src/app/api/auth/route.ts",
-  "src/app/api/auth/google/route.ts",
-  "src/app/auth/confirm/route.ts",
-  "src/app/confirm-email/route.ts",
   "src/app/api/mcp/route.ts",
-  "src/lib/auth.ts",
   "src/lib/mcp/auth.ts",
   "src/lib/data/account.ts",
   "src/lib/data/expense-tabs.ts",
