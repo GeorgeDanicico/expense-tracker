@@ -117,7 +117,7 @@ function toExpenseWrite(input: ExpenseInput) {
 /**
  * `ExpenseRepository` on the `expenses` table. Every table query filters by `user_id` itself instead
  * of relying on RLS, so the user's own pages stay theirs once parents may read family rows (F43).
- * The `get_expense_dashboard` RPC takes no user yet: it filters by `auth.uid()` in SQL until F42.
+ * The `get_expense_dashboard` RPC gets the same `userId` as `p_user_id`.
  * Its errors stay plain `Error`s (500s), as before the repository existed.
  */
 export const supabaseExpenseRepository: ExpenseRepository = {
@@ -146,6 +146,7 @@ export const supabaseExpenseRepository: ExpenseRepository = {
         p_current_end_exclusive: current.endExclusive,
         p_analytics_start: analytics.start,
         p_analytics_end_exclusive: analytics.endExclusive,
+        p_user_id: userId,
       }),
     ]);
 
