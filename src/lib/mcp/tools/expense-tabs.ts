@@ -1,15 +1,10 @@
 import { z } from "zod";
 
-import {
-  createExpenseTabForUser,
-  deleteExpenseTabForUser,
-  getExpenseTabsForUser,
-  updateExpenseTabForUser,
-} from "@/lib/data/expense-tabs";
 import { getExpenseTabLedgerForUser } from "@/lib/data/ledgers";
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
 import { DEFAULT_EXPENSE_TAB_FILTERS, expenseTabFiltersSchema } from "@/lib/expenses/filters";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
+import { getRepositories } from "@/lib/repositories";
 import { expenseTabSchema } from "@/lib/validation/expense-tab";
 import { idSchema } from "@/lib/validation/primitives";
 
@@ -46,7 +41,7 @@ export const expenseTabTools = [
     description: "Saved expense tabs, each grouping categories and subtypes.",
     schema: z.object({}),
     annotations: READ,
-    run: async (_input, { userId }) => ({ tabs: await getExpenseTabsForUser(userId) }),
+    run: async (_input, { userId }) => ({ tabs: await getRepositories().expenseTabs.list(userId) }),
   }),
   defineTool({
     name: "get_expense_tab_expenses",
@@ -65,7 +60,7 @@ export const expenseTabTools = [
     schema: expenseTabSchema,
     shape: tabFields,
     annotations: CREATE,
-    run: async (input, { userId }) => ({ tab: await createExpenseTabForUser(userId, input) }),
+    run: async (input, { userId }) => ({ tab: await getRepositories().expenseTabs.create(userId, input) }),
   }),
   defineTool({
     name: "update_expense_tab",
@@ -75,7 +70,7 @@ export const expenseTabTools = [
     annotations: UPDATE,
     notFound: "Expense tab not found.",
     run: async ({ id, ...input }, { userId }) => {
-      const tab = await updateExpenseTabForUser(userId, id, expenseTabSchema.parse(input));
+      const tab = await getRepositories().expenseTabs.update(userId, id, expenseTabSchema.parse(input));
       return tab && { tab };
     },
   }),
@@ -86,6 +81,6 @@ export const expenseTabTools = [
     schema: idInput,
     annotations: DELETE,
     notFound: "Expense tab not found.",
-    run: async ({ id }, { userId }) => (await deleteExpenseTabForUser(userId, id)) && { deleted: true, id },
+    run: async ({ id }, { userId }) => (await getRepositories().expenseTabs.delete(userId, id)) && { deleted: true, id },
   }),
 ];

@@ -1,11 +1,14 @@
 import "server-only";
 
 import type { AccountRepository } from "@/lib/account/repository";
+import type { ExpenseTabRepository } from "@/lib/expenses/tab-repository";
 import { supabaseAccountRepository } from "@/lib/supabase/repositories/account";
+import { supabaseExpenseTabRepository } from "@/lib/supabase/repositories/expense-tabs";
 
 /** Every repository the app uses. Each repository task adds its own key here. */
 export type Repositories = {
   account: AccountRepository;
+  expenseTabs: ExpenseTabRepository;
 };
 
 /**
@@ -17,5 +20,6 @@ export type Repositories = {
 export function getRepositories(): Repositories {
   return {
     account: supabaseAccountRepository,
+    expenseTabs: supabaseExpenseTabRepository,
   };
 }

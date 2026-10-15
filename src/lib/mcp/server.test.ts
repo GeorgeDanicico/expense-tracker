@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   updateExpenseForUser: vi.fn(),
   deleteExpenseForUser: vi.fn(),
   getMonthlyExpensesForUser: vi.fn(),
-  getExpenseTabForUser: vi.fn(),
   getExpenseTabExpensesForUser: vi.fn(),
   addNetWorthValuationForUser: vi.fn(),
 }));
@@ -19,13 +18,6 @@ vi.mock("@/lib/data/expenses", () => ({
   getMonthlyExpensesForUser: mocks.getMonthlyExpensesForUser,
   getDashboardDataForUser: vi.fn(),
   getExpenseTabExpensesForUser: mocks.getExpenseTabExpensesForUser,
-}));
-vi.mock("@/lib/data/expense-tabs", () => ({
-  getExpenseTabsForUser: vi.fn(),
-  getExpenseTabForUser: mocks.getExpenseTabForUser,
-  createExpenseTabForUser: vi.fn(),
-  updateExpenseTabForUser: vi.fn(),
-  deleteExpenseTabForUser: vi.fn(),
 }));
 vi.mock("@/lib/data/investments", () => ({
   getInvestmentsOverviewForUser: vi.fn(),
@@ -223,7 +215,7 @@ describe("MCP server", () => {
     const tab = aTab({ id: ID });
 
     beforeEach(() => {
-      mocks.getExpenseTabForUser.mockResolvedValue(tab);
+      repositories.expenseTabs.tabs.set("owner", [tab]);
       mocks.getExpenseTabExpensesForUser.mockResolvedValue([]);
     });
 
