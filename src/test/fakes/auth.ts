@@ -1,8 +1,11 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import type {
   AuthenticatedUser,
   AuthFailure,
   AuthResult,
   AuthService,
+  AuthSession,
   EmailLink,
   OAuthProvider,
   OAuthUrlResult,
@@ -10,6 +13,9 @@ import type {
 } from "@/lib/auth/service";
 
 type FakeAccount = { id: string; email: string; password: string; confirmed: boolean };
+
+/** A session from `startSession`. Set `active` to false to expire it; `checks` counts `isActive` calls. */
+export type FakeAuthSession = AuthSession & { active: boolean; checks: number };
 
 export type FakeAuthOptions = {
   /** When true (the default), new accounts must confirm their email before they can sign in. */
@@ -25,6 +31,7 @@ export type FakeAuthOptions = {
  *   beforeEach(() => { auth = new FakeAuth(); });
  *
  * `fail(method, reason)` makes the next call of that method fail like the provider would.
+ * Inside a session's `run`, `getCurrentUser()` returns that session's user.
  */
 export class FakeAuth implements AuthService {
   readonly accounts: FakeAccount[] = [];
@@ -35,7 +42,10 @@ export class FakeAuth implements AuthService {
   lastConfirmationUrl: string | null = null;
   /** The provider and callback URL passed to the last `oauthSignInUrl`. */
   lastOAuth: { provider: OAuthProvider; callbackUrl: string } | null = null;
+  /** Every session handed out by `startSession`, oldest first. */
+  readonly sessions: FakeAuthSession[] = [];
 
+  private readonly sessionUser = new AsyncLocalStorage<AuthenticatedUser>();
   private readonly failures = new Map<keyof AuthService, string>();
   private readonly requireEmailConfirmation: boolean;
   private nextId = 1;
@@ -55,7 +65,7 @@ export class FakeAuth implements AuthService {
   }
 
   async getCurrentUser() {
-    return this.currentUser;
+    return this.sessionUser.getStore() ?? this.currentUser;
   }
 
   async signInWithPassword(email: string, password: string): Promise<AuthResult> {
@@ -106,6 +116,26 @@ export class FakeAuth implements AuthService {
     account.confirmed = true;
     this.currentUser = { id: account.id, email: account.email };
     return { ok: true };
+  }
+
+  async startSession(email: string, password: string): Promise<AuthSession | null> {
+    if (this.takeFailure("startSession")) return null;
+    const account = this.accounts.find((candidate) => candidate.email === email);
+    if (!account || account.password !== password || !account.confirmed) return null;
+    const user = { id: account.id, email: account.email };
+    const session: FakeAuthSession = {
+      userId: user.id,
+      email: user.email,
+      active: true,
+      checks: 0,
+      run: (fn) => this.sessionUser.run(user, fn),
+      async isActive() {
+        session.checks += 1;
+        return session.active;
+      },
+    };
+    this.sessions.push(session);
+    return session;
   }
 
   private createAccount(email: string, password: string, confirmed: boolean): AuthenticatedUser {

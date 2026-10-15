@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   parseBasicCredentials: vi.fn(),
   getMcpSession: vi.fn(),
   createMcpServer: vi.fn(),
-  runWithSupabaseClient: vi.fn(),
+  run: vi.fn(),
 }));
 
 vi.mock("@/lib/mcp/auth", () => ({
@@ -14,20 +14,23 @@ vi.mock("@/lib/mcp/auth", () => ({
   getMcpSession: mocks.getMcpSession,
 }));
 vi.mock("@/lib/mcp/server", () => ({ createMcpServer: mocks.createMcpServer }));
-vi.mock("@/lib/supabase/server", () => ({ runWithSupabaseClient: mocks.runWithSupabaseClient }));
 
 import { McpServer } from "@modelcontextprotocol/server";
 
 import { DELETE, GET, POST } from "@/app/api/mcp/route";
 
 const scope = new AsyncLocalStorage<{ name: string }>();
-const client = { name: "session-client" };
-const session = { client, userId: "10000000-0000-4000-8000-000000000041", email: "user@example.com" };
+const session = {
+  userId: "10000000-0000-4000-8000-000000000041",
+  email: "user@example.com",
+  run: mocks.run,
+  isActive: async () => true,
+};
 const credentials = { email: session.email, password: "correct-horse" };
 
 function buildServer() {
   const server = new McpServer({ name: "expense-tracker", version: "test" });
-  server.registerTool("whoami", { description: "Returns the scoped client name." }, async () => ({
+  server.registerTool("whoami", { description: "Returns the scope name." }, async () => ({
     content: [{ type: "text", text: scope.getStore()?.name ?? "unscoped" }],
   }));
   return server;
@@ -68,9 +71,7 @@ describe("/api/mcp", () => {
     mocks.parseBasicCredentials.mockReturnValue(credentials);
     mocks.getMcpSession.mockResolvedValue({ status: "ok", session });
     mocks.createMcpServer.mockImplementation(buildServer);
-    mocks.runWithSupabaseClient.mockImplementation((scopedClient: { name: string }, fn: () => unknown) =>
-      scope.run(scopedClient, fn),
-    );
+    mocks.run.mockImplementation((fn: () => unknown) => scope.run({ name: "session-scope" }, fn));
   });
 
   afterEach(() => {
@@ -147,15 +148,15 @@ describe("/api/mcp", () => {
     expect(mocks.createMcpServer).toHaveBeenCalledWith({ userId: session.userId, email: session.email });
   });
 
-  it("runs tool calls inside the session's Supabase client scope", async () => {
+  it("runs tool calls inside the session's scope", async () => {
     const response = await POST(
       rpc({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "whoami", arguments: {} } }),
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.runWithSupabaseClient).toHaveBeenCalledWith(client, expect.any(Function));
+    expect(mocks.run).toHaveBeenCalledWith(expect.any(Function));
     const [message] = sseMessages(await response.text());
-    expect(message.result.content).toEqual([{ type: "text", text: "session-client" }]);
+    expect(message.result.content).toEqual([{ type: "text", text: "session-scope" }]);
   });
 
   it("rejects GET and DELETE with 405 in stateless mode", async () => {

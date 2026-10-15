@@ -1,15 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@supabase/supabase-js", () => mocks);
-vi.mock("@/lib/supabase/config", () => ({
-  getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "pk" }),
-}));
+import { FakeAuth } from "@/test/fakes/auth";
+
+let auth: FakeAuth;
+vi.mock("@/lib/auth", () => ({ getAuth: () => auth }));
 
 import { getMcpSession, parseBasicCredentials, resetMcpAuthForTests } from "@/lib/mcp/auth";
 
 const credentials = { email: "user@example.com", password: "correct-horse" };
-const user = { id: "10000000-0000-4000-8000-000000000041", email: credentials.email };
 
 function request(authorization?: string) {
   return new Request("http://localhost/api/mcp", {
@@ -19,21 +17,6 @@ function request(authorization?: string) {
 
 function basic(value: string) {
   return `Basic ${Buffer.from(value).toString("base64")}`;
-}
-
-function mockClients({ signInError = null as unknown, sessionValid = true } = {}) {
-  const auth = {
-    signInWithPassword: vi.fn().mockResolvedValue(
-      signInError ? { data: { user: null }, error: signInError } : { data: { user }, error: null },
-    ),
-    getSession: vi.fn().mockResolvedValue(
-      sessionValid
-        ? { data: { session: { access_token: "token" } }, error: null }
-        : { data: { session: null }, error: { message: "Refresh failed" } },
-    ),
-  };
-  mocks.createClient.mockImplementation(() => ({ auth }));
-  return auth;
 }
 
 describe("parseBasicCredentials", () => {
@@ -56,14 +39,16 @@ describe("parseBasicCredentials", () => {
 });
 
 describe("getMcpSession", () => {
+  let user: { id: string; email: string };
+
   beforeEach(() => {
-    vi.resetAllMocks();
     resetMcpAuthForTests();
+    auth = new FakeAuth();
+    user = auth.addUser(credentials.email, credentials.password);
+    vi.spyOn(auth, "startSession");
   });
 
   it("shares a single sign-in between concurrent first calls", async () => {
-    const auth = mockClients();
-
     const [first, second] = await Promise.all([
       getMcpSession(credentials, "1.1.1.1"),
       getMcpSession(credentials, "1.1.1.1"),
@@ -71,68 +56,70 @@ describe("getMcpSession", () => {
 
     expect(first).toMatchObject({ status: "ok", session: { userId: user.id, email: user.email } });
     expect(second).toEqual(first);
-    expect(auth.signInWithPassword).toHaveBeenCalledTimes(1);
+    expect(auth.startSession).toHaveBeenCalledTimes(1);
   });
 
-  it("creates one non-persistent, auto-refreshing client per session", async () => {
-    mockClients();
-
+  it("starts the session with the Basic credentials", async () => {
     await getMcpSession(credentials, null);
 
-    expect(mocks.createClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "pk", {
-      auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
-    });
+    expect(auth.startSession).toHaveBeenCalledExactlyOnceWith(credentials.email, credentials.password);
   });
 
-  it("reuses the cached client after checking its session", async () => {
-    const auth = mockClients();
+  it("reuses the cached session after checking it is still active", async () => {
     const first = await getMcpSession(credentials, null);
     const second = await getMcpSession(credentials, null);
     expect(second).toEqual(first);
-    expect(auth.signInWithPassword).toHaveBeenCalledTimes(1);
-    expect(auth.getSession).toHaveBeenCalledTimes(1);
+    expect(auth.startSession).toHaveBeenCalledTimes(1);
+    expect(auth.sessions[0].checks).toBe(1);
   });
 
   it("signs in exactly once more when the cached session cannot refresh", async () => {
-    const auth = mockClients({ sessionValid: false });
     await getMcpSession(credentials, null);
+    auth.sessions[0].active = false;
+
     expect(await getMcpSession(credentials, null)).toMatchObject({ status: "ok" });
-    expect(auth.signInWithPassword).toHaveBeenCalledTimes(2);
-    expect(mocks.createClient).toHaveBeenCalledTimes(2);
+    expect(auth.startSession).toHaveBeenCalledTimes(2);
   });
 
   it("returns unauthorized for bad credentials and does not cache the failure", async () => {
-    const auth = mockClients({ signInError: { message: "Invalid login credentials" } });
-    expect(await getMcpSession(credentials, null)).toEqual({ status: "unauthorized" });
-    expect(await getMcpSession(credentials, null)).toEqual({ status: "unauthorized" });
-    expect(auth.signInWithPassword).toHaveBeenCalledTimes(2);
-    expect(auth.getSession).not.toHaveBeenCalled();
+    const wrong = { ...credentials, password: "wrong-password" };
+    expect(await getMcpSession(wrong, null)).toEqual({ status: "unauthorized" });
+    expect(await getMcpSession(wrong, null)).toEqual({ status: "unauthorized" });
+    expect(auth.startSession).toHaveBeenCalledTimes(2);
+    expect(auth.sessions).toHaveLength(0);
   });
 
-  it("throttles repeated failures per credential without calling Supabase", async () => {
-    mockClients({ signInError: { message: "Invalid login credentials" } });
+  it("returns unauthorized when the auth provider fails", async () => {
+    auth.fail("startSession");
+
+    expect(await getMcpSession(credentials, null)).toEqual({ status: "unauthorized" });
+  });
+
+  it("throttles repeated failures per credential without calling the auth provider", async () => {
+    const wrong = { ...credentials, password: "wrong-password" };
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await getMcpSession(credentials, `10.0.0.${attempt}`);
+      await getMcpSession(wrong, `10.0.0.${attempt}`);
     }
-    expect(await getMcpSession(credentials, "10.0.0.99")).toEqual({ status: "throttled" });
-    expect(mocks.createClient).toHaveBeenCalledTimes(5);
+    expect(await getMcpSession(wrong, "10.0.0.99")).toEqual({ status: "throttled" });
+    expect(auth.startSession).toHaveBeenCalledTimes(5);
   });
 
   describe("after five failures from one IP", () => {
     beforeEach(async () => {
-      mockClients({ signInError: { message: "Invalid login credentials" } });
       for (let attempt = 0; attempt < 5; attempt += 1) {
         await getMcpSession({ ...credentials, password: `wrong-password-${attempt}` }, "10.0.0.1");
       }
     });
 
-    it("throttles that IP across different credentials without calling Supabase", async () => {
+    it("throttles that IP across different credentials without calling the auth provider", async () => {
       expect(await getMcpSession(credentials, "10.0.0.1")).toEqual({ status: "throttled" });
-      expect(mocks.createClient).toHaveBeenCalledTimes(5);
+      expect(auth.startSession).toHaveBeenCalledTimes(5);
     });
 
     it("still lets another IP try", async () => {
-      expect(await getMcpSession(credentials, "10.0.0.2")).toEqual({ status: "unauthorized" });
+      expect(await getMcpSession({ ...credentials, password: "wrong-password" }, "10.0.0.2")).toEqual({
+        status: "unauthorized",
+      });
     });
   });
 });

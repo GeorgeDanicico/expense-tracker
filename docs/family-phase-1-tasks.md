@@ -301,9 +301,10 @@ Results are plain domain objects, such as `{ ok: true }` or `{ ok: false, reason
 
 **Depends on:** R04. **Files:** `src/lib/mcp/auth.ts` and its test, `src/app/api/mcp/route.ts`, `src/lib/auth/service.ts`, `src/lib/supabase/auth.ts`, the ESLint allowlist.
 
-- Add `AuthService.startSession(email, password)`. It returns `{ userId, email, run(fn) } | null`.
+- Add `AuthService.startSession(email, password)`. It returns `AuthSession | null`, where `AuthSession` is `{ userId, email, run(fn), isActive() }`.
   - The Supabase implementation signs in with a fresh, non-persisted client, exactly as `mcp/auth.ts` does today.
   - `run` wraps `runWithSupabaseClient`, so repositories inside it act as that user.
+  - `isActive()` is the cached-session check `mcp/auth.ts` already does (`getSession()` on that client), so the session cache can drop a session that can no longer refresh.
 - Basic auth parsing, session caching and throttling stay in `mcp/auth.ts`, unchanged.
 
 **Done when** the MCP tests pass with the same behaviour, and neither `src/lib/mcp/auth.ts` nor the MCP route imports Supabase.
