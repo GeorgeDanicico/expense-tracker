@@ -263,6 +263,12 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      create_family: {
+        Args: {
+          p_name: string;
+        };
+        Returns: string;
+      };
       create_net_worth_item_with_valuation: {
         Args: {
           p_category: string;
