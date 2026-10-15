@@ -21,7 +21,7 @@ A private, mobile-first family app, starting with an expense tracker. Built with
 
 ## Run locally
 
-The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. Set `PRICE_SERVICE_URL` to the base URL of the investment price service. For another project, copy `.env.example` to `.env.local` and replace the values. Keep these variables server-only; do not add a `NEXT_PUBLIC_` prefix.
+The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. Set `PRICE_SERVICE_URL` to the base URL of the investment price service. `FAMILY_ENABLED=true` turns on the family features, which are still in development; leave it `false` (or unset) to keep them off. For another project, copy `.env.example` to `.env.local` and replace the values. Keep these variables server-only; do not add a `NEXT_PUBLIC_` prefix.
 
 ```bash
 npm install
