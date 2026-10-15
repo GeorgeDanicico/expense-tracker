@@ -219,7 +219,12 @@ const NET_WORTH: NetWorthOverview = {
   calculationIssues: [],
 };
 
-const ACCOUNT: AccountData = { email: "preview@example.com", currency: "EUR", features: { family: false } };
+const ACCOUNT: AccountData = {
+  email: "preview@example.com",
+  currency: "EUR",
+  features: { family: false },
+  membership: null,
+};
 
 /** Resolves an SWR key to fixture data, mirroring the API routes' shapes. */
 export function fixtureFor(key: string): unknown {

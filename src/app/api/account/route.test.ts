@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PARENT_PERMISSIONS } from "@/lib/family/repository";
+import { aKid, aParent } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
@@ -33,7 +35,7 @@ describe("GET /api/account", () => {
   it("returns the default currency when the user has not chosen one", async () => {
     const response = await callRoute(GET);
 
-    expect(response.body).toEqual({ email: user.email, currency: "EUR", features: { family: false } });
+    expect(response.body).toEqual({ email: user.email, currency: "EUR", features: { family: false }, membership: null });
   });
 
   it("reports the family feature as on when FAMILY_ENABLED is true", async () => {
@@ -79,6 +81,62 @@ describe("GET /api/account", () => {
 
     expect(response).toMatchObject({ status: 500, body: { error: "Unable to load account settings." } });
   });
+
+  it("returns no membership, without asking for one, while the family flag is off", async () => {
+    repositories.family.membership = aParent();
+
+    const response = await callRoute(GET);
+
+    expect(response).toMatchObject({ status: 200, body: { membership: null } });
+    expect(repositories.family.calls).toEqual([]);
+  });
+
+  it("returns no membership when the user has no family", async () => {
+    vi.stubEnv("FAMILY_ENABLED", "true");
+
+    const response = await callRoute(GET);
+
+    expect(response).toMatchObject({ status: 200, body: { membership: null } });
+    expect(repositories.family.calls).toEqual(["getMembership"]);
+  });
+
+  it("returns a parent's membership with full permissions and without ids", async () => {
+    vi.stubEnv("FAMILY_ENABLED", "true");
+    repositories.family.membership = aParent({ familyName: "The Smiths" });
+
+    const response = await callRoute(GET);
+
+    expect(response.body).toMatchObject({
+      membership: { role: "parent", isCreator: true, familyName: "The Smiths", permissions: PARENT_PERMISSIONS },
+    });
+    expect(Object.keys((response.body as { membership: object }).membership).sort()).toEqual([
+      "familyName",
+      "isCreator",
+      "permissions",
+      "role",
+    ]);
+  });
+
+  it("returns a kid's membership with their own permissions", async () => {
+    vi.stubEnv("FAMILY_ENABLED", "true");
+    const permissions = { expenses: "edit", investments: "off", net_worth: "edit", family_finance: "off" } as const;
+    repositories.family.membership = aKid({ permissions });
+
+    const response = await callRoute(GET);
+
+    expect(response.body).toMatchObject({
+      membership: { role: "kid", isCreator: false, familyName: "The Smiths", permissions },
+    });
+  });
+
+  it("hides a membership failure behind a generic message", async () => {
+    vi.stubEnv("FAMILY_ENABLED", "true");
+    vi.spyOn(repositories.family, "getMembership").mockRejectedValue(new Error("private database failure"));
+
+    const response = await callRoute(GET);
+
+    expect(response).toMatchObject({ status: 500, body: { error: "Unable to load account settings." } });
+  });
 });
 
 describe("PATCH /api/account", () => {
@@ -92,7 +150,7 @@ describe("PATCH /api/account", () => {
   it("returns the family feature as off when FAMILY_ENABLED is false", async () => {
     const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
 
-    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: false } });
+    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: false }, membership: null });
   });
 
   it("returns the family feature as on when FAMILY_ENABLED is true", async () => {
@@ -100,7 +158,28 @@ describe("PATCH /api/account", () => {
 
     const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
 
-    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: true } });
+    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: true }, membership: null });
+  });
+
+  it("returns the membership with the updated account", async () => {
+    vi.stubEnv("FAMILY_ENABLED", "true");
+    repositories.family.membership = aKid();
+
+    const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
+
+    expect(response.body).toMatchObject({
+      currency: "USD",
+      membership: { role: "kid", isCreator: false, familyName: "The Smiths", permissions: aKid().permissions },
+    });
+  });
+
+  it("returns no membership, without asking for one, while the family flag is off", async () => {
+    repositories.family.membership = aKid();
+
+    const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
+
+    expect(response.body).toMatchObject({ membership: null });
+    expect(repositories.family.calls).toEqual([]);
   });
 
   it("rejects an unsupported currency without saving it", async () => {
