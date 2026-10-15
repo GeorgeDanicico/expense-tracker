@@ -52,10 +52,62 @@ const uiGuardrails = {
   },
 };
 
+/**
+ * Storage and auth boundary: only these files may import Supabase or the
+ * generated database types. Everything else goes through the repository and
+ * auth interfaces. See "Shared names → Repositories and auth" in
+ * docs/family-phase-1-tasks.md.
+ */
+const SUPABASE_BOUNDARY = [
+  "src/lib/supabase/**",
+  "src/lib/repositories.ts",
+  "src/lib/auth/index.ts",
+  "src/proxy.ts",
+];
+
+/**
+ * Temporary: files that still import Supabase directly. Each step 0 task
+ * (R02–R09) removes its own files from this list, and R10 deletes the list.
+ */
+const TEMPORARY_SUPABASE_IMPORTERS = [
+  "src/app/api/auth/route.ts",
+  "src/app/api/auth/google/route.ts",
+  "src/app/auth/confirm/route.ts",
+  "src/app/confirm-email/route.ts",
+  "src/app/api/mcp/route.ts",
+  "src/lib/auth.ts",
+  "src/lib/mcp/auth.ts",
+  "src/lib/data/account.ts",
+  "src/lib/data/expense-tabs.ts",
+  "src/lib/data/expenses.ts",
+  "src/lib/data/investments.ts",
+  "src/lib/data/net-worth.ts",
+];
+
+const supabaseBoundary = {
+  files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+  ignores: [...SUPABASE_BOUNDARY, ...TEMPORARY_SUPABASE_IMPORTERS],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            group: ["@supabase/*", "@/lib/supabase", "@/lib/supabase/*", "@/lib/database.types"],
+            message:
+              'Supabase stays behind the repository and auth interfaces. Use getRepositories() or getAuth() instead; see "Shared names → Repositories and auth" in docs/family-phase-1-tasks.md.',
+          },
+        ],
+      },
+    ],
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   uiGuardrails,
+  supabaseBoundary,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
