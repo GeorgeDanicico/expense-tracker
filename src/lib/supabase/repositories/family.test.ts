@@ -565,4 +565,119 @@ describe("Supabase family repository", () => {
       await expect(family.revokeInvite(inviteId)).rejects.toThrow(new Error("Unable to revoke the invite."));
     });
   });
+
+  describe("previewInvite", () => {
+    const codeHash = "0123456789abcdef".repeat(4);
+    const kidPreviewRow = {
+      family_name: "The Smiths",
+      inviter_name: "Ana",
+      role: "kid",
+      permissions: kidPermissions,
+      expires_at: "2026-10-23T09:00:00+00:00",
+    };
+
+    it("calls preview_family_invite with the code's hash", async () => {
+      const { rpcs } = useRpc(() => ({ data: [], error: null }));
+
+      await family.previewInvite(codeHash);
+
+      expect(rpcs).toEqual([{ fn: "preview_family_invite", args: { p_code_hash: codeHash } }]);
+    });
+
+    it("maps a kid invite with every module", async () => {
+      useRpc(() => ({ data: [kidPreviewRow], error: null }));
+
+      expect(await family.previewInvite(codeHash)).toEqual({
+        familyName: "The Smiths",
+        inviterName: "Ana",
+        role: "kid",
+        permissions: kidPermissions,
+        expiresAt: "2026-10-23T09:00:00+00:00",
+      });
+    });
+
+    it("maps a parent invite with null permissions and a missing inviter name", async () => {
+      useRpc(() => ({ data: [{ ...kidPreviewRow, role: "parent", permissions: null, inviter_name: null }], error: null }));
+
+      expect(await family.previewInvite(codeHash)).toMatchObject({ role: "parent", permissions: null, inviterName: null });
+    });
+
+    it("treats a kid invite's unknown levels as off", async () => {
+      useRpc(() => ({ data: [{ ...kidPreviewRow, permissions: { expenses: "edit", investments: "view" } }], error: null }));
+
+      expect((await family.previewInvite(codeHash))?.permissions).toEqual({
+        expenses: "edit",
+        investments: "off",
+        net_worth: "off",
+        family_finance: "off",
+      });
+    });
+
+    it("returns null for a code that can't be redeemed", async () => {
+      useRpc(() => ({ data: [], error: null }));
+
+      expect(await family.previewInvite(codeHash)).toBeNull();
+    });
+
+    it("refuses a malformed hash as a server failure, without calling the database", async () => {
+      const { rpcs } = useRpc(() => ({ data: [kidPreviewRow], error: null }));
+
+      await expect(family.previewInvite("ABCD2345")).rejects.toThrow(new Error("Unable to check the invite code."));
+      expect(rpcs).toEqual([]);
+    });
+
+    it("translates a missing caller into a 403", async () => {
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Sign in to use an invite code." } }));
+
+      await expect(family.previewInvite(codeHash)).rejects.toThrow(new DomainError("Sign in to use an invite code.", 403));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.previewInvite(codeHash)).rejects.toThrow(new Error("Unable to check the invite code."));
+    });
+  });
+
+  describe("redeemInvite", () => {
+    const codeHash = "0123456789abcdef".repeat(4);
+
+    it("calls redeem_family_invite with the code's hash and returns the new member id", async () => {
+      const { rpcs } = useRpc(() => ({ data: kidMemberId, error: null }));
+
+      expect(await family.redeemInvite(codeHash)).toBe(kidMemberId);
+      expect(rpcs).toEqual([{ fn: "redeem_family_invite", args: { p_code_hash: codeHash } }]);
+    });
+
+    it("refuses a malformed hash as a server failure, without calling the database", async () => {
+      const { rpcs } = useRpc(() => ({ data: kidMemberId, error: null }));
+
+      await expect(family.redeemInvite("a".repeat(63))).rejects.toThrow(new Error("Unable to join the family."));
+      expect(rpcs).toEqual([]);
+    });
+
+    it("translates being already in a family into a 409", async () => {
+      useRpc(() => ({ data: null, error: { code: "23505", message: "You're already in a family." } }));
+
+      await expect(family.redeemInvite(codeHash)).rejects.toThrow(new DomainError("You're already in a family.", 409));
+    });
+
+    it("translates a code that can't be redeemed into a 404", async () => {
+      useRpc(() => ({ data: null, error: { code: "P0002", message: "This code isn't valid anymore." } }));
+
+      await expect(family.redeemInvite(codeHash)).rejects.toThrow(new DomainError("This code isn't valid anymore.", 404));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.redeemInvite(codeHash)).rejects.toThrow(new Error("Unable to join the family."));
+    });
+
+    it("treats a missing member id as a failure", async () => {
+      useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.redeemInvite(codeHash)).rejects.toThrow(new Error("Unable to join the family."));
+    });
+  });
 });

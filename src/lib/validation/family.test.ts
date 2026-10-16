@@ -6,6 +6,7 @@ import {
   displayNameSchema,
   familyNameSchema,
   inviteCodeSchema,
+  joinFamilySchema,
   normalizeInviteCode,
   permissionsSchema,
   usernameSchema,
@@ -163,5 +164,18 @@ describe("createInviteSchema", () => {
     const permissions = { ...PERMISSION_PRESETS.young_kid, family_finance: "edit" };
 
     expect(createInviteSchema.safeParse({ role: "kid", permissions }).success).toBe(false);
+  });
+});
+
+describe("joinFamilySchema", () => {
+  it("normalizes the code", () => {
+    expect(joinFamilySchema.parse({ code: " abcd-2345 " })).toEqual({ code: "ABCD2345" });
+  });
+
+  it.each([{}, { code: null }, { code: 12345678 }, { code: "ABCD234" }])("rejects %j with the code's message", (body) => {
+    const result = joinFamilySchema.safeParse(body);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.flatten().fieldErrors).toEqual({ code: ["Enter the 8-character invite code."] });
   });
 });

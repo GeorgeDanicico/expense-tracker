@@ -146,6 +146,7 @@ export function anInvite(overrides: Partial<FakeInvite> = {}): FakeInvite {
   return {
     inviteId: "80000000-0000-4000-8000-000000000001",
     familyId: "70000000-0000-4000-8000-000000000001",
+    familyName: "The Smiths",
     codeHash: "a".repeat(64),
     role: "kid",
     permissions: DEFAULT_KID_PERMISSIONS,

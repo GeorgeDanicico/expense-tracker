@@ -72,6 +72,17 @@ export type NewInvite =
   | { role: "parent"; permissions: null; codeHash: string }
   | { role: "kid"; permissions: Permissions; codeHash: string };
 
+/** What an invite code invites the caller to, as `previewInvite()` shows it before they join. */
+export type InvitePreview = {
+  familyName: string;
+  /** The inviter's display name, else username, else email before the `@`; `null` when none exists. */
+  inviterName: string | null;
+  role: FamilyRole;
+  /** Every module for a kid invite; `null` for a parent invite. */
+  permissions: Permissions | null;
+  expiresAt: string;
+};
+
 /**
  * Families and memberships. Get it from `getRepositories()`; never import an implementation.
  * Unlike the finance repositories, methods take no `userId`: they act as the signed-in caller,
@@ -134,4 +145,18 @@ export interface FamilyRepository {
    * exist or belongs to another family.
    */
   revokeInvite(inviteId: string): Promise<void>;
+  /**
+   * What the invite with `codeHash` (`hashInviteCode(code)`) invites the caller to, or `null` when the
+   * code can't be redeemed: unknown, expired, used, revoked, or its creator is no longer a parent. The
+   * reason is never revealed. Works for callers already in a family too. A malformed hash is a bug in
+   * the caller and throws a plain `Error`.
+   */
+  previewInvite(codeHash: string): Promise<InvitePreview | null>;
+  /**
+   * The caller joins the family of the invite with `codeHash` (`hashInviteCode(code)`), with its role
+   * (and, for a kid, its permissions), and the invite is used up. Returns the new member id. Throws a
+   * 409 `DomainError` when the caller is already in a family, and a 404 one when the code can't be
+   * redeemed (for any of `previewInvite`'s reasons). A malformed hash throws a plain `Error`.
+   */
+  redeemInvite(codeHash: string): Promise<string>;
 }

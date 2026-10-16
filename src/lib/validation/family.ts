@@ -98,3 +98,8 @@ export const createInviteSchema = z
   .transform(({ role, permissions }): InviteRequest =>
     role === "kid" ? { role, permissions: permissions as Permissions } : { role, permissions: null },
   );
+
+/** The body of `POST /api/family/join/preview` and `POST /api/family/join`: `{ code }`, normalized. */
+export const joinFamilySchema = z.object({
+  code: z.string("Enter the 8-character invite code.").pipe(inviteCodeSchema),
+});
