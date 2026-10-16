@@ -1,9 +1,10 @@
 begin;
 create extension if not exists pgtap;
-select plan(83);
+select plan(93);
 
--- F13: profiles.managed_by_family and must_change_password, their guard, and
--- add_managed_kid(), complete_password_change() and require_password_change().
+-- F13: profiles.managed_by_family and must_change_password, their guard, the
+-- mark being cleared when a membership is deleted, and add_managed_kid(),
+-- complete_password_change() and require_password_change().
 --
 -- Users (prefix f1300000):
 --   family A: 01 creator, 02 second parent, 03 kid (no profile row)
@@ -184,6 +185,14 @@ select is(
    where p.oid = 'public.guard_profile_managed_account()'::regprocedure),
   'false:search_path=""',
   'the guard is security invoker and pins an empty search_path'
+);
+select ok(
+  (select p.prosecdef and p.proconfig = array['search_path=""']
+   from pg_catalog.pg_proc p
+   where p.oid = 'family_private.clear_managed_mark_on_removal()'::regprocedure)
+  and not has_function_privilege('authenticated', 'family_private.clear_managed_mark_on_removal()', 'execute')
+  and not has_function_privilege('service_role', 'family_private.clear_managed_mark_on_removal()', 'execute'),
+  'the removal trigger is security definer, pins an empty search_path and is not granted'
 );
 
 -- ---------------------------------------------------------------------------
@@ -552,15 +561,67 @@ select is(pg_temp.kid_state('f1300000-0000-4000-8000-000000000003'), '-:true',
   'the missing profile row is created with the flag and no family mark');
 
 -- ---------------------------------------------------------------------------
+-- Removing a kid clears their mark for that family
+-- ---------------------------------------------------------------------------
+
+-- The creator removes the managed kid with F12's remove_family_member.
+select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-000000000001","role":"authenticated"}', true);
+select lives_ok(
+  $$ select public.remove_family_member(pg_temp.member_id('f1300000-0000-4000-8000-000000000006')) $$,
+  'the creator can remove a managed kid'
+);
+select is(pg_temp.membership('f1300000-0000-4000-8000-000000000006'), null,
+  'the kid is no longer a member');
+select is(pg_temp.kid_state('f1300000-0000-4000-8000-000000000006'), '-:true',
+  'removing the kid clears their mark and keeps the flag');
+
+select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-000000000002","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000006',
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+  'P0002', 'That account wasn''t found.',
+  'a parent cannot re-add a removed kid'
+);
+
+-- Family B's creator removes 09, who is marked for family A: that mark isn't
+-- B's, so it stays.
+select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-000000000004","role":"authenticated"}', true);
+select lives_ok(
+  $$ select public.remove_family_member('f1300000-0000-4000-8000-0000000000b4') $$,
+  'the other family''s creator can remove a kid marked for a different family'
+);
+select is(pg_temp.kid_state('f1300000-0000-4000-8000-000000000009'), 'a1:true',
+  'a mark for a different family is left alone');
+
+-- Any other path that deletes the membership clears the mark too.
+reset role;
+delete from public.family_members
+where user_id = 'f1300000-0000-4000-8000-000000000007';
+select is(pg_temp.kid_state('f1300000-0000-4000-8000-000000000007'), '-:true',
+  'deleting the membership directly clears the mark as well');
+
+-- ---------------------------------------------------------------------------
 -- Deleting the family clears the mark
 -- ---------------------------------------------------------------------------
 
+-- Kid 03 is a member of family A; mark it, as if the family had created it.
+update public.profiles set managed_by_family = 'f1300000-0000-4000-8000-0000000000a1'
+where id = 'f1300000-0000-4000-8000-000000000003';
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-000000000001","role":"authenticated"}', true);
+select lives_ok(
+  $$ select public.delete_family('Family A') $$,
+  'the creator can still delete a family with a managed kid in it'
+);
+
 reset role;
-delete from public.families where id = 'f1300000-0000-4000-8000-0000000000a1';
-select is(pg_temp.kid_state('f1300000-0000-4000-8000-000000000006'), '-:true',
+select is(pg_temp.membership('f1300000-0000-4000-8000-000000000003'), null,
+  'the managed kid''s membership is gone');
+select is(pg_temp.kid_state('f1300000-0000-4000-8000-000000000003'), '-:true',
   'deleting the family unmarks its kid accounts and keeps the flag');
 select is(pg_temp.kid_state('f1300000-0000-4000-8000-000000000009'), '-:true',
-  'including one that never joined it');
+  'including one that was never a member');
 
 select * from finish();
 rollback;

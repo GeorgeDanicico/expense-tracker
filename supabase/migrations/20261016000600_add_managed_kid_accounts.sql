@@ -9,7 +9,8 @@ begin;
 --    before using the app (F31). Set by F28 on create and by
 --    require_password_change() (F32); cleared by complete_password_change().
 -- 3. A trigger stops the API roles from setting or changing either column.
--- 4. Three RPCs: add_managed_kid, complete_password_change and
+-- 4. Deleting a membership clears the user's mark for that family.
+-- 5. Three RPCs: add_managed_kid, complete_password_change and
 --    require_password_change.
 --
 -- Kid-account state lives here rather than in the auth provider's metadata, so
@@ -89,6 +90,47 @@ create trigger profiles_guard_managed_account
 before insert or delete or update of managed_by_family, must_change_password
 on public.profiles
 for each row execute function public.guard_profile_managed_account();
+
+-- ---------------------------------------------------------------------------
+-- A removed kid is no longer the family's to manage
+-- ---------------------------------------------------------------------------
+
+-- When a membership is deleted (remove_family_member from F12, or any other
+-- path), clear the user's mark for that family. Otherwise add_managed_kid
+-- would let a parent re-add a removed, now standalone kid without their
+-- consent and see their finances again.
+--
+-- Deleting the whole family is already covered by the on delete set null
+-- foreign key; during that cascade this trigger finds the mark either already
+-- cleared or about to be, and setting it to null twice is harmless. Deleting
+-- the user cascades to their profile too, and then this finds no row.
+--
+-- Security definer, so it runs as the owner (which F04's and the guard above
+-- let through) and RLS never hides the profile row.
+create function family_private.clear_managed_mark_on_removal()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.profiles p
+  set managed_by_family = null
+  where p.id = old.user_id
+    and p.managed_by_family = old.family_id;
+  return null;
+end;
+$$;
+
+revoke all on function family_private.clear_managed_mark_on_removal()
+  from public, anon, authenticated, service_role;
+
+create trigger family_members_clear_managed_mark
+after delete on public.family_members
+for each row execute function family_private.clear_managed_mark_on_removal();
+
+comment on trigger family_members_clear_managed_mark on public.family_members is
+  'A deleted membership clears the user''s profiles.managed_by_family when it names that family.';
 
 -- ---------------------------------------------------------------------------
 -- Public RPCs
