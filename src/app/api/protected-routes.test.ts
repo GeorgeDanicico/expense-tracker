@@ -30,6 +30,7 @@ const PROTECTED_ROUTES: Record<string, string[]> = {
   family: ["DELETE", "GET", "POST"],
   "family/invites": ["GET", "POST"],
   "family/invites/[id]": ["DELETE"],
+  "family/kids": ["POST"],
   "family/members/[id]": ["DELETE"],
   "family/members/[id]/permissions": ["PATCH"],
   investments: ["GET"],

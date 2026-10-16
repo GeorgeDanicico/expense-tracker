@@ -35,3 +35,9 @@ export const currencyCode = z
 
 /** A real YYYY-MM-DD calendar date (rejects e.g. 2026-02-30). */
 export const calendarDate = z.string().refine(isValidDate, "Choose a real calendar date.");
+
+/** A password as sign-in accepts it: 8–128 characters. */
+export const passwordSchema = z
+  .string("Enter a password.")
+  .min(8, "Password must contain at least 8 characters.")
+  .max(128, "Password must contain at most 128 characters.");

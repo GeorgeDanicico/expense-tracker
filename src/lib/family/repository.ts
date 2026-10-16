@@ -95,6 +95,14 @@ export interface FamilyRepository {
    */
   setMemberPermissions(memberId: string, permissions: Permissions): Promise<void>;
   /**
+   * Adds the account `userId` to the caller's family as a kid with `permissions` (every module), and
+   * returns the new member's id. For parents, and only for an account created for the caller's family
+   * (a managed kid account, see `AuthAdmin.createUser`'s `managedByFamily`). Throws a 403 `DomainError`
+   * when the caller isn't a parent, a 404 one when the account isn't marked for the caller's family,
+   * a 409 one when it's already in a family, and a 422 one when the permissions are invalid.
+   */
+  addManagedKid(userId: string, permissions: Permissions): Promise<string>;
+  /**
    * Removes a member from the caller's family and leaves them a notice. For the family's creator,
    * never on themselves. Throws a 403 `DomainError` when the caller isn't the creator or names
    * themselves, and a 404 one when the member isn't in the caller's family.

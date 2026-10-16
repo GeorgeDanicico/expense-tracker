@@ -11,6 +11,8 @@ import {
 } from "@/lib/family/repository";
 import { FAMILY_ROLES, MODULE_KEYS, isLevelAllowed, type PermissionLevel, type Permissions } from "@/lib/permissions";
 
+import type { FakeAdminProfile } from "./auth";
+
 /** An invite as the fake stores it: what `listInvites()` shows, plus what only the database knows. */
 export type FakeInvite = FamilyInvite & {
   familyId: string;
@@ -44,6 +46,12 @@ export class FakeFamilyRepository implements FamilyRepository {
   /** Who the caller is, for the member entry `createFamily` adds. Defaults to `testUser` from `@/test/route`. */
   caller = { userId: "10000000-0000-4000-8000-000000000001", displayName: "owner" as string | null };
   invites: FakeInvite[] = [];
+  /**
+   * The accounts' kid-account profile columns, by user id, which `addManagedKid` checks like
+   * `add_managed_kid` does. Share `FakeAuthAdmin`'s map so accounts it creates are found:
+   * `repositories.family.accountProfiles = admin.profiles`.
+   */
+  accountProfiles: ReadonlyMap<string, FakeAdminProfile> = new Map();
   readonly calls: (keyof FamilyRepository)[] = [];
 
   /** The caller's family id when they are a parent; otherwise throws the SQL's 403. */
@@ -114,6 +122,40 @@ export class FakeFamilyRepository implements FamilyRepository {
     this.replaceMembers((members) =>
       members.map((member) => (member.memberId === memberId ? { ...member, permissions: { ...permissions } } : member)),
     );
+  }
+
+  /**
+   * Like `add_managed_kid`: parents only, for an account in `accountProfiles` marked for the caller's
+   * family that has no membership yet. Adds the kid to `family` (when seeded) with its profile's names.
+   */
+  async addManagedKid(userId: string, permissions: Permissions) {
+    this.calls.push("addManagedKid");
+    if (this.membership?.role !== "parent") throw new DomainError("Only parents can add a kid.", 403);
+    const profile = this.accountProfiles.get(userId);
+    if (!profile || profile.managedByFamily !== this.membership.familyId) {
+      throw new DomainError("That account wasn't found.", 404);
+    }
+    if (this.family?.members.some((member) => member.userId === userId)) {
+      throw new DomainError("That account is already in a family.", 409);
+    }
+    if (!isValidPermissions(permissions)) throw new DomainError("Choose an allowed level for every module.", 422);
+
+    const memberId = randomUUID();
+    this.replaceMembers((members) => [
+      ...members,
+      {
+        memberId,
+        userId,
+        role: "kid",
+        isCreator: false,
+        displayName: profile.displayName,
+        username: profile.username,
+        joinedAt: new Date().toISOString(),
+        lastActiveAt: null,
+        permissions: { ...permissions },
+      },
+    ]);
+    return memberId;
   }
 
   /** Like `remove_family_member`: the creator only, never on themselves. */

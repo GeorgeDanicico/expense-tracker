@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { FAMILY_ROLES, MODULE_LABELS, MODULE_LEVELS, type ModuleKey, type Permissions } from "@/lib/permissions";
+import { passwordSchema } from "@/lib/validation/primitives";
 
 const moduleLevel = <M extends ModuleKey>(module: M) =>
   z.enum(MODULE_LEVELS[module], `Choose an allowed level for ${MODULE_LABELS[module]}.`);
@@ -49,6 +50,14 @@ export const displayNameSchema = z
   .trim()
   .min(1, "Enter a name.")
   .max(40, "Use at most 40 characters.");
+
+/** The body of `POST /api/family/kids`: the new kid account and the kid's permissions. */
+export const createKidSchema = z.object({
+  displayName: displayNameSchema,
+  username: usernameSchema,
+  password: passwordSchema,
+  permissions: permissionsSchema,
+});
 
 /** No 0, O, 1, I or L, so codes are easy to read aloud and type. */
 export const INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
