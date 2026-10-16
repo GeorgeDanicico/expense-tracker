@@ -28,6 +28,7 @@ const FAMILY_ERROR = "Unable to load the family.";
 const CREATE_FAMILY_ERROR = "Unable to create the family.";
 const SET_PERMISSIONS_ERROR = "Unable to save the permissions.";
 const ADD_KID_ERROR = "Unable to add the kid to the family.";
+const REQUIRE_PASSWORD_CHANGE_ERROR = "Unable to reset the password.";
 const REMOVE_MEMBER_ERROR = "Unable to remove the member.";
 const DELETE_FAMILY_ERROR = "Unable to delete the family.";
 const TOUCH_ERROR = "Unable to record your last activity.";
@@ -182,6 +183,15 @@ export const supabaseFamilyRepository: FamilyRepository = {
 
     if (error) throw translateDatabaseError(error, ADD_KID_ERROR);
     if (!data) throw new Error(ADD_KID_ERROR);
+    return data;
+  },
+
+  async requirePasswordChange(memberId: string): Promise<string> {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("require_password_change", { p_member_id: memberId });
+
+    if (error) throw translateDatabaseError(error, REQUIRE_PASSWORD_CHANGE_ERROR);
+    if (!data) throw new Error(REQUIRE_PASSWORD_CHANGE_ERROR);
     return data;
   },
 

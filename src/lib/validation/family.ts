@@ -103,3 +103,6 @@ export const createInviteSchema = z
 export const joinFamilySchema = z.object({
   code: z.string("Enter the 8-character invite code.").pipe(inviteCodeSchema),
 });
+
+/** The body of `POST /api/family/members/[id]/password`: the kid's new temporary password. */
+export const resetKidPasswordSchema = z.object({ password: passwordSchema });

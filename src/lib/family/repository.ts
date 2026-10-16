@@ -114,6 +114,13 @@ export interface FamilyRepository {
    */
   addManagedKid(userId: string, permissions: Permissions): Promise<string>;
   /**
+   * Marks a kid of the caller's family as having to choose a new password, and returns the kid's user
+   * id. For parents, and the permission check for resetting a kid's password. Throws a 403
+   * `DomainError` when the caller isn't a parent or the member is a parent, and a 404 one when the
+   * member isn't in the caller's family.
+   */
+  requirePasswordChange(memberId: string): Promise<string>;
+  /**
    * Removes a member from the caller's family and leaves them a notice. For the family's creator,
    * never on themselves. Throws a 403 `DomainError` when the caller isn't the creator or names
    * themselves, and a 404 one when the member isn't in the caller's family.

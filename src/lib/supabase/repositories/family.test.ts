@@ -322,6 +322,43 @@ describe("Supabase family repository", () => {
     });
   });
 
+  describe("requirePasswordChange", () => {
+    it("calls require_password_change with the member as the request's caller", async () => {
+      const { rpcs } = useRpc(() => ({ data: kidUserId, error: null }));
+
+      await family.requirePasswordChange(kidMemberId);
+
+      expect(rpcs).toEqual([{ fn: "require_password_change", args: { p_member_id: kidMemberId } }]);
+    });
+
+    it("returns the kid's user id", async () => {
+      useRpc(() => ({ data: kidUserId, error: null }));
+
+      expect(await family.requirePasswordChange(kidMemberId)).toBe(kidUserId);
+    });
+
+    it.each([
+      { code: "42501", status: 403, message: "Only parents can reset a kid's password." },
+      { code: "P0002", status: 404, message: "That family member wasn't found." },
+    ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
+      useRpc(() => ({ data: null, error: { code, message } }));
+
+      await expect(family.requirePasswordChange(kidMemberId)).rejects.toThrow(new DomainError(message, status));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.requirePasswordChange(kidMemberId)).rejects.toThrow(new Error("Unable to reset the password."));
+    });
+
+    it("treats a missing user id as a failure", async () => {
+      useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.requirePasswordChange(kidMemberId)).rejects.toThrow(new Error("Unable to reset the password."));
+    });
+  });
+
   describe("removeMember", () => {
     it("calls remove_family_member with the member", async () => {
       const { rpcs } = useRpc(() => ({ data: null, error: null }));
