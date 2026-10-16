@@ -5,6 +5,7 @@ import {
   ACCOUNT_NOTICES_API_KEY,
   EXPENSE_TABS_API_KEY,
   FAMILY_API_KEY,
+  FAMILY_INVITES_API_KEY,
   INVESTMENTS_API_KEY,
   NET_WORTH_API_KEY,
   expenseTabApiKey,
@@ -138,4 +139,9 @@ export function afterNoticeDismissed(mutate: ScopedMutator, id: string) {
 /** After changing the family (a member's permissions): caches the updated family. */
 export function afterFamilyChanged(mutate: ScopedMutator, response: FamilyResponse) {
   return mutate(FAMILY_API_KEY, response, { revalidate: false });
+}
+
+/** After creating or revoking an invite: reloads the pending invites. */
+export function afterInvitesChanged(mutate: ScopedMutator) {
+  return mutate(FAMILY_INVITES_API_KEY);
 }
