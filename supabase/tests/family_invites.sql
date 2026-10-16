@@ -56,7 +56,7 @@ $$;
 --   c1 A kid, expired a day ago
 --   c2 A parent, used an hour ago by 05
 --   c3 A parent, revoked 2 hours ago
---   c4 A parent, pending, creator unknown (created_by null), 1 hour old
+--   c4 A parent, pending, created by 02, 1 hour old
 --   d1 B kid, pending, created by 04, 1 hour old
 insert into public.family_invites
   (id, family_id, code_hash, role, permissions, created_by, created_at, expires_at, used_at, used_by, revoked_at)
@@ -71,7 +71,7 @@ values
    'f0800000-0000-4000-8000-000000000001', now() - interval '3 hours', now() + interval '45 hours',
    null, null, now() - interval '2 hours'),
   ('f0800000-0000-4000-8000-0000000000c4', 'f0800000-0000-4000-8000-0000000000a1', pg_temp.h('c4'), 'parent', null,
-   null, now() - interval '1 hour', now() + interval '47 hours', null, null, null),
+   'f0800000-0000-4000-8000-000000000002', now() - interval '1 hour', now() + interval '47 hours', null, null, null),
   ('f0800000-0000-4000-8000-0000000000d1', 'f0800000-0000-4000-8000-0000000000b1', pg_temp.h('d1'), 'kid',
    '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off"}',
    'f0800000-0000-4000-8000-000000000004', now() - interval '1 hour', now() + interval '167 hours', null, null, null);
@@ -470,18 +470,18 @@ select set_config('request.jwt.claims', '{"sub":"f0800000-0000-4000-8000-0000000
 select is(
   (select array_agg(x order by x) from unnest(pg_temp.listed()) as x),
   array[
-    'c4:parent:-',
+    'c4:parent:bogdan.f08',
     'k1:kid:bogdan.f08',
     'k2:kid:Ana',
     'p1:parent:bogdan.f08',
     'p2:parent:Dana',
     'pj:parent:bogdan.f08'
   ],
-  'the creator lists the family''s pending invites, with display name, then username, then nothing'
+  'the creator lists the family''s pending invites, with display name, else username'
 );
 select is(
   (pg_temp.listed())[6],
-  'c4:parent:-',
+  'c4:parent:bogdan.f08',
   'the oldest invite is listed last'
 );
 select is(
@@ -512,7 +512,7 @@ select set_config('request.jwt.claims', '{"sub":"f0800000-0000-4000-8000-0000000
 select is(
   (select array_agg(x order by x) from unnest(pg_temp.listed()) as x),
   array[
-    'c4:parent:-',
+    'c4:parent:bogdan.f08',
     'k1:kid:bogdan.f08',
     'k2:kid:Ana',
     'p1:parent:bogdan.f08',
@@ -540,10 +540,12 @@ select is(
 );
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"f0800000-0000-4000-8000-000000000001","role":"authenticated"}', true);
+-- F09: an invite whose creator is no longer a parent of the family can't be
+-- redeemed, so it isn't listed either.
 select is(
-  (select x from unnest(pg_temp.listed()) as x where x like 'p2:%'),
-  'p2:parent:-',
-  'an invite whose creator was deleted is listed without a name'
+  (select count(*)::integer from unnest(pg_temp.listed()) as x where x like 'p2:%'),
+  0,
+  'an invite whose creator was deleted is no longer listed'
 );
 
 -- ---------------------------------------------------------------------------
@@ -604,7 +606,6 @@ select is(
     'k1:kid:bogdan.f08',
     'k2:kid:Ana',
     'p1:parent:bogdan.f08',
-    'p2:parent:-',
     'pj:parent:bogdan.f08'
   ],
   'a revoked invite is no longer listed'
