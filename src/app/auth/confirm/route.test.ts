@@ -36,6 +36,12 @@ describe("GET /auth/confirm", () => {
     expect(await confirm("token_hash=hash-1&type=signup&next=/settings")).toBe("http://localhost/settings");
   });
 
+  it("keeps a join link through the confirmation", async () => {
+    auth.emailLinks.set("code-1", email);
+
+    expect(await confirm(`code=code-1&next=${encodeURIComponent("/join/ABCD2345")}`)).toBe("http://localhost/join/ABCD2345");
+  });
+
   it("redirects to the dashboard when there is no next path", async () => {
     auth.emailLinks.set("code-1", email);
 

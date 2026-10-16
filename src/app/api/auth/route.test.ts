@@ -186,6 +186,18 @@ describe("POST /api/auth", () => {
     expect(auth.lastConfirmationUrl).toBe("http://localhost/auth/confirm?next=%2Fdashboard");
   });
 
+  it("keeps a same-site next path in the confirmation link", async () => {
+    await post({ mode: "signup", email, password, next: "/join/ABCD2345" });
+
+    expect(auth.lastConfirmationUrl).toBe("http://localhost/auth/confirm?next=%2Fjoin%2FABCD2345");
+  });
+
+  it("ignores an external next path in the confirmation link", async () => {
+    await post({ mode: "signup", email, password, next: "https://evil.test/" });
+
+    expect(auth.lastConfirmationUrl).toBe("http://localhost/auth/confirm?next=%2Fdashboard");
+  });
+
   it("refuses to sign up with a username", async () => {
     const response = await post({ mode: "signup", email: "ana", password });
 

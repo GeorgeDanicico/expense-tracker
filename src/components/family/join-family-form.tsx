@@ -24,9 +24,9 @@ export function joinSummary(preview: Pick<InvitePreview, "familyName" | "inviter
 
 /**
  * "Join with a code": checks the code first, then asks you to confirm before joining.
- * `initialCode` fills the field (used by the `/join/[code]` link).
+ * `initialCode` fills the field (used by the `/join/[code]` link); `onJoined` runs after joining.
  */
-export function JoinFamilyForm({ initialCode = "" }: { initialCode?: string }) {
+export function JoinFamilyForm({ initialCode = "", onJoined }: { initialCode?: string; onJoined?: () => void }) {
   const { mutate } = useSWRConfig();
   const previewForm = useApiForm();
   const joinForm = useApiForm();
@@ -53,6 +53,7 @@ export function JoinFamilyForm({ initialCode = "" }: { initialCode?: string }) {
       const joined = await apiRequest<FamilyResponse>(FAMILY_JOIN_API_URL, { method: "POST", body: JSON.stringify({ code }) });
       setPreview(null);
       await afterFamilyJoined(mutate, joined);
+      onJoined?.();
     }, { fallback: "Unable to join the family. Please try again." });
   }
 

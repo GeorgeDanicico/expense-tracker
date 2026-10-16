@@ -16,7 +16,7 @@ import { afterSignIn } from "@/lib/api/invalidate";
 
 type AuthMode = "login" | "signup";
 
-function AuthModeForm({ mode }: { mode: AuthMode }) {
+function AuthModeForm({ mode, next }: { mode: AuthMode; next: string }) {
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const form = useApiForm();
@@ -38,12 +38,13 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
           mode,
           email: formData.get("email"),
           password: formData.get("password"),
+          next,
         }),
       });
 
       if (result.authenticated) {
         await afterSignIn(mutate);
-        router.replace("/dashboard");
+        router.replace(next);
         return;
       }
 
@@ -127,7 +128,7 @@ const CALLBACK_ERRORS: Record<string, string> = {
   "confirmation-failed": "We couldn't sign you in from that link. Please try again.",
 };
 
-export function AuthForm() {
+export function AuthForm({ next = "/dashboard" }: { next?: string }) {
   const [mode, setMode] = useState<AuthMode>("login");
   const callbackError = CALLBACK_ERRORS[useSearchParams().get("message") ?? ""];
   return (
@@ -152,7 +153,7 @@ export function AuthForm() {
           {callbackError ? (
             <InlineAlert status="error">{callbackError}</InlineAlert>
           ) : null}
-          <AuthModeForm key={mode} mode={mode} />
+          <AuthModeForm key={mode} mode={mode} next={next} />
           <HStack gap="3">
             <Separator flex="1" />
             <Text flexShrink="0" textStyle="xs" color="fg.muted">
@@ -161,7 +162,7 @@ export function AuthForm() {
             <Separator flex="1" />
           </HStack>
           <Button asChild variant="outline" size="md" width="full">
-            <a href="/api/auth/google">
+            <a href={`/api/auth/google?next=${encodeURIComponent(next)}`}>
               <Image src="/google-logo.svg" alt="" boxSize="18px" />
               Google
             </a>

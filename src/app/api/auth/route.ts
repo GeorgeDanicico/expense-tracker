@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 
 import { getAuth, getAuthAdmin } from "@/lib/auth";
-import { siteOrigin } from "@/lib/http/origin";
+import { safeNextPath, siteOrigin } from "@/lib/http/origin";
 import { json } from "@/lib/http/route";
 import { usernameSchema } from "@/lib/validation/family";
 
@@ -12,6 +12,8 @@ const authSchema = z.object({
   mode: z.enum(["login", "signup"]),
   email: emailSchema,
   password: z.string().min(8, "Password must contain at least 8 characters.").max(128),
+  /** Where the confirmation link leads after sign-up (for example a `/join/<code>` link). */
+  next: z.string().max(200).optional(),
 });
 
 /**
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return invalidBody(parsed.error);
 
   const confirmationUrl = new URL("/auth/confirm", siteOrigin(request));
-  confirmationUrl.searchParams.set("next", "/dashboard");
+  confirmationUrl.searchParams.set("next", safeNextPath(parsed.data.next));
   const signUp = await getAuth().signUp(parsed.data.email, parsed.data.password, confirmationUrl.toString());
 
   if (!signUp.ok) {
