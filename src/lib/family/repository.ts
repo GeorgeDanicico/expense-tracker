@@ -72,6 +72,24 @@ export interface FamilyRepository {
    */
   createFamily(name: string): Promise<string>;
   /**
+   * Replaces a kid's permissions with `permissions` (every module). For parents of the kid's family.
+   * Throws a 403 `DomainError` when the caller isn't a parent or the member is a parent, a 404 one
+   * when the member isn't in the caller's family, and a 422 one when the permissions are invalid.
+   */
+  setMemberPermissions(memberId: string, permissions: Permissions): Promise<void>;
+  /**
+   * Removes a member from the caller's family and leaves them a notice. For the family's creator,
+   * never on themselves. Throws a 403 `DomainError` when the caller isn't the creator or names
+   * themselves, and a 404 one when the member isn't in the caller's family.
+   */
+  removeMember(memberId: string): Promise<void>;
+  /**
+   * Deletes the caller's family and leaves every other member a notice. For the family's creator.
+   * `confirmName` must be the family's name, ignoring case and surrounding spaces. Throws a 403
+   * `DomainError` when the caller isn't the creator, and a 422 one when the name doesn't match.
+   */
+  deleteFamily(confirmName: string): Promise<void>;
+  /**
    * Marks the caller as active now. Does nothing for a caller without a family, or when they were
    * last marked under 5 minutes ago.
    */

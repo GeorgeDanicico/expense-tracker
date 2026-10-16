@@ -25,6 +25,16 @@ export const familyNameSchema = z
 /** The body of `POST /api/family`. */
 export const createFamilySchema = z.object({ name: familyNameSchema });
 
+const CONFIRM_NAME_MESSAGE = "Type the family's name to confirm.";
+
+/** The body of `DELETE /api/family`: the family's name, typed to confirm. The database compares it ignoring case. */
+export const deleteFamilySchema = z.object({
+  confirmName: z.string(CONFIRM_NAME_MESSAGE).trim().min(1, CONFIRM_NAME_MESSAGE),
+});
+
+/** The body of `PATCH /api/family/members/[id]/permissions`. */
+export const memberPermissionsSchema = z.object({ permissions: permissionsSchema });
+
 /** Lowercase; starts with a letter or digit, then letters, digits, dots, underscores or hyphens; 3–30 characters. */
 export const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,29}$/;
 

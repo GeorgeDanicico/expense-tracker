@@ -244,6 +244,86 @@ describe("Supabase family repository", () => {
     });
   });
 
+  describe("setMemberPermissions", () => {
+    const teen = { expenses: "edit", investments: "edit", net_worth: "edit", family_finance: "off" } as const;
+
+    it("calls set_member_permissions with the member and every module", async () => {
+      const { rpcs } = useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.setMemberPermissions(kidMemberId, teen)).resolves.toBeUndefined();
+
+      expect(rpcs).toEqual([{ fn: "set_member_permissions", args: { p_member_id: kidMemberId, p_permissions: teen } }]);
+    });
+
+    it.each([
+      { code: "42501", status: 403, message: "Only parents can change a kid's permissions." },
+      { code: "P0002", status: 404, message: "That family member wasn't found." },
+      { code: "23514", status: 422, message: "Choose an allowed level for every module." },
+    ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
+      useRpc(() => ({ data: null, error: { code, message } }));
+
+      await expect(family.setMemberPermissions(kidMemberId, teen)).rejects.toThrow(new DomainError(message, status));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.setMemberPermissions(kidMemberId, teen)).rejects.toThrow(
+        new Error("Unable to save the permissions."),
+      );
+    });
+  });
+
+  describe("removeMember", () => {
+    it("calls remove_family_member with the member", async () => {
+      const { rpcs } = useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.removeMember(kidMemberId)).resolves.toBeUndefined();
+
+      expect(rpcs).toEqual([{ fn: "remove_family_member", args: { p_member_id: kidMemberId } }]);
+    });
+
+    it.each([
+      { code: "42501", status: 403, message: "Only the family's creator can remove members." },
+      { code: "P0002", status: 404, message: "That family member wasn't found." },
+    ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
+      useRpc(() => ({ data: null, error: { code, message } }));
+
+      await expect(family.removeMember(kidMemberId)).rejects.toThrow(new DomainError(message, status));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.removeMember(kidMemberId)).rejects.toThrow(new Error("Unable to remove the member."));
+    });
+  });
+
+  describe("deleteFamily", () => {
+    it("calls delete_family with the typed name", async () => {
+      const { rpcs } = useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.deleteFamily("the smiths")).resolves.toBeUndefined();
+
+      expect(rpcs).toEqual([{ fn: "delete_family", args: { p_confirm_name: "the smiths" } }]);
+    });
+
+    it.each([
+      { code: "42501", status: 403, message: "Only the family's creator can delete the family." },
+      { code: "23514", status: 422, message: "Type the family's name to confirm." },
+    ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
+      useRpc(() => ({ data: null, error: { code, message } }));
+
+      await expect(family.deleteFamily("The Smiths")).rejects.toThrow(new DomainError(message, status));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.deleteFamily("The Smiths")).rejects.toThrow(new Error("Unable to delete the family."));
+    });
+  });
+
   describe("touchLastActive", () => {
     it("calls touch_last_active as the request's caller, with no arguments", async () => {
       const { rpcs } = useRpc(() => ({ data: null, error: null }));

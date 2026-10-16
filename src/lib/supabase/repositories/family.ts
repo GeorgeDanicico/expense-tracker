@@ -23,6 +23,9 @@ import { createClient } from "@/lib/supabase/server";
 const MEMBERSHIP_ERROR = "Unable to load your family membership.";
 const FAMILY_ERROR = "Unable to load the family.";
 const CREATE_FAMILY_ERROR = "Unable to create the family.";
+const SET_PERMISSIONS_ERROR = "Unable to save the permissions.";
+const REMOVE_MEMBER_ERROR = "Unable to remove the member.";
+const DELETE_FAMILY_ERROR = "Unable to delete the family.";
 const TOUCH_ERROR = "Unable to record your last activity.";
 
 /** A member entry of `get_family()`; `lastActiveAt` and `permissions` are absent when hidden. */
@@ -120,6 +123,30 @@ export const supabaseFamilyRepository: FamilyRepository = {
     if (error) throw translateDatabaseError(error, CREATE_FAMILY_ERROR);
     if (!data) throw new Error(CREATE_FAMILY_ERROR);
     return data;
+  },
+
+  async setMemberPermissions(memberId: string, permissions: Permissions): Promise<void> {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("set_member_permissions", {
+      p_member_id: memberId,
+      p_permissions: permissions,
+    });
+
+    if (error) throw translateDatabaseError(error, SET_PERMISSIONS_ERROR);
+  },
+
+  async removeMember(memberId: string): Promise<void> {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("remove_family_member", { p_member_id: memberId });
+
+    if (error) throw translateDatabaseError(error, REMOVE_MEMBER_ERROR);
+  },
+
+  async deleteFamily(confirmName: string): Promise<void> {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("delete_family", { p_confirm_name: confirmName });
+
+    if (error) throw translateDatabaseError(error, DELETE_FAMILY_ERROR);
   },
 
   async touchLastActive(): Promise<void> {
