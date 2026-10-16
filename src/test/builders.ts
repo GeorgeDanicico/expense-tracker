@@ -4,6 +4,7 @@ import { PARENT_PERMISSIONS, type CurrentMember, type FamilyData, type FamilyMem
 import type { InvestmentTransaction } from "@/lib/investments/types";
 import type { NetWorthManualItemSource, NetWorthValuation } from "@/lib/net-worth/types";
 import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
+import type { FakeInvite } from "@/test/fakes/family";
 
 /** Test fixtures with readable defaults; override only what a test is about. */
 
@@ -133,6 +134,26 @@ export function aFamilyMember(overrides: Partial<FamilyMember> = {}): FamilyMemb
     joinedAt: "2026-10-02T09:00:00.000Z",
     lastActiveAt: null,
     permissions: DEFAULT_KID_PERMISSIONS,
+    ...overrides,
+  };
+}
+
+/**
+ * A pending kid invite of `aParent()`'s family, as `FakeFamilyRepository` stores it. Push it onto
+ * `repositories.family.invites`; override `role: "parent"` with `permissions: null` for a parent invite.
+ */
+export function anInvite(overrides: Partial<FakeInvite> = {}): FakeInvite {
+  return {
+    inviteId: "80000000-0000-4000-8000-000000000001",
+    familyId: "70000000-0000-4000-8000-000000000001",
+    codeHash: "a".repeat(64),
+    role: "kid",
+    permissions: DEFAULT_KID_PERMISSIONS,
+    createdByName: "owner",
+    createdAt: "2026-10-01T09:00:00.000Z",
+    expiresAt: "2999-01-01T00:00:00.000Z",
+    usedAt: null,
+    revokedAt: null,
     ...overrides,
   };
 }

@@ -28,6 +28,8 @@ const PROTECTED_ROUTES: Record<string, string[]> = {
   "expenses/[id]": ["DELETE"],
   "expenses/export": ["GET"],
   family: ["DELETE", "GET", "POST"],
+  "family/invites": ["GET", "POST"],
+  "family/invites/[id]": ["DELETE"],
   "family/members/[id]": ["DELETE"],
   "family/members/[id]/permissions": ["PATCH"],
   investments: ["GET"],

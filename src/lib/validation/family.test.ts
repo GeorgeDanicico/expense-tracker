@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { PERMISSION_PRESETS } from "@/lib/permissions";
 import {
+  createInviteSchema,
   displayNameSchema,
   familyNameSchema,
   inviteCodeSchema,
@@ -124,5 +125,43 @@ describe("inviteCodeSchema", () => {
 
   it("rejects a non-string", () => {
     expect(inviteCodeSchema.safeParse(12345678).success).toBe(false);
+  });
+});
+
+describe("createInviteSchema", () => {
+  it("accepts a parent invite without permissions", () => {
+    expect(createInviteSchema.parse({ role: "parent" })).toEqual({ role: "parent", permissions: null });
+    expect(createInviteSchema.parse({ role: "parent", permissions: null })).toEqual({ role: "parent", permissions: null });
+  });
+
+  it("accepts a kid invite with every module's level", () => {
+    expect(createInviteSchema.parse({ role: "kid", permissions: PERMISSION_PRESETS.teen })).toEqual({
+      role: "kid",
+      permissions: PERMISSION_PRESETS.teen,
+    });
+  });
+
+  it("requires permissions for a kid invite", () => {
+    expect(createInviteSchema.safeParse({ role: "kid" }).error?.flatten().fieldErrors).toEqual({
+      permissions: ["Choose what the kid can use."],
+    });
+  });
+
+  it("refuses permissions on a parent invite", () => {
+    expect(
+      createInviteSchema.safeParse({ role: "parent", permissions: PERMISSION_PRESETS.teen }).error?.flatten().fieldErrors,
+    ).toEqual({ permissions: ["Parents always have full access."] });
+  });
+
+  it("refuses an unknown role", () => {
+    expect(messages(createInviteSchema.safeParse({ role: "grandparent" }))).toEqual([
+      "Choose whether to invite a parent or a kid.",
+    ]);
+  });
+
+  it("refuses a level the module doesn't allow", () => {
+    const permissions = { ...PERMISSION_PRESETS.young_kid, family_finance: "edit" };
+
+    expect(createInviteSchema.safeParse({ role: "kid", permissions }).success).toBe(false);
   });
 });

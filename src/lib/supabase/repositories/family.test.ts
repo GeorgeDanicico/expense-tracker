@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DomainError } from "@/lib/errors";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
+import type { Permissions } from "@/lib/permissions";
 import { fakeSupabase } from "@/test/fake-supabase";
 
 const mocks = vi.hoisted(() => ({ createClient: vi.fn() }));
@@ -14,6 +15,8 @@ const parentMemberId = "60000000-0000-4000-8000-000000000151";
 const kidMemberId = "60000000-0000-4000-8000-000000000152";
 const parentUserId = "10000000-0000-4000-8000-000000000151";
 const kidUserId = "10000000-0000-4000-8000-000000000152";
+const inviteId = "80000000-0000-4000-8000-000000000151";
+const otherInviteId = "80000000-0000-4000-8000-000000000152";
 
 const kidPermissions = { expenses: "edit", investments: "off", net_worth: "edit", family_finance: "view" };
 
@@ -342,6 +345,179 @@ describe("Supabase family repository", () => {
       useRpc(() => ({ data: null, error: { message: "private database failure" } }));
 
       await expect(family.touchLastActive()).rejects.toThrow(new Error("Unable to record your last activity."));
+    });
+  });
+
+  describe("createInvite", () => {
+    const codeHash = "0123456789abcdef".repeat(4);
+    const created = { invite_id: inviteId, expires_at: "2026-10-18T09:00:00+00:00" };
+
+    it("calls create_family_invite with null permissions for a parent invite", async () => {
+      const { rpcs } = useRpc(() => ({ data: [created], error: null }));
+
+      await family.createInvite({ role: "parent", permissions: null, codeHash });
+
+      expect(rpcs).toEqual([
+        { fn: "create_family_invite", args: { p_role: "parent", p_permissions: null, p_code_hash: codeHash } },
+      ]);
+    });
+
+    it("sends a kid invite's permissions", async () => {
+      const { rpcs } = useRpc(() => ({ data: [created], error: null }));
+
+      await family.createInvite({ role: "kid", permissions: kidPermissions as Permissions, codeHash });
+
+      expect(rpcs[0].args).toEqual({ p_role: "kid", p_permissions: kidPermissions, p_code_hash: codeHash });
+    });
+
+    it("returns the invite's id and expiry", async () => {
+      useRpc(() => ({ data: [created], error: null }));
+
+      expect(await family.createInvite({ role: "parent", permissions: null, codeHash })).toEqual({
+        inviteId,
+        expiresAt: "2026-10-18T09:00:00+00:00",
+      });
+    });
+
+    it("refuses a malformed hash as a server failure, without calling the database", async () => {
+      const { rpcs } = useRpc(() => ({ data: [created], error: null }));
+
+      await expect(family.createInvite({ role: "parent", permissions: null, codeHash: "ABCD2345" })).rejects.toThrow(
+        new Error("Unable to create the invite."),
+      );
+      expect(rpcs).toEqual([]);
+    });
+
+    it("translates a non-parent caller into a 403", async () => {
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Only parents can invite people to the family." } }));
+
+      await expect(family.createInvite({ role: "parent", permissions: null, codeHash })).rejects.toThrow(
+        new DomainError("Only parents can invite people to the family.", 403),
+      );
+    });
+
+    it("translates invalid permissions into a 422", async () => {
+      useRpc(() => ({ data: null, error: { code: "23514", message: "Choose an allowed level for every module." } }));
+
+      await expect(
+        family.createInvite({ role: "kid", permissions: kidPermissions as Permissions, codeHash }),
+      ).rejects.toThrow(new DomainError("Choose an allowed level for every module.", 422));
+    });
+
+    it("translates a hash already in use into a 409", async () => {
+      useRpc(() => ({ data: null, error: { code: "23505", message: "That invite code is already in use." } }));
+
+      await expect(family.createInvite({ role: "parent", permissions: null, codeHash })).rejects.toThrow(
+        new DomainError("That invite code is already in use.", 409),
+      );
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.createInvite({ role: "parent", permissions: null, codeHash })).rejects.toThrow(
+        new Error("Unable to create the invite."),
+      );
+    });
+
+    it("treats a missing row as a failure", async () => {
+      useRpc(() => ({ data: [], error: null }));
+
+      await expect(family.createInvite({ role: "parent", permissions: null, codeHash })).rejects.toThrow(
+        new Error("Unable to create the invite."),
+      );
+    });
+  });
+
+  describe("listInvites", () => {
+    const kidInviteRow = {
+      invite_id: inviteId,
+      role: "kid",
+      permissions: kidPermissions,
+      created_by_name: "Ana",
+      created_at: "2026-10-16T09:00:00+00:00",
+      expires_at: "2026-10-23T09:00:00+00:00",
+    };
+
+    it("calls list_family_invites as the request's caller, with no arguments", async () => {
+      const { rpcs } = useRpc(() => ({ data: [], error: null }));
+
+      expect(await family.listInvites()).toEqual([]);
+      expect(rpcs).toEqual([{ fn: "list_family_invites", args: {} }]);
+    });
+
+    it("maps kid and parent invites, keeping the database's order", async () => {
+      const parentInviteRow = { ...kidInviteRow, invite_id: otherInviteId, role: "parent", permissions: null, created_by_name: null };
+      useRpc(() => ({ data: [parentInviteRow, kidInviteRow], error: null }));
+
+      expect(await family.listInvites()).toEqual([
+        {
+          inviteId: otherInviteId,
+          role: "parent",
+          permissions: null,
+          createdByName: null,
+          createdAt: "2026-10-16T09:00:00+00:00",
+          expiresAt: "2026-10-23T09:00:00+00:00",
+        },
+        {
+          inviteId,
+          role: "kid",
+          permissions: kidPermissions,
+          createdByName: "Ana",
+          createdAt: "2026-10-16T09:00:00+00:00",
+          expiresAt: "2026-10-23T09:00:00+00:00",
+        },
+      ]);
+    });
+
+    it("treats a kid invite's unknown levels as off", async () => {
+      useRpc(() => ({ data: [{ ...kidInviteRow, permissions: { expenses: "edit", investments: "view" } }], error: null }));
+
+      expect((await family.listInvites())[0].permissions).toEqual({
+        expenses: "edit",
+        investments: "off",
+        net_worth: "off",
+        family_finance: "off",
+      });
+    });
+
+    it("translates a non-parent caller into a 403", async () => {
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Only parents can see the family's invites." } }));
+
+      await expect(family.listInvites()).rejects.toThrow(new DomainError("Only parents can see the family's invites.", 403));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.listInvites()).rejects.toThrow(new Error("Unable to load the invites."));
+    });
+  });
+
+  describe("revokeInvite", () => {
+    it("calls revoke_family_invite with the invite's id", async () => {
+      const { rpcs } = useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.revokeInvite(inviteId)).resolves.toBeUndefined();
+      expect(rpcs).toEqual([{ fn: "revoke_family_invite", args: { p_invite_id: inviteId } }]);
+    });
+
+    it("translates a non-parent caller into a 403", async () => {
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Only parents can revoke invites." } }));
+
+      await expect(family.revokeInvite(inviteId)).rejects.toThrow(new DomainError("Only parents can revoke invites.", 403));
+    });
+
+    it("translates an unknown or other-family invite into a 404", async () => {
+      useRpc(() => ({ data: null, error: { code: "P0002", message: "That invite wasn't found." } }));
+
+      await expect(family.revokeInvite(inviteId)).rejects.toThrow(new DomainError("That invite wasn't found.", 404));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.revokeInvite(inviteId)).rejects.toThrow(new Error("Unable to revoke the invite."));
     });
   });
 });
