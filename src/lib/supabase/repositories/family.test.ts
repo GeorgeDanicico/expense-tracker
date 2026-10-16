@@ -277,6 +277,51 @@ describe("Supabase family repository", () => {
     });
   });
 
+  describe("addManagedKid", () => {
+    const youngKid = { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off" } as const;
+
+    it("calls add_managed_kid with the account and every module as the request's caller", async () => {
+      const { rpcs } = useRpc(() => ({ data: kidMemberId, error: null }));
+
+      await family.addManagedKid(kidUserId, youngKid);
+
+      expect(rpcs).toEqual([{ fn: "add_managed_kid", args: { p_user_id: kidUserId, p_permissions: youngKid } }]);
+    });
+
+    it("returns the new member's id", async () => {
+      useRpc(() => ({ data: kidMemberId, error: null }));
+
+      expect(await family.addManagedKid(kidUserId, youngKid)).toBe(kidMemberId);
+    });
+
+    it.each([
+      { code: "42501", status: 403, message: "Only parents can add a kid." },
+      { code: "P0002", status: 404, message: "That account wasn't found." },
+      { code: "23505", status: 409, message: "That account is already in a family." },
+      { code: "23514", status: 422, message: "Choose an allowed level for every module." },
+    ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
+      useRpc(() => ({ data: null, error: { code, message } }));
+
+      await expect(family.addManagedKid(kidUserId, youngKid)).rejects.toThrow(new DomainError(message, status));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.addManagedKid(kidUserId, youngKid)).rejects.toThrow(
+        new Error("Unable to add the kid to the family."),
+      );
+    });
+
+    it("treats a missing member id as a failure", async () => {
+      useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.addManagedKid(kidUserId, youngKid)).rejects.toThrow(
+        new Error("Unable to add the kid to the family."),
+      );
+    });
+  });
+
   describe("removeMember", () => {
     it("calls remove_family_member with the member", async () => {
       const { rpcs } = useRpc(() => ({ data: null, error: null }));
