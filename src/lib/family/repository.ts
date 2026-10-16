@@ -55,6 +55,23 @@ export type FamilyData = {
   members: FamilyMember[];
 };
 
+/** A pending invite (not used, revoked or expired), as `listInvites()` shows it to a parent. Never carries the code. */
+export type FamilyInvite = {
+  inviteId: string;
+  role: FamilyRole;
+  /** Every module for a kid invite; `null` for a parent invite. */
+  permissions: Permissions | null;
+  /** The creator's display name, else username, else email before the `@`; `null` once their account is gone. */
+  createdByName: string | null;
+  createdAt: string;
+  expiresAt: string;
+};
+
+/** What `createInvite` stores: a kid invite carries the kid's permissions, a parent invite none. */
+export type NewInvite =
+  | { role: "parent"; permissions: null; codeHash: string }
+  | { role: "kid"; permissions: Permissions; codeHash: string };
+
 /**
  * Families and memberships. Get it from `getRepositories()`; never import an implementation.
  * Unlike the finance repositories, methods take no `userId`: they act as the signed-in caller,
@@ -94,4 +111,19 @@ export interface FamilyRepository {
    * last marked under 5 minutes ago.
    */
   touchLastActive(): Promise<void>;
+  /**
+   * Creates an invite to the caller's family and returns its id and expiry (48 hours for a parent
+   * invite, 7 days for a kid invite). `codeHash` is `hashInviteCode(code)`; the plain code never
+   * reaches storage. Throws a 403 `DomainError` when the caller isn't a parent, a 422 one for an
+   * invalid role or permissions, and a 409 one when the hash is already in use (retry with a new code).
+   */
+  createInvite(invite: NewInvite): Promise<{ inviteId: string; expiresAt: string }>;
+  /** The family's pending invites, newest first. Throws a 403 `DomainError` when the caller isn't a parent. */
+  listInvites(): Promise<FamilyInvite[]>;
+  /**
+   * Revokes an invite of the caller's family; an invite already revoked or used is left as it is.
+   * Throws a 403 `DomainError` when the caller isn't a parent, and a 404 one when the invite doesn't
+   * exist or belongs to another family.
+   */
+  revokeInvite(inviteId: string): Promise<void>;
 }

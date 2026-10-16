@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { MODULE_LABELS, MODULE_LEVELS, type ModuleKey } from "@/lib/permissions";
+import { FAMILY_ROLES, MODULE_LABELS, MODULE_LEVELS, type ModuleKey, type Permissions } from "@/lib/permissions";
 
 const moduleLevel = <M extends ModuleKey>(module: M) =>
   z.enum(MODULE_LEVELS[module], `Choose an allowed level for ${MODULE_LABELS[module]}.`);
@@ -65,3 +65,27 @@ export const inviteCodeSchema = z
   .string()
   .transform(normalizeInviteCode)
   .refine((code) => INVITE_CODE_PATTERN.test(code), "Enter the 8-character invite code.");
+
+/** An invite's role and, for a kid, permissions: what `POST /api/family/invites` stores. */
+export type InviteRequest = { role: "parent"; permissions: null } | { role: "kid"; permissions: Permissions };
+
+/**
+ * The body of `POST /api/family/invites`: `{ role, permissions? }`. A kid invite needs every module's
+ * level; a parent invite has none (missing or null), because parents always have full access.
+ */
+export const createInviteSchema = z
+  .object({
+    role: z.enum(FAMILY_ROLES, "Choose whether to invite a parent or a kid."),
+    permissions: permissionsSchema.nullish(),
+  })
+  .superRefine(({ role, permissions }, context) => {
+    if (role === "kid" && !permissions) {
+      context.addIssue({ code: "custom", path: ["permissions"], message: "Choose what the kid can use." });
+    }
+    if (role === "parent" && permissions) {
+      context.addIssue({ code: "custom", path: ["permissions"], message: "Parents always have full access." });
+    }
+  })
+  .transform(({ role, permissions }): InviteRequest =>
+    role === "kid" ? { role, permissions: permissions as Permissions } : { role, permissions: null },
+  );
