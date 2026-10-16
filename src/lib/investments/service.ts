@@ -15,6 +15,7 @@ import type {
   InvestmentTransactionMutationResponse,
   InvestmentTransactionsResponse,
   InvestmentsOverview,
+  FamilyInvestmentsOverview,
 } from "@/lib/investments/types";
 import { mergeInvestmentQuotes } from "@/lib/investments/valuation";
 import { getRepositories } from "@/lib/repositories";
@@ -47,6 +48,21 @@ export async function getInvestmentsOverview(userId: string): Promise<Investment
   }
 
   return mergeInvestmentQuotes(aggregate, quotes);
+}
+
+/** Every viewer's investments, one overview each, in the order given. Nobody else's is read. */
+export async function getFamilyInvestmentsOverview(
+  viewers: Array<{ userId: string; memberId: string; name: string; currency: string }>,
+): Promise<FamilyInvestmentsOverview> {
+  const members = await Promise.all(
+    viewers.map(async ({ userId, memberId, name, currency }) => ({
+      memberId,
+      name,
+      currency,
+      overview: await getInvestmentsOverview(userId),
+    })),
+  );
+  return { members };
 }
 
 /** One asset's orders, newest first, or null when the user holds no such asset. */

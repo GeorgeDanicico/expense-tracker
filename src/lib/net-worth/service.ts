@@ -4,7 +4,8 @@ import type { z } from "zod";
 
 import { getInvestmentsOverview } from "@/lib/investments/service";
 import { DomainError } from "@/lib/errors";
-import { buildNetWorthOverview } from "@/lib/net-worth/calculation";
+import { buildNetWorthOverview, combineNetWorthTotals } from "@/lib/net-worth/calculation";
+import type { FamilyNetWorthOverview } from "@/lib/net-worth/types";
 import type { NetWorthItemChanges, NetWorthValuationInput } from "@/lib/net-worth/repository";
 import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
 import { getRepositories } from "@/lib/repositories";
@@ -19,6 +20,24 @@ export async function getNetWorthOverview(userId: string) {
   const [investments, manualItems] = await Promise.all([investmentsPromise, manualItemsPromise]);
 
   return buildNetWorthOverview(investments, manualItems);
+}
+
+/**
+ * Every viewer's net worth, one overview each in the order given, plus their totals added up per
+ * currency. Nothing is converted between currencies.
+ */
+export async function getFamilyNetWorthOverview(
+  viewers: Array<{ userId: string; memberId: string; name: string; currency: string }>,
+): Promise<FamilyNetWorthOverview> {
+  const members = await Promise.all(
+    viewers.map(async ({ userId, memberId, name, currency }) => ({
+      memberId,
+      name,
+      currency,
+      overview: await getNetWorthOverview(userId),
+    })),
+  );
+  return { members, totalsByCurrency: combineNetWorthTotals(members.map(({ overview }) => overview.totalsByCurrency)) };
 }
 
 /**

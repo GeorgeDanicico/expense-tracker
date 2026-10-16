@@ -59,14 +59,18 @@ export function AssetDetail({
   brokerId,
   detailId,
   onClose,
+  member: ownerMember,
 }: {
   asset: InvestmentOverviewAsset;
   accountId: string;
   brokerId: InvestmentBrokerId;
   detailId: string;
   onClose: () => void;
+  /** The member whose asset this is; the page's viewed member when left out. */
+  member?: string;
 }) {
-  const { member } = useViewing();
+  const viewing = useViewing();
+  const member = ownerMember ?? viewing.member;
   const key = investmentTransactionsApiKey({ accountId, instrument: asset.instrument, currency: asset.currency, member });
   const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentTransactionsResponse>(key, apiFetcher);
   const unrealized = getInvestmentGainPresentation(asset.unrealizedGain, asset.currency);

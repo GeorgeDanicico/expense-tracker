@@ -19,7 +19,6 @@ vi.mock("@/lib/investments/quotes/get-adapter", () => ({
 import { GET as getDashboard } from "@/app/api/dashboard/route";
 import { GET as getTabs } from "@/app/api/expense-tabs/route";
 import { GET as getExpenses } from "@/app/api/expenses/route";
-import { GET as getInvestments } from "@/app/api/investments/route";
 
 type Handler = (request: NextRequest, context: { params: Promise<{ id: string }> }) => Promise<Response>;
 
@@ -160,8 +159,7 @@ describe("GET /api/expenses?member=all", () => {
     expect((await call(getExpenses as Handler, FAMILY_MONTH)).status).toBe(404);
   });
 
-  it("is only for expenses: the other finance reads still answer 404 to it", async () => {
-    expect((await call(getInvestments as Handler, "/api/investments?member=all")).status).toBe(404);
+  it("is not for the other finance reads: saved tabs still answer 404 to it", async () => {
     expect((await call(getTabs as Handler, "/api/expense-tabs?member=all")).status).toBe(404);
   });
 });

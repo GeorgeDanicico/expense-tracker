@@ -130,6 +130,21 @@ export type InvestmentsOverview = {
   calculationIssues?: InvestmentCalculationIssue[];
 };
 
+/** One family member's investments in the combined family view. */
+export type FamilyInvestmentsMember = {
+  memberId: string;
+  name: string;
+  currency: string;
+  overview: InvestmentsOverview;
+};
+
+/**
+ * The family view of investments (`?member=all`): one overview per member, in family order. There are
+ * no combined totals, because an overview only reports totals per broker and currency, each valued
+ * only where a quote exists.
+ */
+export type FamilyInvestmentsOverview = { members: FamilyInvestmentsMember[] };
+
 export type InvestmentTransactionDto = InvestmentTransaction & {
   brokerId: InvestmentBrokerId;
 };
