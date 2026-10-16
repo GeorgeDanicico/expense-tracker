@@ -8,6 +8,7 @@ import {
   type FamilyInvite,
   type FamilyMember,
   type FamilyRepository,
+  type InvitePreview,
   type NewInvite,
 } from "@/lib/family/repository";
 import {
@@ -33,6 +34,8 @@ const TOUCH_ERROR = "Unable to record your last activity.";
 const CREATE_INVITE_ERROR = "Unable to create the invite.";
 const LIST_INVITES_ERROR = "Unable to load the invites.";
 const REVOKE_INVITE_ERROR = "Unable to revoke the invite.";
+const PREVIEW_INVITE_ERROR = "Unable to check the invite code.";
+const REDEEM_INVITE_ERROR = "Unable to join the family.";
 
 /** `hashInviteCode`'s output. Anything else is a bug in the caller, never the user's fault. */
 const CODE_HASH_PATTERN = /^[0-9a-f]{64}$/;
@@ -109,6 +112,11 @@ function toInvite(row: InviteRow): FamilyInvite {
     createdAt: row.created_at,
     expiresAt: row.expires_at,
   };
+}
+
+/** The database would refuse a malformed hash with a 422 meant for users; it is a server bug, so fail as one. */
+function assertCodeHash(codeHash: string, failure: string) {
+  if (!CODE_HASH_PATTERN.test(codeHash)) throw new Error(failure);
 }
 
 /** `FamilyRepository` on the family RPCs, which act as the request's caller. */
@@ -199,8 +207,7 @@ export const supabaseFamilyRepository: FamilyRepository = {
   },
 
   async createInvite({ role, permissions, codeHash }: NewInvite) {
-    // The database would refuse a malformed hash with a 422 meant for users; it is a server bug, so fail as one.
-    if (!CODE_HASH_PATTERN.test(codeHash)) throw new Error(CREATE_INVITE_ERROR);
+    assertCodeHash(codeHash, CREATE_INVITE_ERROR);
 
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("create_family_invite", {
@@ -228,5 +235,36 @@ export const supabaseFamilyRepository: FamilyRepository = {
     const { error } = await supabase.rpc("revoke_family_invite", { p_invite_id: inviteId });
 
     if (error) throw translateDatabaseError(error, REVOKE_INVITE_ERROR);
+  },
+
+  async previewInvite(codeHash: string): Promise<InvitePreview | null> {
+    assertCodeHash(codeHash, PREVIEW_INVITE_ERROR);
+
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("preview_family_invite", { p_code_hash: codeHash });
+
+    if (error) throw translateDatabaseError(error, PREVIEW_INVITE_ERROR);
+    const row = data?.[0];
+    if (!row) return null;
+
+    const role = toRole(row.role, PREVIEW_INVITE_ERROR);
+    return {
+      familyName: row.family_name,
+      inviterName: row.inviter_name,
+      role,
+      permissions: role === "kid" ? toPermissions(role, row.permissions ?? undefined) : null,
+      expiresAt: row.expires_at,
+    };
+  },
+
+  async redeemInvite(codeHash: string): Promise<string> {
+    assertCodeHash(codeHash, REDEEM_INVITE_ERROR);
+
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("redeem_family_invite", { p_code_hash: codeHash });
+
+    if (error) throw translateDatabaseError(error, REDEEM_INVITE_ERROR);
+    if (!data) throw new Error(REDEEM_INVITE_ERROR);
+    return data;
   },
 };

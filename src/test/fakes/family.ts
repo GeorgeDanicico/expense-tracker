@@ -7,6 +7,7 @@ import {
   type FamilyData,
   type FamilyInvite,
   type FamilyRepository,
+  type InvitePreview,
   type NewInvite,
 } from "@/lib/family/repository";
 import { FAMILY_ROLES, MODULE_KEYS, isLevelAllowed, type PermissionLevel, type Permissions } from "@/lib/permissions";
@@ -16,11 +17,14 @@ import type { FakeAdminProfile } from "./auth";
 /** An invite as the fake stores it: what `listInvites()` shows, plus what only the database knows. */
 export type FakeInvite = FamilyInvite & {
   familyId: string;
+  /** The name of the invite's family, which `previewInvite` shows and `redeemInvite` joins. */
+  familyName: string;
   codeHash: string;
   usedAt: string | null;
   revokedAt: string | null;
 };
 
+const CODE_HASH_PATTERN = /^[0-9a-f]{64}$/;
 const PARENT_INVITE_HOURS = 48;
 const KID_INVITE_HOURS = 7 * 24;
 
@@ -199,7 +203,7 @@ export class FakeFamilyRepository implements FamilyRepository {
     if (role === "kid" && !isValidPermissions(permissions)) {
       throw new DomainError("Choose an allowed level for every module.", 422);
     }
-    if (!/^[0-9a-f]{64}$/.test(codeHash)) throw new DomainError("The invite code is not valid.", 422);
+    this.checkCodeHash(codeHash);
     if (this.invites.some((invite) => invite.codeHash === codeHash)) {
       throw new DomainError("That invite code is already in use.", 409);
     }
@@ -209,6 +213,7 @@ export class FakeFamilyRepository implements FamilyRepository {
     const invite: FakeInvite = {
       inviteId: randomUUID(),
       familyId,
+      familyName: this.membership?.familyName ?? "",
       codeHash,
       role,
       permissions,
@@ -251,6 +256,88 @@ export class FakeFamilyRepository implements FamilyRepository {
     const invite = this.invites.find((candidate) => candidate.inviteId === inviteId && candidate.familyId === familyId);
     if (!invite) throw new DomainError("That invite wasn't found.", 404);
     if (!invite.usedAt && !invite.revokedAt) invite.revokedAt = new Date().toISOString();
+  }
+
+  /**
+   * Like `preview_family_invite`: the invite with `codeHash` when it can be redeemed, else `null`
+   * without saying why. Works for callers already in a family. (The fake doesn't model an invite
+   * whose creator is no longer a parent; mark such an invite revoked instead.)
+   */
+  async previewInvite(codeHash: string): Promise<InvitePreview | null> {
+    this.calls.push("previewInvite");
+    this.checkCodeHash(codeHash);
+    const invite = this.redeemableInvite(codeHash);
+    if (!invite) return null;
+
+    return {
+      familyName: invite.familyName,
+      inviterName: invite.createdByName,
+      role: invite.role,
+      permissions: invite.permissions,
+      expiresAt: invite.expiresAt,
+    };
+  }
+
+  /**
+   * Like `redeem_family_invite`: refuses a caller already in a family (409), then a code that can't
+   * be redeemed (404); else makes the caller a member with the invite's role and permissions, marks
+   * the invite used, and returns the new member id. Afterwards `family` holds the invite's family
+   * with only the caller's own entry, since the fake doesn't know its other members.
+   */
+  async redeemInvite(codeHash: string) {
+    this.calls.push("redeemInvite");
+    this.checkCodeHash(codeHash);
+    if (this.membership || this.family) throw new DomainError("You're already in a family.", 409);
+    const invite = this.redeemableInvite(codeHash);
+    if (!invite) throw new DomainError("This code isn't valid anymore.", 404);
+
+    const memberId = randomUUID();
+    const joinedAt = new Date().toISOString();
+    const permissions = invite.role === "kid" && invite.permissions ? { ...invite.permissions } : PARENT_PERMISSIONS;
+
+    this.membership = {
+      memberId,
+      familyId: invite.familyId,
+      familyName: invite.familyName,
+      role: invite.role,
+      isCreator: false,
+      permissions,
+    };
+    this.family = {
+      family: { id: invite.familyId, name: invite.familyName, createdAt: invite.createdAt },
+      members: [
+        {
+          memberId,
+          userId: this.caller.userId,
+          role: invite.role,
+          isCreator: false,
+          displayName: this.caller.displayName,
+          username: null,
+          joinedAt,
+          lastActiveAt: null,
+          permissions,
+        },
+      ],
+    };
+    invite.usedAt = joinedAt;
+    return memberId;
+  }
+
+  /** The SQL's 422 for a hash that isn't 64 lowercase hex characters. */
+  private checkCodeHash(codeHash: string) {
+    if (!CODE_HASH_PATTERN.test(codeHash)) throw new DomainError("The invite code is not valid.", 422);
+  }
+
+  /** Like `family_private.is_invite_redeemable`: unused, unrevoked, unexpired, and a kid's permissions still valid. */
+  private redeemableInvite(codeHash: string) {
+    return this.invites.find(
+      (invite) =>
+        invite.codeHash === codeHash &&
+        !invite.usedAt &&
+        !invite.revokedAt &&
+        Date.parse(invite.expiresAt) > Date.now() &&
+        (invite.role === "parent" || (invite.permissions !== null && isValidPermissions(invite.permissions))),
+    );
   }
 
   /** A member of the caller's family, or the SQL's 404 (unknown and other-family members look the same). */
