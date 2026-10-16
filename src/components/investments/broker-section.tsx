@@ -17,11 +17,14 @@ export function BrokerSection({
   selectedKey,
   onSelect,
   onClose,
+  member,
 }: {
   broker: InvestmentsOverview["brokers"][number];
   selectedKey: string | null;
   onSelect: (asset: InvestmentsOverview["brokers"][number]["assets"][number]) => void;
   onClose: () => void;
+  /** Whose order history the detail reads, when it isn't the page's own viewed member (the family view). */
+  member?: string;
 }) {
   const detailId = investmentDetailId(broker.accountId);
   const headingId = `investment-broker-${broker.accountId}`;
@@ -75,6 +78,7 @@ export function BrokerSection({
               brokerId={broker.brokerId}
               detailId={detailId}
               onClose={onClose}
+              member={member}
             />
           ) : null}
         </Stack>

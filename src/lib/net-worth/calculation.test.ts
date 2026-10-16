@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildNetWorthOverview } from "@/lib/net-worth/calculation";
+import { buildNetWorthOverview, combineNetWorthTotals } from "@/lib/net-worth/calculation";
+import type { NetWorthTotal } from "@/lib/net-worth/types";
 import type { InvestmentsOverview } from "@/lib/investments/types";
 import { aManualItem, aValuation } from "@/test/builders";
 
@@ -128,5 +129,40 @@ describe("buildNetWorthOverview", () => {
     const overview = buildNetWorthOverview(investmentsHolding({ ...pricedApple, ...unpriced }, sold), []);
 
     expect(overview.entries.map((entry) => entry.name)).toEqual(["Apple Inc."]);
+  });
+});
+
+describe("combineNetWorthTotals", () => {
+  const total = (overrides: Partial<NetWorthTotal>): NetWorthTotal => ({
+    currency: "EUR", assets: "0", liabilities: "0", knownSubtotal: "0", netWorth: "0",
+    missingValueCount: 0, status: "complete", ...overrides,
+  });
+
+  it("adds members' totals per currency and keeps currencies apart", () => {
+    const combined = combineNetWorthTotals([
+      [total({ assets: "100.1", liabilities: "20", knownSubtotal: "80.1", netWorth: "80.1" })],
+      [
+        total({ assets: "50.2", knownSubtotal: "50.2", netWorth: "50.2" }),
+        total({ currency: "RON", assets: "7", knownSubtotal: "7", netWorth: "7" }),
+      ],
+    ]);
+
+    expect(combined).toEqual([
+      { currency: "EUR", assets: "150.3", liabilities: "20", knownSubtotal: "130.3", netWorth: "130.3", missingValueCount: 0, status: "complete" },
+      { currency: "RON", assets: "7", liabilities: "0", knownSubtotal: "7", netWorth: "7", missingValueCount: 0, status: "complete" },
+    ]);
+  });
+
+  it("leaves the combined net worth unknown when any member's is incomplete", () => {
+    const [eur] = combineNetWorthTotals([
+      [total({ assets: "10", knownSubtotal: "10", netWorth: "10" })],
+      [total({ assets: "5", knownSubtotal: "5", netWorth: null, missingValueCount: 2, status: "incomplete" })],
+    ]);
+
+    expect(eur).toMatchObject({ knownSubtotal: "15", netWorth: null, missingValueCount: 2, status: "incomplete" });
+  });
+
+  it("returns nothing for members without totals", () => {
+    expect(combineNetWorthTotals([[], []])).toEqual([]);
   });
 });

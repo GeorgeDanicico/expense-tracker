@@ -1,7 +1,7 @@
 /** The query parameter a finance read takes to show another family member's data. */
 export const MEMBER_PARAM = "member";
 
-/** The `?member=` value for the combined family view of expenses (F46); every other finance read answers 404 to it. */
+/** The `?member=` value for the combined family view (F46 expenses, F47 investments and net worth); the other finance reads answer 404 to it. */
 export const ALL_MEMBERS = "all";
 
 /**

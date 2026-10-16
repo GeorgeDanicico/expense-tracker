@@ -74,6 +74,23 @@ export type NetWorthOverview = {
   calculationIssues: InvestmentCalculationIssue[];
 };
 
+/** One family member's balance sheet in the combined family view. */
+export type FamilyNetWorthMember = {
+  memberId: string;
+  name: string;
+  currency: string;
+  overview: NetWorthOverview;
+};
+
+/**
+ * The family view of net worth (`?member=all`): one overview per member, and the members' totals
+ * added together per currency (never across currencies).
+ */
+export type FamilyNetWorthOverview = {
+  members: FamilyNetWorthMember[];
+  totalsByCurrency: NetWorthTotal[];
+};
+
 export type NetWorthValuation = {
   id: string;
   itemId: string;

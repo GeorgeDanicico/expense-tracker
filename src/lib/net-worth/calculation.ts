@@ -291,3 +291,33 @@ export function buildNetWorthOverview(
     calculationIssues: investments.calculationIssues ?? [],
   };
 }
+
+/**
+ * Adds members' totals together per currency, with no conversion. A combined net worth is only known
+ * when every member's is, so one incomplete member leaves the currency "Partial" with its known subtotal.
+ */
+export function combineNetWorthTotals(totalsPerMember: NetWorthTotal[][]): NetWorthTotal[] {
+  const byCurrency = new Map<string, NetWorthTotal[]>();
+  for (const total of totalsPerMember.flat()) {
+    byCurrency.set(total.currency, [...(byCurrency.get(total.currency) ?? []), total]);
+  }
+
+  return [...byCurrency]
+    .toSorted(([left], [right]) => left.localeCompare(right))
+    .map(([currency, totals]) => {
+      const sum = (pick: (total: NetWorthTotal) => string) =>
+        totals.reduce((acc, total) => acc.plus(pick(total)), decimal(0));
+      const missingValueCount = totals.reduce((acc, total) => acc + total.missingValueCount, 0);
+      const knownSubtotal = formatNetWorthDecimal(sum((total) => total.knownSubtotal));
+
+      return {
+        currency,
+        assets: formatNetWorthDecimal(sum((total) => total.assets)),
+        liabilities: formatNetWorthDecimal(sum((total) => total.liabilities)),
+        knownSubtotal,
+        netWorth: missingValueCount === 0 ? knownSubtotal : null,
+        missingValueCount,
+        status: missingValueCount === 0 ? "complete" : "incomplete",
+      } satisfies NetWorthTotal;
+    });
+}

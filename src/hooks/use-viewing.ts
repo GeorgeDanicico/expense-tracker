@@ -14,7 +14,7 @@ export type ViewingState = {
    * and `"all"` for the combined family view (see `family`).
    */
   member: string | null;
-  /** True for the combined family view (`?member=all`, expenses only): read-only, across every member. */
+  /** True for the combined family view (`?member=all`: expenses, investments, net worth): read-only, across every member. */
   family: boolean;
   /** True while viewing someone else: every add, edit, delete and import control stays hidden. */
   readOnly: boolean;
