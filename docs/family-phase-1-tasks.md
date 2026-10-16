@@ -9,12 +9,11 @@ An agent needs only two things: the shared sections below (how the work is run, 
 
 ## Progress (16 October 2026)
 
-**41 of 59 tasks are done:** all of step 0, the whole database layer, and most of the server code. Nothing is visible to users yet: everything is behind `FAMILY_ENABLED`, and no family migration is on the live database.
+**43 of 59 tasks are done:** all of step 0, the whole database layer, and most of the server code. Nothing is visible to users yet: everything is behind `FAMILY_ENABLED`, and no family migration is on the live database.
 
 | State | Count | Tasks |
 | --- | --- | --- |
-| Done | 41 | R01–R10, F01–F18, F20, F21, F22, F28, F29, F30, F31, F34, F35, F41 (folded into R06–R09), F42, F43, F44 |
-| In progress | 2 | F32, F33 |
+| Done | 43 | R01–R10, F01–F18, F20, F21, F22, F28, F29, F30, F31, F32, F33, F34, F35, F41 (folded into R06–R09), F42, F43, F44 |
 | Not started | 16 | F19, F23–F27, F36–F40, F45–F49 |
 
 ### Done, with their pull requests
@@ -26,14 +25,14 @@ An agent needs only two things: the shared sections below (how the work is run, 
 | 1.2 Bearer tokens | F14 [#37](https://github.com/GeorgeDanicico/expense-tracker/pull/37) |
 | 1.3 Permissions in the app | F15 [#38](https://github.com/GeorgeDanicico/expense-tracker/pull/38), F16 [#45](https://github.com/GeorgeDanicico/expense-tracker/pull/45), F17 [#47](https://github.com/GeorgeDanicico/expense-tracker/pull/47), F18 [#43](https://github.com/GeorgeDanicico/expense-tracker/pull/43) |
 | 1.4 Create and join | F20 [#44](https://github.com/GeorgeDanicico/expense-tracker/pull/44), F21 [#54](https://github.com/GeorgeDanicico/expense-tracker/pull/54), F22 [#61](https://github.com/GeorgeDanicico/expense-tracker/pull/61) |
-| 1.5 Kid accounts | F28 [#53](https://github.com/GeorgeDanicico/expense-tracker/pull/53), F29 [#57](https://github.com/GeorgeDanicico/expense-tracker/pull/57), F30 [#59](https://github.com/GeorgeDanicico/expense-tracker/pull/59), F31 [#58](https://github.com/GeorgeDanicico/expense-tracker/pull/58) |
+| 1.5 Kid accounts | F28 [#53](https://github.com/GeorgeDanicico/expense-tracker/pull/53), F29 [#57](https://github.com/GeorgeDanicico/expense-tracker/pull/57), F30 [#59](https://github.com/GeorgeDanicico/expense-tracker/pull/59), F31 [#58](https://github.com/GeorgeDanicico/expense-tracker/pull/58), F32 [#63](https://github.com/GeorgeDanicico/expense-tracker/pull/63) |
 | 1.6 Family settings | F34 [#50](https://github.com/GeorgeDanicico/expense-tracker/pull/50), F35 [#51](https://github.com/GeorgeDanicico/expense-tracker/pull/51) |
 | 1.7 Family finance | F41 (folded into R06–R09), F42 [#41](https://github.com/GeorgeDanicico/expense-tracker/pull/41), F43 [#52](https://github.com/GeorgeDanicico/expense-tracker/pull/52), F44 [#56](https://github.com/GeorgeDanicico/expense-tracker/pull/56) |
 
 ### What's left, in order
 
 1. **Finish the server work.**
-   - **F32 and F33** are in progress.
+   - The server work is done.
 2. **Checkpoint 1: George applies the family migrations to the live database** (list under "Applying migrations"). This is the gate for every screen task.
 3. **F49** (new): members' currency in `get_family()`. It must land before F45–F47.
 4. **The screens**, after checkpoint 1:
@@ -48,7 +47,6 @@ An agent needs only two things: the shared sections below (how the work is run, 
 - **Approve checkpoint 1:** apply the migrations listed under "Applying migrations" to the live database.
 - **Set `SUPABASE_SECRET_KEY`** in `.env.local` and on the VPS. Kid accounts (F29) and username sign-in (F30) need it. Without it, the app still starts, but those two features fail safely.
 - **Check the kid email domain once the key is set:** do one live check that Supabase Auth accepts `@kids.ifam.invalid`. If it doesn't, change `KID_EMAIL_DOMAIN` in `src/lib/family/kid-account.ts`.
-- **Check Supabase's "Secure email change" setting** before F33. Explanation in F33.
 - **Fix git over SSH on the Mac** (`ssh-add`). Until then, git runs over HTTPS through `gh` (see "Lessons from running the tasks").
 - **Decide whether to delete the screenshot branches.** `family/f30-screenshots` and `screenshots/f31-password-change` exist only to show images in PRs.
 
