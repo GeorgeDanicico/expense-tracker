@@ -68,6 +68,36 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["families"]["Insert"]>;
         Relationships: [];
       };
+      family_invites: {
+        Row: {
+          code_hash: string;
+          created_at: string;
+          created_by: string | null;
+          expires_at: string;
+          family_id: string;
+          id: string;
+          permissions: Json | null;
+          revoked_at: string | null;
+          role: string;
+          used_at: string | null;
+          used_by: string | null;
+        };
+        Insert: {
+          code_hash: string;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at: string;
+          family_id: string;
+          id?: string;
+          permissions?: Json | null;
+          revoked_at?: string | null;
+          role: string;
+          used_at?: string | null;
+          used_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["family_invites"]["Insert"]>;
+        Relationships: [];
+      };
       family_members: {
         Row: {
           family_id: string;
@@ -284,6 +314,17 @@ export type Database = {
         };
         Returns: string;
       };
+      create_family_invite: {
+        Args: {
+          p_code_hash: string;
+          p_permissions: Json | null;
+          p_role: string;
+        };
+        Returns: {
+          expires_at: string;
+          invite_id: string;
+        }[];
+      };
       create_net_worth_item_with_valuation: {
         Args: {
           p_category: string;
@@ -338,6 +379,17 @@ export type Database = {
           kind: string;
         }[];
       };
+      list_family_invites: {
+        Args: never;
+        Returns: {
+          created_at: string;
+          created_by_name: string | null;
+          expires_at: string;
+          invite_id: string;
+          permissions: Json | null;
+          role: string;
+        }[];
+      };
       remove_family_member: {
         Args: { p_member_id: string };
         Returns: undefined;
@@ -345,6 +397,10 @@ export type Database = {
       require_password_change: {
         Args: { p_member_id: string };
         Returns: string;
+      };
+      revoke_family_invite: {
+        Args: { p_invite_id: string };
+        Returns: undefined;
       };
       set_member_permissions: {
         Args: {
