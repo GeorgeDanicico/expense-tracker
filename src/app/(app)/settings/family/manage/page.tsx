@@ -1,9 +1,11 @@
 "use client";
 
+import { Stack } from "@chakra-ui/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import useSWR from "swr";
 
+import { ManageInvites } from "@/components/family/manage-invites";
 import { ManageMembers } from "@/components/family/manage-members";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useAccount } from "@/hooks/use-account";
@@ -28,5 +30,10 @@ export default function ManageFamilyPage() {
   if (!data) return <DataLoading label="Loading your family…" />;
   if (!data.family) return null;
 
-  return <ManageMembers data={data.family} />;
+  return (
+    <Stack gap="6">
+      <ManageMembers data={data.family} />
+      <ManageInvites />
+    </Stack>
+  );
 }

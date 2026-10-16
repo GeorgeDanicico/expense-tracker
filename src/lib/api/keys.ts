@@ -3,7 +3,7 @@ import { resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { AccountNotice } from "@/lib/account/notice-repository";
-import type { FamilyData } from "@/lib/family/repository";
+import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
 
 // Each key notes the response type its GET returns. Types owned by a domain
 // module are referenced there; wrapper shapes that only exist on the wire live here.
@@ -22,6 +22,12 @@ export const INVESTMENTS_API_KEY = "/api/investments";
 export const NET_WORTH_API_KEY = "/api/net-worth";
 /** GET → {@link FamilyResponse}; POST `{ name }` returns {@link FamilyResponse} with the new family (201). */
 export const FAMILY_API_KEY = "/api/family";
+/** GET → {@link InvitesResponse}: the pending invites, newest first (parents only); POST `{ role, permissions? }` → {@link CreatedInvite} (201). */
+export const FAMILY_INVITES_API_KEY = "/api/family/invites";
+/** DELETE only → 204: revokes the invite. */
+export function familyInviteApiUrl(id: string) {
+  return `${FAMILY_INVITES_API_KEY}/${encodeURIComponent(id)}`;
+}
 /** POST only: `{ code }` → `InvitePreview` (`@/lib/family/repository`), or 404 for a code that can't be redeemed. */
 export const FAMILY_JOIN_PREVIEW_API_URL = "/api/family/join/preview";
 /** POST only: `{ code }` → {@link FamilyResponse} with the joined family (201). */
@@ -35,6 +41,9 @@ export function dismissNoticeApiUrl(id: string) {
 export const EXPENSE_TABS_API_KEY = "/api/expense-tabs";
 
 export type NoticesResponse = { notices: AccountNotice[] };
+export type InvitesResponse = { invites: FamilyInvite[] };
+/** The only response that carries the plain code; it is never stored or listed again. */
+export type CreatedInvite = { inviteId: string; code: string; url: string; expiresAt: string };
 export type FamilyResponse = { family: FamilyData | null };
 export type TabsResponse = { tabs: ExpenseTab[] };
 export type SavedTabResponse = { tab: ExpenseTab };
