@@ -41,6 +41,7 @@ export const expenseTabTools = [
     description: "Saved expense tabs, each grouping categories and subtypes.",
     schema: z.object({}),
     annotations: READ,
+    module: "expenses",
     run: async (_input, { userId }) => ({ tabs: await getRepositories().expenseTabs.list(userId) }),
   }),
   defineTool({
@@ -50,6 +51,7 @@ export const expenseTabTools = [
     schema: tabExpensesSchema,
     shape: { tabId: idSchema(), filters: flatFilters.optional() },
     annotations: READ,
+    module: "expenses",
     notFound: "Expense tab not found.",
     run: ({ tabId, filters }, { userId }) => getExpenseTabLedger(userId, tabId, filters),
   }),
@@ -60,6 +62,7 @@ export const expenseTabTools = [
     schema: expenseTabSchema,
     shape: tabFields,
     annotations: CREATE,
+    module: "expenses",
     run: async (input, { userId }) => ({ tab: await getRepositories().expenseTabs.create(userId, input) }),
   }),
   defineTool({
@@ -68,6 +71,7 @@ export const expenseTabTools = [
     description: "Replace a tab's name, categories and subtypes.",
     schema: updateTabSchema,
     annotations: UPDATE,
+    module: "expenses",
     notFound: "Expense tab not found.",
     run: async ({ id, ...input }, { userId }) => {
       const tab = await getRepositories().expenseTabs.update(userId, id, expenseTabSchema.parse(input));
@@ -80,6 +84,7 @@ export const expenseTabTools = [
     description: "Permanently delete a saved tab. Its expenses are kept.",
     schema: idInput,
     annotations: DELETE,
+    module: "expenses",
     notFound: "Expense tab not found.",
     run: async ({ id }, { userId }) => (await getRepositories().expenseTabs.delete(userId, id)) && { deleted: true, id },
   }),

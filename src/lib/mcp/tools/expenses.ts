@@ -52,6 +52,7 @@ export const expenseTools = [
     description: "Expenses for one month (default: current month) with total, count and average.",
     schema: z.object({ month: z.string().refine(isValidMonth, "Use YYYY-MM.").optional() }),
     annotations: READ,
+    module: "expenses",
     run: ({ month = getBucharestMonth() }, { userId }) => getMonthlyLedger(userId, month),
   }),
   defineTool({
@@ -61,6 +62,7 @@ export const expenseTools = [
     schema: spendingSummarySchema,
     shape: spendingSummarySchema.shape,
     annotations: READ,
+    module: "expenses",
     run: ({ period, granularity, date }, { userId }) => getDashboardData(
       userId,
       parseAnalyticsFilters(new URLSearchParams({ period, granularity, ...(date && { date }) })),
@@ -73,6 +75,7 @@ export const expenseTools = [
     schema: addExpenseSchema,
     shape: { ...fields, expenseDate: fields.expenseDate.optional() },
     annotations: CREATE,
+    module: "expenses",
     run: async (input, { userId }) => ({ expense: await getRepositories().expenses.create(userId, input) }),
   }),
   defineTool({
@@ -82,6 +85,7 @@ export const expenseTools = [
     schema: updateExpenseSchema,
     shape: updateExpenseSchema.shape,
     annotations: UPDATE,
+    module: "expenses",
     notFound: "Expense not found.",
     run: async ({ id, ...patch }, { userId }) => {
       const expense = await getRepositories().expenses.update(userId, id, patch);
@@ -94,6 +98,7 @@ export const expenseTools = [
     description: "Permanently delete an expense.",
     schema: idInput,
     annotations: DELETE,
+    module: "expenses",
     notFound: "Expense not found.",
     run: async ({ id }, { userId }) => (await getRepositories().expenses.delete(userId, id)) && { deleted: true, id },
   }),

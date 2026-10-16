@@ -15,6 +15,7 @@ export const netWorthTools = [
     description: "Net worth with investments and manual assets and liabilities.",
     schema: z.object({}),
     annotations: READ,
+    module: "net_worth",
     run: (_input, { userId }) => getNetWorthOverview(userId),
   }),
   defineTool({
@@ -23,6 +24,7 @@ export const netWorthTools = [
     description: "Create an asset or liability with its first valuation. Decimals are strings.",
     schema: netWorthItemSchema,
     annotations: CREATE,
+    module: "net_worth",
     run: (input, { userId }) => getRepositories().netWorth.createItem(userId, { ...input, purchaseAmount: input.purchaseAmount ?? null }),
   }),
   defineTool({
@@ -31,6 +33,7 @@ export const netWorthTools = [
     description: "Rename, recategorize, set the purchase amount or archive an item.",
     schema: updateItemSchema,
     annotations: UPDATE,
+    module: "net_worth",
     notFound: "Net-worth item not found.",
     run: async ({ id, ...patch }, { userId }) =>
       (await updateNetWorthItem(userId, id, netWorthItemPatchSchema.parse(patch))) && { updated: true, id },
@@ -41,6 +44,7 @@ export const netWorthTools = [
     description: "Set an item's value on a date, replacing any value already on that date.",
     schema: z.object({ itemId: idSchema(), ...netWorthValuationSchema.shape }),
     annotations: UPDATE,
+    module: "net_worth",
     notFound: "Net-worth item not found.",
     run: async ({ itemId, ...input }, { userId }) => {
       const valuation = await addNetWorthValuation(userId, itemId, input);
@@ -53,6 +57,7 @@ export const netWorthTools = [
     description: "Correct the value or date of an existing valuation.",
     schema: z.object({ id: idSchema(), ...netWorthValuationSchema.shape }),
     annotations: UPDATE,
+    module: "net_worth",
     notFound: "Valuation not found.",
     run: async ({ id, ...input }, { userId }) => {
       const valuation = await getRepositories().netWorth.updateValuation(userId, id, input);
