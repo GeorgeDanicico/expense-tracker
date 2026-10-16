@@ -162,6 +162,21 @@ export class FakeFamilyRepository implements FamilyRepository {
     return memberId;
   }
 
+  /**
+   * Like `require_password_change`: parents only, for a kid of their family. Returns the kid's user
+   * id and, when the account is in `accountProfiles`, sets its `mustChangePassword`.
+   */
+  async requirePasswordChange(memberId: string) {
+    this.calls.push("requirePasswordChange");
+    if (this.membership?.role !== "parent") throw new DomainError("Only parents can reset a kid's password.", 403);
+    const target = this.findMember(memberId);
+    if (target.role !== "kid") throw new DomainError("Only a kid's password can be reset.", 403);
+
+    const profile = this.accountProfiles.get(target.userId);
+    if (profile) profile.mustChangePassword = true;
+    return target.userId;
+  }
+
   /** Like `remove_family_member`: the creator only, never on themselves. */
   async removeMember(memberId: string) {
     this.calls.push("removeMember");
