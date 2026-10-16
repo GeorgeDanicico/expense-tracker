@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
+import type { AuthAdmin, CreatedUser, CreateUserInput } from "@/lib/auth/admin";
 import type {
   AuthenticatedUser,
   AuthFailure,
@@ -11,6 +12,7 @@ import type {
   OAuthUrlResult,
   SignUpResult,
 } from "@/lib/auth/service";
+import { DomainError } from "@/lib/errors";
 
 type FakeAccount = { id: string; email: string; password: string; confirmed: boolean };
 
@@ -149,5 +151,86 @@ export class FakeAuth implements AuthService {
     if (reason === undefined) return null;
     this.failures.delete(method);
     return { ok: false, reason };
+  }
+}
+
+/** The kid-account columns `FakeAuthAdmin` keeps for each account it creates, as `profiles` stores them. */
+export type FakeAdminProfile = {
+  username: string;
+  displayName: string;
+  managedByFamily: string | null;
+  mustChangePassword: boolean;
+};
+
+/**
+ * In-memory `AuthAdmin` for route and service tests. Its accounts live in a `FakeAuth`, so an account
+ * it creates can sign in through that fake, and a password it sets is the one sign-in checks:
+ *
+ *   let auth: FakeAuth;
+ *   let admin: FakeAuthAdmin;
+ *   vi.mock("@/lib/auth", () => ({ getAuth: () => auth, getAuthAdmin: () => admin }));
+ *   beforeEach(() => { auth = new FakeAuth(); admin = new FakeAuthAdmin(auth); });
+ *
+ * Seed a username account with `createUser`, assert on `profiles`, `auth.accounts` and
+ * `deletedUserIds`, and use `fail(method, error)` to make the next call of that method throw `error`.
+ * Its errors match the Supabase implementation's: 409 for a taken email or username, 404 for an
+ * unknown account.
+ */
+export class FakeAuthAdmin implements AuthAdmin {
+  /** The profile columns of every account created here, by user id. */
+  readonly profiles = new Map<string, FakeAdminProfile>();
+  /** The user ids passed to `deleteUser`, oldest first. */
+  readonly deletedUserIds: string[] = [];
+
+  private readonly failures = new Map<keyof AuthAdmin, Error>();
+
+  constructor(readonly auth: FakeAuth = new FakeAuth()) {}
+
+  /** Makes the next call of `method` throw `error`. */
+  fail(method: keyof AuthAdmin, error: Error = new Error("Auth admin failure")) {
+    this.failures.set(method, error);
+  }
+
+  async createUser({ email, password, ...profile }: CreateUserInput): Promise<CreatedUser> {
+    this.throwFailure("createUser");
+    if (this.auth.accounts.some((account) => account.email === email)) {
+      throw new DomainError("An account with that email already exists.", 409);
+    }
+    if ([...this.profiles.values()].some((existing) => existing.username === profile.username)) {
+      throw new DomainError("That username is taken.", 409);
+    }
+    const user = this.auth.addUser(email, password);
+    this.profiles.set(user.id, { ...profile });
+    return user;
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    this.throwFailure("deleteUser");
+    this.deletedUserIds.push(userId);
+    const index = this.auth.accounts.findIndex((account) => account.id === userId);
+    if (index < 0) throw new DomainError("That account doesn't exist.", 404);
+    this.auth.accounts.splice(index, 1);
+    this.profiles.delete(userId);
+  }
+
+  async setPassword(userId: string, password: string): Promise<void> {
+    this.throwFailure("setPassword");
+    const account = this.auth.accounts.find((candidate) => candidate.id === userId);
+    if (!account) throw new DomainError("That account doesn't exist.", 404);
+    account.password = password;
+  }
+
+  async findEmailByUsername(username: string): Promise<string | null> {
+    this.throwFailure("findEmailByUsername");
+    const wanted = username.trim().toLowerCase();
+    const userId = [...this.profiles].find(([, profile]) => profile.username === wanted)?.[0];
+    return this.auth.accounts.find((account) => account.id === userId)?.email ?? null;
+  }
+
+  private throwFailure(method: keyof AuthAdmin) {
+    const error = this.failures.get(method);
+    if (error === undefined) return;
+    this.failures.delete(method);
+    throw error;
   }
 }
