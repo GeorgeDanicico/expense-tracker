@@ -6,6 +6,7 @@ import { FakeFamilyRepository } from "./family";
 import { FakeInvestmentRepository } from "./investments";
 import { FakeExpenseRepository } from "./expenses";
 import { FakeNetWorthRepository } from "./net-worth";
+import { FakeNoticeRepository } from "./notices";
 
 /**
  * In-memory stand-in for `@/lib/repositories`. A route or MCP test swaps it in with one line,
@@ -23,6 +24,7 @@ export type FakeRepositories = {
   investments: FakeInvestmentRepository;
   expenses: FakeExpenseRepository;
   netWorth: FakeNetWorthRepository;
+  notices: FakeNoticeRepository;
 };
 
 let current: FakeRepositories | undefined;
@@ -35,6 +37,7 @@ export function resetFakeRepositories(): FakeRepositories {
     investments: new FakeInvestmentRepository(),
     expenses: new FakeExpenseRepository(),
     netWorth: new FakeNetWorthRepository(),
+    notices: new FakeNoticeRepository(),
   };
   return current;
 }

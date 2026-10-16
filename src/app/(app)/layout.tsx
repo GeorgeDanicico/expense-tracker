@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+import { AccountNoticeDialog } from "@/components/family/account-notice-dialog";
 import { AppShell } from "@/components/layout/app-shell";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useAccount } from "@/hooks/use-account";
@@ -40,5 +41,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     return <DataError retry={() => void mutate()} />;
   }
 
-  return <AppShell email={data.email}>{children}</AppShell>;
+  return (
+    <AppShell email={data.email}>
+      {children}
+      {data.features.family ? <AccountNoticeDialog /> : null}
+    </AppShell>
+  );
 }
