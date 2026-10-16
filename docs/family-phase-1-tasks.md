@@ -33,7 +33,7 @@ An agent needs only two things: the shared sections below (how the work is run, 
 
 1. **Finish the server work.**
    - The server work is done.
-2. **Checkpoint 1: George applies the family migrations to the live database** (list under "Applying migrations"). This is the gate for every screen task.
+2. **Checkpoint 1: done (16 October 2026).** The 14 family migrations are on the live database (list under "Applying migrations"). The screen tasks are unblocked.
 3. **F49** (new): members' currency in `get_family()`. It must land before F45–F47.
 4. **The screens**, after checkpoint 1:
    - F19 (navigation and page guards)
@@ -44,7 +44,6 @@ An agent needs only two things: the shared sections below (how the work is run, 
 
 ### Needs George
 
-- **Approve checkpoint 1:** apply the migrations listed under "Applying migrations" to the live database.
 - **Set `SUPABASE_SECRET_KEY`** in `.env.local` and on the VPS. Kid accounts (F29) and username sign-in (F30) need it. Without it, the app still starts, but those two features fail safely.
 - **Check the kid email domain once the key is set:** do one live check that Supabase Auth accepts `@kids.ifam.invalid`. If it doesn't, change `KID_EMAIL_DOMAIN` in `src/lib/family/kid-account.ts`.
 - **Fix git over SSH on the Mac** (`ssh-add`). Until then, git runs over HTTPS through `gh` (see "Lessons from running the tasks").
@@ -119,7 +118,7 @@ Rules for every task:
 
 Local development (`.env.local`) talks to the **live** Supabase project, and agents never apply migrations there. You (George) apply them.
 
-**Checkpoint 1 (ready now, not applied yet):** apply these 14 migrations, in this order. This merges the three checkpoints the plan originally had, for the reasons under "Decisions made while building".
+**Checkpoint 1 (applied 16 October 2026):** these 14 migrations were applied, in this order. This merges the three checkpoints the plan originally had, for the reasons under "Decisions made while building".
 
 | # | File | Task | What it does to the live database |
 | --- | --- | --- | --- |
@@ -137,6 +136,8 @@ Local development (`.env.local`) talks to the **live** Supabase project, and age
 | 12 | `20261016000700_create_family_invites.sql` | F08 | New table and three functions |
 | 13 | `20261016000800_widen_family_finance_reads.sql` | F43 | Widens six **select** policies. No effect until a family exists |
 | 14 | `20261016000900_add_invite_redemption.sql` | F09 | Two functions, and recreates `list_family_invites` |
+
+**Version stamps:** they were applied through the Supabase tool, which stamps its own version (`20261016100552` to `20261016100834`) instead of the file-name timestamps. The statements are the same and the order is the same. If the Supabase command-line tool is used later, its migration history will not match these file names, so repair the history (`supabase migration repair`) rather than pushing them again.
 
 **After checkpoint 1:** every later SQL task gets its own timestamp from the coordinator and is applied one at a time, after it merges.
 
