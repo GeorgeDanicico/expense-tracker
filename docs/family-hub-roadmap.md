@@ -41,7 +41,7 @@ These facts shape the plan:
 
 The step-by-step task breakdown is in [family-phase-1-tasks.md](family-phase-1-tasks.md), one agent and one PR per task. It starts with **step 0 (R01–R10)**, which moves the existing Supabase code behind repository and auth interfaces (decision 8) and runs alongside the SQL-only step 1.1.
 
-**Status (16 October 2026): in progress.** Step 0 and the whole database layer are merged, as are most of the server routes: 39 of 59 tasks. The screens are next, and they wait until the family migrations are applied to the live database (checkpoint 1). The current state is in the "Progress" section of the task plan.
+**Status (16 October 2026): in progress.** Step 0 and the whole database layer are merged, as are most of the server routes: 43 of 59 tasks. The screens are next, and they wait until the family migrations are applied to the live database (checkpoint 1). The current state is in the "Progress" section of the task plan.
 
 ### Who can do what
 
