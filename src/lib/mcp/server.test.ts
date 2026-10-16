@@ -6,7 +6,7 @@ vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
 import type { ExpenseRepository } from "@/lib/expenses/repository";
 import { createMcpServer } from "@/lib/mcp/server";
-import { aManualItem, aTab, aTransaction, anExpense } from "@/test/builders";
+import { aKid, aManualItem, aParent, aTab, aTransaction, anExpense } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 
 const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
@@ -239,5 +239,125 @@ describe("MCP server", () => {
       expect(result.isError).toBe(true);
       expect(expenses.listForTab).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("MCP family permissions", () => {
+  const FORBIDDEN = "You don't have access to this.";
+  const fuel = { description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel" };
+  const order = { brokerId: "xtb", instrument: "VWCE.DE", currency: "EUR", side: "buy", amount: "150", quantity: "1.5", unitPrice: "100", executedAt: "2026-01-01T10:00:00Z" };
+  const kidWithoutInvestments = () => aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off" } });
+  const kidWithNothing = () => aKid({ permissions: { expenses: "off", investments: "off", net_worth: "off", family_finance: "off" } });
+
+  const investmentMethods = [
+    "listAccountsWithTransactions", "getAssetHistory", "listAssetTransactions", "getOrCreateAccount",
+    "findTransaction", "createTransaction", "deleteTransaction",
+  ] as const;
+
+  let repositories: FakeRepositories;
+
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    repositories = resetFakeRepositories();
+    vi.stubEnv("FAMILY_ENABLED", "true");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["get_investments", {}],
+    ["list_investment_transactions", { accountId: ID, instrument: "VWCE.DE", currency: "EUR" }],
+    ["add_investment_transaction", order],
+    ["delete_investment_transaction", { id: ID }],
+  ])("refuses %s for a kid with investments off, without touching the data", async (name, args) => {
+    repositories.family.membership = kidWithoutInvestments();
+    const spies = investmentMethods.map((method) => vi.spyOn(repositories.investments, method));
+
+    const result = await call(name, args);
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual({ error: FORBIDDEN });
+    for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["list_expenses", { month: "2026-10" }],
+    ["get_spending_summary", {}],
+    ["add_expense", fuel],
+    ["list_expense_tabs", {}],
+    ["create_expense_tab", { name: "Car", categoryKeys: ["car"], subtypeKeys: [] }],
+  ])("allows %s for a kid with expenses on", async (name, args) => {
+    repositories.family.membership = kidWithoutInvestments();
+
+    const result = await call(name, args);
+
+    expect(result.isError).toBeFalsy();
+  });
+
+  it("refuses the net worth tools for a kid with net worth off", async () => {
+    repositories.family.membership = kidWithoutInvestments();
+
+    const result = await call("get_net_worth");
+
+    expect(result.structuredContent).toEqual({ error: FORBIDDEN });
+  });
+
+  it("refuses the expense tools for a kid with expenses off", async () => {
+    repositories.family.membership = kidWithNothing();
+    const create = vi.spyOn(repositories.expenses, "create");
+
+    const result = await call("add_expense", fuel);
+
+    expect(result.structuredContent).toEqual({ error: FORBIDDEN });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("lets a kid with every module off read the account, without reading the membership", async () => {
+    repositories.family.membership = kidWithNothing();
+
+    const result = await call("get_account");
+
+    expect(result.isError).toBeFalsy();
+    expect(repositories.family.calls).toEqual([]);
+  });
+
+  it("lets a parent use the investments tools", async () => {
+    repositories.family.membership = aParent();
+
+    const result = await call("add_investment_transaction", order);
+
+    expect(result.isError).toBeFalsy();
+    expect(repositories.investments.transactions).toHaveLength(1);
+  });
+
+  it("lets a user without a family use the investments tools", async () => {
+    const result = await call("add_investment_transaction", order);
+
+    expect(result.isError).toBeFalsy();
+    expect(repositories.investments.transactions).toHaveLength(1);
+    expect(repositories.family.calls).toEqual(["getMembership"]);
+  });
+
+  it("runs the tools without reading the membership while the family flag is off", async () => {
+    vi.stubEnv("FAMILY_ENABLED", "false");
+    repositories.family.membership = kidWithNothing();
+
+    const result = await call("add_investment_transaction", order);
+
+    expect(result.isError).toBeFalsy();
+    expect(repositories.investments.transactions).toHaveLength(1);
+    expect(repositories.family.calls).toEqual([]);
+  });
+
+  it("hides a failure to read the membership behind the generic message", async () => {
+    vi.spyOn(repositories.family, "getMembership").mockRejectedValue(new Error("connection string leaked"));
+
+    const result = await call("list_expenses", { month: "2026-10" });
+
+    expect(result.isError).toBe(true);
+    expect(result.body.error).toBe("The request could not be completed. Try again later.");
+    expect(JSON.stringify(result)).not.toContain("leaked");
   });
 });

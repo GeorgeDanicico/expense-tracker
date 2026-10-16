@@ -2,6 +2,9 @@ import type { CallToolResult, McpServer, ToolAnnotations } from "@modelcontextpr
 import { z } from "zod";
 
 import { DomainError } from "@/lib/errors";
+import { getCurrentMember } from "@/lib/family/current-member";
+import { FORBIDDEN_MESSAGE } from "@/lib/http/permission";
+import { can, type ModuleKey } from "@/lib/permissions";
 
 export type ToolContext = { userId: string; email: string };
 type ToolRegistrar = (server: McpServer, ctx: ToolContext) => void;
@@ -15,6 +18,11 @@ type ToolDefinition<S extends z.ZodType> = {
   /** The advertised fields, for schemas that are not a plain object (pipes, unions). */
   shape?: z.ZodRawShape;
   annotations: ToolAnnotations;
+  /**
+   * The family permission module this tool belongs to, the same as its REST route's. A kid without
+   * `edit` on it is refused before the input is read. Tools without a module are open to everyone.
+   */
+  module?: ModuleKey;
   /** Message for a null or false result from `run`. */
   notFound?: string;
   run: (input: z.output<S>, ctx: ToolContext) => Promise<unknown>;
@@ -59,6 +67,10 @@ export function defineTool<S extends z.ZodType>(tool: ToolDefinition<S>): ToolRe
       annotations: tool.annotations,
     }, async (args) => {
       try {
+        // Runs inside the MCP session's `run`, so getCurrentMember() reads the session user's membership.
+        if (tool.module && !can(await getCurrentMember(), tool.module, "edit")) {
+          return result({ error: FORBIDDEN_MESSAGE }, true);
+        }
         const data = await tool.run(tool.schema.parse(args), ctx);
         if (data === null || data === false || data === undefined) {
           return result({ error: tool.notFound ?? "Not found." }, true);

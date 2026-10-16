@@ -17,6 +17,7 @@ export const investmentTools = [
     description: "Investment accounts, positions and current valuation.",
     schema: z.object({}),
     annotations: READ,
+    module: "investments",
     run: (_input, { userId }) => getInvestmentsOverview(userId),
   }),
   defineTool({
@@ -25,6 +26,7 @@ export const investmentTools = [
     description: "Orders for one instrument and currency in an investment account.",
     schema: investmentTransactionQuerySchema,
     annotations: READ,
+    module: "investments",
     notFound: "Investment position not found.",
     run: (input, { userId }) => getInvestmentTransactions(userId, input),
   }),
@@ -34,6 +36,7 @@ export const investmentTools = [
     description: "Record a buy or sell order. Decimals are strings; executedAt is an ISO date-time.",
     schema: investmentTransactionSchema,
     annotations: CREATE,
+    module: "investments",
     run: (input, { userId }) => createInvestmentTransaction(userId, input),
   }),
   defineTool({
@@ -42,6 +45,7 @@ export const investmentTools = [
     description: "Permanently delete an investment order.",
     schema: z.object({ id: idSchema() }),
     annotations: DELETE,
+    module: "investments",
     notFound: "Investment order not found.",
     run: async ({ id }, { userId }) => (await deleteInvestmentTransaction(userId, id)) && { deleted: true, id },
   }),
