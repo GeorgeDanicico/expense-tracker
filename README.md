@@ -18,10 +18,11 @@ A private, mobile-first family app, starting with an expense tracker. Built with
 - Owner-only Supabase RLS policies, explicit grants, input constraints, and query indexes
 - Database-side dashboard aggregation so historical rows are not transferred to the app server
 - Remote MCP server at `/api/mcp` so Claude can read and record ledger data
+- Family hub (behind `FAMILY_ENABLED`): families, parent and kid roles, per-kid permissions, and a family view of finances; see [Family hub](#family-hub)
 
 ## Run locally
 
-The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. Set `PRICE_SERVICE_URL` to the base URL of the investment price service. `FAMILY_ENABLED=true` turns on the family features, which are still in development; leave it `false` (or unset) to keep them off. `SUPABASE_SECRET_KEY` (the project's secret API key) is optional: the app starts without it, but creating kid accounts and signing in with a username need it. It bypasses every database rule, so keep it only in server env files, never in the browser or in logs. For another project, copy `.env.example` to `.env.local` and replace the values. Keep these variables server-only; do not add a `NEXT_PUBLIC_` prefix.
+The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. Set `PRICE_SERVICE_URL` to the base URL of the investment price service. `FAMILY_ENABLED=true` turns on the family features described under [Family hub](#family-hub); leave it `false` (or unset) to keep them off. `SUPABASE_SECRET_KEY` (the project's secret API key) is optional: the app starts without it, but creating kid accounts and signing in with a username need it. It bypasses every database rule, so keep it only in server env files, never in the browser or in logs. For another project, copy `.env.example` to `.env.local` and replace the values. Keep these variables server-only; do not add a `NEXT_PUBLIC_` prefix.
 
 ```bash
 npm install
@@ -62,6 +63,14 @@ Migrations live in `supabase/migrations`. They add or upgrade the expense ledger
 - authenticated-only SELECT, INSERT, UPDATE, and DELETE policies scoped to `auth.uid()`;
 - RLS-protected `net_worth_items` and `net_worth_valuations` with atomic first-value creation;
 - anonymous privilege revocation and hardened legacy tracker policies/functions.
+
+## Family hub
+
+The family hub lets people share the app as a family. Someone creates a family and becomes its creator, then invites others with a parent or kid code or link. Parents can see everyone's expenses, investments and net worth, switch between members, and manage the family. Kids see only what their parents allow, set per module, and parents can create and remove kid accounts, reset their passwords, and delete the family. Phase 1 is described in [docs/family-hub-roadmap.md](docs/family-hub-roadmap.md).
+
+- **`FAMILY_ENABLED`:** set it to `true` to turn the family features on. When it is `false` or unset, none of the family code runs, its API routes answer 404, and the app behaves as a single-user ledger.
+- **`SUPABASE_SECRET_KEY`:** the project's secret API key, server-only. Creating a kid account and signing in with a username need it; without it the app still starts and email sign-in works, but those two fail safely. It bypasses every database rule, so never expose it to the browser or logs.
+- **Kid sign-in by username:** a kid has no email address. A parent picks a username and a first password, and the kid signs in with that username on the normal sign-in page and must choose a new password straight away. Behind the scenes the account uses a placeholder email on `kids.ifam.invalid`. A kid can add a real email later.
 
 ## MCP / Claude
 

@@ -41,7 +41,7 @@ These facts shape the plan:
 
 The step-by-step task breakdown is in [family-phase-1-tasks.md](family-phase-1-tasks.md), one agent and one PR per task. It starts with **step 0 (R01–R10)**, which moves the existing Supabase code behind repository and auth interfaces (decision 8) and runs alongside the SQL-only step 1.1.
 
-**Status (16 October 2026): in progress.** Everything except the release (F48) is merged: 58 of 59 tasks, with the family migrations on the live database. The current state is in the "Progress" section of the task plan.
+**Status (16 October 2026): done.** All 59 tasks are merged, with the family migrations on the live database, and the family hub is documented in the README. It stays behind `FAMILY_ENABLED` until the flag is turned on in production (set `SUPABASE_SECRET_KEY` and `FAMILY_ENABLED=true`, then run the smoke test in F48); removing the flag is a later follow-up.
 
 ### Who can do what
 
