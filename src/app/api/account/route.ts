@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import type { AccountData, AccountMembership } from "@/lib/account/types";
+import type { AuthenticatedUser } from "@/lib/auth";
 import { isFamilyEnabled } from "@/lib/features";
 import { getCurrentMember } from "@/lib/family/current-member";
 import { HttpError, json, readJson, withUser } from "@/lib/http/route";
@@ -15,17 +16,20 @@ async function accountMembership(): Promise<AccountMembership | null> {
   return { role, isCreator, familyName, permissions };
 }
 
-function accountData(email: string, currency: string, membership: AccountMembership | null): AccountData {
-  return { email, currency, features: { family: isFamilyEnabled() }, membership };
+/** The account response, reading the currency (unless given), the membership and the password flag in parallel. */
+async function accountData(user: AuthenticatedUser, knownCurrency?: string): Promise<AccountData> {
+  const account = getRepositories().account;
+  const [currency, membership, mustChangePassword] = await Promise.all([
+    knownCurrency ?? account.getCurrency(user.id),
+    accountMembership(),
+    account.getMustChangePassword(user.id),
+  ]);
+  return { email: user.email, currency, features: { family: isFamilyEnabled() }, membership, mustChangePassword };
 }
 
-export const GET = withUser(async (_request, user) => {
-  const [currency, membership] = await Promise.all([
-    getRepositories().account.getCurrency(user.id),
-    accountMembership(),
-  ]);
-  return json(accountData(user.email, currency, membership));
-}, { failure: "Unable to load account settings." });
+export const GET = withUser(async (_request, user) => json(await accountData(user)), {
+  failure: "Unable to load account settings.",
+});
 
 export const PATCH = withUser(async (request: NextRequest, user) => {
   const payload = (await readJson(request)) as { currency?: unknown } | null;
@@ -35,5 +39,5 @@ export const PATCH = withUser(async (request: NextRequest, user) => {
 
   await getRepositories().account.updateCurrency(user, payload.currency);
 
-  return json(accountData(user.email, payload.currency, await accountMembership()));
+  return json(await accountData(user, payload.currency));
 }, { failure: "The currency could not be saved. Please try again." });

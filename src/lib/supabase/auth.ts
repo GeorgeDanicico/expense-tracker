@@ -91,6 +91,12 @@ export const supabaseAuth: AuthService = {
     return result((await supabase.auth.verifyOtp({ email: link.email, token: link.token, type: link.type })).error);
   },
 
+  async updatePassword(password) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.updateUser({ password });
+    return result(error);
+  },
+
   async startSession(email, password): Promise<AuthSession | null> {
     try {
       const { url, publishableKey } = getSupabaseConfig();

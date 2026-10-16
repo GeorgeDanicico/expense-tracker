@@ -37,7 +37,7 @@ describe("GET /api/account", () => {
   it("returns the default currency when the user has not chosen one", async () => {
     const response = await callRoute(GET);
 
-    expect(response.body).toEqual({ email: user.email, currency: "EUR", features: { family: false }, membership: null });
+    expect(response.body).toEqual({ email: user.email, currency: "EUR", features: { family: false }, membership: null, mustChangePassword: false });
   });
 
   it("reports the family feature as on when FAMILY_ENABLED is true", async () => {
@@ -131,6 +131,39 @@ describe("GET /api/account", () => {
     });
   });
 
+  it("reports that the user must change their password while the flag is set", async () => {
+    repositories.account.mustChangePassword.add(user.id);
+
+    const response = await callRoute(GET);
+
+    expect(response).toMatchObject({ status: 200, body: { mustChangePassword: true } });
+  });
+
+  it("reports the password flag while the family flag is off", async () => {
+    vi.stubEnv("FAMILY_ENABLED", "false");
+    repositories.account.mustChangePassword.add(user.id);
+
+    const response = await callRoute(GET);
+
+    expect(response.body).toMatchObject({ features: { family: false }, mustChangePassword: true });
+  });
+
+  it("reports no password change for another user's flag", async () => {
+    repositories.account.mustChangePassword.add("10000000-0000-4000-8000-000000000099");
+
+    const response = await callRoute(GET);
+
+    expect(response.body).toMatchObject({ mustChangePassword: false });
+  });
+
+  it("hides a password flag failure behind a generic message", async () => {
+    vi.spyOn(repositories.account, "getMustChangePassword").mockRejectedValue(new Error("private database failure"));
+
+    const response = await callRoute(GET);
+
+    expect(response).toMatchObject({ status: 500, body: { error: "Unable to load account settings." } });
+  });
+
   it("hides a membership failure behind a generic message", async () => {
     vi.stubEnv("FAMILY_ENABLED", "true");
     vi.spyOn(repositories.family, "getMembership").mockRejectedValue(new Error("private database failure"));
@@ -152,7 +185,7 @@ describe("PATCH /api/account", () => {
   it("returns the family feature as off when FAMILY_ENABLED is false", async () => {
     const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
 
-    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: false }, membership: null });
+    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: false }, membership: null, mustChangePassword: false });
   });
 
   it("returns the family feature as on when FAMILY_ENABLED is true", async () => {
@@ -160,7 +193,7 @@ describe("PATCH /api/account", () => {
 
     const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
 
-    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: true }, membership: null });
+    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: true }, membership: null, mustChangePassword: false });
   });
 
   it("returns the membership with the updated account", async () => {
@@ -182,6 +215,14 @@ describe("PATCH /api/account", () => {
 
     expect(response.body).toMatchObject({ membership: null });
     expect(repositories.family.calls).toEqual([]);
+  });
+
+  it("returns the password flag with the updated account", async () => {
+    repositories.account.mustChangePassword.add(user.id);
+
+    const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
+
+    expect(response.body).toMatchObject({ currency: "USD", mustChangePassword: true });
   });
 
   it("rejects an unsupported currency without saving it", async () => {

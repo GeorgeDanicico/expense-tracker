@@ -83,4 +83,52 @@ describe("Supabase account repository", () => {
       );
     });
   });
+
+  describe("getMustChangePassword", () => {
+    it("reads the flag from the user's own profile", async () => {
+      const { queries } = useDatabase([
+        { id: otherUser.id, must_change_password: false },
+        { id: user.id, must_change_password: true },
+      ]);
+
+      expect(await account.getMustChangePassword(user.id)).toBe(true);
+      expect(queries[0]).toMatchObject({ table: "profiles", operation: "select", filters: [["eq", "id", user.id]] });
+    });
+
+    it("is false when the flag is not set", async () => {
+      useDatabase([{ id: user.id, must_change_password: false }]);
+
+      expect(await account.getMustChangePassword(user.id)).toBe(false);
+    });
+
+    it("is false when the user has no profile", async () => {
+      useDatabase([{ id: otherUser.id, must_change_password: true }]);
+
+      expect(await account.getMustChangePassword(user.id)).toBe(false);
+    });
+
+    it("hides a database error behind a generic message", async () => {
+      useDatabase([], { fail: () => true });
+
+      await expect(account.getMustChangePassword(user.id)).rejects.toThrow(new Error("Unable to load account settings."));
+    });
+  });
+
+  describe("completePasswordChange", () => {
+    it("calls complete_password_change without arguments", async () => {
+      const { rpcs } = useDatabase([]);
+
+      await account.completePasswordChange();
+
+      expect(rpcs).toEqual([{ fn: "complete_password_change", args: {} }]);
+    });
+
+    it("hides a database error behind a generic message", async () => {
+      useDatabase([], { rpc: () => ({ data: null, error: { message: "private database failure" } }) });
+
+      await expect(account.completePasswordChange()).rejects.toThrow(
+        new Error("Unable to finish changing your password."),
+      );
+    });
+  });
 });

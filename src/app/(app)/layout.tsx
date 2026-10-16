@@ -18,6 +18,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       return;
     }
 
+    if (data?.mustChangePassword) {
+      router.replace("/change-password");
+      return;
+    }
+
     if (data) {
       router.prefetch("/dashboard");
       router.prefetch("/expenses");
@@ -27,7 +32,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     }
   }, [data, error, router]);
 
-  if ((isLoading && !data) || (error instanceof ApiError && error.status === 401)) {
+  if ((isLoading && !data) || (error instanceof ApiError && error.status === 401) || data?.mustChangePassword) {
     return <DataLoading layout="screen" label="Opening your ledger…" />;
   }
 

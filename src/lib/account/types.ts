@@ -18,4 +18,9 @@ export type AccountData = {
   features: { family: boolean };
   /** `null` when the user has no family, and always `null` while the family flag is off. */
   membership: AccountMembership | null;
+  /**
+   * The user has to choose a new password before using the app (a kid account a parent created or
+   * reset). Not behind the family flag; always `false` for an ordinary account.
+   */
+  mustChangePassword: boolean;
 };

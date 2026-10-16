@@ -9,6 +9,8 @@ import type { FamilyData } from "@/lib/family/repository";
 
 /** GET → `AccountData` (`@/lib/account/types`); PATCH returns the updated `AccountData`. */
 export const ACCOUNT_API_KEY = "/api/account";
+/** POST only: `{ password }` → 204. Not fetched with SWR; refresh `ACCOUNT_API_KEY` afterwards. */
+export const ACCOUNT_PASSWORD_API_URL = "/api/account/password";
 /** GET → `InvestmentsOverview` (`@/lib/investments/types`). */
 export const INVESTMENTS_API_KEY = "/api/investments";
 /** GET → `NetWorthOverview` (`@/lib/net-worth/types`). */

@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AccountRepository } from "@/lib/account/repository";
+import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeCurrency } from "@/lib/utils/currency";
 
@@ -30,5 +31,26 @@ export const supabaseAccountRepository: AccountRepository = {
     );
 
     if (error) throw new Error("The currency could not be saved. Please try again.");
+  },
+
+  /** A user without a profile row has never been asked to change their password. */
+  async getMustChangePassword(userId) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("must_change_password")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) throw new Error("Unable to load account settings.");
+    return data?.must_change_password === true;
+  },
+
+  /** `complete_password_change()` acts as the request's caller and touches no other row. */
+  async completePasswordChange() {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("complete_password_change");
+
+    if (error) throw translateDatabaseError(error, "Unable to finish changing your password.");
   },
 };
