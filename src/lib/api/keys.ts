@@ -88,3 +88,8 @@ export function investmentTransactionsApiKey({
   const params = new URLSearchParams({ accountId, instrument, currency });
   return `/api/investment-transactions?${params}`;
 }
+
+/** PATCH only: `{ permissions }` → {@link FamilyResponse} with the updated family. Kids only; parents answer 403. */
+export function familyMemberPermissionsApiUrl(memberId: string) {
+  return `/api/family/members/${encodeURIComponent(memberId)}/permissions`;
+}
