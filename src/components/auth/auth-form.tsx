@@ -54,16 +54,33 @@ function AuthModeForm({ mode }: { mode: AuthMode }) {
   return (
     <form onSubmit={submit}>
       <Stack gap="3">
-        <FormField label="Email address" error={form.fieldError("email")}>
-          <Input
-            name="email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            size="md"
-            required
-          />
-        </FormField>
+        {mode === "login" ? (
+          // Kid accounts sign in with a username, so this field takes either.
+          <FormField label="Email or username" error={form.fieldError("email")}>
+            <Input
+              name="email"
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="you@example.com"
+              size="md"
+              required
+            />
+          </FormField>
+        ) : (
+          <FormField label="Email address" error={form.fieldError("email")}>
+            <Input
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              size="md"
+              required
+            />
+          </FormField>
+        )}
 
         <FormField
           label="Password"
