@@ -57,6 +57,8 @@ export interface AuthService {
   completeEmailLink(link: EmailLink): Promise<AuthResult>;
   /** Sets a new password for the signed-in user. The session stays signed in. */
   updatePassword(password: string): Promise<AuthResult>;
+  /** Asks to change the signed-in user's email; the link sent to the new address goes to `confirmationUrl`. */
+  updateEmail(email: string, confirmationUrl: string): Promise<AuthResult>;
   /** Signs in without touching the request's session. Null when the credentials are rejected or the provider fails. */
   startSession(email: string, password: string): Promise<AuthSession | null>;
 }

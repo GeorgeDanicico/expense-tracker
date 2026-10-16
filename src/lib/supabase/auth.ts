@@ -97,6 +97,12 @@ export const supabaseAuth: AuthService = {
     return result(error);
   },
 
+  async updateEmail(email, confirmationUrl) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: confirmationUrl });
+    return result(error);
+  },
+
   async startSession(email, password): Promise<AuthSession | null> {
     try {
       const { url, publishableKey } = getSupabaseConfig();

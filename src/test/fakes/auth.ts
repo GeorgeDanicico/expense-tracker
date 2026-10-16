@@ -42,6 +42,8 @@ export class FakeAuth implements AuthService {
   currentUser: AuthenticatedUser | null = null;
   /** The confirmation URL passed to the last `signUp`. */
   lastConfirmationUrl: string | null = null;
+  /** The new address and confirmation URL passed to the last `updateEmail`. */
+  lastEmailChange: { email: string; confirmationUrl: string } | null = null;
   /** The provider and callback URL passed to the last `oauthSignInUrl`. */
   lastOAuth: { provider: OAuthProvider; callbackUrl: string } | null = null;
   /** Every session handed out by `startSession`, oldest first. */
@@ -128,6 +130,19 @@ export class FakeAuth implements AuthService {
     const account = this.accounts.find((candidate) => candidate.id === user?.id);
     if (!account) return { ok: false, reason: "Auth session missing!" };
     account.password = password;
+    return { ok: true };
+  }
+
+  /** Records the request; like the provider, the address only changes once the emailed link is opened. */
+  async updateEmail(email: string, confirmationUrl: string): Promise<AuthResult> {
+    const failure = this.takeFailure("updateEmail");
+    if (failure) return failure;
+    const user = await this.getCurrentUser();
+    if (!this.accounts.some((candidate) => candidate.id === user?.id)) return { ok: false, reason: "Auth session missing!" };
+    if (this.accounts.some((account) => account.email === email)) {
+      return { ok: false, reason: "A user with this email address has already been registered" };
+    }
+    this.lastEmailChange = { email, confirmationUrl };
     return { ok: true };
   }
 
