@@ -4,6 +4,7 @@ import { Box, Button, Flex, SimpleGrid, Skeleton, Stack, Text } from "@chakra-ui
 import { RefreshCw, X } from "lucide-react";
 import useSWR from "swr";
 
+import { WriteOnly } from "@/components/family/write-only";
 import { AddOrderDialog } from "@/components/investments/add-order-dialog";
 import { InvestmentValue } from "@/components/investments/investment-value";
 import { TransactionList } from "@/components/investments/transaction-list";
@@ -14,6 +15,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Stat } from "@/components/ui/stat";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useViewing } from "@/hooks/use-viewing";
 import { apiFetcher } from "@/lib/api/client";
 import { investmentTransactionsApiKey } from "@/lib/api/keys";
 import type {
@@ -64,7 +66,8 @@ export function AssetDetail({
   detailId: string;
   onClose: () => void;
 }) {
-  const key = investmentTransactionsApiKey({ accountId, instrument: asset.instrument, currency: asset.currency });
+  const { member } = useViewing();
+  const key = investmentTransactionsApiKey({ accountId, instrument: asset.instrument, currency: asset.currency, member });
   const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentTransactionsResponse>(key, apiFetcher);
   const unrealized = getInvestmentGainPresentation(asset.unrealizedGain, asset.currency);
   const realized = getInvestmentGainPresentation(asset.realizedGain, asset.currency);
@@ -95,7 +98,9 @@ export function AssetDetail({
           </Text>
         </Stack>
         <Flex align="center" gap="1" flexShrink="0" ms="auto">
-          <AddOrderDialog accountId={accountId} brokerId={brokerId} asset={asset} />
+          <WriteOnly>
+            <AddOrderDialog accountId={accountId} brokerId={brokerId} asset={asset} />
+          </WriteOnly>
           <IconButton aria-label={`Close ${asset.instrument} details`} size="xs" tooltip onClick={onClose}>
             <X size={ICON.sm} strokeWidth={ICON_STROKE} />
           </IconButton>

@@ -8,12 +8,12 @@ import { HttpError, json, readJson, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { isSupportedCurrency } from "@/lib/utils/currency";
 
-/** The caller's membership without its ids; `null` with no family or while the flag is off. */
+/** The caller's membership with their own member id only (not the family's id); `null` with no family or while the flag is off. */
 async function accountMembership(): Promise<AccountMembership | null> {
   const member = await getCurrentMember();
   if (!member) return null;
-  const { role, isCreator, familyName, permissions } = member;
-  return { role, isCreator, familyName, permissions };
+  const { memberId, role, isCreator, familyName, permissions } = member;
+  return { memberId, role, isCreator, familyName, permissions };
 }
 
 /** The account response, reading the currency (unless given), the membership and the password flag in parallel. */

@@ -1,10 +1,12 @@
 import { Button, Flex, Stack, Text } from "@chakra-ui/react";
 import Link from "next/link";
 
+import { WriteOnly } from "@/components/family/write-only";
 import { AddNetWorthValuationDialog } from "@/components/net-worth/add-net-worth-valuation-dialog";
 import { EditNetWorthItemDialog } from "@/components/net-worth/edit-net-worth-item-dialog";
 import { NetWorthValue } from "@/components/net-worth/net-worth-value";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
+import { useViewing } from "@/hooks/use-viewing";
 import type { NetWorthEntry } from "@/lib/net-worth/types";
 import { formatDate, formatDateTime } from "@/lib/calendar";
 
@@ -29,6 +31,7 @@ function entryDate(entry: NetWorthEntry) {
 
 /** One balance-sheet line: name, status, meta, value with change, and actions. */
 export function NetWorthEntryRow({ entry }: { entry: NetWorthEntry }) {
+  const { hrefFor } = useViewing();
   const status = entryStatus(entry);
   const meta = [entry.reference, entry.currency, entryDate(entry)].filter(Boolean).join(" · ");
 
@@ -57,13 +60,15 @@ export function NetWorthEntryRow({ entry }: { entry: NetWorthEntry }) {
         </Text>
         {entry.source === "investment" ? (
           <Button asChild size="xs" variant="ghost" color="fg.muted" flexShrink="0">
-            <Link href="/investments">View investment →</Link>
+            <Link href={hrefFor("/investments")}>View investment →</Link>
           </Button>
         ) : (
-          <Flex gap="1" flexShrink="0">
-            <AddNetWorthValuationDialog entry={entry} onSuccess={() => undefined} />
-            <EditNetWorthItemDialog entry={entry} onSuccess={() => undefined} />
-          </Flex>
+          <WriteOnly>
+            <Flex gap="1" flexShrink="0">
+              <AddNetWorthValuationDialog entry={entry} onSuccess={() => undefined} />
+              <EditNetWorthItemDialog entry={entry} onSuccess={() => undefined} />
+            </Flex>
+          </WriteOnly>
         )}
       </Flex>
     </Flex>

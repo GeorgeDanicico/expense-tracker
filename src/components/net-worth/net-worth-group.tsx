@@ -3,6 +3,7 @@ import { Stack } from "@chakra-ui/react";
 import { CardLink } from "@/components/ui/card-link";
 import { NetWorthEntryRow } from "@/components/net-worth/net-worth-entry-row";
 import { Card } from "@/components/ui/card";
+import { useViewing } from "@/hooks/use-viewing";
 import { netWorthCategoryLabel, type NetWorthEntry } from "@/lib/net-worth/types";
 
 /** A balance-sheet category (Cash, Property, …) with its entry rows. */
@@ -13,6 +14,7 @@ export function NetWorthGroup({
   category: string;
   entries: NetWorthEntry[];
 }) {
+  const { readOnly, hrefFor } = useViewing();
   const headingId = `net-worth-category-${category}`;
   return (
     <Card as="section" aria-labelledby={headingId}>
@@ -20,7 +22,7 @@ export function NetWorthGroup({
         id={headingId}
         title={netWorthCategoryLabel(category)}
         description={`${entries.length} ${entries.length === 1 ? "entry" : "entries"}`}
-        actions={category === "investments" ? <CardLink href="/investments">Manage investments</CardLink> : undefined}
+        actions={category === "investments" ? <CardLink href={hrefFor("/investments")}>{readOnly ? "View investments" : "Manage investments"}</CardLink> : undefined}
       />
       <Card.Body pt="1" pb="1">
         <Stack as="ul" gap="0" listStyleType="none" divideY="1px" divideColor="border">

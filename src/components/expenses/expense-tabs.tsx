@@ -19,7 +19,8 @@ export function ExpenseTabs({
   tabs: ExpenseTab[];
   value: string;
   onValueChange: (value: string) => void;
-  onCreate: () => void;
+  /** Omitted while viewing another member: their tabs can be opened but not added to. */
+  onCreate?: () => void;
   children: ReactNode;
 }) {
   return (
@@ -39,18 +40,20 @@ export function ExpenseTabs({
             ))}
           </Tabs.List>
         </Box>
-        <Button
-          flexShrink="0"
-          mb="1"
-          size="xs"
-          variant="ghost"
-          color="fg.muted"
-          onClick={onCreate}
-          aria-label="Create expense tab"
-        >
-          <Plus size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
-          <Box as="span" display={{ base: "none", sm: "inline" }}>New tab</Box>
-        </Button>
+        {onCreate ? (
+          <Button
+            flexShrink="0"
+            mb="1"
+            size="xs"
+            variant="ghost"
+            color="fg.muted"
+            onClick={onCreate}
+            aria-label="Create expense tab"
+          >
+            <Plus size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
+            <Box as="span" display={{ base: "none", sm: "inline" }}>New tab</Box>
+          </Button>
+        ) : null}
       </Flex>
       {children}
     </Tabs.Root>

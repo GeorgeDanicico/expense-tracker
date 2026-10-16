@@ -1,3 +1,6 @@
+/** The query parameter a finance read takes to show another family member's data. */
+export const MEMBER_PARAM = "member";
+
 /**
  * Whose data a finance read shows. Every finance GET response carries it as `viewing`; the page
  * passes `?member=<memberId>` to see another member's data. Safe to import from the frontend.

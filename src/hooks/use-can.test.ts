@@ -46,6 +46,7 @@ describe("useCan", () => {
 
   it("answers true for every module for a parent", () => {
     accountState.account = anAccount({
+      memberId: "60000000-0000-4000-8000-000000000001",
       role: "parent",
       isCreator: true,
       familyName: "The Smiths",
@@ -58,6 +59,7 @@ describe("useCan", () => {
 
   it("follows a kid's permissions", () => {
     accountState.account = anAccount({
+      memberId: "60000000-0000-4000-8000-000000000002",
       role: "kid",
       isCreator: false,
       familyName: "The Smiths",

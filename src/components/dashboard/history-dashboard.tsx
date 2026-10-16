@@ -11,18 +11,18 @@ import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { Stat, StatGroup } from "@/components/ui/stat";
-import { useAccount } from "@/hooks/use-account";
+import { useViewing } from "@/hooks/use-viewing";
 import { dashboardApiKey } from "@/lib/api/keys";
 import { historyBoundaries, seriesInsights } from "@/lib/expenses/analytics";
 import type { AnalyticsFilters, DashboardData } from "@/lib/expenses/types";
 import { formatDate } from "@/lib/calendar";
 
 export function HistoryDashboard({ filters }: { filters: AnalyticsFilters }) {
+  const { member, currency } = useViewing();
   const { data, error, isValidating, mutate } = useSWR<DashboardData>(
-    dashboardApiKey(filters),
+    dashboardApiKey(filters, member),
     { keepPreviousData: false },
   );
-  const { currency } = useAccount();
   const boundaries = historyBoundaries(filters, data?.currentMonth);
   const single = filters.period === "custom";
   const day = single && filters.granularity === "day";
@@ -77,7 +77,7 @@ export function HistoryDashboard({ filters }: { filters: AnalyticsFilters }) {
             <Card>
               <Card.Header title={day ? "Recorded spending" : "Monthly trend"} />
               <Card.Body>
-                <MonthlyBarChart series={data.analytics.series} currency={currency} />
+                <MonthlyBarChart series={data.analytics.series} currency={currency} member={member} />
               </Card.Body>
             </Card>
             <Card>

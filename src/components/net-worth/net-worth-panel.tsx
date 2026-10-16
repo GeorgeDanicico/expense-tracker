@@ -5,6 +5,8 @@ import { Landmark, WalletCards } from "lucide-react";
 import { useMemo } from "react";
 import useSWR from "swr";
 
+import { ViewingControls } from "@/components/family/viewing-picker";
+import { WriteOnly } from "@/components/family/write-only";
 import { AddNetWorthItemDialog } from "@/components/net-worth/add-net-worth-item-dialog";
 import { NetWorthAttention } from "@/components/net-worth/net-worth-attention";
 import { NetWorthGroup } from "@/components/net-worth/net-worth-group";
@@ -14,10 +16,10 @@ import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state"
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
-import { useAccount } from "@/hooks/use-account";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useViewing } from "@/hooks/use-viewing";
 import { apiFetcher } from "@/lib/api/client";
-import { NET_WORTH_API_KEY } from "@/lib/api/keys";
+import { netWorthApiKey } from "@/lib/api/keys";
 import type { NetWorthEntry, NetWorthOverview } from "@/lib/net-worth/types";
 
 function groupedEntries(entries: NetWorthEntry[]) {
@@ -46,8 +48,8 @@ function groupedEntries(entries: NetWorthEntry[]) {
 
 export function NetWorthPanel() {
   useDocumentTitle("Net worth");
-  const { data, error, isLoading, isValidating, mutate } = useSWR<NetWorthOverview>(NET_WORTH_API_KEY, apiFetcher);
-  const { currency } = useAccount();
+  const { member, currency, readOnly, name } = useViewing();
+  const { data, error, isLoading, isValidating, mutate } = useSWR<NetWorthOverview>(netWorthApiKey(member), apiFetcher);
   const grouped = useMemo(() => groupedEntries(data?.entries ?? []), [data?.entries]);
 
   if (isLoading && !data) return <DataLoading label="Loading your net worth…" />;
@@ -56,7 +58,13 @@ export function NetWorthPanel() {
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>
-      <PageHeader title="Net worth" actions={<AddNetWorthItemDialog defaultCurrency={currency} onSuccess={() => undefined} />} />
+      <PageHeader title="Net worth" actions={
+          <WriteOnly>
+            <AddNetWorthItemDialog defaultCurrency={currency} onSuccess={() => undefined} />
+          </WriteOnly>
+        }
+      />
+      <ViewingControls noun="net worth" />
       <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
 
       <NetWorthAttention overview={data} />
@@ -71,8 +79,12 @@ export function NetWorthPanel() {
         <Card>
           <EmptyState
             icon={<Landmark />}
-            title="Build your balance sheet"
-            description="Add cash, property, jewelry, debts or a custom asset. Investment holdings will appear automatically when they have an active position."
+            title={readOnly ? "Nothing here yet" : "Build your balance sheet"}
+            description={
+              readOnly
+                ? `${name} hasn’t added anything to their balance sheet yet.`
+                : "Add cash, property, jewelry, debts or a custom asset. Investment holdings will appear automatically when they have an active position."
+            }
           />
         </Card>
       ) : (

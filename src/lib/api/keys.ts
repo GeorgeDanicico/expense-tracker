@@ -4,6 +4,17 @@ import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/f
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { AccountNotice } from "@/lib/account/notice-repository";
 import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
+import { MEMBER_PARAM } from "@/lib/family/viewing";
+
+/**
+ * Adds `?member=<memberId>` (or `&member=`) to a finance read's URL so it shows that member's data.
+ * `null` or `undefined` is yourself and leaves the URL as it was, so caches of different members
+ * never share a key.
+ */
+export function withMember(url: string, member?: string | null) {
+  if (!member) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}${MEMBER_PARAM}=${encodeURIComponent(member)}`;
+}
 
 // Each key notes the response type its GET returns. Types owned by a domain
 // module are referenced there; wrapper shapes that only exist on the wire live here.
@@ -16,10 +27,20 @@ export const ACCOUNT_PASSWORD_API_URL = "/api/account/password";
 export const ACCOUNT_EMAIL_API_URL = "/api/account/email";
 /** GET → {@link NoticesResponse}: the unseen notices, oldest first. 404 while the family flag is off. */
 export const ACCOUNT_NOTICES_API_KEY = "/api/account/notices";
-/** GET → `InvestmentsOverview` (`@/lib/investments/types`). */
+/** GET → `InvestmentsOverview` (`@/lib/investments/types`). Your own data; see {@link investmentsApiKey} for a member's. */
 export const INVESTMENTS_API_KEY = "/api/investments";
-/** GET → `NetWorthOverview` (`@/lib/net-worth/types`). */
+/** GET → `NetWorthOverview` (`@/lib/net-worth/types`). Your own data; see {@link netWorthApiKey} for a member's. */
 export const NET_WORTH_API_KEY = "/api/net-worth";
+
+/** {@link INVESTMENTS_API_KEY} for the family member `member` (yourself when `null`). */
+export function investmentsApiKey(member?: string | null) {
+  return withMember(INVESTMENTS_API_KEY, member);
+}
+
+/** {@link NET_WORTH_API_KEY} for the family member `member` (yourself when `null`). */
+export function netWorthApiKey(member?: string | null) {
+  return withMember(NET_WORTH_API_KEY, member);
+}
 /** GET → {@link FamilyResponse}; POST `{ name }` returns {@link FamilyResponse} with the new family (201). */
 export const FAMILY_API_KEY = "/api/family";
 /** GET → {@link InvitesResponse}: the pending invites, newest first (parents only); POST `{ role, permissions? }` → {@link CreatedInvite} (201). */
@@ -37,8 +58,13 @@ export function dismissNoticeApiUrl(id: string) {
   return `${ACCOUNT_NOTICES_API_KEY}/${encodeURIComponent(id)}/dismiss`;
 }
 
-/** GET → {@link TabsResponse}; POST returns {@link SavedTabResponse}. */
+/** GET → {@link TabsResponse}; POST returns {@link SavedTabResponse}. Your own tabs; see {@link expenseTabsApiKey} for a member's. */
 export const EXPENSE_TABS_API_KEY = "/api/expense-tabs";
+
+/** {@link EXPENSE_TABS_API_KEY} for the family member `member` (yourself when `null`). */
+export function expenseTabsApiKey(member?: string | null) {
+  return withMember(EXPENSE_TABS_API_KEY, member);
+}
 
 export type NoticesResponse = { notices: AccountNotice[] };
 export type InvitesResponse = { invites: FamilyInvite[] };
@@ -54,34 +80,39 @@ export function expenseTabApiKey(id: string) {
 }
 
 /** GET → `ExpenseTabLedgerData` (`@/lib/expenses/tabs`). */
-export function expenseTabExpensesApiKey(id: string, filters: ExpenseTabFilters, revision?: string) {
+export function expenseTabExpensesApiKey(
+  id: string,
+  filters: ExpenseTabFilters,
+  revision?: string,
+  member?: string | null,
+) {
   const params = expenseTabFilterParams(filters);
   if (revision) params.set("revision", revision);
-  return `${expenseTabApiKey(id)}/expenses?${params}`;
+  return withMember(`${expenseTabApiKey(id)}/expenses?${params}`, member);
 }
 
 /** GET → `DashboardData` (`@/lib/expenses/types`). */
-export function dashboardApiKey(filters: AnalyticsFilters) {
+export function dashboardApiKey(filters: AnalyticsFilters, member?: string | null) {
   const params = new URLSearchParams({
     period: filters.period,
     granularity: filters.granularity,
     date: filters.customDate,
   });
-  return `/api/dashboard?${params}`;
+  return withMember(`/api/dashboard?${params}`, member);
 }
 
 /** GET → `ExpensesData` (`@/lib/expenses/types`). */
-export function expensesApiKey(month: string) {
-  return `/api/expenses?month=${encodeURIComponent(month)}`;
+export function expensesApiKey(month: string, member?: string | null) {
+  return withMember(`/api/expenses?month=${encodeURIComponent(month)}`, member);
 }
 
 /** GET → `ExpensesData` (`@/lib/expenses/types`). */
-export function mainExpensesApiKey(month: string) {
-  return `${expensesApiKey(resolveMainExpenseMonth(month))}&context=main`;
+export function mainExpensesApiKey(month: string, member?: string | null) {
+  return `${expensesApiKey(resolveMainExpenseMonth(month), member)}&context=main`;
 }
 
-export function mainExpensesExportUrl(month: string) {
-  return `/api/expenses/export?month=${encodeURIComponent(resolveMainExpenseMonth(month))}`;
+export function mainExpensesExportUrl(month: string, member?: string | null) {
+  return withMember(`/api/expenses/export?month=${encodeURIComponent(resolveMainExpenseMonth(month))}`, member);
 }
 
 /** GET → `InvestmentTransactionsResponse` (`@/lib/investments/types`). */
@@ -89,13 +120,15 @@ export function investmentTransactionsApiKey({
   accountId,
   instrument,
   currency,
+  member,
 }: {
   accountId: string;
   instrument: string;
   currency: string;
+  member?: string | null;
 }) {
   const params = new URLSearchParams({ accountId, instrument, currency });
-  return `/api/investment-transactions?${params}`;
+  return withMember(`/api/investment-transactions?${params}`, member);
 }
 
 /** DELETE only → 204. The creator removes a member (never themselves). */
