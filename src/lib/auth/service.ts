@@ -55,6 +55,8 @@ export interface AuthService {
   oauthSignInUrl(provider: OAuthProvider, callbackUrl: string): Promise<OAuthUrlResult>;
   /** Verifies a link sent by email and stores the resulting session for this request. */
   completeEmailLink(link: EmailLink): Promise<AuthResult>;
+  /** Sets a new password for the signed-in user. The session stays signed in. */
+  updatePassword(password: string): Promise<AuthResult>;
   /** Signs in without touching the request's session. Null when the credentials are rejected or the provider fails. */
   startSession(email: string, password: string): Promise<AuthSession | null>;
 }

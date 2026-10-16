@@ -6,6 +6,7 @@ import {
   afterExpenseDeleted,
   afterInvestmentChange,
   afterNetWorthChange,
+  afterPasswordChange,
   afterSignIn,
   afterSignOut,
   afterTabDeleted,
@@ -133,6 +134,10 @@ describe("cache invalidation after mutations", () => {
     const signIn = recorder();
     await afterSignIn(signIn.mutate);
     expect(signIn.calls.map((call) => call.keys)).toEqual([["/api/account"]]);
+
+    const passwordChange = recorder();
+    await afterPasswordChange(passwordChange.mutate);
+    expect(passwordChange.calls).toEqual([{ keys: ["/api/account"], data: undefined, options: undefined }]);
 
     const signOut = recorder();
     await afterSignOut(signOut.mutate);

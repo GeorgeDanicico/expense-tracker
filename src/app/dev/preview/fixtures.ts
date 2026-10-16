@@ -224,6 +224,7 @@ const ACCOUNT: AccountData = {
   currency: "EUR",
   features: { family: false },
   membership: null,
+  mustChangePassword: false,
 };
 
 /** Resolves an SWR key to fixture data, mirroring the API routes' shapes. */

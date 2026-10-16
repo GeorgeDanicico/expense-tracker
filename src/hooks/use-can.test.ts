@@ -24,7 +24,7 @@ function renderUseCan(module: ModuleKey, level: PermissionLevel) {
 }
 
 function anAccount(membership: AccountMembership | null): AccountData {
-  return { email: "user@example.com", currency: "EUR", features: { family: true }, membership };
+  return { email: "user@example.com", currency: "EUR", features: { family: true }, membership, mustChangePassword: false };
 }
 
 beforeEach(() => {

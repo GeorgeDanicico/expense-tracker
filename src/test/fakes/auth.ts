@@ -120,6 +120,17 @@ export class FakeAuth implements AuthService {
     return { ok: true };
   }
 
+  /** Changes the password of the signed-in account; fails like the provider when nobody is signed in. */
+  async updatePassword(password: string): Promise<AuthResult> {
+    const failure = this.takeFailure("updatePassword");
+    if (failure) return failure;
+    const user = await this.getCurrentUser();
+    const account = this.accounts.find((candidate) => candidate.id === user?.id);
+    if (!account) return { ok: false, reason: "Auth session missing!" };
+    account.password = password;
+    return { ok: true };
+  }
+
   async startSession(email: string, password: string): Promise<AuthSession | null> {
     if (this.takeFailure("startSession")) return null;
     const account = this.accounts.find((candidate) => candidate.email === email);

@@ -104,6 +104,11 @@ export function afterSignIn(mutate: ScopedMutator) {
   return mutate(ACCOUNT_API_KEY);
 }
 
+/** Reloads the account, so its `mustChangePassword` flag no longer sends the app to `/change-password`. */
+export function afterPasswordChange(mutate: ScopedMutator) {
+  return mutate(ACCOUNT_API_KEY);
+}
+
 /** Clears every cached response without refetching. */
 export function afterSignOut(mutate: ScopedMutator) {
   return mutate(() => true, undefined, { revalidate: false });
