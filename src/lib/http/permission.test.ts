@@ -81,7 +81,17 @@ describe("withPermission", () => {
 
     await withPermission("expenses", "edit", handler)(request, context);
 
-    expect(handler).toHaveBeenCalledWith(request, user, context);
+    expect(handler).toHaveBeenCalledWith(request, user, context, null);
+  });
+
+  it("passes the membership it checked to the handler, without reading it twice", async () => {
+    const kid = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "off", family_finance: "off" } });
+    repositories.family.membership = kid;
+
+    await call();
+
+    expect(handler).toHaveBeenCalledWith(undefined, user, undefined, kid);
+    expect(repositories.family.calls).toEqual(["touchLastActive", "getMembership"]);
   });
 
   it("maps a failure to read the membership to the route's failure message", async () => {

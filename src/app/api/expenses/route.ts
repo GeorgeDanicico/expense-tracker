@@ -1,28 +1,33 @@
 import type { NextRequest } from "next/server";
 
 import { getMonthlyLedger } from "@/lib/expenses/service";
+import { resolveViewedUserFor } from "@/lib/family/viewed-user";
 import { withPermission } from "@/lib/http/permission";
 import { HttpError, json, parseInput, readJson } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { getBucharestMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
 
-export const GET = withPermission("expenses", "edit", async (request: NextRequest, user) => {
+export const GET = withPermission("expenses", "edit", async (request: NextRequest, user, _context, member) => {
+  const { userId, viewing } = await resolveViewedUserFor(request, user, member);
   const requestedMonth = request.nextUrl.searchParams.get("month") ?? "";
   const isMainLedger = request.nextUrl.searchParams.get("context") === "main";
   const month = isMainLedger
     ? resolveMainExpenseMonth(requestedMonth)
     : isValidMonth(requestedMonth) ? requestedMonth : getBucharestMonth();
 
-  const { expenses, total, average } = await getMonthlyLedger(user.id, month);
+  const { expenses, total, average } = await getMonthlyLedger(userId, month);
   return json({
     month,
     ...(isMainLedger ? { effectiveMonth: month } : {}),
     expenses,
     total,
     average,
+    viewing,
   });
 }, { failure: "Unable to load expenses." });
+
+// Writes never read `?member=`: they always act on the caller.
 
 export const POST = withPermission("expenses", "edit", async (request: NextRequest, user) => {
   const payload = (await readJson(request)) as Record<string, unknown> | null;

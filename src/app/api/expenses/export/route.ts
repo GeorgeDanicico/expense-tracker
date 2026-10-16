@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { buildExpenseWorkbook } from "@/lib/export/xlsx";
+import { resolveViewedUserFor } from "@/lib/family/viewed-user";
 import { withPermission } from "@/lib/http/permission";
 import { HttpError, PRIVATE_HEADERS } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
@@ -9,7 +10,9 @@ import { isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 export const runtime = "nodejs";
 
 // No `failure`: unexpected errors keep Next's default response instead of a JSON body.
-export const GET = withPermission("expenses", "edit", async (request: NextRequest, user) => {
+// A read like the month list, so it takes `?member=` too and exports that member's month.
+export const GET = withPermission("expenses", "edit", async (request: NextRequest, user, _context, member) => {
+  const { userId } = await resolveViewedUserFor(request, user, member);
   const requestedMonth = request.nextUrl.searchParams.get("month") ?? "";
   if (!isValidMonth(requestedMonth)) {
     throw new HttpError(400, "Invalid month. Use YYYY-MM.");
@@ -18,8 +21,8 @@ export const GET = withPermission("expenses", "edit", async (request: NextReques
 
   const repositories = getRepositories();
   const [expenses, currency] = await Promise.all([
-    repositories.expenses.listMonth(user.id, month),
-    repositories.account.getCurrency(user.id),
+    repositories.expenses.listMonth(userId, month),
+    repositories.account.getCurrency(userId),
   ]);
   const workbook = buildExpenseWorkbook(expenses, currency);
   return new NextResponse(workbook, {
