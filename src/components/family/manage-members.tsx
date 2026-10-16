@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { CreateKidDialog } from "@/components/family/create-kid-dialog";
 import { EditPermissionsDialog } from "@/components/family/edit-permissions-dialog";
+import { RemoveMemberDialog } from "@/components/family/remove-member-dialog";
 import { ResetPasswordDialog } from "@/components/family/reset-password-dialog";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -19,9 +20,10 @@ function roleLabel(member: FamilyMember) {
   return member.role === "parent" ? "Parent" : "Kid";
 }
 
-function MemberRow({ member }: { member: FamilyMember }) {
+function MemberRow({ member, canRemove }: { member: FamilyMember; canRemove: boolean }) {
   const [editing, setEditing] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const name = memberName(member);
 
   return (
@@ -50,30 +52,44 @@ function MemberRow({ member }: { member: FamilyMember }) {
         {lastActiveLabel(member.lastActiveAt)}
       </Table.Cell>
       <Table.Cell pe="3">
-        {member.role === "kid" ? (
-          <Flex direction={{ base: "column", md: "row" }} align="stretch" justify="flex-end" gap="1.5">
-            <Button size="xs" variant="outline" onClick={() => setEditing(true)} aria-label={`Edit permissions for ${name}`}>
-              Edit permissions
-            </Button>
+        <Flex direction={{ base: "column", md: "row" }} align="stretch" justify="flex-end" gap="1.5">
+          {member.role === "kid" ? (
+            <>
+              <Button size="xs" variant="outline" onClick={() => setEditing(true)} aria-label={`Edit permissions for ${name}`}>
+                Edit permissions
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setResetting(true)}
+                aria-label={`Reset password for ${name}`}
+              >
+                Reset password
+              </Button>
+            </>
+          ) : null}
+          {canRemove && !member.isCreator ? (
             <Button
               size="xs"
               variant="outline"
-              onClick={() => setResetting(true)}
-              aria-label={`Reset password for ${name}`}
+              colorPalette="danger"
+              onClick={() => setRemoving(true)}
+              aria-label={`Remove ${name} from the family`}
             >
-              Reset password
+              Remove
             </Button>
-            {editing ? <EditPermissionsDialog member={member} open onOpenChange={setEditing} /> : null}
-            {resetting ? <ResetPasswordDialog member={member} open onOpenChange={setResetting} /> : null}
-          </Flex>
-        ) : null}
+          ) : null}
+        </Flex>
+        {editing ? <EditPermissionsDialog member={member} open onOpenChange={setEditing} /> : null}
+        {resetting ? <ResetPasswordDialog member={member} open onOpenChange={setResetting} /> : null}
+        {removing ? <RemoveMemberDialog member={member} open onOpenChange={setRemoving} /> : null}
       </Table.Cell>
     </Table.Row>
   );
 }
 
-/** The members table for parents: role, last activity, kid accounts, and permission and password buttons for each kid. */
-export function ManageMembers({ data }: { data: FamilyData }) {
+/** The members table for parents: role, last activity, kid accounts, permission and password buttons for each kid, and Remove for the creator. */
+export function ManageMembers({ data, isCreator = false }: { data: FamilyData; isCreator?: boolean }) {
   const [adding, setAdding] = useState(false);
 
   return (
@@ -103,7 +119,7 @@ export function ManageMembers({ data }: { data: FamilyData }) {
           </Table.Header>
           <Table.Body>
             {data.members.map((member) => (
-              <MemberRow key={member.memberId} member={member} />
+              <MemberRow key={member.memberId} member={member} canRemove={isCreator} />
             ))}
           </Table.Body>
         </Table.Root>

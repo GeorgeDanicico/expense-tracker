@@ -94,3 +94,22 @@ describe("KidSignInDetails", () => {
     expect(html).not.toContain("username");
   });
 });
+
+describe("ManageMembers removal", () => {
+  const withParent: FamilyData = {
+    ...data,
+    members: [...data.members, member({ memberId: "2", displayName: "Dan" })],
+  };
+
+  it("offers Remove to the creator for everyone but the creator", () => {
+    const html = render(<ManageMembers data={withParent} isCreator />);
+    expect(html).toContain("Remove Mara from the family");
+    expect(html).toContain("Remove Dan from the family");
+    expect(html).not.toContain("Remove Ana from the family");
+  });
+
+  it("hides Remove from other parents", () => {
+    const html = render(<ManageMembers data={withParent} />);
+    expect(html).not.toContain("from the family");
+  });
+});

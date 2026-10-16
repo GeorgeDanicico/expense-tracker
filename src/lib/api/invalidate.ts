@@ -145,3 +145,13 @@ export function afterFamilyChanged(mutate: ScopedMutator, response: FamilyRespon
 export function afterInvitesChanged(mutate: ScopedMutator) {
   return mutate(FAMILY_INVITES_API_KEY);
 }
+
+/** After removing a member: reloads the family, so the member disappears from the list. */
+export function afterMemberRemoved(mutate: ScopedMutator) {
+  return mutate(FAMILY_API_KEY);
+}
+
+/** After deleting the family: caches "no family" and reloads the account, whose membership is gone. */
+export function afterFamilyDeleted(mutate: ScopedMutator) {
+  return afterFamilyJoined(mutate, { family: null });
+}

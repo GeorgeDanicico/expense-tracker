@@ -18,6 +18,11 @@ export function noticeMessage(notice: Pick<AccountNotice, "kind" | "familyName">
     : `You were removed from the family ${notice.familyName}. Your own data is still here.`;
 }
 
+/** The dialog title for a notice. */
+export function noticeTitle(notice: Pick<AccountNotice, "kind">): string {
+  return notice.kind === "family_deleted" ? "Your family was deleted" : "You were removed from the family";
+}
+
 /** The dialog for one notice, with OK (and closing it) calling `onDismiss`. */
 export function NoticeDialog({
   notice,
@@ -39,7 +44,7 @@ export function NoticeDialog({
       size="sm"
       placement="center"
       role="alertdialog"
-      title={notice.kind === "family_deleted" ? "Your family was deleted" : "You left the family"}
+      title={noticeTitle(notice)}
       footer={
         <Button variant="solid" colorPalette="brand" loading={pending} onClick={onDismiss}>
           OK
