@@ -4,7 +4,8 @@ import { Separator, Stack, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import { NavItem, NavSectionGroup } from "@/components/layout/nav-item";
-import { MORE_SECTIONS, NAV_ITEMS } from "@/components/layout/nav-items";
+import { NAV_ITEMS } from "@/components/layout/nav-items";
+import { useNavigation } from "@/components/layout/use-navigation";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { InstallInstructions } from "@/components/pwa/install-instructions";
 import { AppDialog } from "@/components/ui/app-dialog";
@@ -21,6 +22,7 @@ export function MoreSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { moreSections } = useNavigation();
   return (
     <AppDialog
       title="More"
@@ -31,7 +33,7 @@ export function MoreSheet({
       closeLabel="Close More"
     >
       <Stack gap="1">
-        {MORE_SECTIONS.map((section) => (
+        {moreSections.map((section) => (
           <NavSectionGroup key={section.label} section={section} onNavigate={() => onOpenChange(false)} />
         ))}
         <Separator my="2" />

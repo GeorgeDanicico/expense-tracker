@@ -7,7 +7,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { MoreSheet } from "@/components/layout/more-sheet";
-import { MORE_ITEMS, TAB_BAR_ITEMS, isActivePath } from "@/components/layout/nav-items";
+import { isActivePath } from "@/components/layout/nav-items";
+import { useNavigation } from "@/components/layout/use-navigation";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 
 const itemStyles = (active: boolean): SystemStyleObject => ({
@@ -37,8 +38,9 @@ function TabLabel({ children }: { children: string }) {
 /** Fixed bottom navigation on mobile: Home, Expenses and the More sheet. */
 export function MobileTabBar({ email }: { email: string }) {
   const pathname = usePathname();
+  const { tabBarItems, moreItems } = useNavigation();
   const [open, setOpen] = useState(false);
-  const moreActive = MORE_ITEMS.some(({ href }) => isActivePath(pathname, href));
+  const moreActive = moreItems.some(({ href }) => isActivePath(pathname, href));
   return (
     <Flex
       as="nav"
@@ -54,7 +56,7 @@ export function MobileTabBar({ email }: { email: string }) {
       px="2"
       pb="env(safe-area-inset-bottom)"
     >
-      {TAB_BAR_ITEMS.map(({ href, label, icon: Icon }) => {
+      {tabBarItems.map(({ href, label, icon: Icon }) => {
         const active = pathname === href;
         return (
           <ChakraLink key={href} asChild css={itemStyles(active)}>
