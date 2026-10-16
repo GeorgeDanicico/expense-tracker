@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   afterExpenseCreated,
   afterExpenseDeleted,
+  afterFamilyJoined,
   afterInvestmentChange,
   afterNetWorthChange,
   afterPasswordChange,
@@ -142,5 +143,15 @@ describe("cache invalidation after mutations", () => {
     const signOut = recorder();
     await afterSignOut(signOut.mutate);
     expect(signOut.calls).toEqual([{ keys: CACHED_KEYS, data: undefined, options: NO_REVALIDATE }]);
+  });
+
+  it("caches the joined family and reloads the account", async () => {
+    const response = { family: { family: { id: "f1", name: "Home", createdAt: "2026-10-16T00:00:00Z" }, members: [] } };
+    const joined = recorder();
+    await afterFamilyJoined(joined.mutate, response);
+    expect(joined.calls).toEqual([
+      { keys: ["/api/family"], data: response, options: NO_REVALIDATE },
+      { keys: ["/api/account"], data: undefined, options: undefined },
+    ]);
   });
 });
