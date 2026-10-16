@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
 import { aKid, aParent } from "@/test/builders";
+import { forgetLastActive } from "@/lib/family/last-active";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
@@ -15,6 +16,7 @@ let user: ReturnType<typeof signedInAs>;
 
 beforeEach(() => {
   repositories = resetFakeRepositories();
+  forgetLastActive();
   user = signedInAs();
   vi.stubEnv("FAMILY_ENABLED", "false");
 });
@@ -97,7 +99,7 @@ describe("GET /api/account", () => {
     const response = await callRoute(GET);
 
     expect(response).toMatchObject({ status: 200, body: { membership: null } });
-    expect(repositories.family.calls).toEqual(["getMembership"]);
+    expect(repositories.family.calls).toEqual(["touchLastActive", "getMembership"]);
   });
 
   it("returns a parent's membership with full permissions and without ids", async () => {

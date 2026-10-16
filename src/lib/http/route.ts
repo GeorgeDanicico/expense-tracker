@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getAuthenticatedUser, type AuthenticatedUser } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
+import { touchLastActiveInBackground } from "@/lib/family/last-active";
 import { idSchema } from "@/lib/validation/primitives";
 
 /** Every API response is per-user data and must never be cached by browsers or proxies. */
@@ -85,6 +86,8 @@ function errorResponse(error: HttpError | DomainError) {
  * Wraps a route handler with authentication and error mapping:
  * no user → 401, `HttpError`/`DomainError` → their status, anything else → 500 with `failure`.
  * Without `failure`, unexpected errors propagate to Next's default error response.
+ * While the family flag is on, it also records the user's last activity in the background
+ * (`touchLastActiveInBackground`), which never delays or changes the response.
  */
 export function withUser<Req extends Request = Request, Ctx = unknown>(
   handler: (request: Req, user: AuthenticatedUser, context: Ctx) => Promise<Response>,
@@ -93,6 +96,7 @@ export function withUser<Req extends Request = Request, Ctx = unknown>(
   return async (request?: Req, context?: Ctx): Promise<Response> => {
     const user = await getAuthenticatedUser();
     if (!user) return unauthorized();
+    touchLastActiveInBackground(user.id);
 
     try {
       return await handler(request as Req, user, context as Ctx);

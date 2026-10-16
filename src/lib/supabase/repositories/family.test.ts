@@ -243,4 +243,25 @@ describe("Supabase family repository", () => {
       await expect(family.createFamily("The Smiths")).rejects.toThrow(new Error("Unable to create the family."));
     });
   });
+
+  describe("touchLastActive", () => {
+    it("calls touch_last_active as the request's caller, with no arguments", async () => {
+      const { rpcs } = useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.touchLastActive()).resolves.toBeUndefined();
+      expect(rpcs).toEqual([{ fn: "touch_last_active", args: {} }]);
+    });
+
+    it("translates a missing caller into a 403", async () => {
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Sign in first." } }));
+
+      await expect(family.touchLastActive()).rejects.toThrow(new DomainError("Sign in first.", 403));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.touchLastActive()).rejects.toThrow(new Error("Unable to record your last activity."));
+    });
+  });
 });

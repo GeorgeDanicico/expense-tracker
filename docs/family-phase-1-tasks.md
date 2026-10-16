@@ -810,12 +810,13 @@ Before writing code, check that Supabase Auth accepts the `.invalid` domain with
 
 ### F34: Track last activity
 
-**Depends on:** F10, F15. **Files:** `src/lib/http/route.ts`, `FamilyRepository` (`touchLastActive`), the tests.
+**Depends on:** F10, F15. **Files:** `src/lib/http/route.ts`, `src/lib/family/last-active.ts` (new), `FamilyRepository` (`touchLastActive`), the tests.
 
-- After authentication, when the flag is on and `getCurrentMember()` returns a member, `withUser` calls `touchLastActive()` without waiting for it, and ignores errors.
-- An in-process map skips the call when the same user touched in the last 5 minutes.
+- After authentication, when the flag is on, `withUser` (and so `withPermission`) calls `touchLastActive()` without waiting for it, and ignores its errors without logging the user id. It doesn't call `getCurrentMember()` first: `touch_last_active()` already does nothing for users without a family, so a membership lookup would only add a query to every request.
+- An in-process map skips the call when the same user was touched in the last 5 minutes. The map is bounded: once it's full, expired entries and then the oldest ones are dropped.
+- A slow or failing touch never delays or changes the response. MCP requests don't go through `withUser`, so they don't touch.
 
-**Done when** the tests show one call per user per 5 minutes, no call when the flag is off, and that a failure doesn't affect the response.
+**Done when** the tests show one call per user per 5 minutes, a call for each of two users, no call when the flag is off, and that a failure doesn't affect the response.
 
 ### F35: Members API and deleting the family
 

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DomainError } from "@/lib/errors";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
 import { aFamily, aKid, aParent } from "@/test/builders";
+import { forgetLastActive } from "@/lib/family/last-active";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
@@ -16,6 +17,7 @@ let user: ReturnType<typeof signedInAs>;
 
 beforeEach(() => {
   repositories = resetFakeRepositories();
+  forgetLastActive();
   user = signedInAs();
   vi.stubEnv("FAMILY_ENABLED", "true");
 });
@@ -109,7 +111,7 @@ describe("POST /api/family", () => {
       family: { name: "The Smiths" },
       members: [{ userId: user.id, role: "parent", isCreator: true, permissions: PARENT_PERMISSIONS }],
     });
-    expect(repositories.family.calls).toEqual(["createFamily", "getFamily"]);
+    expect(repositories.family.calls).toEqual(["touchLastActive", "createFamily", "getFamily"]);
   });
 
   it("trims the family name", async () => {
@@ -125,21 +127,21 @@ describe("POST /api/family", () => {
       status: 422,
       body: { error: "Check the family name and try again.", fieldErrors: { name: ["Enter a family name."] } },
     });
-    expect(repositories.family.calls).toEqual([]);
+    expect(repositories.family.calls).toEqual(["touchLastActive"]);
   });
 
   it("rejects a name longer than 60 characters with 422", async () => {
     const response = await createFamily({ name: "x".repeat(61) });
 
     expect(response).toMatchObject({ status: 422, body: { fieldErrors: { name: ["Use at most 60 characters."] } } });
-    expect(repositories.family.calls).toEqual([]);
+    expect(repositories.family.calls).toEqual(["touchLastActive"]);
   });
 
   it("rejects a missing or malformed body with 422", async () => {
     const response = await createFamily("{");
 
     expect(response).toMatchObject({ status: 422, body: { error: "Check the family name and try again." } });
-    expect(repositories.family.calls).toEqual([]);
+    expect(repositories.family.calls).toEqual(["touchLastActive"]);
   });
 
   it("answers 409 when the caller is already in a family, leaving it unchanged", async () => {

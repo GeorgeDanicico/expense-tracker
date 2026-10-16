@@ -8,6 +8,7 @@ import { DomainError } from "@/lib/errors";
 import { withPermission } from "@/lib/http/permission";
 import { json } from "@/lib/http/route";
 import { aKid, aParent } from "@/test/builders";
+import { forgetLastActive } from "@/lib/family/last-active";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { signedInAs } from "@/test/route";
 
@@ -26,6 +27,7 @@ async function call(options: { failure?: string } = { failure: "Unable to do it.
 beforeEach(() => {
   vi.clearAllMocks();
   repositories = resetFakeRepositories();
+  forgetLastActive();
   user = signedInAs();
   vi.stubEnv("FAMILY_ENABLED", "true");
 });
@@ -62,7 +64,7 @@ describe("withPermission", () => {
 
   it("runs the handler for a user without a family", async () => {
     expect(await call()).toEqual({ status: 200, body: { ok: true } });
-    expect(repositories.family.calls).toEqual(["getMembership"]);
+    expect(repositories.family.calls).toEqual(["touchLastActive", "getMembership"]);
   });
 
   it("runs the handler without reading the membership while the family flag is off", async () => {

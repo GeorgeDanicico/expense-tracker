@@ -66,4 +66,9 @@ export class FakeFamilyRepository implements FamilyRepository {
     };
     return familyId;
   }
+
+  /** Only records the call; `family` is left as the test seeded it. */
+  async touchLastActive() {
+    this.calls.push("touchLastActive");
+  }
 }
