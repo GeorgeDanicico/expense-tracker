@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { FAMILY_ROLES, MODULE_LABELS, MODULE_LEVELS, type ModuleKey, type Permissions } from "@/lib/permissions";
-import { passwordSchema } from "@/lib/validation/primitives";
+import { passwordSchema } from "@/lib/validation/password";
 
 const moduleLevel = <M extends ModuleKey>(module: M) =>
   z.enum(MODULE_LEVELS[module], `Choose an allowed level for ${MODULE_LABELS[module]}.`);
