@@ -11,6 +11,8 @@ import type { FamilyData } from "@/lib/family/repository";
 export const ACCOUNT_API_KEY = "/api/account";
 /** POST only: `{ password }` → 204. Not fetched with SWR; refresh `ACCOUNT_API_KEY` afterwards. */
 export const ACCOUNT_PASSWORD_API_URL = "/api/account/password";
+/** PATCH only: `{ email }` → 204. The change applies once the link sent to the new address is opened. */
+export const ACCOUNT_EMAIL_API_URL = "/api/account/email";
 /** GET → `InvestmentsOverview` (`@/lib/investments/types`). */
 export const INVESTMENTS_API_KEY = "/api/investments";
 /** GET → `NetWorthOverview` (`@/lib/net-worth/types`). */

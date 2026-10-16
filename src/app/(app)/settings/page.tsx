@@ -1,7 +1,7 @@
 "use client";
 
-import { Button, NativeSelect, Stack } from "@chakra-ui/react";
-import { Save } from "lucide-react";
+import { Button, Input, NativeSelect, Stack } from "@chakra-ui/react";
+import { Mail, Save } from "lucide-react";
 import { FormEvent, useState } from "react";
 
 import { DataError, DataLoading } from "@/components/ui/data-state";
@@ -11,9 +11,11 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAccount } from "@/hooks/use-account";
+import { useApiForm } from "@/hooks/use-api-form";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { apiRequest } from "@/lib/api/client";
-import { ACCOUNT_API_KEY } from "@/lib/api/keys";
+import { ACCOUNT_API_KEY, ACCOUNT_EMAIL_API_URL } from "@/lib/api/keys";
+import { KID_EMAIL_DOMAIN } from "@/lib/family/kid-account";
 import type { AccountData } from "@/lib/account/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
 
@@ -23,6 +25,8 @@ export default function SettingsPage() {
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
+  const emailForm = useApiForm();
+  const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
 
   async function saveCurrency(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,6 +46,17 @@ export default function SettingsPage() {
     }
   }
 
+  function saveEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (emailForm.pending) return;
+    const email = String(new FormData(event.currentTarget).get("email") ?? "");
+
+    void emailForm.submit(async () => {
+      await apiRequest<void>(ACCOUNT_EMAIL_API_URL, { method: "PATCH", body: JSON.stringify({ email }) });
+      setEmailSentTo(email.trim());
+    }, { fallback: "Unable to save your email. Please try again." });
+  }
+
   if (isLoading && !data) return <DataLoading label="Loading your settings…" />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
   if (!data) return <DataLoading label="Loading your settings…" />;
@@ -53,6 +68,47 @@ export default function SettingsPage() {
 
       {status === "saved" ? <InlineAlert status="success">Your account currency was updated.</InlineAlert> : null}
       {status === "error" ? <InlineAlert status="error">{message}</InlineAlert> : null}
+
+      {data.email.toLowerCase().endsWith(`@${KID_EMAIL_DOMAIN}`) ? (
+        <Card>
+          <Card.Header
+            title="Add an email address"
+            description="Use it to recover your account. You can keep signing in with your username."
+          />
+          <form onSubmit={saveEmail}>
+            <Card.Body>
+              <Stack gap="3">
+                {emailSentTo ? (
+                  <InlineAlert status="success">
+                    We sent a link to {emailSentTo}. Open it to finish adding your email.
+                  </InlineAlert>
+                ) : null}
+                {emailForm.error ? <InlineAlert status="error">{emailForm.error}</InlineAlert> : null}
+                <FormField
+                  label="Email address"
+                  error={emailForm.fieldError("email")}
+                  orientation={{ base: "vertical", md: "horizontal" }}
+                  css={{ "--field-label-width": "sizes.40" }}
+                >
+                  <Input
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    maxW={{ md: "20rem" }}
+                    required
+                  />
+                </FormField>
+              </Stack>
+            </Card.Body>
+            <Card.Footer justifyContent="flex-end" borderTopWidth="1px" pt="3">
+              <Button type="submit" variant="solid" colorPalette="brand" loading={emailForm.pending}>
+                <Mail size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Send link
+              </Button>
+            </Card.Footer>
+          </form>
+        </Card>
+      ) : null}
 
       <Card>
         <Card.Header

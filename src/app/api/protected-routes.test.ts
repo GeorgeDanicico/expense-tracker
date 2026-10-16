@@ -20,6 +20,7 @@ const PUBLIC_ROUTES = ["auth", "auth/google", "mcp"];
 // under src/app/api means adding it here, so a route without auth fails below.
 const PROTECTED_ROUTES: Record<string, string[]> = {
   account: ["GET", "PATCH"],
+  "account/email": ["PATCH"],
   "account/password": ["POST"],
   dashboard: ["GET"],
   "expense-tabs": ["GET", "POST"],

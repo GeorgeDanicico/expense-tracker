@@ -133,6 +133,22 @@ describe("supabaseAuth", () => {
     expect(await supabaseAuth.updatePassword("new-secret-1")).toEqual({ ok: false, reason: "provider says no" });
   });
 
+  it("asks to change the signed-in user's email, with the confirmation link", async () => {
+    const auth = mockAuth({ updateUser: { data: { user: { id: "user-1" } }, error: null } });
+
+    expect(await supabaseAuth.updateEmail("a@example.test", "http://localhost/auth/confirm?next=/settings")).toEqual({ ok: true });
+    expect(auth.updateUser).toHaveBeenCalledExactlyOnceWith(
+      { email: "a@example.test" },
+      { emailRedirectTo: "http://localhost/auth/confirm?next=/settings" },
+    );
+  });
+
+  it("passes an email change error message through", async () => {
+    mockAuth({ updateUser: { data: { user: null }, error: PROVIDER_ERROR } });
+
+    expect(await supabaseAuth.updateEmail("a@example.test", "http://x.test")).toEqual({ ok: false, reason: "provider says no" });
+  });
+
   it("returns the OAuth URL for the provider", async () => {
     const auth = mockAuth({ signInWithOAuth: { data: { url: "https://accounts.google.test/o" }, error: null } });
 
