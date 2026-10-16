@@ -28,6 +28,8 @@ These facts shape the plan:
 
 ## Phase 0: Safety net and rename
 
+**Status: done** (merged in [#19](https://github.com/GeorgeDanicico/expense-tracker/pull/19)).
+
 | Step | What | Done when |
 | --- | --- | --- |
 | **0.1** | **CI for pull requests**: a GitHub workflow running `lint`, `typecheck`, `test` and `test:db` (a Supabase CLI local stack) on every PR. | A PR shows green checks, and a deliberately broken RLS test fails CI. |
@@ -38,6 +40,8 @@ These facts shape the plan:
 ## Phase 1: Foundations (families, roles, permissions, a native-ready API)
 
 The step-by-step task breakdown is in [family-phase-1-tasks.md](family-phase-1-tasks.md), one agent and one PR per task. It starts with **step 0 (R01–R10)**, which moves the existing Supabase code behind repository and auth interfaces (decision 8) and runs alongside the SQL-only step 1.1.
+
+**Status (16 October 2026): in progress.** Step 0 and the whole database layer are merged, as are most of the server routes: 39 of 59 tasks. The screens are next, and they wait until the family migrations are applied to the live database (checkpoint 1). The current state is in the "Progress" section of the task plan.
 
 ### Who can do what
 
