@@ -98,6 +98,11 @@ export function investmentTransactionsApiKey({
   return `/api/investment-transactions?${params}`;
 }
 
+/** DELETE only → 204. The creator removes a member (never themselves). */
+export function familyMemberApiUrl(memberId: string) {
+  return `/api/family/members/${encodeURIComponent(memberId)}`;
+}
+
 /** PATCH only: `{ permissions }` → {@link FamilyResponse} with the updated family. Kids only; parents answer 403. */
 export function familyMemberPermissionsApiUrl(memberId: string) {
   return `/api/family/members/${encodeURIComponent(memberId)}/permissions`;
