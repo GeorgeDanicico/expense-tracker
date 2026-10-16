@@ -22,7 +22,7 @@ const ROLE_ITEMS = [
 ] as const;
 
 /** A button that copies `text` and says so for a moment. */
-function CopyButton({ text, label }: { text: string; label: string }) {
+export function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
 

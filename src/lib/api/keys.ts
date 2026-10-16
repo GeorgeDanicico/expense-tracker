@@ -102,3 +102,11 @@ export function investmentTransactionsApiKey({
 export function familyMemberPermissionsApiUrl(memberId: string) {
   return `/api/family/members/${encodeURIComponent(memberId)}/permissions`;
 }
+
+/** POST only: `{ displayName, username, password, permissions }` → {@link FamilyResponse} with the updated family (201). Parents only. */
+export const FAMILY_KIDS_API_URL = "/api/family/kids";
+
+/** POST only: `{ password }` → `{ success: true }`. A parent sets a kid's temporary password; the kid must change it at next sign-in. */
+export function familyMemberPasswordApiUrl(memberId: string) {
+  return `/api/family/members/${encodeURIComponent(memberId)}/password`;
+}
