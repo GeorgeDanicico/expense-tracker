@@ -390,6 +390,20 @@ export type Database = {
           role: string;
         }[];
       };
+      preview_family_invite: {
+        Args: { p_code_hash: string };
+        Returns: {
+          expires_at: string;
+          family_name: string;
+          inviter_name: string | null;
+          permissions: Json | null;
+          role: string;
+        }[];
+      };
+      redeem_family_invite: {
+        Args: { p_code_hash: string };
+        Returns: string;
+      };
       remove_family_member: {
         Args: { p_member_id: string };
         Returns: undefined;
