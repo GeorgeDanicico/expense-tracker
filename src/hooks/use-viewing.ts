@@ -6,11 +6,16 @@ import useSWR from "swr";
 import { useAccount } from "@/hooks/use-account";
 import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 import type { FamilyMember } from "@/lib/family/repository";
-import { MEMBER_PARAM } from "@/lib/family/viewing";
+import { ALL_MEMBERS, MEMBER_PARAM } from "@/lib/family/viewing";
 
 export type ViewingState = {
-  /** The viewed member's id for API keys; `null` when viewing yourself (also for `?member=` set to your own id). */
+  /**
+   * The viewed member's id for API keys; `null` when viewing yourself (also for `?member=` set to your own id),
+   * and `"all"` for the combined family view (see `family`).
+   */
   member: string | null;
+  /** True for the combined family view (`?member=all`, expenses only): read-only, across every member. */
+  family: boolean;
   /** True while viewing someone else: every add, edit, delete and import control stays hidden. */
   readOnly: boolean;
   /** The viewed member from the family list; `null` for yourself, or until the family has loaded. */
@@ -34,20 +39,23 @@ export function useViewing(): ViewingState {
   const { account, currency: ownCurrency } = useAccount();
   const requested = searchParams.get(MEMBER_PARAM) || null;
   const ownId = account?.membership?.memberId;
+  const family = requested === ALL_MEMBERS;
   const member = requested && requested.toLowerCase() !== ownId?.toLowerCase() ? requested : null;
 
-  const { data, error } = useSWR<FamilyResponse>(member ? FAMILY_API_KEY : null);
-  const viewed = member
+  // The family view needs no member list: its response names every member.
+  const { data, error } = useSWR<FamilyResponse>(member && !family ? FAMILY_API_KEY : null);
+  const viewed = member && !family
     ? (data?.family?.members.find((entry) => entry.memberId.toLowerCase() === member.toLowerCase()) ?? null)
     : null;
 
   return {
     member,
+    family,
     readOnly: member !== null,
     viewed,
-    name: member ? (viewed?.displayName ?? viewed?.username ?? "this member") : "you",
+    name: family ? "everyone" : member ? (viewed?.displayName ?? viewed?.username ?? "this member") : "you",
     currency: viewed?.currency ?? ownCurrency,
-    ready: member === null || Boolean(data) || Boolean(error),
+    ready: member === null || family || Boolean(data) || Boolean(error),
     hrefFor: (href) => {
       if (!member) return href;
       const [path, query = ""] = href.split("?");

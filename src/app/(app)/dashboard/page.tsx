@@ -1,9 +1,10 @@
 "use client";
 
-import { Stack } from "@chakra-ui/react";
+import { Stack, Text } from "@chakra-ui/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+import { FamilySummaryDashboard } from "@/components/dashboard/family-summary-dashboard";
 import { HistoryDashboard } from "@/components/dashboard/history-dashboard";
 import { MonthlyDashboard } from "@/components/dashboard/monthly-dashboard";
 import { SummaryDashboard } from "@/components/dashboard/summary-dashboard";
@@ -55,13 +56,19 @@ function DashboardContent() {
           />
         }
       />
-      <ViewingControls noun="expenses" />
+      <ViewingControls noun="expenses" family />
       {!viewing.ready ? <DataLoading label="Loading Home…" /> : null}
-      {viewing.ready && view === "summary" ? <SummaryDashboard params={params} /> : null}
-      {viewing.ready && view === "monthly" ? (
+      {viewing.ready && viewing.family && view !== "summary" ? (
+        <Text textStyle="bodySm" color="fg.muted">
+          Monthly and History show one person at a time. Choose a member above, or go back to Summary.
+        </Text>
+      ) : null}
+      {viewing.ready && viewing.family && view === "summary" ? <FamilySummaryDashboard /> : null}
+      {viewing.ready && !viewing.family && view === "summary" ? <SummaryDashboard params={params} /> : null}
+      {viewing.ready && !viewing.family && view === "monthly" ? (
         <MonthlyDashboard key={month} month={month} params={params} />
       ) : null}
-      {viewing.ready && view === "history" ? (
+      {viewing.ready && !viewing.family && view === "history" ? (
         <HistoryDashboard key={dashboardApiKey(filters, viewing.member)} filters={filters} />
       ) : null}
     </Stack>

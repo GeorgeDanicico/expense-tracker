@@ -9,7 +9,7 @@ import { ExpenseTable } from "@/components/expenses/expense-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useViewing } from "@/hooks/use-viewing";
 import { SUBTYPE_LABELS, CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
-import type { Expense } from "@/lib/expenses/types";
+import type { ListedExpense } from "@/lib/expenses/types";
 
 function NoExpenses({ filtered = false }: { filtered?: boolean }) {
   const { readOnly } = useViewing();
@@ -37,7 +37,7 @@ export function ExpenseList({
   allowDelete = false,
   filterMode = "internal",
 }: {
-  expenses: Expense[];
+  expenses: ListedExpense[];
   currency: string;
   compact?: boolean;
   allowDelete?: boolean;

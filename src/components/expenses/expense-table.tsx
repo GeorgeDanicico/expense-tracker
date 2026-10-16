@@ -4,7 +4,7 @@ import { CategoryVisual } from "@/components/expenses/category-visual";
 import { DeleteExpenseButton } from "@/components/expenses/delete-expense-button";
 import { Amount } from "@/components/ui/amount";
 import { CategoryBadge } from "@/components/ui/status-badge";
-import type { Expense } from "@/lib/expenses/types";
+import type { ListedExpense } from "@/lib/expenses/types";
 import { formatDate } from "@/lib/calendar";
 
 /** Desktop expense table: 40px rows, numeric amounts, quiet row actions. */
@@ -13,10 +13,11 @@ export function ExpenseTable({
   currency,
   allowDelete,
 }: {
-  expenses: Expense[];
+  expenses: ListedExpense[];
   currency: string;
   allowDelete: boolean;
 }) {
+  const showMember = expenses.some((expense) => expense.memberName);
   return (
     <Box display={{ base: "none", lg: "block" }} overflowX="auto">
       <Table.Root interactive>
@@ -24,6 +25,7 @@ export function ExpenseTable({
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader ps="4">Transaction</Table.ColumnHeader>
+            {showMember ? <Table.ColumnHeader>Member</Table.ColumnHeader> : null}
             <Table.ColumnHeader>Date</Table.ColumnHeader>
             <Table.ColumnHeader>Category</Table.ColumnHeader>
             <Table.ColumnHeader data-numeric pe={allowDelete ? "3" : "4"}>Amount</Table.ColumnHeader>
@@ -52,12 +54,13 @@ export function ExpenseTable({
                   </Stack>
                 </Flex>
               </Table.Cell>
+              {showMember ? <Table.Cell whiteSpace="nowrap">{expense.memberName}</Table.Cell> : null}
               <Table.Cell color="fg.muted" whiteSpace="nowrap">{formatDate(expense.expenseDate)}</Table.Cell>
               <Table.Cell>
                 <CategoryBadge category={expense.category} subtype={expense.subtype} />
               </Table.Cell>
               <Table.Cell data-numeric pe={allowDelete ? "3" : "4"}>
-                <Amount value={expense.amount} currency={currency} size="sm" />
+                <Amount value={expense.amount} currency={expense.currency ?? currency} size="sm" />
               </Table.Cell>
               {allowDelete ? (
                 <Table.Cell pe="3" textAlign="end">

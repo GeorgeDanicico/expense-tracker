@@ -10,7 +10,7 @@ import { useViewing } from "@/hooks/use-viewing";
 import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 import { FILTER_KEYS } from "@/lib/expenses/filters";
 import type { FamilyMember } from "@/lib/family/repository";
-import { MEMBER_PARAM } from "@/lib/family/viewing";
+import { ALL_MEMBERS, MEMBER_PARAM } from "@/lib/family/viewing";
 import { can } from "@/lib/permissions";
 
 const ME = "";
@@ -34,13 +34,13 @@ export function viewingHref(pathname: string, current: { toString(): string }, v
  * finance on, and only when the family has someone else to look at. The choice lives in the URL as
  * `?member=`; "Me" removes it. A saved tab and its filters belong to one member, so switching drops them.
  */
-export function ViewingPicker() {
+export function ViewingPicker({ allowFamily = false }: { allowFamily?: boolean }) {
   const id = useId();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { account } = useAccount();
-  const { member } = useViewing();
+  const { member, family } = useViewing();
   const membership = account?.membership ?? null;
   const allowed = membership !== null && can(membership, "family_finance", "view");
   const { data } = useSWR<FamilyResponse>(allowed ? FAMILY_API_KEY : null);
@@ -51,6 +51,7 @@ export function ViewingPicker() {
   );
   if (!others.length) return null;
 
+  const familySelected = allowFamily && family;
   const selected = others.find((entry) => entry.memberId.toLowerCase() === member?.toLowerCase());
 
   function choose(value: string) {
@@ -63,8 +64,9 @@ export function ViewingPicker() {
         Viewing
       </chakra.label>
       <NativeSelect.Root size="sm" flex={{ base: "1", sm: "none" }} width={{ sm: "14rem" }} minW="0">
-        <NativeSelect.Field id={id} value={selected?.memberId ?? ME} onChange={(event) => choose(event.target.value)}>
+        <NativeSelect.Field id={id} value={familySelected ? ALL_MEMBERS : (selected?.memberId ?? ME)} onChange={(event) => choose(event.target.value)}>
           <option value={ME}>Me</option>
+          {allowFamily ? <option value={ALL_MEMBERS}>Family (everyone)</option> : null}
           {others.map((entry) => (
             <option key={entry.memberId} value={entry.memberId}>
               {memberLabel(entry)}
@@ -79,8 +81,9 @@ export function ViewingPicker() {
 
 /** "You're viewing Ana's expenses": shown on a finance page only while it is read-only. */
 export function ViewingBar({ noun }: { noun: string }) {
-  const { readOnly, name } = useViewing();
+  const { readOnly, family, name } = useViewing();
   if (!readOnly) return null;
+  const subject = family ? "the whole family's" : `${name}'s`;
   return (
     <Flex
       role="status"
@@ -95,16 +98,19 @@ export function ViewingBar({ noun }: { noun: string }) {
       textStyle="bodySm"
       color="fg.muted"
     >
-      You&apos;re viewing {name}&apos;s {noun}. Nothing here can be changed.
+      You&apos;re viewing {subject} {noun}. Nothing here can be changed.
     </Flex>
   );
 }
 
-/** The picker and the read-only bar for one finance page; `noun` completes "You're viewing Ana's …". */
-export function ViewingControls({ noun }: { noun: string }) {
+/**
+ * The picker and the read-only bar for one finance page; `noun` completes "You're viewing Ana's …".
+ * `family` adds the "Family (everyone)" choice, for the pages that can show every member at once.
+ */
+export function ViewingControls({ noun, family = false }: { noun: string; family?: boolean }) {
   return (
     <>
-      <ViewingPicker />
+      <ViewingPicker allowFamily={family} />
       <ViewingBar noun={noun} />
     </>
   );
