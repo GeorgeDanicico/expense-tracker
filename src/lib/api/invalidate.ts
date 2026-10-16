@@ -3,11 +3,13 @@ import type { ScopedMutator } from "swr";
 import {
   ACCOUNT_API_KEY,
   EXPENSE_TABS_API_KEY,
+  FAMILY_API_KEY,
   INVESTMENTS_API_KEY,
   NET_WORTH_API_KEY,
   expenseTabApiKey,
   expensesApiKey,
   mainExpensesApiKey,
+  type FamilyResponse,
   type TabsResponse,
 } from "@/lib/api/keys";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
@@ -112,4 +114,10 @@ export function afterPasswordChange(mutate: ScopedMutator) {
 /** Clears every cached response without refetching. */
 export function afterSignOut(mutate: ScopedMutator) {
   return mutate(() => true, undefined, { revalidate: false });
+}
+
+/** After creating or joining a family: caches the new family and reloads the account, whose membership changed. */
+export async function afterFamilyJoined(mutate: ScopedMutator, response: FamilyResponse) {
+  await mutate(FAMILY_API_KEY, response, { revalidate: false });
+  await mutate(ACCOUNT_API_KEY);
 }

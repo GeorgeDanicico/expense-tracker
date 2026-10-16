@@ -19,6 +19,10 @@ export const INVESTMENTS_API_KEY = "/api/investments";
 export const NET_WORTH_API_KEY = "/api/net-worth";
 /** GET → {@link FamilyResponse}; POST `{ name }` returns {@link FamilyResponse} with the new family (201). */
 export const FAMILY_API_KEY = "/api/family";
+/** POST only: `{ code }` → `InvitePreview` (`@/lib/family/repository`), or 404 for a code that can't be redeemed. */
+export const FAMILY_JOIN_PREVIEW_API_URL = "/api/family/join/preview";
+/** POST only: `{ code }` → {@link FamilyResponse} with the joined family (201). */
+export const FAMILY_JOIN_API_URL = "/api/family/join";
 /** GET → {@link TabsResponse}; POST returns {@link SavedTabResponse}. */
 export const EXPENSE_TABS_API_KEY = "/api/expense-tabs";
 
