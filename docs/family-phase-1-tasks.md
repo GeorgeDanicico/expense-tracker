@@ -9,12 +9,12 @@ An agent needs only two things: the shared sections below (how the work is run, 
 
 ## Progress (16 October 2026)
 
-**43 of 59 tasks are done:** all of step 0, the whole database layer, and most of the server code. Nothing is visible to users yet: everything is behind `FAMILY_ENABLED`, and no family migration is on the live database.
+**58 of 59 tasks are done:** everything except the release (F48). Nothing is visible to users yet: everything is behind `FAMILY_ENABLED`. All family migrations (checkpoint 1 and F49) are on the live database.
 
 | State | Count | Tasks |
 | --- | --- | --- |
-| Done | 43 | R01–R10, F01–F18, F20, F21, F22, F28, F29, F30, F31, F32, F33, F34, F35, F41 (folded into R06–R09), F42, F43, F44 |
-| Not started | 16 | F19, F23–F27, F36–F40, F45–F49 |
+| Done | 58 | R01–R10, F01–F47 (F41 folded into R06–R09), F49 |
+| Not started | 1 | F48 |
 
 ### Done, with their pull requests
 
@@ -28,19 +28,11 @@ An agent needs only two things: the shared sections below (how the work is run, 
 | 1.5 Kid accounts | F28 [#53](https://github.com/GeorgeDanicico/expense-tracker/pull/53), F29 [#57](https://github.com/GeorgeDanicico/expense-tracker/pull/57), F30 [#59](https://github.com/GeorgeDanicico/expense-tracker/pull/59), F31 [#58](https://github.com/GeorgeDanicico/expense-tracker/pull/58), F32 [#63](https://github.com/GeorgeDanicico/expense-tracker/pull/63), F33 [#64](https://github.com/GeorgeDanicico/expense-tracker/pull/64) |
 | 1.6 Family settings | F34 [#50](https://github.com/GeorgeDanicico/expense-tracker/pull/50), F35 [#51](https://github.com/GeorgeDanicico/expense-tracker/pull/51) |
 | 1.7 Family finance | F41 (folded into R06–R09), F42 [#41](https://github.com/GeorgeDanicico/expense-tracker/pull/41), F43 [#52](https://github.com/GeorgeDanicico/expense-tracker/pull/52), F44 [#56](https://github.com/GeorgeDanicico/expense-tracker/pull/56) |
+| 1.7 and the screens | F49 [#66](https://github.com/GeorgeDanicico/expense-tracker/pull/66), F19 [#67](https://github.com/GeorgeDanicico/expense-tracker/pull/67), F23 [#68](https://github.com/GeorgeDanicico/expense-tracker/pull/68), F24 [#69](https://github.com/GeorgeDanicico/expense-tracker/pull/69), F25 [#70](https://github.com/GeorgeDanicico/expense-tracker/pull/70), F26 [#71](https://github.com/GeorgeDanicico/expense-tracker/pull/71), F27 [#72](https://github.com/GeorgeDanicico/expense-tracker/pull/72), F36 [#73](https://github.com/GeorgeDanicico/expense-tracker/pull/73), F37 [#74](https://github.com/GeorgeDanicico/expense-tracker/pull/74), F38 [#75](https://github.com/GeorgeDanicico/expense-tracker/pull/75), F39 [#76](https://github.com/GeorgeDanicico/expense-tracker/pull/76), F40 [#77](https://github.com/GeorgeDanicico/expense-tracker/pull/77), F45 [#78](https://github.com/GeorgeDanicico/expense-tracker/pull/78), F46 [#79](https://github.com/GeorgeDanicico/expense-tracker/pull/79), F47 [#80](https://github.com/GeorgeDanicico/expense-tracker/pull/80) |
 
 ### What's left, in order
 
-1. **Finish the server work.**
-   - The server work is done.
-2. **Checkpoint 1: done (16 October 2026).** The 14 family migrations are on the live database (list under "Applying migrations"). The screen tasks are unblocked.
-3. **F49** (new): members' currency in `get_family()`. It must land before F45–F47.
-4. **The screens**, after checkpoint 1:
-   - F19 (navigation and page guards)
-   - F23–F27 (settings pages, create or join, the join link, members, my permissions)
-   - F36–F40 (the notices popup, manage family)
-   - F45–F47 (the member picker and the family finance views)
-5. **F48: release.** Set the secret key and turn on `FAMILY_ENABLED` on the VPS, run the smoke test, and later remove the flag.
+1. **F48: release.** Set `SUPABASE_SECRET_KEY` and turn on `FAMILY_ENABLED` on the VPS, run the smoke test, and later remove the flag.
 
 ### Needs George
 
