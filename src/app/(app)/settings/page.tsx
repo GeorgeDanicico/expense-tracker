@@ -9,7 +9,6 @@ import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { PageHeader } from "@/components/ui/page-header";
 import { useAccount } from "@/hooks/use-account";
 import { useApiForm } from "@/hooks/use-api-form";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -63,9 +62,7 @@ export default function SettingsPage() {
   const currency = selectedCurrency ?? data.currency;
 
   return (
-    <Stack maxW="780px" gap={{ base: "4", md: "5" }}>
-      <PageHeader title="Settings" />
-
+    <Stack gap={{ base: "4", md: "5" }}>
       {status === "saved" ? <InlineAlert status="success">Your account currency was updated.</InlineAlert> : null}
       {status === "error" ? <InlineAlert status="error">{message}</InlineAlert> : null}
 
