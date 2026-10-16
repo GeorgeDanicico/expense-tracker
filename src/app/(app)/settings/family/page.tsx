@@ -5,7 +5,7 @@ import useSWR from "swr";
 
 import { CreateFamilyForm } from "@/components/family/create-family-form";
 import { JoinFamilyForm } from "@/components/family/join-family-form";
-import { Card } from "@/components/ui/card";
+import { FamilyMembers } from "@/components/family/family-members";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
@@ -26,9 +26,5 @@ export default function FamilySettingsPage() {
     );
   }
 
-  return (
-    <Card>
-      <Card.Header title={data.family.family.name} description="Your family and its members will show up here." />
-    </Card>
-  );
+  return <FamilyMembers data={data.family} />;
 }
