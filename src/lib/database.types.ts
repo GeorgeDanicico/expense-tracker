@@ -243,6 +243,8 @@ export type Database = {
           email: string | null;
           full_name: string | null;
           id: string;
+          managed_by_family: string | null;
+          must_change_password: boolean;
           updated_at: string;
           username: string | null;
         };
@@ -254,6 +256,8 @@ export type Database = {
           email?: string | null;
           full_name?: string | null;
           id: string;
+          managed_by_family?: string | null;
+          must_change_password?: boolean;
           updated_at?: string;
           username?: string | null;
         };
@@ -263,6 +267,17 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      add_managed_kid: {
+        Args: {
+          p_permissions: Json;
+          p_user_id: string;
+        };
+        Returns: string;
+      };
+      complete_password_change: {
+        Args: never;
+        Returns: undefined;
+      };
       create_family: {
         Args: {
           p_name: string;
@@ -326,6 +341,10 @@ export type Database = {
       remove_family_member: {
         Args: { p_member_id: string };
         Returns: undefined;
+      };
+      require_password_change: {
+        Args: { p_member_id: string };
+        Returns: string;
       };
       set_member_permissions: {
         Args: {
