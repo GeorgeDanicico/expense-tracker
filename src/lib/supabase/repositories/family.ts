@@ -22,6 +22,7 @@ import {
 } from "@/lib/permissions";
 import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeCurrency } from "@/lib/utils/currency";
 
 const MEMBERSHIP_ERROR = "Unable to load your family membership.";
 const FAMILY_ERROR = "Unable to load the family.";
@@ -49,6 +50,7 @@ type FamilyMemberJson = {
   isCreator: boolean;
   displayName: string | null;
   username: string | null;
+  currency?: string | null;
   joinedAt: string;
   lastActiveAt?: string | null;
   permissions?: Json;
@@ -87,6 +89,8 @@ function toMember(member: FamilyMemberJson): FamilyMember {
     isCreator: member.isCreator,
     displayName: member.displayName,
     username: member.username,
+    // The SQL always sends it; normalising keeps an unsupported or missing value from reaching amounts.
+    currency: normalizeCurrency(member.currency),
     joinedAt: member.joinedAt,
     // Keep hidden fields absent rather than undefined-valued, so a missing key always means "hidden".
     ...("lastActiveAt" in member ? { lastActiveAt: member.lastActiveAt ?? null } : {}),

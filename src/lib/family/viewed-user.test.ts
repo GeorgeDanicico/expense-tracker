@@ -23,8 +23,8 @@ const finance = (family_finance: Permissions["family_finance"]): Permissions =>
 /** The Smiths as a parent sees them: two parents and two kids. */
 function smiths(): FamilyData {
   const base = aFamily();
-  const entry = (member: { memberId: string; userId: string }, role: "parent" | "kid", displayName: string) => ({
-    ...base.members[0], ...member, role, isCreator: false, displayName,
+  const entry = (member: { memberId: string; userId: string }, role: "parent" | "kid", displayName: string, currency = "EUR") => ({
+    ...base.members[0], ...member, role, isCreator: false, displayName, currency,
     permissions: role === "parent" ? PARENT_PERMISSIONS : finance("off"),
   });
   return {
@@ -32,8 +32,8 @@ function smiths(): FamilyData {
     members: [
       { ...base.members[0], displayName: "Mara" },
       entry(OTHER_PARENT, "parent", "Dan"),
-      entry(KID, "kid", "Ana"),
-      entry(SIBLING, "kid", "Ion"),
+      entry(KID, "kid", "Ana", "RON"),
+      entry(SIBLING, "kid", "Ion", "USD"),
     ],
   };
 }
@@ -62,7 +62,7 @@ describe("resolveViewedUser", () => {
   it("returns the caller, not read-only and without a query, when there is no param", async () => {
     expect(await resolveViewedUser(null, testUser, parent)).toEqual({
       userId: testUser.id,
-      viewing: { memberId: PARENT.memberId, displayName: null, readOnly: false },
+      viewing: { memberId: PARENT.memberId, displayName: null, currency: null, readOnly: false },
     });
     expect(repositories.family.calls).toEqual([]);
   });
@@ -70,28 +70,28 @@ describe("resolveViewedUser", () => {
   it("returns the caller with a null member id for a user without a family", async () => {
     expect(await resolveViewedUser(null, testUser, null)).toEqual({
       userId: testUser.id,
-      viewing: { memberId: null, displayName: null, readOnly: false },
+      viewing: { memberId: null, displayName: null, currency: null, readOnly: false },
     });
   });
 
   it("returns the caller when the param is their own member id, in any case", async () => {
     const result = await resolveViewedUser(PARENT.memberId.toUpperCase(), testUser, parent);
 
-    expect(result).toEqual({ userId: testUser.id, viewing: { memberId: PARENT.memberId, displayName: null, readOnly: false } });
+    expect(result).toEqual({ userId: testUser.id, viewing: { memberId: PARENT.memberId, displayName: null, currency: null, readOnly: false } });
     expect(repositories.family.calls).toEqual([]);
   });
 
   it("lets a parent view a kid, read-only", async () => {
     expect(await resolveViewedUser(KID.memberId, testUser, parent)).toEqual({
       userId: KID.userId,
-      viewing: { memberId: KID.memberId, displayName: "Ana", readOnly: true },
+      viewing: { memberId: KID.memberId, displayName: "Ana", currency: "RON", readOnly: true },
     });
   });
 
   it("lets a parent view the other parent", async () => {
     expect(await resolveViewedUser(OTHER_PARENT.memberId, testUser, parent)).toEqual({
       userId: OTHER_PARENT.userId,
-      viewing: { memberId: OTHER_PARENT.memberId, displayName: "Dan", readOnly: true },
+      viewing: { memberId: OTHER_PARENT.memberId, displayName: "Dan", currency: "EUR", readOnly: true },
     });
   });
 
@@ -100,7 +100,7 @@ describe("resolveViewedUser", () => {
 
     expect(await resolveViewedUser(SIBLING.memberId, kidUser, kid)).toEqual({
       userId: SIBLING.userId,
-      viewing: { memberId: SIBLING.memberId, displayName: "Ion", readOnly: true },
+      viewing: { memberId: SIBLING.memberId, displayName: "Ion", currency: "USD", readOnly: true },
     });
   });
 

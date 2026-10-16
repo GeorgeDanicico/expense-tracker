@@ -27,7 +27,7 @@ function notViewable(): never {
 }
 
 function self(caller: AuthenticatedUser, memberId: string | null): ViewedUser {
-  return { userId: caller.id, viewing: { memberId, displayName: null, readOnly: false } };
+  return { userId: caller.id, viewing: { memberId, displayName: null, currency: null, readOnly: false } };
 }
 
 /**
@@ -69,7 +69,10 @@ export async function resolveViewedUser(
   const viewed = family.members.find((entry) => entry.memberId.toLowerCase() === memberId) ?? notViewable();
 
   if (viewed.userId === caller.id) return self(caller, viewed.memberId);
-  return { userId: viewed.userId, viewing: { memberId: viewed.memberId, displayName: viewed.displayName, readOnly: true } };
+  return {
+    userId: viewed.userId,
+    viewing: { memberId: viewed.memberId, displayName: viewed.displayName, currency: viewed.currency, readOnly: true },
+  };
 }
 
 /** `resolveViewedUser` for the request's `?member=` parameter. */

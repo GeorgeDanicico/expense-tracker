@@ -61,6 +61,7 @@ An agent needs only two things: the shared sections below (how the work is run, 
 - **F30: an unknown username, and a failed admin lookup, both answer exactly like a wrong password** (the same 401). Usernames can't be probed, and email sign-in keeps working without the secret key.
 - **F34: there's no membership lookup before recording activity.** `withUser` calls `touchLastActive()` in the background, at most once per user every 5 minutes. The SQL already does nothing for users without a family.
 - **F44: `withPermission` passes the membership it checked to the handler** as a fourth argument, so finance reads don't look it up twice. `?member=` also works on the CSV export. `?member=all` answers 404 until F46 handles it.
+- **F49: `viewing` carries `currency`.** It is the viewed member's currency, and `null` when viewing yourself (use your own account currency). `get_family()` sends `currency` for every member (the app default without a profile row), the CSV export labels a viewed member's month with it, and the migration is `20261016001000_add_member_currency_to_get_family.sql`.
 - **R10: the boundary lint rule matches on the resolved file,** using `import/no-restricted-paths`, so relative imports are caught too. `src/test/fake-supabase.ts` stays usable outside `src/lib/supabase/`, because one F14 test needs it.
 
 ### Known issues to pick up
