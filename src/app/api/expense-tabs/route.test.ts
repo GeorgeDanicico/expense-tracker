@@ -31,7 +31,7 @@ describe("expense tab routes", () => {
 
     const response = await callRoute(GET);
 
-    expect(response.body).toEqual({ tabs: [tab] });
+    expect(response.body).toEqual({ tabs: [tab], viewing: { memberId: null, displayName: null, readOnly: false } });
   });
 
   it("creates a tab from normalized selections, owned by the signed-in user", async () => {

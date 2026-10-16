@@ -921,6 +921,7 @@ These are for the creator only. Other parents don't see the buttons, and the API
   - With no param, it returns the caller.
   - Otherwise it looks the member up with `FamilyRepository.getFamily()` and checks that the caller is a parent, or a kid with `family_finance` at `view`.
   - It returns that member's user id, or throws 404.
+  - As built: `resolveViewedUser(memberParam, caller, member)` in `src/lib/family/viewed-user.ts`, where `member` is the membership `withPermission` checked (its handler's fourth argument), and `resolveViewedUserFor(request, caller, member)` reads `?member=`. The `Viewing` type is in `src/lib/family/viewing.ts` for the frontend.
 - **Routes:** the finance GET routes (dashboard, expenses month, expense tabs and tab expenses, investments, investment transactions, net worth) accept `?member=<memberId>` and add `viewing: { memberId, displayName, readOnly: boolean }` to their responses.
 - **Writes:** write routes never read the parameter and always act on the caller.
 
