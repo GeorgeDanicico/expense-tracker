@@ -3,15 +3,96 @@
 This document splits phase 1 of the [family hub roadmap](family-hub-roadmap.md) into small tasks, each sized for **one fresh agent and one pull request**:
 
 - **Step 0 (R01–R10)** first puts Supabase behind repository and auth interfaces, so the database or auth provider can be replaced later by writing new implementations instead of touching routes, MCP tools or the UI.
-- **Steps 1.1–1.7 (F01–F48)** then build the family features on top of those interfaces.
+- **Steps 1.1–1.7 (F01–F49)** then build the family features on top of those interfaces. F49 was added while building; see "Progress".
 
 An agent needs only two things: the shared sections below (how the work is run, the shared names, the conventions) and its own task.
+
+## Progress (16 October 2026)
+
+**39 of 59 tasks are done:** all of step 0, the whole database layer, and most of the server code. Nothing is visible to users yet: everything is behind `FAMILY_ENABLED`, and no family migration is on the live database.
+
+| State | Count | Tasks |
+| --- | --- | --- |
+| Done | 39 | R01–R10, F01–F18, F20, F21, F28, F29, F30, F34, F35, F41 (folded into R06–R09), F42, F43, F44 |
+| In review | 1 | F31 ([#58](https://github.com/GeorgeDanicico/expense-tracker/pull/58)) |
+| In progress | 1 | F22 |
+| Not started | 18 | F19, F23–F27, F32, F33, F36–F40, F45–F49 |
+
+### Done, with their pull requests
+
+| Step | Task → PR |
+| --- | --- |
+| 0 Storage and auth boundaries | R01 [#21](https://github.com/GeorgeDanicico/expense-tracker/pull/21), R02 [#27](https://github.com/GeorgeDanicico/expense-tracker/pull/27), R03 [#23](https://github.com/GeorgeDanicico/expense-tracker/pull/23), R04 [#26](https://github.com/GeorgeDanicico/expense-tracker/pull/26), R05 [#29](https://github.com/GeorgeDanicico/expense-tracker/pull/29), R06 [#31](https://github.com/GeorgeDanicico/expense-tracker/pull/31), R07 [#36](https://github.com/GeorgeDanicico/expense-tracker/pull/36), R08 [#33](https://github.com/GeorgeDanicico/expense-tracker/pull/33), R09 [#32](https://github.com/GeorgeDanicico/expense-tracker/pull/32), R10 [#42](https://github.com/GeorgeDanicico/expense-tracker/pull/42) |
+| 1.1 Database | F01 [#28](https://github.com/GeorgeDanicico/expense-tracker/pull/28), F02 [#22](https://github.com/GeorgeDanicico/expense-tracker/pull/22), F03 [#25](https://github.com/GeorgeDanicico/expense-tracker/pull/25), F04 [#24](https://github.com/GeorgeDanicico/expense-tracker/pull/24), F05 [#30](https://github.com/GeorgeDanicico/expense-tracker/pull/30), F06 [#34](https://github.com/GeorgeDanicico/expense-tracker/pull/34), F07 [#39](https://github.com/GeorgeDanicico/expense-tracker/pull/39), F08 [#49](https://github.com/GeorgeDanicico/expense-tracker/pull/49), F09 [#55](https://github.com/GeorgeDanicico/expense-tracker/pull/55), F10 [#40](https://github.com/GeorgeDanicico/expense-tracker/pull/40), F11 [#35](https://github.com/GeorgeDanicico/expense-tracker/pull/35), F12 [#46](https://github.com/GeorgeDanicico/expense-tracker/pull/46), F13 [#48](https://github.com/GeorgeDanicico/expense-tracker/pull/48) |
+| 1.2 Bearer tokens | F14 [#37](https://github.com/GeorgeDanicico/expense-tracker/pull/37) |
+| 1.3 Permissions in the app | F15 [#38](https://github.com/GeorgeDanicico/expense-tracker/pull/38), F16 [#45](https://github.com/GeorgeDanicico/expense-tracker/pull/45), F17 [#47](https://github.com/GeorgeDanicico/expense-tracker/pull/47), F18 [#43](https://github.com/GeorgeDanicico/expense-tracker/pull/43) |
+| 1.4 Create and join | F20 [#44](https://github.com/GeorgeDanicico/expense-tracker/pull/44), F21 [#54](https://github.com/GeorgeDanicico/expense-tracker/pull/54) |
+| 1.5 Kid accounts | F28 [#53](https://github.com/GeorgeDanicico/expense-tracker/pull/53), F29 [#57](https://github.com/GeorgeDanicico/expense-tracker/pull/57), F30 [#59](https://github.com/GeorgeDanicico/expense-tracker/pull/59) |
+| 1.6 Family settings | F34 [#50](https://github.com/GeorgeDanicico/expense-tracker/pull/50), F35 [#51](https://github.com/GeorgeDanicico/expense-tracker/pull/51) |
+| 1.7 Family finance | F41 (folded into R06–R09), F42 [#41](https://github.com/GeorgeDanicico/expense-tracker/pull/41), F43 [#52](https://github.com/GeorgeDanicico/expense-tracker/pull/52), F44 [#56](https://github.com/GeorgeDanicico/expense-tracker/pull/56) |
+
+### What's left, in order
+
+1. **Finish the server work.**
+   - **F31** ([#58](https://github.com/GeorgeDanicico/expense-tracker/pull/58)) is approved, but it must be rebased first. It and F29 each added the same 8–128 character password rule (`src/lib/validation/password.ts` and `passwordSchema` in `src/lib/validation/primitives.ts`); keep one.
+   - **F22** is in progress.
+   - **F32 and F33** can start now.
+2. **Checkpoint 1: George applies the family migrations to the live database** (list under "Applying migrations"). This is the gate for every screen task.
+3. **F49** (new): members' currency in `get_family()`. It must land before F45–F47.
+4. **The screens**, after checkpoint 1:
+   - F19 (navigation and page guards)
+   - F23–F27 (settings pages, create or join, the join link, members, my permissions)
+   - F36–F40 (the notices popup, manage family)
+   - F45–F47 (the member picker and the family finance views)
+5. **F48: release.** Set the secret key and turn on `FAMILY_ENABLED` on the VPS, run the smoke test, and later remove the flag.
+
+### Needs George
+
+- **Approve checkpoint 1:** apply the migrations listed under "Applying migrations" to the live database.
+- **Set `SUPABASE_SECRET_KEY`** in `.env.local` and on the VPS. Kid accounts (F29) and username sign-in (F30) need it. Without it, the app still starts, but those two features fail safely.
+- **Check the kid email domain once the key is set:** do one live check that Supabase Auth accepts `@kids.ifam.invalid`. If it doesn't, change `KID_EMAIL_DOMAIN` in `src/lib/family/kid-account.ts`.
+- **Check Supabase's "Secure email change" setting** before F33. Explanation in F33.
+- **Fix git over SSH on the Mac** (`ssh-add`). Until then, git runs over HTTPS through `gh` (see "Lessons from running the tasks").
+- **Decide whether to delete the screenshot branches.** `family/f30-screenshots` and `screenshots/f31-password-change` exist only to show images in PRs.
+
+### Decisions made while building (they change the task text below)
+
+- **Migration order.** Migrations are applied in file-name order, and the Supabase command-line tool refuses files dated before ones already applied. So the coordinator gives each SQL task a fixed timestamp up front (`20261016000100`, `…000200` and so on).
+- **F43 can go with checkpoint 1,** not only at release. R06–R09 are deployed, so every finance query filters by owner. And no families exist yet, so the widened read policies change nothing until a family is created.
+- **F09: an invite stops working once its creator is no longer a parent of that family,** for example after removal. Preview, redeem and `list_family_invites()` all apply this rule.
+- **F13: removing a managed kid clears their `profiles.managed_by_family` marker.** Without this, a parent could add the kid back without their consent. Signed-in users also can't delete a profile row that carries kid-account state.
+- **F13: `require_password_change` returns the kid's user id (`uuid`)** instead of `void`. F32 needs the id. The RPC table has been updated.
+- **F15: parents get full permissions,** `PARENT_PERMISSIONS`, which is the top level each module allows. The SQL returns `null` for them. With full permissions, `can()` works the same for parents and kids.
+- **F29: kid accounts get the email `<username>@kids.ifam.invalid`.** The domain lives in one constant, `KID_EMAIL_DOMAIN`.
+- **F30: an unknown username, and a failed admin lookup, both answer exactly like a wrong password** (the same 401). Usernames can't be probed, and email sign-in keeps working without the secret key.
+- **F34: there's no membership lookup before recording activity.** `withUser` calls `touchLastActive()` in the background, at most once per user every 5 minutes. The SQL already does nothing for users without a family.
+- **F44: `withPermission` passes the membership it checked to the handler** as a fourth argument, so finance reads don't look it up twice. `?member=` also works on the CSV export. `?member=all` answers 404 until F46 handles it.
+- **R10: the boundary lint rule matches on the resolved file,** using `import/no-restricted-paths`, so relative imports are caught too. `src/test/fake-supabase.ts` stays usable outside `src/lib/supabase/`, because one F14 test needs it.
+
+### Known issues to pick up
+
+- **Members' currency:** a member can't read another member's `profiles.currency`, because RLS on `profiles` allows owners only. A parent viewing a kid would therefore see the wrong currency, and F46 can't group totals by currency. F49 fixes this.
+- **The duplicate password rule:** see F31 above.
+- **`next dev` fails on every page:** it can't read `src/app/favicon.ico`. This is already on `main` and isn't caused by the family work. `next build` and `next start` work.
+- **The app forces the light theme** (`forcedTheme="light"` in `src/components/ui/provider.tsx`), so dark-mode screenshots look exactly like light ones. UI tasks need only one screenshot per width.
+
+### Lessons from running the tasks
+
+- **Fetch into `FETCH_HEAD`, never `origin/main`.** `refs/remotes/origin/main` is shared by every worktree, and another agent's fetch can move it mid-rebase. This happened once, and it briefly undid a merged PR inside another branch.
+  - Use `git fetch <url> main`, then `git rebase FETCH_HEAD`.
+  - Before pushing, check that `git diff FETCH_HEAD --stat` lists only your own files.
+- **SSH is broken on the Mac.** For each command, fetch and push over HTTPS with `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' …`, without changing the git config.
+- **The last-active throttle affects route tests.** With the flag on, every request past sign-in records `touchLastActive` on the family fake. Tests that assert the fake's exact `calls` must call `forgetLastActive()` in `beforeEach`, and expect `"touchLastActive"` first.
+- **Run `npx next typegen` or `npm run build` before `npm run typecheck`** in a fresh worktree. Run `npm ci` first if `node_modules` is empty.
+- **The repo doesn't allow GitHub auto-merge.** The coordinator waits for CI and then merges.
 
 ## How to run a task
 
 Start each agent with this prompt, replacing `<ID>` with the task id, such as `R02` or `F15`:
 
 > Read `AGENTS.md`, then read `docs/family-phase-1-tasks.md`: the sections "How to run a task", "Shared names" and "Conventions", and then task <ID>. Do only task <ID>. Create the branch `family/<id>-<short-slug>` from `main`, using the lowercase id (for example `family/r02-account-repository`). Implement the task, make every check in "Conventions → Checks" pass, and open a pull request titled `<ID>: <task title>`. If the task says something that contradicts the code, stop and report it instead of guessing.
+>
+> Fetch `main` into `FETCH_HEAD` (never `origin/main`, which other worktrees move), branch and rebase from it, and before pushing check that `git diff FETCH_HEAD --stat` lists only your files. See "Lessons from running the tasks".
 
 Rules for every task:
 
@@ -32,7 +113,7 @@ Rules for every task:
 | 1.4 Create and join | F20–F27 | The API tasks (F20–F22) first, then the UI tasks (F23–F27) |
 | 1.5 Kid accounts | F28–F33 | F28 first, then F29–F33 |
 | 1.6 Family settings | F34–F40 | F34 and F35 first, then the UI tasks |
-| 1.7 Family finance | F41–F47 | F41 is folded into R06–R09. F42 after R07. F43 after R06–R09 |
+| 1.7 Family finance | F41–F47, F49 | F41 is folded into R06–R09. F42 after R07. F43 after R06–R09. F49 before F45–F47 |
 | Release | F48 | Last |
 
 **What can start on day one:** R01, R03, F02 and F04.
@@ -41,11 +122,30 @@ Rules for every task:
 
 ### Applying migrations to the live database
 
-Local development (`.env.local`) talks to the **live** Supabase project, and agents never apply migrations there. You (George) apply them, at three checkpoints:
+Local development (`.env.local`) talks to the **live** Supabase project, and agents never apply migrations there. You (George) apply them.
 
-1. **After R03 and F04–F13 are merged:** apply those migrations. They only add new tables and functions that nothing uses while the flag is off, so this is safe, and the UI tasks can then be tried against real data with the flag on locally.
-2. **After F42:** apply the dashboard function change. Its default behaves exactly like today.
-3. **At release (F48):** apply F43, which widens who can read finance rows. Apply it only after R06–R09 are deployed.
+**Checkpoint 1 (ready now, not applied yet):** apply these 14 migrations, in this order. This merges the three checkpoints the plan originally had, for the reasons under "Decisions made while building".
+
+| # | File | Task | What it does to the live database |
+| --- | --- | --- | --- |
+| 1 | `20261015182117_create_app_private_current_user_id.sql` | R03 | Adds a helper function only |
+| 2 | `20261015182916_add_profile_identity.sql` | F04 | Adds two nullable `profiles` columns and a guard trigger |
+| 3 | `20261015213644_create_family_tables.sql` | F03 | New tables, unused while the flag is off |
+| 4 | `20261015221500_add_family_membership_invariants.sql` | F05 | Triggers on the new tables |
+| 5 | `20261015230000_add_family_read_access.sql` | F06 | Helpers, read policies, two read functions |
+| 6 | `20261016000100_create_account_notices.sql` | F11 | New table and two functions |
+| 7 | `20261016000200_create_family_function.sql` | F07 | One function |
+| 8 | `20261016000300_add_member_update_functions.sql` | F10 | Two functions |
+| 9 | `20261016000400_dashboard_takes_user.sql` | F42 | Replaces `get_expense_dashboard`. **Its default behaves exactly like today** |
+| 10 | `20261016000500_add_family_removal_functions.sql` | F12 | Two functions |
+| 11 | `20261016000600_add_managed_kid_accounts.sql` | F13 | Two nullable `profiles` columns, triggers, three functions |
+| 12 | `20261016000700_create_family_invites.sql` | F08 | New table and three functions |
+| 13 | `20261016000800_widen_family_finance_reads.sql` | F43 | Widens six **select** policies. No effect until a family exists |
+| 14 | `20261016000900_add_invite_redemption.sql` | F09 | Two functions, and recreates `list_family_invites` |
+
+**After checkpoint 1:** every later SQL task gets its own timestamp from the coordinator and is applied one at a time, after it merges.
+
+**Release (F48):** no migrations are left for release. It only sets `SUPABASE_SECRET_KEY` and `FAMILY_ENABLED=true`.
 
 ## Shared names
 
@@ -927,9 +1027,22 @@ These are for the creator only. Other parents don't see the buttons, and the API
 
 **Done when** the tests cover a parent viewing a kid, a kid without permission (404), an unknown member (404), and that the responses without the parameter are unchanged apart from the added `viewing` field.
 
+### F49: Members' currency in `get_family()` (added while building)
+
+**Depends on:** F44. **Files:** one migration (the coordinator assigns its timestamp), a pgTAP test, `src/lib/database.types.ts`, `src/lib/family/repository.ts` (the `FamilyMember` type), `src/lib/supabase/repositories/family.ts` and its test, `src/test/fakes/family.ts`, `src/test/builders.ts`.
+
+**Why this task exists:** a member can't read another member's currency, because RLS on `profiles` lets each user read only their own row. F44 found this. Without the currency, a parent viewing a kid sees the kid's amounts with the wrong currency symbol, and F46 has no way to group totals by currency.
+
+- **SQL:** recreate `get_family()` with the same signature, adding `currency` to every member entry. Read it from `profiles.currency`, and fall back to the app default when there's no row or no value, the same way `AccountRepository.getCurrency` does. Currency isn't sensitive, so every member sees it for everyone. Don't widen the `profiles` policies.
+- **Code:** add `currency: string` to `FamilyMember`, and map it in the Supabase implementation and the fake.
+- **Viewing data:** decide whether `viewing` (F44) should carry the viewed member's currency, so finance pages can format amounts correctly. If it should, add it to `viewing`, along with a route test.
+- **Export:** check whether the CSV export header should use the viewed member's currency now that it's available. Note what you decided in the PR.
+
+**Done when:** the pgTAP test shows that each member's currency is returned, that the fallback is used when a member has no profile row, and that nothing else in `get_family()` changed. The mapping and fake tests pass.
+
 ### F45: Member picker and read-only mode
 
-**Depends on:** F44. **Files:** `src/components/family/viewing-picker.tsx` (new), the finance pages and their add, edit and delete controls, `src/lib/api/keys.ts`.
+**Depends on:** F44, F49, checkpoint 1. **Files:** `src/components/family/viewing-picker.tsx` (new), the finance pages and their add, edit and delete controls, `src/lib/api/keys.ts`.
 
 - A "Viewing: Me / <member>" picker shows on the finance pages for anyone allowed to view others. It's stored in the URL as `?member=`.
 - When `readOnly` is true, hide every add, edit, delete and import control, and show a small "You're viewing Ana's expenses" bar.
@@ -939,7 +1052,7 @@ These are for the creator only. Other parents don't see the buttons, and the API
 
 ### F46: Family view for expenses
 
-**Depends on:** F45. **Files:** `src/lib/expenses/service.ts` and the analytics modules, the dashboard and expenses pages and routes, their tests.
+**Depends on:** F45, F49. **Files:** `src/lib/expenses/service.ts` and the analytics modules, the dashboard and expenses pages and routes, their tests.
 
 - Add `?member=all` ("Family") for expenses: the dashboard and the month list combine every member the caller can see.
 - **Totals:** members can use different currencies, so totals are grouped by currency, such as "1,240 RON · 85 EUR", with no conversion. List rows show the member's name.
@@ -949,7 +1062,7 @@ These are for the creator only. Other parents don't see the buttons, and the API
 
 ### F47: Family view for investments and net worth
 
-**Depends on:** F45. **Files:** the investments and net-worth pages, `src/lib/investments/service.ts`, the net-worth service or routes, and tests.
+**Depends on:** F45, F49. **Files:** the investments and net-worth pages, `src/lib/investments/service.ts`, the net-worth service or routes, and tests.
 
 - `?member=all` shows one section per member, using their existing overview, in read-only mode.
 - Add combined totals per currency only where the overview already reports a single currency. Note in the PR where you didn't.
@@ -963,7 +1076,7 @@ These are for the creator only. Other parents don't see the buttons, and the API
 **Depends on:** everything above. **Files:** `docs/family-hub-roadmap.md` (mark phase 1 done), `README.md`.
 
 A checklist for George, with the agent preparing the PR:
-1. Apply the remaining migrations to the live project, **F43 last**.
+1. Check that every migration on `main` is applied to the live project. Checkpoint 1 covers everything through F09; F49 and any later SQL are applied as they merge.
 2. Set `SUPABASE_SECRET_KEY` and `FAMILY_ENABLED=true` in `/etc/expense-tracker/.env.production` on the VPS.
 3. Deploy, then run a smoke test:
    - create a family;
