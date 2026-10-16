@@ -6,13 +6,14 @@ import useSWR from "swr";
 import { AmountComparison } from "@/components/dashboard/amount-comparison";
 import { CardLink } from "@/components/ui/card-link";
 import { MonthlyBarChart } from "@/components/dashboard/monthly-bar-chart";
+import { WriteOnly } from "@/components/family/write-only";
 import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
 import { ExpenseList } from "@/components/expenses/expense-list";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { Stat, StatGroup } from "@/components/ui/stat";
-import { useAccount } from "@/hooks/use-account";
+import { useViewing } from "@/hooks/use-viewing";
 import { dashboardApiKey } from "@/lib/api/keys";
 import { dashboardHref } from "@/lib/expenses/url-state";
 import { categoryShares } from "@/lib/expenses/analytics";
@@ -20,15 +21,18 @@ import type { DashboardData } from "@/lib/expenses/types";
 import { formatMonth, getBucharestMonth } from "@/lib/calendar";
 
 export function SummaryDashboard({ params }: { params: URLSearchParams }) {
+  const { member, currency, hrefFor } = useViewing();
   const { data, error, isValidating, mutate } = useSWR<DashboardData>(
-    dashboardApiKey({
-      period: "3m",
-      granularity: "month",
-      customDate: getBucharestMonth(),
-    }),
+    dashboardApiKey(
+      {
+        period: "3m",
+        granularity: "month",
+        customDate: getBucharestMonth(),
+      },
+      member,
+    ),
     { keepPreviousData: false },
   );
-  const { currency } = useAccount();
   if (!data)
     return error ? (
       <DataError retry={() => void mutate()} />
@@ -59,9 +63,11 @@ export function SummaryDashboard({ params }: { params: URLSearchParams }) {
               <Stat size="sm" label="Average expense" value={<Amount value={data.currentAverage} currency={currency} />} />
               <Stat size="sm" label="Largest expense" value={<Amount value={data.currentLargest} currency={currency} />} />
             </StatGroup>
-            <Box>
-              <AddExpenseDialog selectedMonth={data.currentMonth} currency={currency} />
-            </Box>
+            <WriteOnly>
+              <Box>
+                <AddExpenseDialog selectedMonth={data.currentMonth} currency={currency} />
+              </Box>
+            </WriteOnly>
           </Stack>
         </Card.Body>
       </Card>
@@ -73,7 +79,7 @@ export function SummaryDashboard({ params }: { params: URLSearchParams }) {
           />
           <Card.Body>
             <Stack gap="3">
-              <MonthlyBarChart series={series} currency={currency} />
+              <MonthlyBarChart series={series} currency={currency} member={member} />
               {latest && previous ? (
                 <Stack gap="0.5">
                   <Text textStyle="caption">
@@ -105,7 +111,7 @@ export function SummaryDashboard({ params }: { params: URLSearchParams }) {
       <Card overflow="hidden">
         <Card.Header
           title="Recent expenses"
-          actions={<CardLink href={`/expenses?month=${data.currentMonth}`}>View all</CardLink>}
+          actions={<CardLink href={hrefFor(`/expenses?month=${data.currentMonth}`)}>View all</CardLink>}
         />
         <Box mt="3" borderTopWidth="1px" borderColor="border">
           <ExpenseList expenses={data.currentExpenses} currency={currency} compact />

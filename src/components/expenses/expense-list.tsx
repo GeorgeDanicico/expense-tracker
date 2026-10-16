@@ -7,10 +7,12 @@ import { ExpenseFilters } from "@/components/expenses/expense-filters";
 import { ExpenseMobileList } from "@/components/expenses/expense-mobile-list";
 import { ExpenseTable } from "@/components/expenses/expense-table";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useViewing } from "@/hooks/use-viewing";
 import { SUBTYPE_LABELS, CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
 import type { Expense } from "@/lib/expenses/types";
 
 function NoExpenses({ filtered = false }: { filtered?: boolean }) {
+  const { readOnly } = useViewing();
   return (
     <EmptyState
       size="sm"
@@ -20,7 +22,9 @@ function NoExpenses({ filtered = false }: { filtered?: boolean }) {
       description={
         filtered
           ? "Try another search or choose a different category."
-          : "Add your first expense to start building this month’s picture."
+          : readOnly
+            ? "Nothing has been recorded here yet."
+            : "Add your first expense to start building this month’s picture."
       }
     />
   );

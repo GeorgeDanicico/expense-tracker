@@ -16,6 +16,8 @@ import useSWR from "swr";
 
 import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
 import { CustomExpenseTab } from "@/components/expenses/custom-expense-tab";
+import { ViewingControls } from "@/components/family/viewing-picker";
+import { WriteOnly } from "@/components/family/write-only";
 import { ExpenseTabDialog } from "@/components/expenses/expense-tab-dialog";
 import { ExpenseTabs, MAIN_EXPENSE_TAB } from "@/components/expenses/expense-tabs";
 import { MainExpensesPanel } from "@/components/expenses/main-expenses-panel";
@@ -23,11 +25,11 @@ import { PermissionGate } from "@/components/layout/permission-gate";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
-import { useAccount } from "@/hooks/use-account";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useExpenseTabRouting } from "@/hooks/use-expense-tab-routing";
+import { useViewing } from "@/hooks/use-viewing";
 import {
-  EXPENSE_TABS_API_KEY,
+  expenseTabsApiKey,
   mainExpensesExportUrl,
   type TabsResponse,
 } from "@/lib/api/keys";
@@ -41,14 +43,15 @@ function ExpensesContent() {
   const searchParams = useSearchParams();
   const requestedMonth = searchParams.get("month");
   const month = resolveMainExpenseMonth(requestedMonth);
+  const viewing = useViewing();
   const {
     data: tabsResult,
     error: tabsError,
     isValidating: tabsUpdating,
     mutate: mutateTabs,
-  } = useSWR<TabsResponse>(EXPENSE_TABS_API_KEY);
+  } = useSWR<TabsResponse>(expenseTabsApiKey(viewing.member));
   const tabs = tabsResult?.tabs ?? [];
-  const { currency } = useAccount();
+  const { currency } = viewing;
   const [dialogTarget, setDialogTarget] = useState<DialogTarget | null>(null);
 
   const { activeTabId, activeTab, changeTab, saveTab, returnToMain } = useExpenseTabRouting(tabsResult);
@@ -65,15 +68,19 @@ function ExpensesContent() {
         title="Expenses"
         actions={activeTabId === null ? (
           <>
-            <AddExpenseDialog selectedMonth={month} currency={currency} />
+            <WriteOnly>
+              <AddExpenseDialog selectedMonth={month} currency={currency} />
+            </WriteOnly>
             <Button asChild variant="ghost" size={{ base: "md", sm: "sm" }}>
-              <Link href={mainExpensesExportUrl(month)}>
+              <Link href={mainExpensesExportUrl(month, viewing.member)}>
                 <Download size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Export
               </Link>
             </Button>
           </>
         ) : undefined}
       />
+
+      <ViewingControls noun="expenses" />
 
       {tabsError ? (
         <DataRefresh error={tabsError} updating={tabsUpdating} retry={() => void mutateTabs()} />
@@ -85,16 +92,18 @@ function ExpensesContent() {
         tabs={tabs}
         value={activeTab}
         onValueChange={changeTab}
-        onCreate={() => setDialogTarget({ mode: "create" })}
+        onCreate={viewing.readOnly ? undefined : () => setDialogTarget({ mode: "create" })}
       >
         <Tabs.Content value={MAIN_EXPENSE_TAB} p="0">
-          <MainExpensesPanel month={month} currency={currency} />
+          {viewing.ready ? (
+            <MainExpensesPanel month={month} currency={currency} />
+          ) : <DataLoading label="Loading expenses…" />}
         </Tabs.Content>
         {tabs.map((tab) => (
           <Tabs.Content key={tab.id} value={tab.id} p="0">
             <CustomExpenseTab
               tab={tab}
-              active={tab.id === activeTabId}
+              active={tab.id === activeTabId && viewing.ready}
               currency={currency}
               onEdit={(selected) => setDialogTarget({ mode: "edit", tab: selected })}
               onDeleted={returnToMain}

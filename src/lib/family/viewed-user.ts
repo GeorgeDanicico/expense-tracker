@@ -3,14 +3,13 @@ import "server-only";
 import type { AuthenticatedUser } from "@/lib/auth";
 import { isFamilyEnabled } from "@/lib/features";
 import type { CurrentMember } from "@/lib/family/repository";
-import type { Viewing } from "@/lib/family/viewing";
+import { MEMBER_PARAM, type Viewing } from "@/lib/family/viewing";
 import { HttpError } from "@/lib/http/route";
 import { can } from "@/lib/permissions";
 import { getRepositories } from "@/lib/repositories";
 import { idSchema } from "@/lib/validation/primitives";
 
-/** The query parameter a finance read takes to show another family member's data. */
-export const MEMBER_PARAM = "member";
+export { MEMBER_PARAM };
 
 /**
  * The one answer for every refused `member`: flag off, no family, not allowed, unknown or another

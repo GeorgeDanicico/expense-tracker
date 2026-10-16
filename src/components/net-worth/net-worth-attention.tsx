@@ -3,10 +3,12 @@ import Link from "next/link";
 
 import { entryAnchor } from "@/components/net-worth/net-worth-entry-row";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { useViewing } from "@/hooks/use-viewing";
 import type { NetWorthOverview } from "@/lib/net-worth/types";
 
 /** Warning listing entries that keep a total incomplete. */
 export function NetWorthAttention({ overview }: { overview: NetWorthOverview }) {
+  const { hrefFor } = useViewing();
   if (!overview.attention.length) return null;
 
   return (
@@ -17,7 +19,7 @@ export function NetWorthAttention({ overview }: { overview: NetWorthOverview }) 
             <Text as="span">{item.message}{item.currency ? ` · ${item.currency}` : ""}</Text>
             {item.source === "investment" ? (
               <ChakraLink asChild color="fg.warning" fontWeight="medium" textDecoration="underline" whiteSpace="nowrap">
-                <Link href="/investments">Review</Link>
+                <Link href={hrefFor("/investments")}>Review</Link>
               </ChakraLink>
             ) : item.entryId ? (
               <ChakraLink asChild color="fg.warning" fontWeight="medium" textDecoration="underline" whiteSpace="nowrap">

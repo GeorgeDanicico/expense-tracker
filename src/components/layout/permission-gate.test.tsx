@@ -42,14 +42,14 @@ describe("PermissionGate", () => {
   });
 
   it("shows the message instead of the page to a kid with the module off", () => {
-    state.account = anAccount({ ...kid, isCreator: false, familyName: "Popescu", permissions: DEFAULT_KID_PERMISSIONS });
+    state.account = anAccount({ ...kid, memberId: "60000000-0000-4000-8000-000000000002", isCreator: false, familyName: "Popescu", permissions: DEFAULT_KID_PERMISSIONS });
     const html = render();
     expect(html).toContain("This part of the app is turned off for you. Ask a parent.");
     expect(html).not.toContain("secret page");
   });
 
   it("shows the page to a kid with the module on", () => {
-    state.account = anAccount({ role: "kid", isCreator: false, familyName: "Popescu", permissions: { ...DEFAULT_KID_PERMISSIONS, investments: "edit" } });
+    state.account = anAccount({ memberId: "60000000-0000-4000-8000-000000000002", role: "kid", isCreator: false, familyName: "Popescu", permissions: { ...DEFAULT_KID_PERMISSIONS, investments: "edit" } });
     expect(render()).toContain("secret page");
   });
 

@@ -29,6 +29,7 @@ describe("navigation sections", () => {
 });
 
 const kid = (permissions = DEFAULT_KID_PERMISSIONS): AccountMembership => ({
+  memberId: "60000000-0000-4000-8000-000000000002",
   role: "kid",
   isCreator: false,
   familyName: "Popescu",
@@ -44,7 +45,7 @@ describe("navigationFor", () => {
   });
 
   it("shows everything to a parent", () => {
-    const parent: AccountMembership = { role: "parent", isCreator: true, familyName: "Popescu", permissions: PARENT_PERMISSIONS };
+    const parent: AccountMembership = { memberId: "60000000-0000-4000-8000-000000000001", role: "parent", isCreator: true, familyName: "Popescu", permissions: PARENT_PERMISSIONS };
     expect(navigationFor(parent).sections).toEqual(NAV_SECTIONS);
   });
 

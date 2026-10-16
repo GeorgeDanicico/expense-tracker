@@ -9,11 +9,12 @@ import { DailySpendingChart } from "@/components/dashboard/daily-spending-chart"
 import { MonthComparison } from "@/components/dashboard/month-comparison";
 import { MonthlyStats } from "@/components/dashboard/monthly-stats";
 import { TopExpenses } from "@/components/dashboard/top-expenses";
+import { WriteOnly } from "@/components/family/write-only";
 import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
 import { MonthToolbar } from "@/components/expenses/month-toolbar";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
-import { useAccount } from "@/hooks/use-account";
+import { useViewing } from "@/hooks/use-viewing";
 import { expensesApiKey } from "@/lib/api/keys";
 import { dashboardHref } from "@/lib/expenses/url-state";
 import { monthAnalytics } from "@/lib/expenses/analytics";
@@ -27,14 +28,14 @@ export function MonthlyDashboard({
   month: string;
   params: URLSearchParams;
 }) {
-  const current = useSWR<ExpensesData>(expensesApiKey(month), {
+  const { member, currency, hrefFor } = useViewing();
+  const current = useSWR<ExpensesData>(expensesApiKey(month, member), {
     keepPreviousData: false,
   });
   const previousMonth = shiftMonth(month, -1);
-  const previous = useSWR<ExpensesData>(expensesApiKey(previousMonth), {
+  const previous = useSWR<ExpensesData>(expensesApiKey(previousMonth, member), {
     keepPreviousData: false,
   });
-  const { currency } = useAccount();
   const matching = current.data?.month === month ? current.data : undefined;
   const before =
     previous.data?.month === previousMonth
@@ -49,8 +50,10 @@ export function MonthlyDashboard({
         href={(value) => dashboardHref(params, { view: "monthly", month: value })}
       />
       <Flex gap="2" wrap="wrap" align="center">
-        <AddExpenseDialog selectedMonth={month} currency={currency} />
-        <CardLink href={`/expenses?month=${month}`}>View expenses</CardLink>
+        <WriteOnly>
+          <AddExpenseDialog selectedMonth={month} currency={currency} />
+        </WriteOnly>
+        <CardLink href={hrefFor(`/expenses?month=${month}`)}>View expenses</CardLink>
       </Flex>
       {!analytics ? (
         current.error ? (

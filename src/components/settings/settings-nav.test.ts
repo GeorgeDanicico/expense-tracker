@@ -6,6 +6,7 @@ import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
 import { activeSettingsTab, settingsTabs } from "./settings-nav";
 
 const membership = (role: "parent" | "kid"): AccountMembership => ({
+  memberId: "60000000-0000-4000-8000-000000000001",
   role,
   isCreator: false,
   familyName: "Popescu",

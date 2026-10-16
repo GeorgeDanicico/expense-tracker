@@ -2,6 +2,7 @@ import { Box, Flex, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
 import Link from "next/link";
 
 import { ChartBar } from "@/components/dashboard/chart-bar";
+import { withMember } from "@/lib/api/keys";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatDate, formatMonth } from "@/lib/calendar";
 
@@ -16,11 +17,14 @@ export function MonthlyBarChart({
   currency,
   ariaLabel = "Spending by month",
   getHref,
+  member,
 }: {
   series: { key: string; label: string; total: number }[];
   currency: string;
   ariaLabel?: string;
   getHref?: (item: { key: string; label: string; total: number }) => string | null;
+  /** Whose expenses the default month links open; leave out for your own. */
+  member?: string | null;
 }) {
   const max = Math.max(...series.map((item) => item.total), 1);
   if (!series.length) return <Text textStyle="bodySm" color="fg.muted">No recorded expenses</Text>;
@@ -30,7 +34,7 @@ export function MonthlyBarChart({
         const href = getHref
           ? getHref(item)
           : /^\d{4}-\d{2}(-\d{2})?$/.test(item.key)
-            ? `/expenses?month=${item.key.slice(0, 7)}`
+            ? withMember(`/expenses?month=${item.key.slice(0, 7)}`, member)
             : null;
         const content = (
           <Stack gap="1">

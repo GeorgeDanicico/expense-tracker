@@ -47,7 +47,7 @@ export function matchesExpenseSearch(expense: Expense, term: string) {
 }
 
 type SearchParams = { get(name: string): string | null };
-const FILTER_KEYS = ["scope", "year", "startDate", "endDate", "subtype", "category", "search"] as const;
+export const FILTER_KEYS = ["scope", "year", "startDate", "endDate", "subtype", "category", "search"] as const;
 
 /** Ignore the separately retained main month, but reject incompatible custom date modes. */
 export function parseExpenseTabFilters(params: SearchParams) {

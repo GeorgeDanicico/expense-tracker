@@ -1,6 +1,7 @@
 import { Box, Flex, Stack, Table, Text } from "@chakra-ui/react";
 
 import { RemoveOrderDialog } from "@/components/investments/remove-order-dialog";
+import { useViewing } from "@/hooks/use-viewing";
 import { Amount } from "@/components/ui/amount";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
@@ -24,7 +25,8 @@ export function TransactionList({
   currency: string;
   onDeleted: () => void;
 }) {
-  const remove = (transaction: InvestmentTransactionDto) => (
+  const { readOnly } = useViewing();
+  const remove = (transaction: InvestmentTransactionDto) => readOnly ? null : (
     <RemoveOrderDialog
       accountId={accountId}
       instrument={instrument}
@@ -46,7 +48,9 @@ export function TransactionList({
               <Table.ColumnHeader data-numeric>Quantity</Table.ColumnHeader>
               <Table.ColumnHeader data-numeric>Unit price</Table.ColumnHeader>
               <Table.ColumnHeader data-numeric>Order value</Table.ColumnHeader>
-              <Table.ColumnHeader width="6rem" pe="3"><span className="sr-only">Actions</span></Table.ColumnHeader>
+              {readOnly ? null : (
+                <Table.ColumnHeader width="6rem" pe="3"><span className="sr-only">Actions</span></Table.ColumnHeader>
+              )}
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -57,9 +61,11 @@ export function TransactionList({
                 <Table.Cell data-numeric fontWeight="medium">{transaction.quantity} units</Table.Cell>
                 <Table.Cell data-numeric color="fg.muted">{formatInvestmentAmount(transaction.unitPrice, currency)}</Table.Cell>
                 <Table.Cell data-numeric><Amount value={transaction.amount} currency={currency} size="sm" /></Table.Cell>
-                <Table.Cell pe="3" textAlign="end">
-                  <Box data-row-action display="inline-flex">{remove(transaction)}</Box>
-                </Table.Cell>
+                {readOnly ? null : (
+                  <Table.Cell pe="3" textAlign="end">
+                    <Box data-row-action display="inline-flex">{remove(transaction)}</Box>
+                  </Table.Cell>
+                )}
               </Table.Row>
             ))}
           </Table.Body>

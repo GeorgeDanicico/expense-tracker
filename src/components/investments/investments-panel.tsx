@@ -7,6 +7,8 @@ import useSWR from "swr";
 
 import { AddInvestmentDialog } from "@/components/investments/add-investment-dialog";
 import { BrokerSection } from "@/components/investments/broker-section";
+import { ViewingControls } from "@/components/family/viewing-picker";
+import { WriteOnly } from "@/components/family/write-only";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -14,8 +16,9 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useViewing } from "@/hooks/use-viewing";
 import { apiFetcher } from "@/lib/api/client";
-import { INVESTMENTS_API_KEY } from "@/lib/api/keys";
+import { investmentsApiKey } from "@/lib/api/keys";
 import { investmentAssetKey } from "@/lib/investments/identity";
 import type { InvestmentOverviewAsset, InvestmentsOverview } from "@/lib/investments/types";
 
@@ -35,7 +38,8 @@ function CalculationIssues({ overview }: { overview: InvestmentsOverview }) {
 
 export function InvestmentsPanel() {
   useDocumentTitle("Investments");
-  const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentsOverview>(INVESTMENTS_API_KEY, apiFetcher);
+  const { member, readOnly, name } = useViewing();
+  const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentsOverview>(investmentsApiKey(member), apiFetcher);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   if (isLoading && !data) return <DataLoading label="Loading your investments…" />;
@@ -61,7 +65,8 @@ export function InvestmentsPanel() {
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>
-      <PageHeader title="Investments" actions={<AddInvestmentDialog />} />
+      <PageHeader title="Investments" actions={<WriteOnly><AddInvestmentDialog /></WriteOnly>} />
+      <ViewingControls noun="investments" />
       <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
 
       <CalculationIssues overview={data} />
@@ -71,7 +76,11 @@ export function InvestmentsPanel() {
           <EmptyState
             icon={<Inbox />}
             title="No investments yet"
-            description="Your investment accounts will appear here once their first executed order is recorded."
+            description={
+              readOnly
+                ? `${name}’s investment accounts will appear here once their first executed order is recorded.`
+                : "Your investment accounts will appear here once their first executed order is recorded."
+            }
           />
         </Card>
       ) : (

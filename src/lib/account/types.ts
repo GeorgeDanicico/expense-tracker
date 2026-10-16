@@ -6,6 +6,8 @@ import type { FamilyRole, Permissions } from "@/lib/permissions";
  * on the client as on the server.
  */
 export type AccountMembership = {
+  /** The caller's own member id, so a page can tell "me" from another member (`?member=`). */
+  memberId: string;
   role: FamilyRole;
   isCreator: boolean;
   familyName: string;

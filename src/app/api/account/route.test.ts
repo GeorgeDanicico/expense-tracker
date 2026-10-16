@@ -102,18 +102,25 @@ describe("GET /api/account", () => {
     expect(repositories.family.calls).toEqual(["touchLastActive", "getMembership"]);
   });
 
-  it("returns a parent's membership with full permissions and without ids", async () => {
+  it("returns a parent's membership with full permissions and only their own member id", async () => {
     vi.stubEnv("FAMILY_ENABLED", "true");
     repositories.family.membership = aParent({ familyName: "The Smiths" });
 
     const response = await callRoute(GET);
 
     expect(response.body).toMatchObject({
-      membership: { role: "parent", isCreator: true, familyName: "The Smiths", permissions: PARENT_PERMISSIONS },
+      membership: {
+        memberId: "60000000-0000-4000-8000-000000000001",
+        role: "parent",
+        isCreator: true,
+        familyName: "The Smiths",
+        permissions: PARENT_PERMISSIONS,
+      },
     });
     expect(Object.keys((response.body as { membership: object }).membership).sort()).toEqual([
       "familyName",
       "isCreator",
+      "memberId",
       "permissions",
       "role",
     ]);
@@ -127,7 +134,7 @@ describe("GET /api/account", () => {
     const response = await callRoute(GET);
 
     expect(response.body).toMatchObject({
-      membership: { role: "kid", isCreator: false, familyName: "The Smiths", permissions },
+      membership: { memberId: "60000000-0000-4000-8000-000000000002", role: "kid", isCreator: false, familyName: "The Smiths", permissions },
     });
   });
 

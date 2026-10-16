@@ -7,6 +7,7 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
 import { ExpenseTabDashboard } from "@/components/dashboard/expense-tab-dashboard";
+import { WriteOnly } from "@/components/family/write-only";
 import { ExpenseList } from "@/components/expenses/expense-list";
 import { ExpenseTabFiltersForm } from "@/components/expenses/expense-tab-filters";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
@@ -15,6 +16,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { SectionHeader } from "@/components/ui/section-header";
 import { useApiForm } from "@/hooks/use-api-form";
+import { useViewing } from "@/hooks/use-viewing";
 import { apiRequest } from "@/lib/api/client";
 import { afterTabDeleted } from "@/lib/api/invalidate";
 import { expenseTabApiKey, expenseTabExpensesApiKey } from "@/lib/api/keys";
@@ -36,7 +38,8 @@ export function CustomExpenseTab({
 }) {
   const searchParams = useSearchParams();
   const filters = readExpenseTabFilters(searchParams);
-  const key = expenseTabExpensesApiKey(tab.id, filters, tab.updatedAt);
+  const viewing = useViewing();
+  const key = expenseTabExpensesApiKey(tab.id, filters, tab.updatedAt, viewing.member);
   const { data, error, isValidating, mutate } = useSWR<ExpenseTabLedgerData>(
     active ? key : null,
     { keepPreviousData: false },
@@ -66,14 +69,14 @@ export function CustomExpenseTab({
         title={tab.name}
         meta="All matching expenses across your recorded history."
         actions={
-          <>
+          <WriteOnly>
             <Button size="xs" variant="outline" onClick={() => onEdit(tab)}>
               <Pencil size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Edit tab
             </Button>
             <Button size="xs" variant="outline" colorPalette="danger" onClick={() => setDeleteOpen(true)}>
               <Trash2 size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Delete tab
             </Button>
-          </>
+          </WriteOnly>
         }
       />
 
@@ -102,7 +105,7 @@ export function CustomExpenseTab({
             <ExpenseList
               expenses={matching.expenses}
               currency={currency}
-              allowDelete
+              allowDelete={!viewing.readOnly}
               filterMode="external"
             />
           </Box>
