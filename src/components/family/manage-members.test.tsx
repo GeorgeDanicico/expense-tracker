@@ -6,6 +6,7 @@ import { ledgerSystem } from "@/components/ui/theme";
 import type { FamilyData, FamilyMember } from "@/lib/family/repository";
 import { DEFAULT_KID_PERMISSIONS, PERMISSION_PRESETS } from "@/lib/permissions";
 
+import { KidSignInDetails } from "./kid-sign-in-details";
 import { matchingPreset, PermissionsEditor } from "./permissions-editor";
 import { ManageMembers } from "./manage-members";
 
@@ -65,5 +66,31 @@ describe("PermissionsEditor", () => {
   it("finds the preset that matches, or none for a custom mix", () => {
     expect(matchingPreset(PERMISSION_PRESETS.teen)).toBe("teen");
     expect(matchingPreset({ ...PERMISSION_PRESETS.teen, net_worth: "off" })).toBeNull();
+  });
+});
+
+describe("ManageMembers kid accounts", () => {
+  it("offers Add a kid and Reset password for kids only", () => {
+    const html = render(<ManageMembers data={data} />);
+    expect(html).toContain("Add a kid");
+    expect(html).toContain("Reset password for Mara");
+    expect(html).not.toContain("Reset password for Ana");
+  });
+});
+
+describe("KidSignInDetails", () => {
+  it("tells the kid the username and password and warns it is shown once", () => {
+    const html = render(<KidSignInDetails name="Ana" username="ana" password="tmp-pass-1" />);
+    expect(html).toContain("Ana can sign in with the username <strong>ana</strong> and this password.");
+    expect(html).toContain("choose a new one the first time");
+    expect(html).toContain("tmp-pass-1");
+    expect(html).toContain("Copy temporary password");
+    expect(html).toContain("shown only once");
+  });
+
+  it("leaves out the username after a reset", () => {
+    const html = render(<KidSignInDetails name="Ana" password="tmp-pass-1" />);
+    expect(html).toContain("Ana can sign in with this password.");
+    expect(html).not.toContain("username");
   });
 });

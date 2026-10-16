@@ -3,7 +3,9 @@
 import { Box, Button, Flex, Table, Text } from "@chakra-ui/react";
 import { useState } from "react";
 
+import { CreateKidDialog } from "@/components/family/create-kid-dialog";
 import { EditPermissionsDialog } from "@/components/family/edit-permissions-dialog";
+import { ResetPasswordDialog } from "@/components/family/reset-password-dialog";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { lastActiveLabel } from "@/lib/family/last-active-label";
@@ -19,6 +21,7 @@ function roleLabel(member: FamilyMember) {
 
 function MemberRow({ member }: { member: FamilyMember }) {
   const [editing, setEditing] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const name = memberName(member);
 
   return (
@@ -46,25 +49,45 @@ function MemberRow({ member }: { member: FamilyMember }) {
       <Table.Cell color="fg.muted" whiteSpace="nowrap">
         {lastActiveLabel(member.lastActiveAt)}
       </Table.Cell>
-      <Table.Cell pe="3" textAlign="end">
+      <Table.Cell pe="3">
         {member.role === "kid" ? (
-          <>
+          <Flex direction={{ base: "column", md: "row" }} align="stretch" justify="flex-end" gap="1.5">
             <Button size="xs" variant="outline" onClick={() => setEditing(true)} aria-label={`Edit permissions for ${name}`}>
               Edit permissions
             </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => setResetting(true)}
+              aria-label={`Reset password for ${name}`}
+            >
+              Reset password
+            </Button>
             {editing ? <EditPermissionsDialog member={member} open onOpenChange={setEditing} /> : null}
-          </>
+            {resetting ? <ResetPasswordDialog member={member} open onOpenChange={setResetting} /> : null}
+          </Flex>
         ) : null}
       </Table.Cell>
     </Table.Row>
   );
 }
 
-/** The members table for parents: role, last activity, and a permissions button for each kid. */
+/** The members table for parents: role, last activity, kid accounts, and permission and password buttons for each kid. */
 export function ManageMembers({ data }: { data: FamilyData }) {
+  const [adding, setAdding] = useState(false);
+
   return (
     <Card>
-      <Card.Header title="Members" description={`Everyone in ${data.family.name}.`} />
+      <Card.Header
+        title="Members"
+        description={`Everyone in ${data.family.name}.`}
+        actions={
+          <Button size="sm" variant="solid" colorPalette="brand" onClick={() => setAdding(true)}>
+            Add a kid
+          </Button>
+        }
+      />
+      {adding ? <CreateKidDialog open onOpenChange={setAdding} /> : null}
       <Box overflowX="auto">
         <Table.Root>
           <Table.Caption className="sr-only">Family members</Table.Caption>
@@ -73,7 +96,7 @@ export function ManageMembers({ data }: { data: FamilyData }) {
               <Table.ColumnHeader ps="4">Name</Table.ColumnHeader>
               <Table.ColumnHeader display={{ base: "none", md: "table-cell" }}>Role</Table.ColumnHeader>
               <Table.ColumnHeader>Last active</Table.ColumnHeader>
-              <Table.ColumnHeader width="10" pe="3">
+              <Table.ColumnHeader pe="3">
                 <span className="sr-only">Actions</span>
               </Table.ColumnHeader>
             </Table.Row>
