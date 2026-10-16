@@ -2,6 +2,7 @@ import type { ScopedMutator } from "swr";
 
 import {
   ACCOUNT_API_KEY,
+  ACCOUNT_NOTICES_API_KEY,
   EXPENSE_TABS_API_KEY,
   FAMILY_API_KEY,
   INVESTMENTS_API_KEY,
@@ -10,6 +11,7 @@ import {
   expensesApiKey,
   mainExpensesApiKey,
   type FamilyResponse,
+  type NoticesResponse,
   type TabsResponse,
 } from "@/lib/api/keys";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
@@ -120,4 +122,15 @@ export function afterSignOut(mutate: ScopedMutator) {
 export async function afterFamilyJoined(mutate: ScopedMutator, response: FamilyResponse) {
   await mutate(FAMILY_API_KEY, response, { revalidate: false });
   await mutate(ACCOUNT_API_KEY);
+}
+
+/** Drops the dismissed notice from the cached list, so the next one shows without a refetch. */
+export function afterNoticeDismissed(mutate: ScopedMutator, id: string) {
+  return mutate(
+    ACCOUNT_NOTICES_API_KEY,
+    (current: NoticesResponse | undefined) => current
+      ? { notices: current.notices.filter((notice) => notice.id !== id) }
+      : current,
+    { revalidate: false },
+  );
 }

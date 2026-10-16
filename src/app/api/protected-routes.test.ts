@@ -21,6 +21,8 @@ const PUBLIC_ROUTES = ["auth", "auth/google", "mcp"];
 const PROTECTED_ROUTES: Record<string, string[]> = {
   account: ["GET", "PATCH"],
   "account/email": ["PATCH"],
+  "account/notices": ["GET"],
+  "account/notices/[id]/dismiss": ["POST"],
   "account/password": ["POST"],
   dashboard: ["GET"],
   "expense-tabs": ["GET", "POST"],

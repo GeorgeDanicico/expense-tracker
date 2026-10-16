@@ -2,6 +2,7 @@ import type { AnalyticsFilters } from "@/lib/expenses/types";
 import { resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
+import type { AccountNotice } from "@/lib/account/notice-repository";
 import type { FamilyData } from "@/lib/family/repository";
 
 // Each key notes the response type its GET returns. Types owned by a domain
@@ -13,6 +14,8 @@ export const ACCOUNT_API_KEY = "/api/account";
 export const ACCOUNT_PASSWORD_API_URL = "/api/account/password";
 /** PATCH only: `{ email }` → 204. The change applies once the link sent to the new address is opened. */
 export const ACCOUNT_EMAIL_API_URL = "/api/account/email";
+/** GET → {@link NoticesResponse}: the unseen notices, oldest first. 404 while the family flag is off. */
+export const ACCOUNT_NOTICES_API_KEY = "/api/account/notices";
 /** GET → `InvestmentsOverview` (`@/lib/investments/types`). */
 export const INVESTMENTS_API_KEY = "/api/investments";
 /** GET → `NetWorthOverview` (`@/lib/net-worth/types`). */
@@ -23,9 +26,15 @@ export const FAMILY_API_KEY = "/api/family";
 export const FAMILY_JOIN_PREVIEW_API_URL = "/api/family/join/preview";
 /** POST only: `{ code }` → {@link FamilyResponse} with the joined family (201). */
 export const FAMILY_JOIN_API_URL = "/api/family/join";
+/** POST only → 204: marks the notice as seen. */
+export function dismissNoticeApiUrl(id: string) {
+  return `${ACCOUNT_NOTICES_API_KEY}/${encodeURIComponent(id)}/dismiss`;
+}
+
 /** GET → {@link TabsResponse}; POST returns {@link SavedTabResponse}. */
 export const EXPENSE_TABS_API_KEY = "/api/expense-tabs";
 
+export type NoticesResponse = { notices: AccountNotice[] };
 export type FamilyResponse = { family: FamilyData | null };
 export type TabsResponse = { tabs: ExpenseTab[] };
 export type SavedTabResponse = { tab: ExpenseTab };
