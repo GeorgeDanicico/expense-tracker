@@ -1,40 +1,7 @@
-"use client";
+import { LoginView } from "@/components/auth/login-view";
+import { safeNextPath } from "@/lib/http/origin";
 
-import { Box, Center } from "@chakra-ui/react";
-import { Suspense, useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-import { AuthForm } from "@/components/auth/auth-form";
-import { DataLoading } from "@/components/ui/data-state";
-import { useAccount } from "@/hooks/use-account";
-
-export default function LoginPage() {
-  const router = useRouter();
-  const { account: data, isLoading } = useAccount();
-
-  useEffect(() => {
-    if (data) router.replace("/dashboard");
-  }, [data, router]);
-
-  if (isLoading || data) {
-    return (
-      <Center minH="100dvh" px="4">
-        <Box width="full" maxW="360px">
-          <DataLoading layout="section" label="Checking your session…" />
-        </Box>
-      </Center>
-    );
-  }
-  return (
-    <Center
-      minH="100dvh"
-      px={{ base: "4", md: "6" }}
-      py={{ base: "6", md: "10" }}
-      bg="bg.canvas"
-    >
-      <Suspense>
-        <AuthForm />
-      </Suspense>
-    </Center>
-  );
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
+  const { next } = await searchParams;
+  return <LoginView next={safeNextPath(typeof next === "string" ? next : null)} />;
 }

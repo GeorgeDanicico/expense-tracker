@@ -1,10 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getAuth, type EmailLink, type EmailLinkType } from "@/lib/auth";
-
-function safeNextPath(value: string | null) {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
-}
+import { safeNextPath } from "@/lib/http/origin";
 
 function emailLink(searchParams: URLSearchParams): EmailLink | null {
   const code = searchParams.get("code");
@@ -23,7 +20,6 @@ export async function GET(request: NextRequest) {
   const confirmed = link ? (await getAuth().completeEmailLink(link)).ok : false;
 
   const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = confirmed ? next : "/login";
-  redirectUrl.search = confirmed ? "" : "message=confirmation-failed";
-  return NextResponse.redirect(redirectUrl);
+  const target = confirmed ? new URL(next, redirectUrl.origin) : new URL("/login?message=confirmation-failed", redirectUrl.origin);
+  return NextResponse.redirect(target);
 }

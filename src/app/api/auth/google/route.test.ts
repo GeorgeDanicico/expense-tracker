@@ -23,6 +23,21 @@ describe("GET /api/auth/google", () => {
     );
   });
 
+  it("forwards a same-site next path to the callback", async () => {
+    await callRoute(GET, { url: `/api/auth/google?next=${encodeURIComponent("/join/ABCD2345")}` });
+
+    expect(auth.lastOAuth?.callbackUrl).toBe("http://localhost/auth/confirm?next=%2Fjoin%2FABCD2345");
+  });
+
+  it.each([["an external URL", "https://evil.test/"], ["a protocol-relative path", "//evil.test"]])(
+    "ignores %s as the next path",
+    async (_, next) => {
+      await callRoute(GET, { url: `/api/auth/google?next=${encodeURIComponent(next)}` });
+
+      expect(auth.lastOAuth?.callbackUrl).toBe("http://localhost/auth/confirm?next=%2Fdashboard");
+    },
+  );
+
   it("redirects to the login page when the provider fails", async () => {
     auth.fail("oauthSignInUrl");
 
