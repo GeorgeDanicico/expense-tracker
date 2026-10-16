@@ -1,14 +1,9 @@
-import { isFamilyEnabled } from "@/lib/features";
-import { json, notFound, parseBody, withUser } from "@/lib/http/route";
+import { requireFamilyFeature } from "@/lib/family/feature";
+import { json, noContent, parseBody, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
-import { createFamilySchema } from "@/lib/validation/family";
+import { createFamilySchema, deleteFamilySchema } from "@/lib/validation/family";
 
 const CREATE_FAILURE = "Unable to create the family.";
-
-/** While the family flag is off the route doesn't exist: 404 before anything is queried. */
-function requireFamilyFeature() {
-  if (!isFamilyEnabled()) notFound("Not found.");
-}
 
 export const GET = withUser(async () => {
   requireFamilyFeature();
@@ -27,3 +22,11 @@ export const POST = withUser(async (request) => {
 
   return json({ family }, 201);
 }, { failure: CREATE_FAILURE });
+
+export const DELETE = withUser(async (request) => {
+  requireFamilyFeature();
+  const { confirmName } = await parseBody(request, deleteFamilySchema, "Type the family's name to confirm.");
+
+  await getRepositories().family.deleteFamily(confirmName);
+  return noContent();
+}, { failure: "Unable to delete the family." });

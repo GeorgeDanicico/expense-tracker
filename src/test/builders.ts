@@ -1,6 +1,6 @@
 import type { Expense } from "@/lib/expenses/types";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-import { PARENT_PERMISSIONS, type CurrentMember, type FamilyData } from "@/lib/family/repository";
+import { PARENT_PERMISSIONS, type CurrentMember, type FamilyData, type FamilyMember } from "@/lib/family/repository";
 import type { InvestmentTransaction } from "@/lib/investments/types";
 import type { NetWorthManualItemSource, NetWorthValuation } from "@/lib/net-worth/types";
 import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
@@ -115,5 +115,24 @@ export function aFamily(overrides: Partial<FamilyData["family"]> = {}): FamilyDa
         permissions: PARENT_PERMISSIONS,
       },
     ],
+  };
+}
+
+/**
+ * A kid's entry in `FamilyData.members`, as a parent sees it. Add it to `aFamily().members`;
+ * override `role` (and `permissions: PARENT_PERMISSIONS`) for a second parent.
+ */
+export function aFamilyMember(overrides: Partial<FamilyMember> = {}): FamilyMember {
+  return {
+    memberId: "60000000-0000-4000-8000-000000000002",
+    userId: "10000000-0000-4000-8000-000000000002",
+    role: "kid",
+    isCreator: false,
+    displayName: "kid",
+    username: "kid",
+    joinedAt: "2026-10-02T09:00:00.000Z",
+    lastActiveAt: null,
+    permissions: DEFAULT_KID_PERMISSIONS,
+    ...overrides,
   };
 }
