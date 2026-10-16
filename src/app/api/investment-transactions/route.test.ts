@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { aKid, aParent, aTransaction } from "@/test/builders";
+import { forgetLastActive } from "@/lib/family/last-active";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
@@ -31,6 +32,7 @@ function seedAccount(userId: string, transactions = [transaction]) {
 
 beforeEach(() => {
   repositories = resetFakeRepositories();
+  forgetLastActive();
   user = signedInAs();
 });
 
@@ -179,6 +181,6 @@ describe("investment transactions in a family", () => {
 
   it("saves the order for a user without a family, as before", async () => {
     expect((await createOrder(order)).status).toBe(201);
-    expect(repositories.family.calls).toEqual(["getMembership"]);
+    expect(repositories.family.calls).toEqual(["touchLastActive", "getMembership"]);
   });
 });

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MODULE_KEYS, type ModuleKey, type Permissions } from "@/lib/permissions";
 import { aKid } from "@/test/builders";
+import { forgetLastActive } from "@/lib/family/last-active";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { signedInAs } from "@/test/route";
 
@@ -76,6 +77,7 @@ let repositories: FakeRepositories;
 beforeEach(() => {
   mocks.accessed.length = 0;
   repositories = resetFakeRepositories();
+  forgetLastActive();
   signedInAs();
   vi.stubEnv("FAMILY_ENABLED", "true");
 });
@@ -91,7 +93,8 @@ describe("finance route permissions", () => {
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ error: "You don't have access to this." });
     expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
-    expect(mocks.accessed).toEqual(["family"]);
+    // The background last-activity touch, then the membership check; no finance repository.
+    expect(mocks.accessed).toEqual(["family", "family"]);
   });
 
   it.each(cases)("lets %s /api/%s through for a kid with only %s", async (method, route, module) => {

@@ -71,4 +71,9 @@ export interface FamilyRepository {
    * family, and a 422 one when the name is invalid.
    */
   createFamily(name: string): Promise<string>;
+  /**
+   * Marks the caller as active now. Does nothing for a caller without a family, or when they were
+   * last marked under 5 minutes ago.
+   */
+  touchLastActive(): Promise<void>;
 }

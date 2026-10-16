@@ -23,6 +23,7 @@ import { createClient } from "@/lib/supabase/server";
 const MEMBERSHIP_ERROR = "Unable to load your family membership.";
 const FAMILY_ERROR = "Unable to load the family.";
 const CREATE_FAMILY_ERROR = "Unable to create the family.";
+const TOUCH_ERROR = "Unable to record your last activity.";
 
 /** A member entry of `get_family()`; `lastActiveAt` and `permissions` are absent when hidden. */
 type FamilyMemberJson = {
@@ -119,5 +120,12 @@ export const supabaseFamilyRepository: FamilyRepository = {
     if (error) throw translateDatabaseError(error, CREATE_FAMILY_ERROR);
     if (!data) throw new Error(CREATE_FAMILY_ERROR);
     return data;
+  },
+
+  async touchLastActive(): Promise<void> {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("touch_last_active");
+
+    if (error) throw translateDatabaseError(error, TOUCH_ERROR);
   },
 };
