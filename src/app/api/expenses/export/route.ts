@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 // No `failure`: unexpected errors keep Next's default response instead of a JSON body.
 // A read like the month list, so it takes `?member=` too and exports that member's month.
 export const GET = withPermission("expenses", "edit", async (request: NextRequest, user, _context, member) => {
-  const { userId } = await resolveViewedUserFor(request, user, member);
+  const { userId, viewing } = await resolveViewedUserFor(request, user, member);
   const requestedMonth = request.nextUrl.searchParams.get("month") ?? "";
   if (!isValidMonth(requestedMonth)) {
     throw new HttpError(400, "Invalid month. Use YYYY-MM.");
@@ -20,9 +20,10 @@ export const GET = withPermission("expenses", "edit", async (request: NextReques
   const month = resolveMainExpenseMonth(requestedMonth);
 
   const repositories = getRepositories();
+  // Another member's currency comes from the family (members can't read each other's profiles).
   const [expenses, currency] = await Promise.all([
     repositories.expenses.listMonth(userId, month),
-    repositories.account.getCurrency(userId),
+    viewing.currency ?? repositories.account.getCurrency(userId),
   ]);
   const workbook = buildExpenseWorkbook(expenses, currency);
   return new NextResponse(workbook, {

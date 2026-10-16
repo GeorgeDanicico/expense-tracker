@@ -11,6 +11,7 @@ import {
   type NewInvite,
 } from "@/lib/family/repository";
 import { FAMILY_ROLES, MODULE_KEYS, isLevelAllowed, type PermissionLevel, type Permissions } from "@/lib/permissions";
+import { DEFAULT_CURRENCY } from "@/lib/utils/currency";
 
 import type { FakeAdminProfile } from "./auth";
 
@@ -102,6 +103,7 @@ export class FakeFamilyRepository implements FamilyRepository {
           isCreator: true,
           displayName: this.caller.displayName,
           username: null,
+          currency: DEFAULT_CURRENCY,
           joinedAt: createdAt,
           lastActiveAt: null,
           permissions: PARENT_PERMISSIONS,
@@ -154,6 +156,7 @@ export class FakeFamilyRepository implements FamilyRepository {
         isCreator: false,
         displayName: profile.displayName,
         username: profile.username,
+        currency: DEFAULT_CURRENCY,
         joinedAt: new Date().toISOString(),
         lastActiveAt: null,
         permissions: { ...permissions },
@@ -328,6 +331,7 @@ export class FakeFamilyRepository implements FamilyRepository {
           isCreator: false,
           displayName: this.caller.displayName,
           username: null,
+          currency: DEFAULT_CURRENCY,
           joinedAt,
           lastActiveAt: null,
           permissions,

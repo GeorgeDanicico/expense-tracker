@@ -114,6 +114,7 @@ describe("Supabase family repository", () => {
           isCreator: true,
           displayName: "Ana",
           username: null,
+          currency: "RON",
           joinedAt: "2026-10-01T09:00:00+00:00",
         },
         {
@@ -123,6 +124,7 @@ describe("Supabase family repository", () => {
           isCreator: false,
           displayName: "mihai",
           username: "mihai",
+          currency: "USD",
           joinedAt: "2026-10-02T09:00:00+00:00",
           lastActiveAt: null,
           permissions: kidPermissions,
@@ -159,6 +161,7 @@ describe("Supabase family repository", () => {
             isCreator: true,
             displayName: "Ana",
             username: null,
+            currency: "RON",
             joinedAt: "2026-10-01T09:00:00+00:00",
           },
           {
@@ -168,6 +171,7 @@ describe("Supabase family repository", () => {
             isCreator: false,
             displayName: "mihai",
             username: "mihai",
+            currency: "USD",
             joinedAt: "2026-10-02T09:00:00+00:00",
             lastActiveAt: null,
             permissions: kidPermissions,
@@ -176,6 +180,16 @@ describe("Supabase family repository", () => {
       });
       expect(result?.members[0]).not.toHaveProperty("lastActiveAt");
       expect(result?.members[0]).not.toHaveProperty("permissions");
+    });
+
+    it("gives a member the default currency when the entry has none or an unsupported one", async () => {
+      const [parent, kid] = familyJson.members;
+      useRpc(() => ({
+        data: { ...familyJson, members: [{ ...parent, currency: undefined }, { ...kid, currency: "XYZ" }] },
+        error: null,
+      }));
+
+      expect((await family.getFamily())?.members.map((member) => member.currency)).toEqual(["EUR", "EUR"]);
     });
 
     it("gives a visible parent's null permissions the parent permissions", async () => {

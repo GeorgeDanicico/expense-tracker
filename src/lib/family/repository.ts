@@ -36,6 +36,8 @@ export type FamilyMember = {
   /** The profile's display name, else the username, else the email before the `@`; null if none exists. */
   displayName: string | null;
   username: string | null;
+  /** The member's ISO 4217 currency, visible to everyone in the family; the app default without a profile. */
+  currency: string;
   joinedAt: string;
   /**
    * Hidden (absent) unless the caller is a parent or this is the caller's own entry.

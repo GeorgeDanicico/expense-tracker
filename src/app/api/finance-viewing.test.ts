@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getBucharestMonth } from "@/lib/calendar";
+import { buildExpenseWorkbook } from "@/lib/export/xlsx";
 import { forgetLastActive } from "@/lib/family/last-active";
 import { PARENT_PERMISSIONS, type CurrentMember, type FamilyData } from "@/lib/family/repository";
 import { MEMBER_NOT_FOUND_MESSAGE } from "@/lib/family/viewed-user";
@@ -11,6 +12,10 @@ import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repos
 import { signedInAs, testUser } from "@/test/route";
 
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
+vi.mock("@/lib/export/xlsx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/export/xlsx")>();
+  return { ...actual, buildExpenseWorkbook: vi.fn(actual.buildExpenseWorkbook) };
+});
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 vi.mock("@/lib/investments/quotes/get-adapter", () => ({
   getInvestmentQuoteAdapter: () => ({ getQuotes: async () => new Map() }),
@@ -46,13 +51,13 @@ const finance = (family_finance: Permissions["family_finance"]): Permissions =>
 
 function smiths(): FamilyData {
   const base = aFamily();
-  const entry = (member: typeof DAN, role: "parent" | "kid", displayName: string) => ({
-    ...base.members[0], ...member, role, isCreator: false, displayName,
+  const entry = (member: typeof DAN, role: "parent" | "kid", displayName: string, currency = "EUR") => ({
+    ...base.members[0], ...member, role, isCreator: false, displayName, currency,
     permissions: role === "parent" ? PARENT_PERMISSIONS : finance("off"),
   });
   return {
     family: base.family,
-    members: [{ ...base.members[0], displayName: "Mara" }, entry(DAN, "parent", "Dan"), entry(ANA, "kid", "Ana"), entry(ION, "kid", "Ion")],
+    members: [{ ...base.members[0], displayName: "Mara" }, entry(DAN, "parent", "Dan"), entry(ANA, "kid", "Ana", "RON"), entry(ION, "kid", "Ion", "USD")],
   };
 }
 
@@ -177,7 +182,7 @@ describe("finance reads with ?member=", () => {
     const response = await read(entry, ANA.userId, ANA.memberId);
 
     expect(response.status).toBe(200);
-    expect(response.body.viewing).toEqual({ memberId: ANA.memberId, displayName: "Ana", readOnly: true });
+    expect(response.body.viewing).toEqual({ memberId: ANA.memberId, displayName: "Ana", currency: "RON", readOnly: true });
     expect(withoutViewing(response.body)).toEqual(await ownView(entry, ANA.userId));
     expect(JSON.stringify(response.body)).toContain(entry.marker("Ana", ANA.userId));
     expect(JSON.stringify(response.body)).not.toContain(entry.marker("Mara", MARA.userId));
@@ -187,7 +192,7 @@ describe("finance reads with ?member=", () => {
     const response = await read(entry, DAN.userId, DAN.memberId);
 
     expect(response.status).toBe(200);
-    expect(response.body.viewing).toEqual({ memberId: DAN.memberId, displayName: "Dan", readOnly: true });
+    expect(response.body.viewing).toEqual({ memberId: DAN.memberId, displayName: "Dan", currency: "EUR", readOnly: true });
     expect(withoutViewing(response.body)).toEqual(await ownView(entry, DAN.userId));
   });
 
@@ -197,7 +202,7 @@ describe("finance reads with ?member=", () => {
     const response = await read(entry, ION.userId, ION.memberId);
 
     expect(response.status).toBe(200);
-    expect(response.body.viewing).toEqual({ memberId: ION.memberId, displayName: "Ion", readOnly: true });
+    expect(response.body.viewing).toEqual({ memberId: ION.memberId, displayName: "Ion", currency: "USD", readOnly: true });
     expect(JSON.stringify(response.body)).toContain(entry.marker("Ion", ION.userId));
     expect(JSON.stringify(response.body)).not.toContain(entry.marker("Ana", ANA.userId));
   });
@@ -244,7 +249,7 @@ describe("finance reads with ?member=", () => {
     const response = await read(entry, MARA.userId, MARA.memberId);
 
     expect(response.status).toBe(200);
-    expect(response.body.viewing).toEqual({ memberId: MARA.memberId, displayName: null, readOnly: false });
+    expect(response.body.viewing).toEqual({ memberId: MARA.memberId, displayName: null, currency: null, readOnly: false });
     expect(withoutViewing(response.body)).toEqual(await ownView(entry, MARA.userId));
   });
 
@@ -253,7 +258,7 @@ describe("finance reads with ?member=", () => {
 
     expect(repositories.family.calls).toEqual(["touchLastActive", "getMembership"]);
     expect(response.status).toBe(200);
-    expect(response.body.viewing).toEqual({ memberId: MARA.memberId, displayName: null, readOnly: false });
+    expect(response.body.viewing).toEqual({ memberId: MARA.memberId, displayName: null, currency: null, readOnly: false });
     expect(withoutViewing(response.body)).toEqual(await ownView(entry, MARA.userId));
   });
 
@@ -263,7 +268,7 @@ describe("finance reads with ?member=", () => {
     const response = await read(entry, MARA.userId);
 
     expect(response.status).toBe(200);
-    expect(response.body.viewing).toEqual({ memberId: null, displayName: null, readOnly: false });
+    expect(response.body.viewing).toEqual({ memberId: null, displayName: null, currency: null, readOnly: false });
     expect(withoutViewing(response.body)).toEqual(await ownView(entry, MARA.userId));
     expect(repositories.family.calls).toEqual([]);
   });
@@ -285,20 +290,30 @@ describe("GET /api/expenses/export with ?member=", () => {
 
   it("exports the viewed member's month for a parent", async () => {
     const listMonth = vi.spyOn(repositories.expenses, "listMonth");
-    const getCurrency = vi.spyOn(repositories.account, "getCurrency");
 
     const response = await exportMonth(ANA.memberId);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("x-expense-month")).toBe("2024-02");
     expect(listMonth).toHaveBeenCalledWith(ANA.userId, "2024-02");
-    expect(getCurrency).toHaveBeenCalledWith(ANA.userId);
+  });
+
+  it("labels the viewed member's export with their currency from the family, not the viewer's", async () => {
+    const getCurrency = vi.spyOn(repositories.account, "getCurrency");
+    repositories.account.currencies.set(MARA.userId, "GBP");
+
+    await exportMonth(ANA.memberId);
+
+    expect(buildExpenseWorkbook).toHaveBeenLastCalledWith(expect.anything(), "RON");
+    expect(getCurrency).not.toHaveBeenCalled();
   });
 
   it("exports the caller's own month without the parameter", async () => {
     const listMonth = vi.spyOn(repositories.expenses, "listMonth");
+    repositories.account.currencies.set(MARA.userId, "GBP");
 
     expect((await exportMonth()).status).toBe(200);
+    expect(buildExpenseWorkbook).toHaveBeenLastCalledWith(expect.anything(), "GBP");
     expect(listMonth).toHaveBeenCalledWith(MARA.userId, "2024-02");
   });
 
