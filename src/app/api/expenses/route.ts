@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
-import { getMonthlyLedger } from "@/lib/expenses/service";
-import { resolveViewedUserFor } from "@/lib/family/viewed-user";
+import { getFamilyMonthlyLedger, getMonthlyLedger } from "@/lib/expenses/service";
+import { FAMILY_VIEWING, resolveFamilyViewers, resolveViewedUserFor, wantsFamilyView } from "@/lib/family/viewed-user";
 import { withPermission } from "@/lib/http/permission";
 import { HttpError, json, parseInput, readJson } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
@@ -9,12 +9,23 @@ import { getBucharestMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/
 import { expenseSchema } from "@/lib/validation/expense";
 
 export const GET = withPermission("expenses", "edit", async (request: NextRequest, user, _context, member) => {
-  const { userId, viewing } = await resolveViewedUserFor(request, user, member);
+  const family = wantsFamilyView(request) ? await resolveFamilyViewers(member) : null;
+  const { userId, viewing } = family
+    ? { userId: user.id, viewing: FAMILY_VIEWING }
+    : await resolveViewedUserFor(request, user, member);
   const requestedMonth = request.nextUrl.searchParams.get("month") ?? "";
   const isMainLedger = request.nextUrl.searchParams.get("context") === "main";
   const month = isMainLedger
     ? resolveMainExpenseMonth(requestedMonth)
     : isValidMonth(requestedMonth) ? requestedMonth : getBucharestMonth();
+
+  if (family) {
+    return json({
+      ...(await getFamilyMonthlyLedger(family, month)),
+      ...(isMainLedger ? { effectiveMonth: month } : {}),
+      viewing,
+    });
+  }
 
   const { expenses, total, average } = await getMonthlyLedger(userId, month);
   return json({

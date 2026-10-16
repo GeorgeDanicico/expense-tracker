@@ -5,7 +5,7 @@ import { DeleteExpenseButton } from "@/components/expenses/delete-expense-button
 import { Amount } from "@/components/ui/amount";
 import { ListRow } from "@/components/ui/list-row";
 import { expenseClassificationLabel } from "@/lib/expenses/categories";
-import type { Expense } from "@/lib/expenses/types";
+import type { ListedExpense } from "@/lib/expenses/types";
 import { formatDate } from "@/lib/calendar";
 
 /** Mobile expense rows: icon, description, date · category, amount. */
@@ -14,7 +14,7 @@ export function ExpenseMobileList({
   currency,
   allowDelete,
 }: {
-  expenses: Expense[];
+  expenses: ListedExpense[];
   currency: string;
   allowDelete: boolean;
 }) {
@@ -25,9 +25,13 @@ export function ExpenseMobileList({
           key={expense.id}
           leading={<CategoryVisual category={expense.category} />}
           title={expense.description}
-          meta={`${formatDate(expense.expenseDate)} · ${expenseClassificationLabel(expense.category, expense.subtype)}`}
+          meta={[
+            expense.memberName,
+            formatDate(expense.expenseDate),
+            expenseClassificationLabel(expense.category, expense.subtype),
+          ].filter(Boolean).join(" · ")}
           detail={expense.notes}
-          trailing={<Amount value={expense.amount} currency={currency} size="sm" />}
+          trailing={<Amount value={expense.amount} currency={expense.currency ?? currency} size="sm" />}
           actions={
             allowDelete ? <DeleteExpenseButton id={expense.id} description={expense.description} /> : null
           }

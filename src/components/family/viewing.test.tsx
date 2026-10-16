@@ -119,6 +119,20 @@ describe("useViewing", () => {
     });
   });
 
+  it("is the read-only family view for ?member=all, without loading the member list", () => {
+    state.search = "member=all";
+
+    expect(viewingNow()).toMatchObject({
+      member: "all",
+      family: true,
+      readOnly: true,
+      name: "everyone",
+      ready: true,
+      hrefFor: "/investments?a=1&member=all",
+    });
+    expect(state.fetched).toEqual([null]);
+  });
+
   it("waits for the family before it is ready, and falls back to your currency", () => {
     state.search = `member=${ANA_ID}`;
     state.family = undefined;
@@ -156,6 +170,25 @@ describe("ViewingBar", () => {
     state.search = `member=${ANA_ID}`;
 
     expect(html(<ViewingBar noun="expenses" />)).toContain("You&#x27;re viewing Ana&#x27;s expenses");
+  });
+});
+
+describe("the family view in the picker and the bar", () => {
+  it("offers Family (everyone) only on a page that can show it", () => {
+    expect(html(<ViewingPicker />)).not.toContain("Family (everyone)");
+    expect(html(<ViewingPicker allowFamily />)).toContain(">Family (everyone)</option>");
+  });
+
+  it("selects Family (everyone) for ?member=all", () => {
+    state.search = "member=all";
+
+    expect(html(<ViewingPicker allowFamily />)).toMatch(/<option value="all" selected/);
+  });
+
+  it("says the whole family's expenses are being viewed", () => {
+    state.search = "member=all";
+
+    expect(html(<ViewingBar noun="expenses" />)).toContain("You&#x27;re viewing the whole family&#x27;s expenses");
   });
 });
 

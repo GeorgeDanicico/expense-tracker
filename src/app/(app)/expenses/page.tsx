@@ -16,6 +16,7 @@ import useSWR from "swr";
 
 import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
 import { CustomExpenseTab } from "@/components/expenses/custom-expense-tab";
+import { FamilyExpensesPanel } from "@/components/expenses/family-expenses-panel";
 import { ViewingControls } from "@/components/family/viewing-picker";
 import { WriteOnly } from "@/components/family/write-only";
 import { ExpenseTabDialog } from "@/components/expenses/expense-tab-dialog";
@@ -49,7 +50,10 @@ function ExpensesContent() {
     error: tabsError,
     isValidating: tabsUpdating,
     mutate: mutateTabs,
-  } = useSWR<TabsResponse>(expenseTabsApiKey(viewing.member));
+  } = useSWR<TabsResponse>(
+    // Saved tabs belong to one person, so the family view has none.
+    viewing.family ? null : expenseTabsApiKey(viewing.member),
+  );
   const tabs = tabsResult?.tabs ?? [];
   const { currency } = viewing;
   const [dialogTarget, setDialogTarget] = useState<DialogTarget | null>(null);
@@ -71,16 +75,18 @@ function ExpensesContent() {
             <WriteOnly>
               <AddExpenseDialog selectedMonth={month} currency={currency} />
             </WriteOnly>
-            <Button asChild variant="ghost" size={{ base: "md", sm: "sm" }}>
-              <Link href={mainExpensesExportUrl(month, viewing.member)}>
-                <Download size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Export
-              </Link>
-            </Button>
+            {viewing.family ? null : (
+              <Button asChild variant="ghost" size={{ base: "md", sm: "sm" }}>
+                <Link href={mainExpensesExportUrl(month, viewing.member)}>
+                  <Download size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Export
+                </Link>
+              </Button>
+            )}
           </>
         ) : undefined}
       />
 
-      <ViewingControls noun="expenses" />
+      <ViewingControls noun="expenses" family />
 
       {tabsError ? (
         <DataRefresh error={tabsError} updating={tabsUpdating} retry={() => void mutateTabs()} />
@@ -95,7 +101,9 @@ function ExpensesContent() {
         onCreate={viewing.readOnly ? undefined : () => setDialogTarget({ mode: "create" })}
       >
         <Tabs.Content value={MAIN_EXPENSE_TAB} p="0">
-          {viewing.ready ? (
+          {viewing.ready && viewing.family ? (
+            <FamilyExpensesPanel month={month} currency={currency} />
+          ) : viewing.ready ? (
             <MainExpensesPanel month={month} currency={currency} />
           ) : <DataLoading label="Loading expenses…" />}
         </Tabs.Content>

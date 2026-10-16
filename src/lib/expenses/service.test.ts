@@ -6,7 +6,7 @@ import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repos
 
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
-import { getDashboardData, getExpenseTabLedger, getMonthlyLedger } from "./service";
+import { getDashboardData, getExpenseTabLedger, getFamilyDashboardData, getFamilyMonthlyLedger, getMonthlyLedger } from "./service";
 
 const expense = (id: string, amount: number, overrides = {}) =>
   anExpense({ id, amount, expenseDate: "2026-09-10", ...overrides });
@@ -104,5 +104,110 @@ describe("getDashboardData", () => {
     const dashboard = await getDashboardData("owner", { period: "3m", granularity: "month", customDate: "" });
 
     expect(dashboard).toMatchObject({ currentExpenses: [], currentTotal: 0, currentCount: 0, currentAverage: 0, currentLargest: 0 });
+  });
+});
+
+describe("the family view", () => {
+  const viewers = [
+    { userId: "mara", memberId: "m1", name: "Mara", currency: "RON" },
+    { userId: "dan", memberId: "m2", name: "Dan", currency: "RON" },
+    { userId: "ana", memberId: "m3", name: "Ana", currency: "EUR" },
+  ];
+
+  beforeEach(() => {
+    repositories.expenses.expenses.set("mara", [expense("a", 100, { expenseDate: "2026-09-02" }), expense("b", 40)]);
+    repositories.expenses.expenses.set("dan", [expense("c", 60, { expenseDate: "2026-09-20" })]);
+    repositories.expenses.expenses.set("ana", [expense("d", 85)]);
+    repositories.expenses.expenses.set("outsider", [expense("e", 999)]);
+  });
+
+  describe("getFamilyMonthlyLedger", () => {
+    it("reads each member on their own, never anyone else", async () => {
+      const listMonth = vi.spyOn(repositories.expenses, "listMonth");
+
+      await getFamilyMonthlyLedger(viewers, "2026-09");
+
+      expect(listMonth.mock.calls).toEqual([["mara", "2026-09"], ["dan", "2026-09"], ["ana", "2026-09"]]);
+    });
+
+    it("combines every member's rows newest first, each labelled with the member and their currency", async () => {
+      const { expenses } = await getFamilyMonthlyLedger(viewers, "2026-09");
+
+      expect(expenses.map(({ id, memberName, currency }) => [id, memberName, currency])).toEqual([
+        ["c", "Dan", "RON"],
+        ["d", "Ana", "EUR"],
+        ["b", "Mara", "RON"],
+        ["a", "Mara", "RON"],
+      ]);
+    });
+
+    it("groups the totals by currency without converting", async () => {
+      const { totals } = await getFamilyMonthlyLedger(viewers, "2026-09");
+
+      expect(totals).toEqual([
+        { currency: "RON", total: 200, count: 3, average: 200 / 3, largest: 100 },
+        { currency: "EUR", total: 85, count: 1, average: 85, largest: 85 },
+      ]);
+    });
+
+    it("has no totals for a month nobody spent in", async () => {
+      expect(await getFamilyMonthlyLedger(viewers, "2026-01")).toEqual({ month: "2026-01", expenses: [], totals: [] });
+    });
+  });
+
+  describe("getFamilyDashboardData", () => {
+    const filters = { period: "3m", granularity: "month", customDate: "2026-09" } as const;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-09-25T10:00:00Z") });
+    });
+
+    it("combines the current month per currency and keeps each member's own share", async () => {
+      const data = await getFamilyDashboardData(viewers, filters);
+
+      expect(data.currentMonth).toBe("2026-09");
+      expect(data.totals).toEqual([
+        { currency: "RON", total: 200, count: 3, average: 200 / 3, largest: 100 },
+        { currency: "EUR", total: 85, count: 1, average: 85, largest: 85 },
+      ]);
+      expect(data.members).toEqual([
+        { memberId: "m1", name: "Mara", currency: "RON", total: 140, count: 2 },
+        { memberId: "m2", name: "Dan", currency: "RON", total: 60, count: 1 },
+        { memberId: "m3", name: "Ana", currency: "EUR", total: 85, count: 1 },
+      ]);
+    });
+
+    it("lists the family's newest expenses with their owners", async () => {
+      const data = await getFamilyDashboardData(viewers, filters);
+
+      expect(data.currentExpenses.map(({ id, memberName }) => [id, memberName])).toEqual([
+        ["c", "Dan"],
+        ["d", "Ana"],
+        ["b", "Mara"],
+        ["a", "Mara"],
+      ]);
+    });
+
+    it("keeps only the newest five of everyone's recent expenses", async () => {
+      repositories.expenses.expenses.set("dan", ["1", "2", "3", "4", "5"].map((id) => expense(id, 1, { expenseDate: "2026-09-24" })));
+
+      const data = await getFamilyDashboardData(viewers, filters);
+
+      expect(data.currentExpenses).toHaveLength(5);
+      expect(data.currentExpenses.every((entry) => entry.memberName === "Dan")).toBe(true);
+    });
+
+    it("groups the analytics range per currency too", async () => {
+      repositories.expenses.expenses.set("mara", [expense("m", 30, { expenseDate: "2026-08-03" })]);
+      repositories.expenses.expenses.set("dan", [expense("n", 20, { expenseDate: "2026-06-03" })]);
+      repositories.expenses.expenses.set("ana", [expense("old", 15, { expenseDate: "2026-07-10" })]);
+
+      const data = await getFamilyDashboardData(viewers, filters);
+
+      expect(data.analyticsTotals).toEqual([
+        { currency: "RON", total: 50, count: 2 },
+        { currency: "EUR", total: 15, count: 1 },
+      ]);
+    });
   });
 });
