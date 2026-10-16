@@ -19,6 +19,7 @@ import { CustomExpenseTab } from "@/components/expenses/custom-expense-tab";
 import { ExpenseTabDialog } from "@/components/expenses/expense-tab-dialog";
 import { ExpenseTabs, MAIN_EXPENSE_TAB } from "@/components/expenses/expense-tabs";
 import { MainExpensesPanel } from "@/components/expenses/main-expenses-panel";
+import { PermissionGate } from "@/components/layout/permission-gate";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
@@ -129,8 +130,10 @@ function ExpensesContent() {
 
 export default function ExpensesPage() {
   return (
-    <Suspense fallback={<DataLoading label="Loading expenses…" />}>
-      <ExpensesContent />
-    </Suspense>
+    <PermissionGate module="expenses">
+      <Suspense fallback={<DataLoading label="Loading expenses…" />}>
+        <ExpensesContent />
+      </Suspense>
+    </PermissionGate>
   );
 }

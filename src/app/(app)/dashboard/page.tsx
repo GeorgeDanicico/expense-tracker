@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { HistoryDashboard } from "@/components/dashboard/history-dashboard";
 import { MonthlyDashboard } from "@/components/dashboard/monthly-dashboard";
 import { SummaryDashboard } from "@/components/dashboard/summary-dashboard";
+import { PermissionGate } from "@/components/layout/permission-gate";
 import { DataLoading } from "@/components/ui/data-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -64,8 +65,10 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<DataLoading label="Loading Home…" />}>
-      <DashboardContent />
-    </Suspense>
+    <PermissionGate module="expenses">
+      <Suspense fallback={<DataLoading label="Loading Home…" />}>
+        <DashboardContent />
+      </Suspense>
+    </PermissionGate>
   );
 }
