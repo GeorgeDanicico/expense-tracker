@@ -100,6 +100,7 @@ export type Database = {
       };
       family_members: {
         Row: {
+          color: number | null;
           family_id: string;
           id: string;
           joined_at: string;
@@ -108,6 +109,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          color?: number | null;
           family_id: string;
           id?: string;
           joined_at?: string;
@@ -414,6 +416,13 @@ export type Database = {
       };
       revoke_family_invite: {
         Args: { p_invite_id: string };
+        Returns: undefined;
+      };
+      set_member_color: {
+        Args: {
+          p_member_id: string;
+          p_color: number | null;
+        };
         Returns: undefined;
       };
       set_member_permissions: {

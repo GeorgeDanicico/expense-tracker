@@ -104,6 +104,7 @@ export class FakeFamilyRepository implements FamilyRepository {
           displayName: this.caller.displayName,
           username: null,
           currency: DEFAULT_CURRENCY,
+          color: null,
           joinedAt: createdAt,
           lastActiveAt: null,
           permissions: PARENT_PERMISSIONS,
@@ -128,6 +129,21 @@ export class FakeFamilyRepository implements FamilyRepository {
     this.replaceMembers((members) =>
       members.map((member) => (member.memberId === memberId ? { ...member, permissions: { ...permissions } } : member)),
     );
+  }
+
+  /** Like `set_member_color`: parents only, on any member of their family, one member per colour. */
+  async setMemberColor(memberId: string, color: number | null) {
+    this.calls.push("setMemberColor");
+    this.parentFamilyId("Only parents can choose member colours.");
+    this.findMember(memberId);
+    if (color !== null && (!Number.isInteger(color) || color < 1 || color > 8)) {
+      throw new DomainError("Choose one of the eight colours.", 422);
+    }
+    const members = this.family?.members ?? [];
+    if (color !== null && members.some((member) => member.memberId !== memberId && member.color === color)) {
+      throw new DomainError("Another family member already has that colour.", 409);
+    }
+    this.replaceMembers((all) => all.map((member) => (member.memberId === memberId ? { ...member, color } : member)));
   }
 
   /**
@@ -157,6 +173,7 @@ export class FakeFamilyRepository implements FamilyRepository {
         displayName: profile.displayName,
         username: profile.username,
         currency: DEFAULT_CURRENCY,
+        color: null,
         joinedAt: new Date().toISOString(),
         lastActiveAt: null,
         permissions: { ...permissions },
@@ -332,6 +349,7 @@ export class FakeFamilyRepository implements FamilyRepository {
           displayName: this.caller.displayName,
           username: null,
           currency: DEFAULT_CURRENCY,
+          color: null,
           joinedAt,
           lastActiveAt: null,
           permissions,

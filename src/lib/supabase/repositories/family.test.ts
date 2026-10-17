@@ -125,6 +125,7 @@ describe("Supabase family repository", () => {
           displayName: "mihai",
           username: "mihai",
           currency: "USD",
+          color: 3,
           joinedAt: "2026-10-02T09:00:00+00:00",
           lastActiveAt: null,
           permissions: kidPermissions,
@@ -162,6 +163,7 @@ describe("Supabase family repository", () => {
             displayName: "Ana",
             username: null,
             currency: "RON",
+            color: null,
             joinedAt: "2026-10-01T09:00:00+00:00",
           },
           {
@@ -172,6 +174,7 @@ describe("Supabase family repository", () => {
             displayName: "mihai",
             username: "mihai",
             currency: "USD",
+            color: 3,
             joinedAt: "2026-10-02T09:00:00+00:00",
             lastActiveAt: null,
             permissions: kidPermissions,
@@ -190,6 +193,16 @@ describe("Supabase family repository", () => {
       }));
 
       expect((await family.getFamily())?.members.map((member) => member.currency)).toEqual(["EUR", "EUR"]);
+    });
+
+    it("treats a missing or out-of-palette colour as automatic", async () => {
+      const [parent, kid] = familyJson.members;
+      useRpc(() => ({
+        data: { ...familyJson, members: [{ ...parent, color: undefined }, { ...kid, color: 12 }] },
+        error: null,
+      }));
+
+      expect((await family.getFamily())?.members.map((member) => member.color)).toEqual([null, null]);
     });
 
     it("gives a visible parent's null permissions the parent permissions", async () => {
@@ -288,6 +301,37 @@ describe("Supabase family repository", () => {
       await expect(family.setMemberPermissions(kidMemberId, teen)).rejects.toThrow(
         new Error("Unable to save the permissions."),
       );
+    });
+  });
+
+  describe("setMemberColor", () => {
+    it("calls set_member_color with the member and the colour, or null", async () => {
+      const { rpcs } = useRpc(() => ({ data: null, error: null }));
+
+      await expect(family.setMemberColor(kidMemberId, 4)).resolves.toBeUndefined();
+      await expect(family.setMemberColor(kidMemberId, null)).resolves.toBeUndefined();
+
+      expect(rpcs).toEqual([
+        { fn: "set_member_color", args: { p_member_id: kidMemberId, p_color: 4 } },
+        { fn: "set_member_color", args: { p_member_id: kidMemberId, p_color: null } },
+      ]);
+    });
+
+    it.each([
+      { code: "42501", status: 403, message: "Only parents can choose member colours." },
+      { code: "P0002", status: 404, message: "That family member wasn't found." },
+      { code: "23514", status: 422, message: "Choose one of the eight colours." },
+      { code: "23505", status: 409, message: "Another family member already has that colour." },
+    ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
+      useRpc(() => ({ data: null, error: { code, message } }));
+
+      await expect(family.setMemberColor(kidMemberId, 4)).rejects.toThrow(new DomainError(message, status));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRpc(() => ({ data: null, error: { message: "private database failure" } }));
+
+      await expect(family.setMemberColor(kidMemberId, 4)).rejects.toThrow(new Error("Unable to save the colour."));
     });
   });
 

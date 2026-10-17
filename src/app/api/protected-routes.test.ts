@@ -38,6 +38,7 @@ const PROTECTED_ROUTES: Record<string, string[]> = {
   "family/join/preview": ["POST"],
   "family/kids": ["POST"],
   "family/members/[id]": ["DELETE"],
+  "family/members/[id]/color": ["PATCH"],
   "family/members/[id]/password": ["POST"],
   "family/members/[id]/permissions": ["PATCH"],
   investments: ["GET"],

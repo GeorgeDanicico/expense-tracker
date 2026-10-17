@@ -16,6 +16,7 @@ function member(overrides: Partial<FamilyMember>): FamilyMember {
     displayName: null,
     username: null,
     currency: "RON",
+    color: null,
     joinedAt: "2026-10-12T08:00:00Z",
     ...overrides,
   };

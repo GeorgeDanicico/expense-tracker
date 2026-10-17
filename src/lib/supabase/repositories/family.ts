@@ -20,6 +20,7 @@ import {
   type PermissionLevel,
   type Permissions,
 } from "@/lib/permissions";
+import { MEMBER_COLOR_COUNT } from "@/lib/family/member-colors";
 import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeCurrency } from "@/lib/utils/currency";
@@ -28,6 +29,7 @@ const MEMBERSHIP_ERROR = "Unable to load your family membership.";
 const FAMILY_ERROR = "Unable to load the family.";
 const CREATE_FAMILY_ERROR = "Unable to create the family.";
 const SET_PERMISSIONS_ERROR = "Unable to save the permissions.";
+const SET_COLOR_ERROR = "Unable to save the colour.";
 const ADD_KID_ERROR = "Unable to add the kid to the family.";
 const REQUIRE_PASSWORD_CHANGE_ERROR = "Unable to reset the password.";
 const REMOVE_MEMBER_ERROR = "Unable to remove the member.";
@@ -51,6 +53,7 @@ type FamilyMemberJson = {
   displayName: string | null;
   username: string | null;
   currency?: string | null;
+  color?: number | null;
   joinedAt: string;
   lastActiveAt?: string | null;
   permissions?: Json;
@@ -91,6 +94,7 @@ function toMember(member: FamilyMemberJson): FamilyMember {
     username: member.username,
     // The SQL always sends it; normalising keeps an unsupported or missing value from reaching amounts.
     currency: normalizeCurrency(member.currency),
+    color: typeof member.color === "number" && member.color >= 1 && member.color <= MEMBER_COLOR_COUNT ? member.color : null,
     joinedAt: member.joinedAt,
     // Keep hidden fields absent rather than undefined-valued, so a missing key always means "hidden".
     ...("lastActiveAt" in member ? { lastActiveAt: member.lastActiveAt ?? null } : {}),
@@ -176,6 +180,13 @@ export const supabaseFamilyRepository: FamilyRepository = {
     });
 
     if (error) throw translateDatabaseError(error, SET_PERMISSIONS_ERROR);
+  },
+
+  async setMemberColor(memberId: string, color: number | null): Promise<void> {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("set_member_color", { p_member_id: memberId, p_color: color });
+
+    if (error) throw translateDatabaseError(error, SET_COLOR_ERROR);
   },
 
   async addManagedKid(userId: string, permissions: Permissions): Promise<string> {
