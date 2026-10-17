@@ -140,7 +140,6 @@ export type FamilyInvestmentsMember = {
 
 /**
  * The family total is added up per currency on the client (see family-totals.ts).
- * the family total adds each currency up on the client, leaving a value out where any member is unpriced
  */
 export type FamilyInvestmentsOverview = { members: FamilyInvestmentsMember[] };
 
