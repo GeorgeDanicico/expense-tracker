@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getAuth, type EmailLink, type EmailLinkType } from "@/lib/auth";
-import { safeNextPath } from "@/lib/http/origin";
+import { safeNextPath, siteOrigin } from "@/lib/http/origin";
 
 function emailLink(searchParams: URLSearchParams): EmailLink | null {
   const code = searchParams.get("code");
@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
 
   const confirmed = link ? (await getAuth().completeEmailLink(link)).ok : false;
 
-  const redirectUrl = request.nextUrl.clone();
-  const target = confirmed ? new URL(next, redirectUrl.origin) : new URL("/login?message=confirmation-failed", redirectUrl.origin);
+  // Not request.nextUrl.origin: behind the container's HOSTNAME=0.0.0.0 that would be http://0.0.0.0:3000.
+  const origin = siteOrigin(request);
+  const target = confirmed ? new URL(next, origin) : new URL("/login?message=confirmation-failed", origin);
   return NextResponse.redirect(target);
 }

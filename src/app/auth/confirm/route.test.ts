@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { callRoute } from "@/test/route";
 import { FakeAuth } from "@/test/fakes/auth";
@@ -71,5 +71,28 @@ describe("GET /auth/confirm", () => {
 
   it("redirects to the login page when the link has no token", async () => {
     expect(await confirm("next=/expenses")).toBe(FAILED);
+  });
+
+  describe("in production behind the container's 0.0.0.0 address", () => {
+    const SITE = "https://app.example.test";
+
+    beforeEach(() => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("SITE_URL", SITE);
+    });
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("redirects to SITE_URL, not the address the server is bound to", async () => {
+      auth.emailLinks.set("code-1", email);
+      const response = await callRoute(GET, { url: "http://0.0.0.0:3000/auth/confirm?code=code-1&next=/expenses" });
+
+      expect(response.headers.get("location")).toBe(`${SITE}/expenses`);
+    });
+
+    it("sends a failed link to the login page on SITE_URL", async () => {
+      const response = await callRoute(GET, { url: "http://0.0.0.0:3000/auth/confirm?code=missing" });
+
+      expect(response.headers.get("location")).toBe(`${SITE}/login?message=confirmation-failed`);
+    });
   });
 });

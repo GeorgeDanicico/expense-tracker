@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { getAuth } from "@/lib/auth";
+import { siteOrigin } from "@/lib/http/origin";
 
 const confirmationSchema = z.object({
   email: z.email(),
@@ -15,17 +16,13 @@ export async function GET(request: NextRequest) {
     token: request.nextUrl.searchParams.get("token"),
     type: request.nextUrl.searchParams.get("type"),
   });
-  const redirectUrl = request.nextUrl.clone();
+  // Not request.nextUrl.origin: behind the container's HOSTNAME=0.0.0.0 that would be http://0.0.0.0:3000.
+  const origin = siteOrigin(request);
+  const failed = new URL("/login?message=confirmation-failed", origin);
 
-  if (!parsed.success) {
-    redirectUrl.pathname = "/login";
-    redirectUrl.search = "message=confirmation-failed";
-    return NextResponse.redirect(redirectUrl);
-  }
+  if (!parsed.success) return NextResponse.redirect(failed);
 
   const { ok } = await getAuth().completeEmailLink(parsed.data);
 
-  redirectUrl.pathname = ok ? "/dashboard" : "/login";
-  redirectUrl.search = ok ? "" : "message=confirmation-failed";
-  return NextResponse.redirect(redirectUrl);
+  return NextResponse.redirect(ok ? new URL("/dashboard", origin) : failed);
 }
