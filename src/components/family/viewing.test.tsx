@@ -74,6 +74,13 @@ function html(node: React.ReactNode) {
   return renderToStaticMarkup(<ChakraProvider value={ledgerSystem}>{node}</ChakraProvider>).replace(/<style[\s\S]*?<\/style>/g, "");
 }
 
+/** The chips' labels, in order, with whether each is pressed (chip text follows a decorative dot or icon). */
+function chips(markup: string) {
+  return [...markup.matchAll(/<button[^>]*aria-pressed="(true|false)"[^>]*>(.*?)<\/button>/g)].map(
+    ([, pressed, inner]) => `${inner.replace(/<[^>]+>/g, "")}${pressed === "true" ? " (selected)" : ""}`,
+  );
+}
+
 function Probe() {
   const viewing = useViewing();
   return createElement("pre", null, JSON.stringify({ ...viewing, hrefFor: viewing.hrefFor("/investments?a=1") }));
@@ -175,14 +182,14 @@ describe("ViewingBar", () => {
 
 describe("the family view in the picker and the bar", () => {
   it("offers Family (everyone) only on a page that can show it", () => {
-    expect(html(<ViewingPicker />)).not.toContain("Family (everyone)");
-    expect(html(<ViewingPicker allowFamily />)).toContain(">Family (everyone)</option>");
+    expect(chips(html(<ViewingPicker />))).not.toContain("Family");
+    expect(chips(html(<ViewingPicker allowFamily />))).toEqual(["Me (selected)", "Family", "Ana", "Teo"]);
   });
 
   it("selects Family (everyone) for ?member=all", () => {
     state.search = "member=all";
 
-    expect(html(<ViewingPicker allowFamily />)).toMatch(/<option value="all" selected/);
+    expect(chips(html(<ViewingPicker allowFamily />))).toEqual(["Me", "Family (selected)", "Ana", "Teo"]);
   });
 
   it("says the whole family's expenses are being viewed", () => {
@@ -194,24 +201,19 @@ describe("the family view in the picker and the bar", () => {
 
 describe("ViewingPicker", () => {
   it("lists Me and the other members, not yourself", () => {
-    const markup = html(<ViewingPicker />);
-
-    expect(markup).toContain(">Me</option>");
-    expect(markup).toContain(">Ana</option>");
-    expect(markup).toContain(">Teo</option>");
-    expect(markup).not.toContain(">Maria</option>");
+    expect(chips(html(<ViewingPicker />))).toEqual(["Me (selected)", "Ana", "Teo"]);
   });
 
   it("selects the viewed member", () => {
     state.search = `member=${ANA_ID}`;
 
-    expect(html(<ViewingPicker />)).toMatch(new RegExp(`<option value="${ANA_ID}" selected`));
+    expect(chips(html(<ViewingPicker />))).toEqual(["Me", "Ana (selected)", "Teo"]);
   });
 
   it("shows for a kid with Family finance on", () => {
     state.account = anAccount(membership({ role: "kid", isCreator: false, memberId: ANA_ID, permissions: { ...DEFAULT_KID_PERMISSIONS, family_finance: "view" } }));
 
-    expect(html(<ViewingPicker />)).toContain(">Maria</option>");
+    expect(chips(html(<ViewingPicker />))).toContain("Maria");
   });
 
   it("is hidden for a kid with Family finance off", () => {

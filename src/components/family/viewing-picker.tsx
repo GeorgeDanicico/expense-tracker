@@ -1,14 +1,18 @@
 "use client";
 
-import { chakra, Flex, NativeSelect } from "@chakra-ui/react";
+import { Button, chakra, Flex } from "@chakra-ui/react";
+import { Users } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useId } from "react";
 import useSWR from "swr";
 
+import { MemberSwatch } from "@/components/family/member-swatch";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { useAccount } from "@/hooks/use-account";
 import { useViewing } from "@/hooks/use-viewing";
 import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 import { FILTER_KEYS } from "@/lib/expenses/filters";
+import { memberColorTokens } from "@/lib/family/member-colors";
 import type { FamilyMember } from "@/lib/family/repository";
 import { ALL_MEMBERS, MEMBER_PARAM } from "@/lib/family/viewing";
 import { can } from "@/lib/permissions";
@@ -30,12 +34,13 @@ export function viewingHref(pathname: string, current: { toString(): string }, v
 }
 
 /**
- * "Viewing: Me / <member>" for the finance pages. It shows for a parent, and for a kid with Family
- * finance on, and only when the family has someone else to look at. The choice lives in the URL as
- * `?member=`; "Me" removes it. A saved tab and its filters belong to one member, so switching drops them.
+ * "Viewing: Me · Family · <member> …" for the finance pages: one chip per choice, each member's led by
+ * their colour, so whose data is on screen is always visible. It shows for a parent, and for a kid with
+ * Family finance on, and only when the family has someone else to look at. The choice lives in the URL
+ * as `?member=`; "Me" removes it. A saved tab and its filters belong to one member, so switching drops them.
  */
 export function ViewingPicker({ allowFamily = false }: { allowFamily?: boolean }) {
-  const id = useId();
+  const labelId = useId();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -50,31 +55,50 @@ export function ViewingPicker({ allowFamily = false }: { allowFamily?: boolean }
     (entry) => entry.memberId.toLowerCase() !== membership.memberId.toLowerCase(),
   );
   if (!others.length) return null;
+  // From the list fetched above, so a member who can't use this picker doesn't load the family for it.
+  const colors = memberColorTokens(data?.family?.members ?? []);
+  const memberColor = (id: string) => colors.get(id.toLowerCase());
 
   const familySelected = allowFamily && family;
-  const selected = others.find((entry) => entry.memberId.toLowerCase() === member?.toLowerCase());
+  const selected = familySelected
+    ? ALL_MEMBERS
+    : (others.find((entry) => entry.memberId.toLowerCase() === member?.toLowerCase())?.memberId ?? ME);
 
-  function choose(value: string) {
-    router.push(viewingHref(pathname, searchParams, value), { scroll: false });
-  }
+  const choices = [
+    { value: ME, label: "Me", icon: <MemberSwatch color={memberColor(membership.memberId)} /> },
+    ...(allowFamily
+      ? [{ value: ALL_MEMBERS, label: "Family", icon: <Users size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> }]
+      : []),
+    ...others.map((entry) => ({
+      value: entry.memberId,
+      label: memberLabel(entry),
+      icon: <MemberSwatch color={memberColor(entry.memberId)} />,
+    })),
+  ];
 
   return (
-    <Flex align="center" gap="2" maxW="full">
-      <chakra.label htmlFor={id} textStyle="label" flexShrink="0">
+    <Flex align="center" gap="2" wrap="wrap" maxW="full" role="group" aria-labelledby={labelId}>
+      <chakra.span id={labelId} textStyle="label" flexShrink="0" me="1">
         Viewing
-      </chakra.label>
-      <NativeSelect.Root size="sm" flex={{ base: "1", sm: "none" }} width={{ sm: "14rem" }} minW="0">
-        <NativeSelect.Field id={id} value={familySelected ? ALL_MEMBERS : (selected?.memberId ?? ME)} onChange={(event) => choose(event.target.value)}>
-          <option value={ME}>Me</option>
-          {allowFamily ? <option value={ALL_MEMBERS}>Family (everyone)</option> : null}
-          {others.map((entry) => (
-            <option key={entry.memberId} value={entry.memberId}>
-              {memberLabel(entry)}
-            </option>
-          ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
+      </chakra.span>
+      {choices.map((choice) => {
+        const pressed = choice.value === selected;
+        return (
+          <Button
+            key={choice.value || "me"}
+            size="sm"
+            variant={pressed ? "solid" : "outline"}
+            colorPalette={pressed ? "brand" : undefined}
+            aria-pressed={pressed}
+            onClick={() => {
+              if (!pressed) router.push(viewingHref(pathname, searchParams, choice.value), { scroll: false });
+            }}
+          >
+            {choice.icon}
+            {choice.label}
+          </Button>
+        );
+      })}
     </Flex>
   );
 }
