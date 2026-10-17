@@ -62,6 +62,17 @@ export type CurrencyTotals = {
 /** One member's share of the family view. */
 export type MemberTotals = { memberId: string; name: string; currency: string; total: number; count: number };
 
+/**
+ * One member in the family dashboard: their month plus what the charts need.
+ * Amounts are in the member's own `currency`; nothing here is converted or combined across members.
+ */
+export type FamilyDashboardMember = MemberTotals & {
+  /** Monthly totals: the analytics range's months, then the current month last. */
+  series: Analytics["series"];
+  /** Spending per category over the analytics range, biggest first. */
+  categoryTotals: Analytics["categoryTotals"];
+};
+
 /** `GET /api/expenses?member=all`: every member's month, newest first, with totals per currency. */
 export type FamilyExpensesData = {
   month: string;
@@ -78,8 +89,8 @@ export type FamilyDashboardData = {
   /** The analytics range's totals, one entry per currency. */
   analyticsTotals: { currency: string; total: number; count: number }[];
   analyticsLabel: string;
-  members: MemberTotals[];
-  /** The newest five expenses across the family. */
+  members: FamilyDashboardMember[];
+  /** Each member's five newest expenses this month, newest first across the family. */
   currentExpenses: FamilyExpensesData["expenses"];
   viewing: Viewing;
 };
