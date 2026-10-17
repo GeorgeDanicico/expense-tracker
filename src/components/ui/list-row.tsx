@@ -1,8 +1,12 @@
-import { Flex, Text } from "@chakra-ui/react";
+import { Box, Flex, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-/** Mobile list row: leading icon, title, meta line, trailing amount/actions. */
+/**
+ * Mobile list row: leading icon, title, meta line, trailing amount/actions.
+ * `accent` is a colour token drawn as a bar down the row's start edge (a family member's colour).
+ */
 export function ListRow({
+  accent,
   leading,
   title,
   meta,
@@ -10,6 +14,7 @@ export function ListRow({
   trailing,
   actions,
 }: {
+  accent?: string;
   leading?: ReactNode;
   title: ReactNode;
   meta?: ReactNode;
@@ -29,6 +34,7 @@ export function ListRow({
       _last={{ borderBottomWidth: "0" }}
       listStyleType="none"
     >
+      {accent ? <Box alignSelf="stretch" flexShrink="0" width="1" borderRadius="full" bg={accent} aria-hidden="true" /> : null}
       {leading}
       <Flex direction="column" flex="1" minW="0" gap="0.5">
         <Text textStyle="bodySm" fontWeight="medium" truncate>
