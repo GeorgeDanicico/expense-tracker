@@ -1,4 +1,4 @@
-import type { ScopedMutator } from "swr";
+import { mutate as globalMutate, type ScopedMutator } from "swr";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -15,6 +15,7 @@ import {
   afterTabDeleted,
   afterTabSaved,
 } from "@/lib/api/invalidate";
+import type { AccountData } from "@/lib/account/types";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { ExpensesData } from "@/lib/expenses/types";
 import { aTab, anExpense } from "@/test/builders";
@@ -140,11 +141,37 @@ describe("cache invalidation after mutations", () => {
 
     const passwordChange = recorder();
     await afterPasswordChange(passwordChange.mutate);
-    expect(passwordChange.calls).toEqual([{ keys: ["/api/account"], data: undefined, options: undefined }]);
+    expect(passwordChange.calls.map((call) => call.keys)).toEqual([["/api/account"]]);
+    const clearFlag = passwordChange.calls[0].data as (current?: AccountData) => AccountData | undefined;
+    const account: AccountData = {
+      email: "kid@example.test",
+      currency: "RON",
+      features: { family: true },
+      membership: null,
+      mustChangePassword: true,
+    };
+    expect(clearFlag(account)).toEqual({ ...account, mustChangePassword: false });
+    expect(clearFlag(undefined)).toBeUndefined();
 
     const signOut = recorder();
     await afterSignOut(signOut.mutate);
     expect(signOut.calls).toEqual([{ keys: CACHED_KEYS, data: undefined, options: NO_REVALIDATE }]);
+  });
+
+  it("clears the password flag in SWR's cache even when no hook reads the account", async () => {
+    // `/change-password` mounts no account hook, so a plain revalidation would leave the stale flag behind.
+    const account: AccountData = {
+      email: "kid@example.test",
+      currency: "RON",
+      features: { family: true },
+      membership: null,
+      mustChangePassword: true,
+    };
+    await globalMutate("/api/account", account, { revalidate: false });
+
+    await afterPasswordChange(globalMutate);
+
+    expect(await globalMutate("/api/account")).toEqual({ ...account, mustChangePassword: false });
   });
 
   it("caches the joined family and reloads the account", async () => {
