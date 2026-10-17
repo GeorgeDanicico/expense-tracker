@@ -53,7 +53,9 @@ export const cardSlotRecipe = defineSlotRecipe({
   slots: ["root", "header", "body", "footer", "title", "description"],
   base: {
     root: { borderRadius: "card" },
-    header: { gap: "0.5" },
+    // Chakra's header has no bottom padding, since a body or footer usually follows it.
+    // A header-only card (such as the "Danger zone") would otherwise sit flush with its bottom border.
+    header: { gap: "0.5", _last: { paddingBottom: "var(--card-padding)" } },
     title: { textStyle: "sectionTitle" },
     description: { textStyle: "caption" },
   },
