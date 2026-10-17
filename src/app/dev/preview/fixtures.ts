@@ -7,7 +7,20 @@ import type {
 import type { NetWorthOverview } from "@/lib/net-worth/types";
 import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
 import type { AccountData } from "@/lib/account/types";
-import type { DashboardData, Expense, ExpensesData } from "@/lib/expenses/types";
+import type {
+  DashboardData,
+  Expense,
+  ExpensesData,
+  FamilyDashboardData,
+  FamilyExpensesData,
+} from "@/lib/expenses/types";
+import type { FamilyResponse } from "@/lib/api/keys";
+import { groupByCurrency } from "@/lib/expenses/family";
+import { PARENT_PERMISSIONS } from "@/lib/family/repository";
+import { ALL_MEMBERS, type Viewing } from "@/lib/family/viewing";
+import type { FamilyInvestmentsOverview } from "@/lib/investments/types";
+import type { FamilyNetWorthOverview } from "@/lib/net-worth/types";
+
 import { dateInMonth, daysInMonth, getBucharestMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
 
 /** Deterministic sample data for the development screen preview. */
@@ -219,28 +232,134 @@ const NET_WORTH: NetWorthOverview = {
   calculationIssues: [],
 };
 
+const FAMILY_VIEWING: Viewing = { memberId: ALL_MEMBERS, displayName: null, currency: null, readOnly: true };
+
+// A four-person family, so the "Viewing" picker and the family views (`?member=all`) can be previewed.
+// "George" is the previewing account; each member's sample month is the template scaled and trimmed.
+const FAMILY_MEMBERS = [
+  { memberId: "m-george", name: "George", role: "parent", scale: 1, keep: 14 },
+  { memberId: "m-maria", name: "Maria", role: "parent", scale: 0.7, keep: 11 },
+  { memberId: "m-ana", name: "Ana", role: "kid", scale: 0.18, keep: 7 },
+  { memberId: "m-luca", name: "Luca", role: "kid", scale: 0.12, keep: 5 },
+] as const;
+
 const ACCOUNT: AccountData = {
   email: "preview@example.com",
   currency: "EUR",
-  features: { family: false },
-  membership: null,
+  features: { family: true },
+  membership: {
+    memberId: "m-george",
+    role: "parent",
+    isCreator: true,
+    familyName: "The Danicicos",
+    permissions: PARENT_PERMISSIONS,
+  },
   mustChangePassword: false,
 };
+
+const FAMILY: FamilyResponse = {
+  family: {
+    family: { id: "f-preview", name: "The Danicicos", createdAt: "2026-01-04T10:00:00.000Z" },
+    members: FAMILY_MEMBERS.map((member, index) => ({
+      memberId: member.memberId,
+      userId: `u-${member.memberId}`,
+      role: member.role,
+      isCreator: index === 0,
+      displayName: member.name,
+      username: member.role === "kid" ? member.name.toLowerCase() : null,
+      currency: "EUR",
+      joinedAt: `2026-01-0${index + 4}T10:00:00.000Z`,
+    })),
+  },
+};
+
+function familyExpenses(month: string): FamilyExpensesData["expenses"] {
+  return FAMILY_MEMBERS.flatMap((member) =>
+    expensesFor(month, member.scale)
+      .slice(0, member.keep)
+      .map((expense) => ({
+        ...expense,
+        id: `${member.memberId}-${expense.id}`,
+        memberId: member.memberId,
+        memberName: member.name,
+        currency: "EUR",
+      })),
+  ).toSorted((a, b) => b.expenseDate.localeCompare(a.expenseDate) || a.memberName.localeCompare(b.memberName));
+}
+
+function totalsOf(expenses: FamilyExpensesData["expenses"]) {
+  return groupByCurrency(expenses.map((expense) => ({ currency: expense.currency, total: expense.amount, count: 1, largest: expense.amount })));
+}
+
+function familyLedger(month: string): FamilyExpensesData {
+  const expenses = familyExpenses(month);
+  return { month, expenses, totals: totalsOf(expenses), viewing: FAMILY_VIEWING };
+}
+
+function familyDashboard(): FamilyDashboardData {
+  const currentMonth = getBucharestMonth();
+  const expenses = familyExpenses(currentMonth);
+  const single = dashboard();
+  return {
+    currentMonth,
+    totals: totalsOf(expenses),
+    analyticsTotals: [{ currency: "EUR", total: single.analytics.total * 2, count: 120 }],
+    analyticsLabel: single.analytics.label,
+    members: FAMILY_MEMBERS.map((member) => {
+      const own = expenses.filter((expense) => expense.memberId === member.memberId);
+      return {
+        memberId: member.memberId,
+        name: member.name,
+        currency: "EUR",
+        total: Math.round(own.reduce((sum, expense) => sum + expense.amount, 0) * 100) / 100,
+        count: own.length,
+      };
+    }),
+    currentExpenses: expenses.slice(0, 5),
+    viewing: FAMILY_VIEWING,
+  };
+}
+
+function familyInvestments(): FamilyInvestmentsOverview {
+  return {
+    members: FAMILY_MEMBERS.map((member, index) => ({
+      memberId: member.memberId,
+      name: member.name,
+      currency: "EUR",
+      overview: index < 2 ? INVESTMENTS : { ...INVESTMENTS, brokers: [] },
+    })),
+  };
+}
+
+function familyNetWorth(): FamilyNetWorthOverview {
+  return {
+    members: FAMILY_MEMBERS.map((member, index) => ({
+      memberId: member.memberId,
+      name: member.name,
+      currency: "EUR",
+      overview: index < 2 ? NET_WORTH : { ...NET_WORTH, entries: [], totalsByCurrency: [], attention: [] },
+    })),
+    totalsByCurrency: NET_WORTH.totalsByCurrency,
+  };
+}
 
 /** Resolves an SWR key to fixture data, mirroring the API routes' shapes. */
 export function fixtureFor(key: string): unknown {
   const [path, query = ""] = key.split("?");
   const params = new URLSearchParams(query);
+  const family = params.get("member") === "all";
   if (path === "/api/account") return ACCOUNT;
-  if (path === "/api/dashboard") return dashboard();
+  if (path === "/api/family") return FAMILY;
+  if (path === "/api/dashboard") return family ? familyDashboard() : dashboard();
   if (path === "/api/expenses") {
     const month = params.get("month") ?? getBucharestMonth();
+    if (family) return familyLedger(month);
     return ledger(month, month === getBucharestMonth() ? 1 : 0.92);
   }
   if (path === "/api/expense-tabs") return { tabs: [CAR_TAB] };
   if (path.startsWith("/api/expense-tabs/") && path.endsWith("/expenses")) return carLedger();
-  if (path === "/api/investments") return INVESTMENTS;
+  if (path === "/api/investments") return family ? familyInvestments() : INVESTMENTS;
   if (path === "/api/investment-transactions") return transactions(key);
-  if (path === "/api/net-worth") return NET_WORTH;
+  if (path === "/api/net-worth") return family ? familyNetWorth() : NET_WORTH;
   throw new Error(`No preview fixture for ${key}`);
 }

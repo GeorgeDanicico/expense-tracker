@@ -3,11 +3,16 @@ import { Box, Flex, Stack, Table, Text } from "@chakra-ui/react";
 import { CategoryVisual } from "@/components/expenses/category-visual";
 import { DeleteExpenseButton } from "@/components/expenses/delete-expense-button";
 import { Amount } from "@/components/ui/amount";
+import { MemberSwatch } from "@/components/family/member-swatch";
 import { CategoryBadge } from "@/components/ui/status-badge";
+import { useMemberColors } from "@/hooks/use-member-colors";
 import type { ListedExpense } from "@/lib/expenses/types";
 import { formatDate } from "@/lib/calendar";
 
-/** Desktop expense table: 40px rows, numeric amounts, quiet row actions. */
+/**
+ * Desktop expense table: 40px rows, numeric amounts, quiet row actions. In the family view each row
+ * has a start border in its member's colour, and the Member column repeats it beside the name.
+ */
 export function ExpenseTable({
   expenses,
   currency,
@@ -18,6 +23,7 @@ export function ExpenseTable({
   allowDelete: boolean;
 }) {
   const showMember = expenses.some((expense) => expense.memberName);
+  const memberColor = useMemberColors();
   return (
     <Box display={{ base: "none", lg: "block" }} overflowX="auto">
       <Table.Root interactive>
@@ -37,9 +43,11 @@ export function ExpenseTable({
           </Table.Row>
         </Table.Header>
         <Table.Body>
-          {expenses.map((expense) => (
+          {expenses.map((expense) => {
+            const color = showMember ? memberColor(expense.memberId) : undefined;
+            return (
             <Table.Row key={expense.id}>
-              <Table.Cell ps="4">
+              <Table.Cell ps="4" borderInlineStartWidth={color ? "4px" : undefined} borderInlineStartColor={color}>
                 <Flex align="center" gap="2.5">
                   <CategoryVisual category={expense.category} />
                   <Stack minW="0" gap="0">
@@ -54,7 +62,14 @@ export function ExpenseTable({
                   </Stack>
                 </Flex>
               </Table.Cell>
-              {showMember ? <Table.Cell whiteSpace="nowrap">{expense.memberName}</Table.Cell> : null}
+              {showMember ? (
+                <Table.Cell whiteSpace="nowrap">
+                  <Flex as="span" align="center" gap="2">
+                    <MemberSwatch color={color} />
+                    {expense.memberName}
+                  </Flex>
+                </Table.Cell>
+              ) : null}
               <Table.Cell color="fg.muted" whiteSpace="nowrap">{formatDate(expense.expenseDate)}</Table.Cell>
               <Table.Cell>
                 <CategoryBadge category={expense.category} subtype={expense.subtype} />
@@ -70,7 +85,8 @@ export function ExpenseTable({
                 </Table.Cell>
               ) : null}
             </Table.Row>
-          ))}
+            );
+          })}
         </Table.Body>
       </Table.Root>
     </Box>

@@ -4,11 +4,12 @@ import { CategoryVisual } from "@/components/expenses/category-visual";
 import { DeleteExpenseButton } from "@/components/expenses/delete-expense-button";
 import { Amount } from "@/components/ui/amount";
 import { ListRow } from "@/components/ui/list-row";
+import { useMemberColors } from "@/hooks/use-member-colors";
 import { expenseClassificationLabel } from "@/lib/expenses/categories";
 import type { ListedExpense } from "@/lib/expenses/types";
 import { formatDate } from "@/lib/calendar";
 
-/** Mobile expense rows: icon, description, date · category, amount. */
+/** Mobile expense rows: icon, description, date · category, amount; in the family view, a bar in the member's colour. */
 export function ExpenseMobileList({
   expenses,
   currency,
@@ -18,11 +19,13 @@ export function ExpenseMobileList({
   currency: string;
   allowDelete: boolean;
 }) {
+  const memberColor = useMemberColors();
   return (
     <Box as="ul" display={{ base: "block", lg: "none" }} px="4" m="0">
       {expenses.map((expense) => (
         <ListRow
           key={expense.id}
+          accent={memberColor(expense.memberId)}
           leading={<CategoryVisual category={expense.category} />}
           title={expense.description}
           meta={[

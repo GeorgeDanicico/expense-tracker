@@ -48,7 +48,7 @@ export type ExpensesData = {
 };
 
 /** An expense row as the lists show it; the family view adds whose it is and the currency to show it in. */
-export type ListedExpense = Expense & { memberName?: string; currency?: string };
+export type ListedExpense = Expense & { memberId?: string; memberName?: string; currency?: string };
 
 /** Expense figures in one currency. Totals of different currencies are never added together. */
 export type CurrencyTotals = {

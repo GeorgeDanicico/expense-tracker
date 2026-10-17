@@ -7,6 +7,7 @@ import useSWR from "swr";
 
 import { AddInvestmentDialog } from "@/components/investments/add-investment-dialog";
 import { BrokerSection } from "@/components/investments/broker-section";
+import { MemberName } from "@/components/family/member-swatch";
 import { ViewingControls } from "@/components/family/viewing-picker";
 import { WriteOnly } from "@/components/family/write-only";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -131,7 +132,7 @@ function FamilyInvestmentsPanel() {
 
       {data.members.map((entry) => (
         <Stack key={entry.memberId} as="section" gap="3" aria-labelledby={`family-investments-${entry.memberId}`}>
-          <SectionHeader as="h2" id={`family-investments-${entry.memberId}`} title={entry.name} />
+          <SectionHeader as="h2" id={`family-investments-${entry.memberId}`} title={<MemberName memberId={entry.memberId} name={entry.name} />} />
           <CalculationIssues overview={entry.overview} />
           {!entry.overview.brokers.length ? (
             <Card>

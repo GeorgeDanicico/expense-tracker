@@ -1,6 +1,7 @@
 import { defineSemanticTokens } from "@chakra-ui/react";
 
 import { categoryTokens } from "./category-tokens";
+import { memberTokens } from "./member-tokens";
 
 /** A Chakra colour palette usable through `colorPalette="<name>"`. */
 function palette(values: {
@@ -78,6 +79,7 @@ export const semanticTokens = defineSemanticTokens({
       },
     },
     category: categoryTokens,
+    member: memberTokens,
     chart: {
       bar: { value: "{colors.ledger.clay}" },
       track: { value: "{colors.ledger.line}" },

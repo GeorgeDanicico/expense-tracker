@@ -5,6 +5,7 @@ import useSWR from "swr";
 
 import { CurrencyAmounts } from "@/components/expenses/currency-totals";
 import { ExpenseList } from "@/components/expenses/expense-list";
+import { MemberName } from "@/components/family/member-swatch";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
 import { CardLink } from "@/components/ui/card-link";
@@ -60,7 +61,7 @@ export function FamilySummaryDashboard() {
                 <Flex as="li" key={row.memberId} justify="space-between" align="baseline" gap="3">
                   <Stack gap="0" minW="0">
                     <Text textStyle="bodySm" fontWeight="medium" truncate>
-                      {row.name}
+                      <MemberName memberId={row.memberId} name={row.name} />
                     </Text>
                     <Text textStyle="caption">{row.count === 1 ? "1 transaction" : `${row.count} transactions`}</Text>
                   </Stack>

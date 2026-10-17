@@ -4,12 +4,14 @@ import { Box, Button, Flex, Table, Text } from "@chakra-ui/react";
 import { useState } from "react";
 
 import { CreateKidDialog } from "@/components/family/create-kid-dialog";
+import { MemberSwatch } from "@/components/family/member-swatch";
 import { EditPermissionsDialog } from "@/components/family/edit-permissions-dialog";
 import { RemoveMemberDialog } from "@/components/family/remove-member-dialog";
 import { ResetPasswordDialog } from "@/components/family/reset-password-dialog";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { lastActiveLabel } from "@/lib/family/last-active-label";
+import { memberColorTokens } from "@/lib/family/member-colors";
 import type { FamilyData, FamilyMember } from "@/lib/family/repository";
 
 function memberName(member: FamilyMember) {
@@ -20,7 +22,7 @@ function roleLabel(member: FamilyMember) {
   return member.role === "parent" ? "Parent" : "Kid";
 }
 
-function MemberRow({ member, canRemove }: { member: FamilyMember; canRemove: boolean }) {
+function MemberRow({ member, canRemove, color }: { member: FamilyMember; canRemove: boolean; color: string | undefined }) {
   const [editing, setEditing] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -30,6 +32,7 @@ function MemberRow({ member, canRemove }: { member: FamilyMember; canRemove: boo
     <Table.Row>
       <Table.Cell ps="4">
         <Flex align="center" gap="2" minW="0">
+          <MemberSwatch color={color} />
           <Box minW="0">
             <Text as="span" textStyle="bodySm" fontWeight="medium" display="block" truncate>
               {name}
@@ -91,6 +94,7 @@ function MemberRow({ member, canRemove }: { member: FamilyMember; canRemove: boo
 /** The members table for parents: role, last activity, kid accounts, permission and password buttons for each kid, and Remove for the creator. */
 export function ManageMembers({ data, isCreator = false }: { data: FamilyData; isCreator?: boolean }) {
   const [adding, setAdding] = useState(false);
+  const colors = memberColorTokens(data.members);
 
   return (
     <Card>
@@ -119,7 +123,12 @@ export function ManageMembers({ data, isCreator = false }: { data: FamilyData; i
           </Table.Header>
           <Table.Body>
             {data.members.map((member) => (
-              <MemberRow key={member.memberId} member={member} canRemove={isCreator} />
+              <MemberRow
+                key={member.memberId}
+                member={member}
+                canRemove={isCreator}
+                color={colors.get(member.memberId.toLowerCase())}
+              />
             ))}
           </Table.Body>
         </Table.Root>

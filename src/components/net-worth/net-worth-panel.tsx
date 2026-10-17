@@ -5,6 +5,7 @@ import { Landmark, WalletCards } from "lucide-react";
 import { useMemo } from "react";
 import useSWR from "swr";
 
+import { MemberName } from "@/components/family/member-swatch";
 import { ViewingControls } from "@/components/family/viewing-picker";
 import { WriteOnly } from "@/components/family/write-only";
 import { AddNetWorthItemDialog } from "@/components/net-worth/add-net-worth-item-dialog";
@@ -133,7 +134,7 @@ function FamilyNetWorthPanel() {
 
       {data.members.map((entry) => (
         <Stack key={entry.memberId} as="section" gap="3" aria-labelledby={`family-net-worth-${entry.memberId}`}>
-          <SectionHeader id={`family-net-worth-${entry.memberId}`} title={entry.name} />
+          <SectionHeader id={`family-net-worth-${entry.memberId}`} title={<MemberName memberId={entry.memberId} name={entry.name} />} />
           <NetWorthAttention overview={entry.overview} />
           {entry.overview.totalsByCurrency.length ? (
             <SimpleGrid columns={{ base: 1, sm: 2, xl: 3 }} gap="4" alignItems="start">
