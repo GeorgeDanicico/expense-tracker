@@ -1,21 +1,25 @@
 "use client";
 
-import { Button, Stack } from "@chakra-ui/react";
+import { Button } from "@chakra-ui/react";
 import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
-import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
 import { apiRequest } from "@/lib/api/client";
 import { afterSignOut } from "@/lib/api/invalidate";
 
+/** The sign-out flow: the button opens a confirmation, and only "Yes, log me out" signs out. */
 function useSignOut() {
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const form = useApiForm();
+  const [confirming, setConfirming] = useState(false);
+
   function signOut() {
     void form.submit(async () => {
       await apiRequest<{ success: true }>("/api/auth", { method: "DELETE" });
@@ -23,17 +27,36 @@ function useSignOut() {
       router.replace("/login");
     }, { fallback: "Unable to sign out. Try again." });
   }
-  return { signOut, pending: form.pending, error: form.error };
+
+  const dialog = (
+    <ConfirmDialog
+      open={confirming}
+      onOpenChange={(open) => {
+        if (form.pending) return;
+        setConfirming(open);
+        if (!open) form.reset();
+      }}
+      title="Are you sure you want to log out?"
+      description="You'll need your email or username and password to sign back in."
+      confirmLabel="Yes, log me out"
+      cancelLabel="No"
+      tone="brand"
+      cancelTone="orange"
+      pending={form.pending}
+      error={form.error}
+      onConfirm={signOut}
+    />
+  );
+  return { open: () => setConfirming(true), dialog };
 }
 
 /** Full-width sign-out row (More sheet). */
 export function SignOutButton() {
-  const { signOut, pending, error } = useSignOut();
+  const { open, dialog } = useSignOut();
   return (
-    <Stack gap="2">
+    <>
       <Button
-        onClick={signOut}
-        loading={pending}
+        onClick={open}
         variant="ghost"
         size="md"
         h="11"
@@ -44,24 +67,20 @@ export function SignOutButton() {
       >
         <LogOut size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" /> Sign out
       </Button>
-      {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
-    </Stack>
+      {dialog}
+    </>
   );
 }
 
 /** Icon-only sign-out with a tooltip (sidebar account row). */
 export function SignOutIconButton() {
-  const { signOut, pending, error } = useSignOut();
+  const { open, dialog } = useSignOut();
   return (
     <>
-      <IconButton aria-label="Sign out" size="xs" tooltip onClick={signOut} loading={pending}>
+      <IconButton aria-label="Sign out" size="xs" tooltip onClick={open}>
         <LogOut size={ICON.xs} strokeWidth={ICON_STROKE} />
       </IconButton>
-      {error ? (
-        <Stack position="absolute" insetX="3" bottom="100%" mb="2">
-          <InlineAlert status="error">{error}</InlineAlert>
-        </Stack>
-      ) : null}
+      {dialog}
     </>
   );
 }

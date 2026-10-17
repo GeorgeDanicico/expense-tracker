@@ -20,6 +20,7 @@ export function ConfirmDialog({
   onOpenChange,
   trigger,
   tone = "danger",
+  cancelTone,
   children,
 }: {
   title: ReactNode;
@@ -33,6 +34,7 @@ export function ConfirmDialog({
   onOpenChange?: (open: boolean) => void;
   trigger?: ReactNode;
   tone?: "danger" | "brand";
+  cancelTone?: "orange";
   children?: ReactNode;
 }) {
   return (
@@ -52,6 +54,7 @@ export function ConfirmDialog({
           closesDialog
           pending={pending}
           tone={tone}
+          cancelTone={cancelTone}
           onSubmit={onConfirm}
         />
       }

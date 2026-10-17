@@ -21,6 +21,11 @@ export const tokens = defineTokens({
       clay: { value: "#D97757" },
       clayDark: { value: "#A64B32" },
       clayLine: { value: "#E6CBBE" },
+      // A brighter orange than clay, for a "stay here" action next to a neutral one (sign-out's "No").
+      // White text on it is 4.6:1.
+      orange: { value: "#C4520F" },
+      orangeBg: { value: "#FDEFE4" },
+      orangeLine: { value: "#F3D3BC" },
     },
     status: {
       positive: { value: "#37634A" },

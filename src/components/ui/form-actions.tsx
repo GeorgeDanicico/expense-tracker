@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 /**
  * Cancel + submit pair. Right-aligned on desktop, equal-width on mobile.
  * `closesDialog` turns Cancel into the surrounding dialog's close action.
+ * `cancelTone` makes Cancel a solid button too, for when staying put is the answer to encourage.
  */
 export function FormActions({
   submitLabel,
@@ -15,6 +16,7 @@ export function FormActions({
   pending = false,
   disabled = false,
   tone = "brand",
+  cancelTone,
   form,
   onSubmit,
   leading,
@@ -26,6 +28,7 @@ export function FormActions({
   pending?: boolean;
   disabled?: boolean;
   tone?: "brand" | "danger";
+  cancelTone?: "orange";
   /** `id` of the form to submit, when the actions sit outside it. */
   form?: string;
   /** Click handler instead of a form submission. */
@@ -35,7 +38,13 @@ export function FormActions({
 }) {
   const responsive = { flex: { base: "1", sm: "initial" }, size: { base: "md", sm: "sm" } } as const;
   const cancel = onCancel || closesDialog ? (
-    <Button variant="ghost" disabled={pending} onClick={onCancel} {...responsive}>
+    <Button
+      variant={cancelTone ? "solid" : "ghost"}
+      colorPalette={cancelTone}
+      disabled={pending}
+      onClick={onCancel}
+      {...responsive}
+    >
       {cancelLabel}
     </Button>
   ) : null;

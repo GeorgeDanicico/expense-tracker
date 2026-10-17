@@ -105,6 +105,16 @@ export const semanticTokens = defineSemanticTokens({
       border: "{colors.ledger.lineStrong}",
       focusRing: "{colors.ledger.clayDark}",
     }),
+    orange: palette({
+      solid: "{colors.ledger.orange}",
+      contrast: "{colors.ledger.surface}",
+      fg: "{colors.ledger.orange}",
+      subtle: "{colors.ledger.orangeBg}",
+      muted: "{colors.ledger.orangeLine}",
+      emphasized: "{colors.ledger.orangeLine}",
+      border: "{colors.ledger.orangeLine}",
+      focusRing: "{colors.ledger.orange}",
+    }),
     danger: palette({
       solid: "{colors.status.negative}",
       contrast: "{colors.ledger.surface}",
