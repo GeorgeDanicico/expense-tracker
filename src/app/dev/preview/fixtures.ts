@@ -21,7 +21,7 @@ import { ALL_MEMBERS, type Viewing } from "@/lib/family/viewing";
 import type { FamilyInvestmentsOverview } from "@/lib/investments/types";
 import type { FamilyNetWorthOverview } from "@/lib/net-worth/types";
 
-import { dateInMonth, daysInMonth, getBucharestMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
+import { dateInMonth, daysInMonth, formatMonth, getBucharestMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
 
 /** Deterministic sample data for the development screen preview. */
 const TEMPLATE: [string, number, ExpenseCategory, string | null][] = [
@@ -237,10 +237,10 @@ const FAMILY_VIEWING: Viewing = { memberId: ALL_MEMBERS, displayName: null, curr
 // A four-person family, so the "Viewing" picker and the family views (`?member=all`) can be previewed.
 // "George" is the previewing account; each member's sample month is the template scaled and trimmed.
 const FAMILY_MEMBERS = [
-  { memberId: "m-george", name: "George", role: "parent", scale: 1, keep: 14 },
-  { memberId: "m-maria", name: "Maria", role: "parent", scale: 0.7, keep: 11 },
-  { memberId: "m-ana", name: "Ana", role: "kid", scale: 0.18, keep: 7 },
-  { memberId: "m-luca", name: "Luca", role: "kid", scale: 0.12, keep: 5 },
+  { memberId: "m-george", name: "George", role: "parent", scale: 1, keep: 14, currency: "EUR" },
+  { memberId: "m-maria", name: "Maria", role: "parent", scale: 0.7, keep: 11, currency: "EUR" },
+  { memberId: "m-ana", name: "Ana", role: "kid", scale: 0.18, keep: 7, currency: "EUR" },
+  { memberId: "m-luca", name: "Luca", role: "kid", scale: 0.12, keep: 5, currency: "RON" },
 ] as const;
 
 const ACCOUNT: AccountData = {
@@ -267,7 +267,7 @@ const FAMILY: FamilyResponse = {
       isCreator: index === 0,
       displayName: member.name,
       username: member.role === "kid" ? member.name.toLowerCase() : null,
-      currency: "EUR",
+      currency: member.currency,
       joinedAt: `2026-01-0${index + 4}T10:00:00.000Z`,
     })),
   },
@@ -282,7 +282,7 @@ function familyExpenses(month: string): FamilyExpensesData["expenses"] {
         id: `${member.memberId}-${expense.id}`,
         memberId: member.memberId,
         memberName: member.name,
-        currency: "EUR",
+        currency: member.currency,
       })),
   ).toSorted((a, b) => b.expenseDate.localeCompare(a.expenseDate) || a.memberName.localeCompare(b.memberName));
 }
@@ -307,15 +307,31 @@ function familyDashboard(): FamilyDashboardData {
     analyticsLabel: single.analytics.label,
     members: FAMILY_MEMBERS.map((member) => {
       const own = expenses.filter((expense) => expense.memberId === member.memberId);
+      const total = Math.round(own.reduce((sum, expense) => sum + expense.amount, 0) * 100) / 100;
+      const categories = new Map<ExpenseCategory, number>();
+      for (const expense of own) categories.set(expense.category, (categories.get(expense.category) ?? 0) + expense.amount * 3);
       return {
         memberId: member.memberId,
         name: member.name,
-        currency: "EUR",
-        total: Math.round(own.reduce((sum, expense) => sum + expense.amount, 0) * 100) / 100,
+        currency: member.currency,
+        total,
         count: own.length,
+        series: [
+          ...single.analytics.series.map((point) => ({
+            ...point,
+            label: formatMonth(point.key),
+            total: Math.round(point.total * member.scale * (member.keep / 14) * 100) / 100,
+          })),
+          { key: currentMonth, label: formatMonth(currentMonth), total },
+        ],
+        categoryTotals: [...categories]
+          .map(([category, amount]) => ({ category, label: CATEGORY_LABELS[category], total: Math.round(amount * 100) / 100 }))
+          .sort((a, b) => b.total - a.total),
       };
     }),
-    currentExpenses: expenses.slice(0, 5),
+    currentExpenses: FAMILY_MEMBERS.flatMap((member) =>
+      expenses.filter((expense) => expense.memberId === member.memberId).slice(0, 5),
+    ).toSorted((a, b) => b.expenseDate.localeCompare(a.expenseDate) || a.memberName.localeCompare(b.memberName)),
     viewing: FAMILY_VIEWING,
   };
 }
@@ -325,7 +341,7 @@ function familyInvestments(): FamilyInvestmentsOverview {
     members: FAMILY_MEMBERS.map((member, index) => ({
       memberId: member.memberId,
       name: member.name,
-      currency: "EUR",
+      currency: member.currency,
       overview: index < 2 ? INVESTMENTS : { ...INVESTMENTS, brokers: [] },
     })),
   };
@@ -336,7 +352,7 @@ function familyNetWorth(): FamilyNetWorthOverview {
     members: FAMILY_MEMBERS.map((member, index) => ({
       memberId: member.memberId,
       name: member.name,
-      currency: "EUR",
+      currency: member.currency,
       overview: index < 2 ? NET_WORTH : { ...NET_WORTH, entries: [], totalsByCurrency: [], attention: [] },
     })),
     totalsByCurrency: NET_WORTH.totalsByCurrency,

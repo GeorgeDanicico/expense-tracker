@@ -170,11 +170,35 @@ describe("the family view", () => {
         { currency: "RON", total: 200, count: 3, average: 200 / 3, largest: 100 },
         { currency: "EUR", total: 85, count: 1, average: 85, largest: 85 },
       ]);
-      expect(data.members).toEqual([
+      expect(data.members.map(({ memberId, name, currency, total, count }) => ({ memberId, name, currency, total, count }))).toEqual([
         { memberId: "m1", name: "Mara", currency: "RON", total: 140, count: 2 },
         { memberId: "m2", name: "Dan", currency: "RON", total: 60, count: 1 },
         { memberId: "m3", name: "Ana", currency: "EUR", total: 85, count: 1 },
       ]);
+    });
+
+    it("gives each member a monthly series ending with this month, and their own category totals", async () => {
+      repositories.expenses.expenses.set("mara", [
+        expense("a", 100, { expenseDate: "2026-09-02" }),
+        expense("m", 30, { expenseDate: "2026-08-03", category: "groceries" }),
+        expense("k", 12, { expenseDate: "2026-07-03", category: "health" }),
+      ]);
+
+      const [mara, dan] = (await getFamilyDashboardData(viewers, filters)).members;
+
+      expect(mara.series.map((point) => [point.key, point.total])).toEqual([
+        ["2026-06", 0],
+        ["2026-07", 12],
+        ["2026-08", 30],
+        ["2026-09", 100],
+      ]);
+      expect(mara.series.at(-1)?.label).toBe("September 2026");
+      expect(mara.categoryTotals.map((item) => [item.category, item.total])).toEqual([
+        ["groceries", 30],
+        ["health", 12],
+      ]);
+      expect(dan.series.map((point) => point.total)).toEqual([0, 0, 0, 60]);
+      expect(dan.categoryTotals).toEqual([]);
     });
 
     it("lists the family's newest expenses with their owners", async () => {
@@ -188,13 +212,15 @@ describe("the family view", () => {
       ]);
     });
 
-    it("keeps only the newest five of everyone's recent expenses", async () => {
-      repositories.expenses.expenses.set("dan", ["1", "2", "3", "4", "5"].map((id) => expense(id, 1, { expenseDate: "2026-09-24" })));
+    it("keeps each member's own newest five, not the family's newest five", async () => {
+      repositories.expenses.expenses.set("dan", ["1", "2", "3", "4", "5", "6"].map((id) => expense(id, 1, { expenseDate: "2026-09-24" })));
 
       const data = await getFamilyDashboardData(viewers, filters);
 
-      expect(data.currentExpenses).toHaveLength(5);
-      expect(data.currentExpenses.every((entry) => entry.memberName === "Dan")).toBe(true);
+      const byMember = Object.groupBy(data.currentExpenses, (entry) => entry.memberName);
+      expect(byMember.Dan).toHaveLength(5);
+      expect(byMember.Mara).toHaveLength(2);
+      expect(byMember.Ana).toHaveLength(1);
     });
 
     it("groups the analytics range per currency too", async () => {

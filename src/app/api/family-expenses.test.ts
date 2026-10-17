@@ -175,12 +175,16 @@ describe("GET /api/dashboard?member=all", () => {
       { currency: "EUR", total: 100, count: 2, average: 50, largest: 70 },
       { currency: "USD", total: 15.5, count: 1, average: 15.5, largest: 15.5 },
     ]);
-    expect(body.members).toEqual([
+    expect(body.members).toMatchObject([
       { memberId: MARA.memberId, name: "Mara", currency: "EUR", total: 30, count: 1 },
       { memberId: DAN.memberId, name: "Dan", currency: "EUR", total: 70, count: 1 },
       { memberId: ANA.memberId, name: "Ana", currency: "RON", total: 120, count: 1 },
       { memberId: ION.memberId, name: "Ion", currency: "USD", total: 15.5, count: 1 },
     ]);
+    for (const member of body.members) {
+      expect(member.series.at(-1)).toMatchObject({ key: THIS_MONTH, total: member.total });
+      expect(member.categoryTotals).toEqual(expect.any(Array));
+    }
     expect(body.viewing).toEqual({ memberId: "all", displayName: null, currency: null, readOnly: true });
   });
 

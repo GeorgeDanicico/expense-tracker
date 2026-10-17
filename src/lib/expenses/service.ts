@@ -10,7 +10,7 @@ import type {
   FamilyDashboardData,
   FamilyExpensesData,
 } from "@/lib/expenses/types";
-import { getBucharestMonth, getMonthRange } from "@/lib/calendar";
+import { formatMonth, getBucharestMonth, getMonthRange } from "@/lib/calendar";
 import type { FamilyViewer } from "@/lib/family/viewed-user";
 import { getRepositories } from "@/lib/repositories";
 
@@ -109,6 +109,11 @@ export async function getFamilyDashboardData(
       currency: viewers[index].currency,
       total: data.currentTotal,
       count: data.currentCount,
+      series: [
+        ...data.analytics.series.filter((point) => point.key !== data.currentMonth),
+        { key: data.currentMonth, label: formatMonth(data.currentMonth), total: data.currentTotal },
+      ],
+      categoryTotals: data.analytics.categoryTotals,
     })),
     currentExpenses: perMember
       .flatMap((data, index) =>
@@ -119,7 +124,6 @@ export async function getFamilyDashboardData(
           currency: viewers[index].currency,
         })),
       )
-      .toSorted(compareFamilyExpenses)
-      .slice(0, 5),
+      .toSorted(compareFamilyExpenses),
   };
 }
