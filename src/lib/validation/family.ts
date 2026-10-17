@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { MEMBER_COLOR_COUNT } from "@/lib/family/member-colors";
 import { FAMILY_ROLES, MODULE_LABELS, MODULE_LEVELS, type ModuleKey, type Permissions } from "@/lib/permissions";
 import { passwordSchema } from "@/lib/validation/password";
 
@@ -35,6 +36,16 @@ export const deleteFamilySchema = z.object({
 
 /** The body of `PATCH /api/family/members/[id]/permissions`. */
 export const memberPermissionsSchema = z.object({ permissions: permissionsSchema });
+
+/** The body of `PATCH /api/family/members/[id]/color`: a palette slot 1..8, or `null` for automatic. */
+export const memberColorSchema = z.object({
+  color: z
+    .number("Choose one of the eight colours.")
+    .int("Choose one of the eight colours.")
+    .min(1, "Choose one of the eight colours.")
+    .max(MEMBER_COLOR_COUNT, "Choose one of the eight colours.")
+    .nullable(),
+});
 
 /** Lowercase; starts with a letter or digit, then letters, digits, dots, underscores or hyphens; 3–30 characters. */
 export const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,29}$/;

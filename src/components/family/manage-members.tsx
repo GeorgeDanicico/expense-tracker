@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { CreateKidDialog } from "@/components/family/create-kid-dialog";
 import { MemberSwatch } from "@/components/family/member-swatch";
+import { EditColorDialog } from "@/components/family/edit-color-dialog";
 import { EditPermissionsDialog } from "@/components/family/edit-permissions-dialog";
 import { RemoveMemberDialog } from "@/components/family/remove-member-dialog";
 import { ResetPasswordDialog } from "@/components/family/reset-password-dialog";
@@ -22,7 +23,18 @@ function roleLabel(member: FamilyMember) {
   return member.role === "parent" ? "Parent" : "Kid";
 }
 
-function MemberRow({ member, canRemove, color }: { member: FamilyMember; canRemove: boolean; color: string | undefined }) {
+function MemberRow({
+  member,
+  members,
+  canRemove,
+  color,
+}: {
+  member: FamilyMember;
+  members: readonly FamilyMember[];
+  canRemove: boolean;
+  color: string | undefined;
+}) {
+  const [choosingColor, setChoosingColor] = useState(false);
   const [editing, setEditing] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -56,6 +68,14 @@ function MemberRow({ member, canRemove, color }: { member: FamilyMember; canRemo
       </Table.Cell>
       <Table.Cell pe="3">
         <Flex direction={{ base: "column", md: "row" }} align="stretch" justify="flex-end" gap="1.5">
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => setChoosingColor(true)}
+            aria-label={`Choose colour for ${name}`}
+          >
+            Colour
+          </Button>
           {member.role === "kid" ? (
             <>
               <Button size="xs" variant="outline" onClick={() => setEditing(true)} aria-label={`Edit permissions for ${name}`}>
@@ -83,6 +103,7 @@ function MemberRow({ member, canRemove, color }: { member: FamilyMember; canRemo
             </Button>
           ) : null}
         </Flex>
+        {choosingColor ? <EditColorDialog member={member} members={members} open onOpenChange={setChoosingColor} /> : null}
         {editing ? <EditPermissionsDialog member={member} open onOpenChange={setEditing} /> : null}
         {resetting ? <ResetPasswordDialog member={member} open onOpenChange={setResetting} /> : null}
         {removing ? <RemoveMemberDialog member={member} open onOpenChange={setRemoving} /> : null}
@@ -91,7 +112,7 @@ function MemberRow({ member, canRemove, color }: { member: FamilyMember; canRemo
   );
 }
 
-/** The members table for parents: role, last activity, kid accounts, permission and password buttons for each kid, and Remove for the creator. */
+/** The members table for parents: role, last activity, kid accounts, a colour button for each member, permission and password buttons for each kid, and Remove for the creator. */
 export function ManageMembers({ data, isCreator = false }: { data: FamilyData; isCreator?: boolean }) {
   const [adding, setAdding] = useState(false);
   const colors = memberColorTokens(data.members);
@@ -126,6 +147,7 @@ export function ManageMembers({ data, isCreator = false }: { data: FamilyData; i
               <MemberRow
                 key={member.memberId}
                 member={member}
+                members={data.members}
                 canRemove={isCreator}
                 color={colors.get(member.memberId.toLowerCase())}
               />

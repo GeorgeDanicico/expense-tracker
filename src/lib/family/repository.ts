@@ -38,6 +38,8 @@ export type FamilyMember = {
   username: string | null;
   /** The member's ISO 4217 currency, visible to everyone in the family; the app default without a profile. */
   currency: string;
+  /** The palette slot (1..8) a parent chose for this member, or `null` for an automatic colour. */
+  color: number | null;
   joinedAt: string;
   /**
    * Hidden (absent) unless the caller is a parent or this is the caller's own entry.
@@ -107,6 +109,13 @@ export interface FamilyRepository {
    * when the member isn't in the caller's family, and a 422 one when the permissions are invalid.
    */
   setMemberPermissions(memberId: string, permissions: Permissions): Promise<void>;
+  /**
+   * Sets a member's palette colour (1..8), or resets it to automatic with `null`. For parents, on any
+   * member of their family. Throws a 403 `DomainError` when the caller isn't a parent, a 404 one when
+   * the member isn't in the caller's family, a 422 one for a colour outside 1..8, and a 409 one when
+   * another member already has that colour.
+   */
+  setMemberColor(memberId: string, color: number | null): Promise<void>;
   /**
    * Adds the account `userId` to the caller's family as a kid with `permissions` (every module), and
    * returns the new member's id. For parents, and only for an account created for the caller's family

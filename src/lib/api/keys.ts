@@ -141,6 +141,10 @@ export function familyMemberPermissionsApiUrl(memberId: string) {
   return `/api/family/members/${encodeURIComponent(memberId)}/permissions`;
 }
 
+export function familyMemberColorApiUrl(memberId: string) {
+  return `/api/family/members/${encodeURIComponent(memberId)}/color`;
+}
+
 /** POST only: `{ displayName, username, password, permissions }` → {@link FamilyResponse} with the updated family (201). Parents only. */
 export const FAMILY_KIDS_API_URL = "/api/family/kids";
 

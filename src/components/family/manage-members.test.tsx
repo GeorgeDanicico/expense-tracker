@@ -19,6 +19,7 @@ function member(overrides: Partial<FamilyMember>): FamilyMember {
     displayName: null,
     username: null,
     currency: "RON",
+    color: null,
     joinedAt: "2026-10-12T08:00:00Z",
     lastActiveAt: null,
     ...overrides,
@@ -52,6 +53,14 @@ describe("ManageMembers", () => {
     expect(html.match(/Edit permissions/g)).toHaveLength(2); // aria-label and text of the single kid button
     expect(html).toContain("Edit permissions for Mara");
     expect(html).not.toContain("Edit permissions for Ana");
+  });
+});
+
+describe("ManageMembers colours", () => {
+  it("offers a colour button for every member", () => {
+    const html = render(<ManageMembers data={data} />);
+    expect(html).toContain("Choose colour for Ana");
+    expect(html).toContain("Choose colour for Mara");
   });
 });
 
