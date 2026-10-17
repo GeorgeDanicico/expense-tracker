@@ -12,7 +12,7 @@ export const POST = withUser(async (request) => {
   const { password } = await parseBody(request, changePasswordSchema, "Check the highlighted details and try again.");
 
   const updated = await getAuth().updatePassword(password);
-  if (!updated.ok) throw new HttpError(400, updated.reason);
+  if (!updated.ok) throw new HttpError(updated.kind === "rate_limited" ? 429 : 400, updated.reason);
 
   await getRepositories().account.completePasswordChange();
   return noContent();

@@ -31,10 +31,10 @@ export function unauthorized() {
 
 /** An expected request failure. `withUser` turns it into `{ error, fieldErrors? }` with its status. */
 export class HttpError extends Error {
-  readonly status: 400 | 404 | 422;
+  readonly status: 400 | 404 | 422 | 429;
   readonly fieldErrors?: FieldErrors;
 
-  constructor(status: 400 | 404 | 422, message: string, fieldErrors?: FieldErrors) {
+  constructor(status: 400 | 404 | 422 | 429, message: string, fieldErrors?: FieldErrors) {
     super(message);
     this.name = "HttpError";
     this.status = status;

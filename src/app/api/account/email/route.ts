@@ -16,7 +16,7 @@ export const PATCH = withUser(async (request: NextRequest) => {
   confirmationUrl.searchParams.set("next", "/settings");
 
   const updated = await getAuth().updateEmail(email, confirmationUrl.toString());
-  if (!updated.ok) throw new HttpError(400, updated.reason);
+  if (!updated.ok) throw new HttpError(updated.kind === "rate_limited" ? 429 : 400, updated.reason);
 
   return noContent();
 }, { failure: "Unable to change your email. Please try again." });

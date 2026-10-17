@@ -71,6 +71,10 @@ export async function POST(request: NextRequest) {
     const email = "email" in signInName ? signInName.email : await emailForUsername(signInName.username);
     const signIn = email === null ? null : await getAuth().signInWithPassword(email, password);
     if (!signIn?.ok) {
+      // The provider only says the email isn't confirmed after checking the password, so this
+      // reveals nothing to someone guessing. Any other refusal reads like a wrong password.
+      if (signIn?.kind === "rate_limited") return json({ error: signIn.reason }, 429);
+      if (signIn?.kind === "email_not_confirmed") return json({ error: signIn.reason }, 403);
       return json({ error: SIGN_IN_FAILED }, 401);
     }
     return json({ authenticated: true });
@@ -84,7 +88,7 @@ export async function POST(request: NextRequest) {
   const signUp = await getAuth().signUp(parsed.data.email, parsed.data.password, confirmationUrl.toString());
 
   if (!signUp.ok) {
-    return json({ error: signUp.reason }, 400);
+    return json({ error: signUp.reason }, signUp.kind === "rate_limited" ? 429 : 400);
   }
 
   return json(

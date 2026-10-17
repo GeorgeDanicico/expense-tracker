@@ -117,6 +117,23 @@ describe("POST /api/auth", () => {
     expect(auth.currentUser).toBeNull();
   });
 
+  it("answers 429 with the reason when the provider rate-limits sign-in", async () => {
+    auth.addUser(email, password);
+    auth.fail("signInWithPassword", "Too many attempts.", "rate_limited");
+
+    const response = await post({ mode: "login", email, password });
+
+    expect(response).toMatchObject({ status: 429, body: { error: "Too many attempts." } });
+  });
+
+  it("answers 403 asking to confirm the email for the right password on an unconfirmed account", async () => {
+    await auth.signUp(email, password, "http://localhost/auth/confirm");
+
+    const response = await post({ mode: "login", email, password });
+
+    expect(response).toMatchObject({ status: 403, body: { error: "Email not confirmed" } });
+  });
+
   it("signs in with a username, ignoring case and spaces", async () => {
     const kid = await addKid();
 
@@ -222,6 +239,14 @@ describe("POST /api/auth", () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "User already registered" });
+  });
+
+  it("answers 429 with the reason when the provider can't send more emails", async () => {
+    auth.fail("signUp", "We've sent too many emails.", "rate_limited");
+
+    const response = await post({ mode: "signup", email, password });
+
+    expect(response).toMatchObject({ status: 429, body: { error: "We've sent too many emails." } });
   });
 });
 

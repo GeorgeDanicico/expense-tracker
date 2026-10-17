@@ -112,6 +112,38 @@ describe("supabaseAuth", () => {
     expect(await supabaseAuth.signUp("a@example.test", "secret-1", "http://x.test")).toEqual({ ok: false, reason: "provider says no" });
   });
 
+  it("explains the email rate limit instead of passing the provider's terse message on", async () => {
+    mockAuth({
+      signUp: { data: { session: null }, error: { message: "email rate limit exceeded", code: "over_email_send_rate_limit", status: 429 } },
+    });
+
+    expect(await supabaseAuth.signUp("a@example.test", "secret-1", "http://x.test")).toEqual({
+      ok: false,
+      kind: "rate_limited",
+      reason: "We've sent too many emails in a short time. Please wait up to an hour, then try again.",
+    });
+  });
+
+  it("treats any other 429 as a rate limit", async () => {
+    mockAuth({ updateUser: { data: { user: null }, error: { message: "slow down", code: "something_new", status: 429 } } });
+
+    expect(await supabaseAuth.updateEmail("a@example.test", "http://x.test")).toEqual({
+      ok: false,
+      kind: "rate_limited",
+      reason: "Too many attempts in a short time. Please wait a few minutes, then try again.",
+    });
+  });
+
+  it("marks a sign-in to an unconfirmed account", async () => {
+    mockAuth({ signInWithPassword: { data: {}, error: { message: "Email not confirmed", code: "email_not_confirmed", status: 400 } } });
+
+    expect(await supabaseAuth.signInWithPassword("a@example.test", "secret-1")).toEqual({
+      ok: false,
+      kind: "email_not_confirmed",
+      reason: "Confirm your email first: open the link we sent you, then sign in.",
+    });
+  });
+
   it("signs out", async () => {
     mockAuth({ signOut: { error: null } });
     expect(await supabaseAuth.signOut()).toEqual({ ok: true });
