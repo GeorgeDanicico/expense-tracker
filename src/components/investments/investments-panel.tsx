@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Flex, Stack } from "@chakra-ui/react";
+import { Box, Flex, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import { Inbox, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import useSWR from "swr";
@@ -15,14 +15,17 @@ import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { InvestmentValue } from "@/components/investments/investment-value";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useViewing } from "@/hooks/use-viewing";
 import { apiFetcher } from "@/lib/api/client";
 import { investmentsApiKey } from "@/lib/api/keys";
+import { familyInvestmentTotals } from "@/lib/investments/family-totals";
 import { investmentAssetKey } from "@/lib/investments/identity";
 import type { FamilyInvestmentsOverview, InvestmentOverviewAsset, InvestmentsOverview } from "@/lib/investments/types";
+import { formatInvestmentAmount } from "@/lib/utils/currency";
 
 function CalculationIssues({ overview }: { overview: InvestmentsOverview }) {
   if (!overview.calculationIssues?.length) return null;
@@ -109,6 +112,31 @@ function SingleInvestmentsPanel() {
   );
 }
 
+/** The whole family's total per currency, above the member sections. */
+function FamilyTotals({ data }: { data: FamilyInvestmentsOverview }) {
+  const totals = familyInvestmentTotals(data);
+  if (!totals.length) return null;
+
+  return (
+    <Card>
+      <Card.Header title="Family total" />
+      <Card.Body>
+        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap="4">
+          {totals.map((total) => (
+            <Stack key={total.currency} gap="0.5" minW="0">
+              <Text textStyle="label" color="fg.muted">Total ({total.currency})</Text>
+              <Text textStyle="amountLg">
+                <InvestmentValue currentValue={total.currentValue} unrealizedGain={total.unrealizedGain} currency={total.currency} />
+              </Text>
+              <Text textStyle="caption">Cost basis {formatInvestmentAmount(total.remainingCost, total.currency)}</Text>
+            </Stack>
+          ))}
+        </SimpleGrid>
+      </Card.Body>
+    </Card>
+  );
+}
+
 /** The family view: one section per member, using the same broker sections, read-only. */
 function FamilyInvestmentsPanel() {
   useDocumentTitle("Investments");
@@ -129,6 +157,8 @@ function FamilyInvestmentsPanel() {
       <PageHeader title="Investments" />
       <ViewingControls noun="investments" family />
       <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
+
+      <FamilyTotals data={data} />
 
       {data.members.map((entry) => (
         <Stack key={entry.memberId} as="section" gap="3" aria-labelledby={`family-investments-${entry.memberId}`}>
@@ -155,7 +185,7 @@ function FamilyInvestmentsPanel() {
 
       <Flex align="center" gap="2" textStyle="caption">
         <TriangleAlert size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
-        Values are shown separately by member and currency; no currencies are combined.
+        Totals are added per currency; no currencies are combined. A total with no price for some holding shows cost basis only.
       </Flex>
     </Stack>
   );

@@ -139,9 +139,7 @@ export type FamilyInvestmentsMember = {
 };
 
 /**
- * The family view of investments (`?member=all`): one overview per member, in family order. There are
- * no combined totals, because an overview only reports totals per broker and currency, each valued
- * only where a quote exists.
+ * The family total is added up per currency on the client (see family-totals.ts).
  */
 export type FamilyInvestmentsOverview = { members: FamilyInvestmentsMember[] };
 
