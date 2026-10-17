@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 import type {
   AuthenticatedUser,
+  AuthFailure,
   AuthResult,
   AuthService,
   AuthSession,
@@ -16,8 +17,42 @@ import type { Database } from "@/lib/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { createClient, getBearerToken, runWithSupabaseClient } from "@/lib/supabase/server";
 
-function result(error: { message: string } | null): AuthResult {
-  return error ? { ok: false, reason: error.message } : { ok: true };
+type ProviderError = { message: string; code?: string; status?: number };
+
+/**
+ * Supabase Auth's error codes the user can act on, with what to tell them. Its own messages are terse
+ * ("email rate limit exceeded") and name limits the user doesn't know about.
+ */
+const KNOWN_FAILURES: Record<string, Omit<AuthFailure, "ok">> = {
+  over_email_send_rate_limit: {
+    kind: "rate_limited",
+    reason: "We've sent too many emails in a short time. Please wait up to an hour, then try again.",
+  },
+  over_request_rate_limit: {
+    kind: "rate_limited",
+    reason: "Too many attempts in a short time. Please wait a few minutes, then try again.",
+  },
+  email_not_confirmed: {
+    kind: "email_not_confirmed",
+    reason: "Confirm your email first: open the link we sent you, then sign in.",
+  },
+  email_exists: { reason: "Another account already uses this email address." },
+  user_already_exists: { reason: "Another account already uses this email address." },
+  same_password: { reason: "Choose a password that's different from your current one." },
+  email_address_invalid: { reason: "Enter a valid email address." },
+  signup_disabled: { reason: "New accounts can't be created right now." },
+};
+
+/** The failure for a Supabase Auth error: a known code's message, any other 429 as a rate limit, else the provider's message. */
+export function authFailure(error: ProviderError): AuthFailure {
+  const known = error.code === undefined ? undefined : KNOWN_FAILURES[error.code];
+  if (known) return { ok: false, ...known };
+  if (error.status === 429) return { ok: false, ...KNOWN_FAILURES.over_request_rate_limit };
+  return { ok: false, reason: error.message };
+}
+
+function result(error: ProviderError | null): AuthResult {
+  return error ? authFailure(error) : { ok: true };
 }
 
 /**
@@ -60,7 +95,7 @@ export const supabaseAuth: AuthService = {
       password,
       options: { emailRedirectTo: confirmationUrl },
     });
-    if (error) return { ok: false, reason: error.message };
+    if (error) return authFailure(error);
     return { ok: true, signedIn: Boolean(data.session) };
   },
 

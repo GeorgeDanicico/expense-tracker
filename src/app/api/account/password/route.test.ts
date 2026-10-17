@@ -105,6 +105,15 @@ describe("POST /api/account/password", () => {
     expect(repositories.account.mustChangePassword.has(user.id)).toBe(true);
   });
 
+  it("answers 429 when the auth provider rate-limits the change", async () => {
+    auth.fail("updatePassword", "Too many attempts.", "rate_limited");
+
+    const response = await changePassword({ password: NEW_PASSWORD });
+
+    expect(response).toMatchObject({ status: 429, body: { error: "Too many attempts." } });
+    expect(repositories.account.mustChangePassword.has(user.id)).toBe(true);
+  });
+
   it("does not clear the flag when the password update fails", async () => {
     const complete = vi.spyOn(repositories.account, "completePasswordChange");
     auth.fail("updatePassword");

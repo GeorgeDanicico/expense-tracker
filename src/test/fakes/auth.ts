@@ -4,6 +4,7 @@ import type { AuthAdmin, CreatedUser, CreateUserInput } from "@/lib/auth/admin";
 import type {
   AuthenticatedUser,
   AuthFailure,
+  AuthFailureKind,
   AuthResult,
   AuthService,
   AuthSession,
@@ -32,7 +33,7 @@ export type FakeAuthOptions = {
  *   vi.mock("@/lib/auth", () => ({ getAuth: () => auth }));
  *   beforeEach(() => { auth = new FakeAuth(); });
  *
- * `fail(method, reason)` makes the next call of that method fail like the provider would.
+ * `fail(method, reason, kind?)` makes the next call of that method fail like the provider would.
  * Inside a session's `run`, `getCurrentUser()` returns that session's user.
  */
 export class FakeAuth implements AuthService {
@@ -50,7 +51,7 @@ export class FakeAuth implements AuthService {
   readonly sessions: FakeAuthSession[] = [];
 
   private readonly sessionUser = new AsyncLocalStorage<AuthenticatedUser>();
-  private readonly failures = new Map<keyof AuthService, string>();
+  private readonly failures = new Map<keyof AuthService, Omit<AuthFailure, "ok">>();
   private readonly requireEmailConfirmation: boolean;
   private nextId = 1;
 
@@ -63,9 +64,9 @@ export class FakeAuth implements AuthService {
     return this.createAccount(email, password, true);
   }
 
-  /** Makes the next call of `method` fail with `reason`. */
-  fail(method: keyof AuthService, reason = "Auth provider failure") {
-    this.failures.set(method, reason);
+  /** Makes the next call of `method` fail with `reason`, and `kind` for a rate limit or an unconfirmed email. */
+  fail(method: keyof AuthService, reason = "Auth provider failure", kind?: AuthFailureKind) {
+    this.failures.set(method, kind ? { reason, kind } : { reason });
   }
 
   async getCurrentUser() {
@@ -77,7 +78,7 @@ export class FakeAuth implements AuthService {
     if (failure) return failure;
     const account = this.accounts.find((candidate) => candidate.email === email);
     if (!account || account.password !== password) return { ok: false, reason: "Invalid login credentials" };
-    if (!account.confirmed) return { ok: false, reason: "Email not confirmed" };
+    if (!account.confirmed) return { ok: false, reason: "Email not confirmed", kind: "email_not_confirmed" };
     this.currentUser = { id: account.id, email: account.email };
     return { ok: true };
   }
@@ -173,10 +174,10 @@ export class FakeAuth implements AuthService {
   }
 
   private takeFailure(method: keyof AuthService): AuthFailure | null {
-    const reason = this.failures.get(method);
-    if (reason === undefined) return null;
+    const failure = this.failures.get(method);
+    if (failure === undefined) return null;
     this.failures.delete(method);
-    return { ok: false, reason };
+    return { ok: false, ...failure };
   }
 }
 

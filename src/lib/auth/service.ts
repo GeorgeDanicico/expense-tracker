@@ -9,8 +9,15 @@ export type AuthenticatedUser = {
   email: string;
 };
 
-/** A failed auth call. `reason` is the provider's message, safe to show to the user. */
-export type AuthFailure = { ok: false; reason: string };
+/**
+ * Failures the routes answer differently from a plain refusal: the provider's rate limits (such as
+ * its hourly cap on emails, which a free Supabase project reaches after a few sign-ups), and a
+ * correct password for an account whose email isn't confirmed yet.
+ */
+export type AuthFailureKind = "rate_limited" | "email_not_confirmed";
+
+/** A failed auth call. `reason` is safe to show to the user. */
+export type AuthFailure = { ok: false; reason: string; kind?: AuthFailureKind };
 
 export type AuthResult = { ok: true } | AuthFailure;
 
