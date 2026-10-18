@@ -1,5 +1,6 @@
 export { Amount, type AmountTone } from "./amount";
 export { AppDialog, type AppDialogProps } from "./app-dialog";
+export { Avatar, type AvatarSize } from "./avatar";
 export { Card } from "./card";
 export { CardLink } from "./card-link";
 export { ConfirmDialog } from "./confirm-dialog";

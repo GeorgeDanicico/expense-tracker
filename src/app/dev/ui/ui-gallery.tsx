@@ -20,6 +20,7 @@ import { useState } from "react";
 import {
   Amount,
   AppDialog,
+  Avatar,
   Card,
   CategoryBadge,
   ConfirmDialog,
@@ -46,6 +47,9 @@ import { GalleryRow, GallerySection } from "./gallery-section";
 import { TokenSwatches, TypeScale } from "./gallery-tokens";
 
 const SIZES = ["xs", "sm", "md"] as const;
+const AVATAR_SIZES = ["xs", "sm", "md", "lg"] as const;
+const MEMBER_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+const AVATAR_NAMES = ["Ana Pop", "Teo", "Maria Ionescu", "Dan", "Ioana Marin", "Radu", "Elena Stan", "Vlad"] as const;
 
 export function UiGallery() {
   const [view, setView] = useState<"summary" | "monthly" | "history">("summary");
@@ -198,6 +202,18 @@ export function UiGallery() {
           <GalleryRow label="Category (color)">
             {EXPENSE_CATEGORIES.map((category) => <CategoryBadge key={category} category={category} tone="color" />)}
           </GalleryRow>
+        </GallerySection>
+
+        <GallerySection title="Avatar" description="xs 24px · sm 32px (default) · md 40px · lg 64px. Initials show when there is no picture or it fails to load.">
+          {AVATAR_SIZES.map((size) => (
+            <GalleryRow key={size} label={size}>
+              <Avatar name="Ana Pop" src="/apple-icon.png" size={size} />
+              {MEMBER_SLOTS.map((slot) => (
+                <Avatar key={slot} name={AVATAR_NAMES[slot - 1]} color={`member.${slot}`} size={size} />
+              ))}
+              <Avatar name="No Colour" size={size} />
+            </GalleryRow>
+          ))}
         </GallerySection>
 
         <SimpleGrid columns={{ base: 1, lg: 2 }} gap="4">
