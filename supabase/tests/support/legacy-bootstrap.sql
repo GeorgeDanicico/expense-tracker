@@ -51,3 +51,11 @@ begin new.updated_at = now(); return new; end $$;
 -- Only their signatures are needed by the historic privilege-hardening migration.
 create function public.handle_new_user() returns trigger language plpgsql as $$ begin return new; end $$;
 create function public.reset_daily_tokens() returns void language sql as $$ select $$;
+-- The standalone image ships an old storage schema whose buckets table has no
+-- `public` column (the Storage service adds it on a real project). The avatars
+-- migration inserts a private bucket, so add the column when it's missing.
+do $$ begin
+  if to_regclass('storage.buckets') is not null then
+    alter table storage.buckets add column if not exists public boolean default false;
+  end if;
+end $$;
