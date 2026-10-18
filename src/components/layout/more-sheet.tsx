@@ -42,7 +42,7 @@ export function MoreSheet({
         <Separator my="2" />
         <NavItem item={NAV_ITEMS.settings} onNavigate={() => onOpenChange(false)} />
         <Flex px="3" align="center" gap="2">
-          <Avatar size="xs" name={email} src={avatarUrl} />
+          <Avatar size="xs" name={email} src={avatarUrl} decorative />
           <Text flex="1" minW="0" textStyle="caption" overflowWrap="anywhere">
             {email}
           </Text>
