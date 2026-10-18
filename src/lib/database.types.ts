@@ -268,6 +268,7 @@ export type Database = {
       };
       profiles: {
         Row: {
+          avatar_path: string | null;
           avatar_url: string | null;
           created_at: string;
           currency: string;
@@ -281,6 +282,7 @@ export type Database = {
           username: string | null;
         };
         Insert: {
+          avatar_path?: string | null;
           avatar_url?: string | null;
           created_at?: string;
           currency?: string;
