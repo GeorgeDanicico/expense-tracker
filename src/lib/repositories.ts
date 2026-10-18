@@ -2,12 +2,14 @@ import "server-only";
 
 import type { AccountRepository } from "@/lib/account/repository";
 import type { NoticeRepository } from "@/lib/account/notice-repository";
+import type { AvatarRepository } from "@/lib/avatars/repository";
 import type { ExpenseRepository } from "@/lib/expenses/repository";
 import type { ExpenseTabRepository } from "@/lib/expenses/tab-repository";
 import type { FamilyRepository } from "@/lib/family/repository";
 import type { InvestmentRepository } from "@/lib/investments/repository";
 import type { NetWorthRepository } from "@/lib/net-worth/repository";
 import { supabaseAccountRepository } from "@/lib/supabase/repositories/account";
+import { supabaseAvatarRepository } from "@/lib/supabase/repositories/avatars";
 import { supabaseExpenseTabRepository } from "@/lib/supabase/repositories/expense-tabs";
 import { supabaseExpenseRepository } from "@/lib/supabase/repositories/expenses";
 import { supabaseFamilyRepository } from "@/lib/supabase/repositories/family";
@@ -18,6 +20,7 @@ import { supabaseNoticeRepository } from "@/lib/supabase/repositories/notices";
 /** Every repository the app uses. Each repository task adds its own key here. */
 export type Repositories = {
   account: AccountRepository;
+  avatars: AvatarRepository;
   expenseTabs: ExpenseTabRepository;
   family: FamilyRepository;
   investments: InvestmentRepository;
@@ -35,6 +38,7 @@ export type Repositories = {
 export function getRepositories(): Repositories {
   return {
     account: supabaseAccountRepository,
+    avatars: supabaseAvatarRepository,
     expenseTabs: supabaseExpenseTabRepository,
     family: supabaseFamilyRepository,
     investments: supabaseInvestmentRepository,

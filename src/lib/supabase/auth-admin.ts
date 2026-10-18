@@ -1,26 +1,10 @@
 import "server-only";
 
-import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
-
 import type { AuthAdmin, CreatedUser, CreateUserInput } from "@/lib/auth/admin";
-import type { Database } from "@/lib/database.types";
 import { DomainError } from "@/lib/errors";
-import { getSupabaseAdminConfig } from "@/lib/supabase/config";
+import { createAdminClient } from "@/lib/supabase/admin-client";
 
-type AdminClient = SupabaseClient<Database>;
 type ProviderError = { code?: string; message: string };
-
-/**
- * SECURITY: a client with the secret key. It bypasses RLS and every grant meant for signed-in
- * users, so it is created only here, only on the server, and only when an `AuthAdmin` method is
- * about to run. It never stores, refreshes or reads a session: it acts as the service, not as a user.
- */
-function createAdminClient(): AdminClient {
-  const { url, secretKey } = getSupabaseAdminConfig();
-  return createSupabaseClient<Database>(url, secretKey, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-}
 
 /** An auth API error as a domain error, keeping the provider's details private unless they are meant for users. */
 function authError(error: ProviderError, fallback: string): Error {
