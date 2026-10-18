@@ -149,6 +149,7 @@ describe("cache invalidation after mutations", () => {
       features: { family: true },
       membership: null,
       mustChangePassword: true,
+      avatarUrl: null,
     };
     expect(clearFlag(account)).toEqual({ ...account, mustChangePassword: false });
     expect(clearFlag(undefined)).toBeUndefined();
@@ -166,6 +167,7 @@ describe("cache invalidation after mutations", () => {
       features: { family: true },
       membership: null,
       mustChangePassword: true,
+      avatarUrl: null,
     };
     await globalMutate("/api/account", account, { revalidate: false });
 

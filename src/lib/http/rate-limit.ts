@@ -80,6 +80,22 @@ export const inviteCodeAttempts = createFailureLimiter({
   windowMs: INVITE_CODE_WINDOW_MS,
 });
 
+// This limiter shares the in-memory store under review in #93
+// (https://github.com/GeorgeDanicico/expense-tracker/issues/93); its follow-up moves this one too.
+
+/** Avatar uploads allowed per user in `AVATAR_UPLOAD_WINDOW_MS`, counting every attempt. */
+export const AVATAR_UPLOAD_MAX_ATTEMPTS = 20;
+export const AVATAR_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Avatar uploads per user id for `PUT /api/account/avatar`. Unlike the invite limiter it records
+ * every attempt (through `recordFailure`), because each one costs an image decode.
+ */
+export const avatarUploadAttempts = createFailureLimiter({
+  maxFailures: AVATAR_UPLOAD_MAX_ATTEMPTS,
+  windowMs: AVATAR_UPLOAD_WINDOW_MS,
+});
+
 /** What a route answers, with status 429, to a key over its limit. */
 export const TOO_MANY_ATTEMPTS_MESSAGE = "Too many codes that didn't work. Try again in a few minutes.";
 

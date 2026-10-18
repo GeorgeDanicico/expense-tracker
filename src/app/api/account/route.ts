@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import type { AccountData, AccountMembership } from "@/lib/account/types";
 import type { AuthenticatedUser } from "@/lib/auth";
+import { avatarUrl } from "@/lib/avatars/paths";
 import { isFamilyEnabled } from "@/lib/features";
 import { getCurrentMember } from "@/lib/family/current-member";
 import { HttpError, json, readJson, withUser } from "@/lib/http/route";
@@ -16,15 +17,26 @@ async function accountMembership(): Promise<AccountMembership | null> {
   return { memberId, role, isCreator, familyName, permissions };
 }
 
-/** The account response, reading the currency (unless given), the membership and the password flag in parallel. */
+/**
+ * The account response, reading the currency (unless given), the membership, the password flag and
+ * the picture in parallel.
+ */
 async function accountData(user: AuthenticatedUser, knownCurrency?: string): Promise<AccountData> {
-  const account = getRepositories().account;
-  const [currency, membership, mustChangePassword] = await Promise.all([
+  const { account, avatars } = getRepositories();
+  const [currency, membership, mustChangePassword, avatarPath] = await Promise.all([
     knownCurrency ?? account.getCurrency(user.id),
     accountMembership(),
     account.getMustChangePassword(user.id),
+    avatars.getPath(user.id),
   ]);
-  return { email: user.email, currency, features: { family: isFamilyEnabled() }, membership, mustChangePassword };
+  return {
+    email: user.email,
+    currency,
+    features: { family: isFamilyEnabled() },
+    membership,
+    mustChangePassword,
+    avatarUrl: avatarUrl(avatarPath),
+  };
 }
 
 export const GET = withUser(async (_request, user) => json(await accountData(user)), {

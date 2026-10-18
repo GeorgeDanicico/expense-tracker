@@ -40,6 +40,8 @@ export type FamilyMember = {
   currency: string;
   /** The palette slot (1..8) a parent chose for this member, or `null` for an automatic colour. */
   color: number | null;
+  /** The member's picture as an `/api/avatars/…` URL, or `null` without one. Visible to the whole family. */
+  avatarUrl: string | null;
   joinedAt: string;
   /**
    * Hidden (absent) unless the caller is a parent or this is the caller's own entry.

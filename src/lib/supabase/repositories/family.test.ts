@@ -164,6 +164,7 @@ describe("Supabase family repository", () => {
             username: null,
             currency: "RON",
             color: null,
+            avatarUrl: null,
             joinedAt: "2026-10-01T09:00:00+00:00",
           },
           {
@@ -175,6 +176,7 @@ describe("Supabase family repository", () => {
             username: "mihai",
             currency: "USD",
             color: 3,
+            avatarUrl: null,
             joinedAt: "2026-10-02T09:00:00+00:00",
             lastActiveAt: null,
             permissions: kidPermissions,
@@ -203,6 +205,36 @@ describe("Supabase family repository", () => {
       }));
 
       expect((await family.getFamily())?.members.map((member) => member.color)).toEqual([null, null]);
+    });
+
+    it("turns a member's storage key into an avatar URL", async () => {
+      const [parent, kid] = familyJson.members;
+      const fileId = "20000000-0000-4000-8000-0000000000a1";
+      useRpc(() => ({
+        data: { ...familyJson, members: [{ ...parent, avatarPath: `${parentUserId}/${fileId}.webp` }, { ...kid, avatarPath: null }] },
+        error: null,
+      }));
+
+      expect((await family.getFamily())?.members.map((member) => member.avatarUrl)).toEqual([
+        `/api/avatars/${parentUserId}/${fileId}`,
+        null,
+      ]);
+    });
+
+    it("gives no avatar URL for a missing or malformed storage key", async () => {
+      const [parent, kid] = familyJson.members;
+      useRpc(() => ({
+        data: {
+          ...familyJson,
+          members: [
+            { ...parent, avatarPath: undefined },
+            { ...kid, avatarPath: "https://example.com/picture.webp" },
+          ],
+        },
+        error: null,
+      }));
+
+      expect((await family.getFamily())?.members.map((member) => member.avatarUrl)).toEqual([null, null]);
     });
 
     it("gives a visible parent's null permissions the parent permissions", async () => {

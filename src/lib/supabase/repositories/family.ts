@@ -1,5 +1,6 @@
 import "server-only";
 
+import { avatarUrl } from "@/lib/avatars/paths";
 import type { Json } from "@/lib/database.types";
 import {
   PARENT_PERMISSIONS,
@@ -54,6 +55,8 @@ type FamilyMemberJson = {
   username: string | null;
   currency?: string | null;
   color?: number | null;
+  /** The member's storage key (`<userId>/<uuid>.webp`), never a URL. */
+  avatarPath?: string | null;
   joinedAt: string;
   lastActiveAt?: string | null;
   permissions?: Json;
@@ -95,6 +98,8 @@ function toMember(member: FamilyMemberJson): FamilyMember {
     // The SQL always sends it; normalising keeps an unsupported or missing value from reaching amounts.
     currency: normalizeCurrency(member.currency),
     color: typeof member.color === "number" && member.color >= 1 && member.color <= MEMBER_COLOR_COUNT ? member.color : null,
+    // `avatarUrl()` answers null for a malformed key, so a bad row can't produce a strange URL.
+    avatarUrl: avatarUrl(member.avatarPath),
     joinedAt: member.joinedAt,
     // Keep hidden fields absent rather than undefined-valued, so a missing key always means "hidden".
     ...("lastActiveAt" in member ? { lastActiveAt: member.lastActiveAt ?? null } : {}),
