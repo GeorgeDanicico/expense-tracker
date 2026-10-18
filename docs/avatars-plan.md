@@ -193,7 +193,7 @@ create policy avatars_select_self_or_family on storage.objects
 for select to authenticated
 using (
   bucket_id = 'avatars'
-  and (storage.foldername(name))[1] = any ((select family_private.visible_avatar_owner_ids()))
+  and (storage.foldername(name))[1] = any ((select family_private.visible_avatar_owner_ids())::text[])
 );
 
 -- get_family(): identical to 20261016001100 plus each member's avatarPath.
