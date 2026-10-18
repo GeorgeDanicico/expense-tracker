@@ -4,6 +4,7 @@ import { Button, Input, NativeSelect, Stack } from "@chakra-ui/react";
 import { Mail, Save } from "lucide-react";
 import { FormEvent, useState } from "react";
 
+import { AvatarCard } from "@/components/settings/avatar-card";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
@@ -65,6 +66,8 @@ export default function SettingsPage() {
     <Stack gap={{ base: "4", md: "5" }}>
       {status === "saved" ? <InlineAlert status="success">Your account currency was updated.</InlineAlert> : null}
       {status === "error" ? <InlineAlert status="error">{message}</InlineAlert> : null}
+
+      <AvatarCard email={data.email} avatarUrl={data.avatarUrl} />
 
       {data.email.toLowerCase().endsWith(`@${KID_EMAIL_DOMAIN}`) ? (
         <Card>

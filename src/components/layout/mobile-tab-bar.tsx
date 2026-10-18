@@ -36,7 +36,7 @@ function TabLabel({ children }: { children: string }) {
 }
 
 /** Fixed bottom navigation on mobile: Home, Expenses and the More sheet. */
-export function MobileTabBar({ email }: { email: string }) {
+export function MobileTabBar({ email, avatarUrl = null }: { email: string; avatarUrl?: string | null }) {
   const pathname = usePathname();
   const { tabBarItems, moreItems } = useNavigation();
   const [open, setOpen] = useState(false);
@@ -69,6 +69,7 @@ export function MobileTabBar({ email }: { email: string }) {
       })}
       <MoreSheet
         email={email}
+        avatarUrl={avatarUrl}
         open={open}
         onOpenChange={setOpen}
         trigger={

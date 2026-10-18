@@ -65,4 +65,18 @@ describe("FamilyMembers", () => {
     const html = render({ ...data, members: data.members.filter((m) => m.role === "parent") });
     expect(html).not.toContain("Kids");
   });
+
+  it("shows a member's picture, named by them, and initials for a member without one", () => {
+    const html = render({
+      ...data,
+      members: [
+        member({ memberId: "1", displayName: "Ana Pop", avatarUrl: "/api/avatars/u1/a1b2" }),
+        member({ memberId: "2", displayName: "Dan Ionescu" }),
+      ],
+    });
+    expect(html).toMatch(/<img[^>]*src="\/api\/avatars\/u1\/a1b2"/);
+    expect(html).toMatch(/<img[^>]*alt="Ana Pop"/);
+    expect(html.match(/<img/g)).toHaveLength(1);
+    expect(html).toContain(">DI<");
+  });
 });

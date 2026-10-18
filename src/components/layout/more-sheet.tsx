@@ -1,6 +1,6 @@
 "use client";
 
-import { Separator, Stack, Text } from "@chakra-ui/react";
+import { Flex, Separator, Stack, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import { NavItem, NavSectionGroup } from "@/components/layout/nav-item";
@@ -9,15 +9,18 @@ import { useNavigation } from "@/components/layout/use-navigation";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { InstallInstructions } from "@/components/pwa/install-instructions";
 import { AppDialog } from "@/components/ui/app-dialog";
+import { Avatar } from "@/components/ui/avatar";
 
 /** Mobile bottom sheet with secondary destinations and account actions. */
 export function MoreSheet({
   email,
+  avatarUrl = null,
   trigger,
   open,
   onOpenChange,
 }: {
   email: string;
+  avatarUrl?: string | null;
   trigger: ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -38,9 +41,12 @@ export function MoreSheet({
         ))}
         <Separator my="2" />
         <NavItem item={NAV_ITEMS.settings} onNavigate={() => onOpenChange(false)} />
-        <Text px="3" textStyle="caption" overflowWrap="anywhere">
-          {email}
-        </Text>
+        <Flex px="3" align="center" gap="2">
+          <Avatar size="xs" name={email} src={avatarUrl} />
+          <Text flex="1" minW="0" textStyle="caption" overflowWrap="anywhere">
+            {email}
+          </Text>
+        </Flex>
         <SignOutButton />
         <InstallInstructions />
       </Stack>
