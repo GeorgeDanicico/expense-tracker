@@ -140,3 +140,44 @@ describe("fakeSupabase", () => {
     expect(second).toEqual({ data: null, error: { message: "private database failure" }, count: null });
   });
 });
+
+describe("fakeSupabase storage", () => {
+  const bytes = (...values: number[]) => new Uint8Array(values);
+
+  it("uploads, downloads and removes objects, recording each call", async () => {
+    const { client, objects, storageCalls } = fakeSupabase();
+    const bucket = client.storage.from("pictures");
+
+    const uploaded = await bucket.upload("a/1.webp", bytes(1, 2), { contentType: "image/webp", upsert: false });
+    const downloaded = await bucket.download("a/1.webp");
+    const removed = await bucket.remove(["a/1.webp", "a/missing.webp"]);
+
+    expect(uploaded).toEqual({ data: expect.objectContaining({ path: "a/1.webp", fullPath: "pictures/a/1.webp" }), error: null });
+    expect(new Uint8Array(await downloaded.data!.arrayBuffer())).toEqual(bytes(1, 2));
+    expect(removed).toEqual({ data: [{ name: "a/1.webp" }], error: null });
+    expect(objects).toEqual({ pictures: {} });
+    expect(storageCalls).toEqual([
+      { bucket: "pictures", operation: "upload", paths: ["a/1.webp"], options: { contentType: "image/webp", upsert: false } },
+      { bucket: "pictures", operation: "download", paths: ["a/1.webp"] },
+      { bucket: "pictures", operation: "remove", paths: ["a/1.webp", "a/missing.webp"] },
+    ]);
+  });
+
+  it("refuses to overwrite without upsert and fails to download a missing object", async () => {
+    const { client, objects } = fakeSupabase({}, { objects: { pictures: { "a/1.webp": bytes(1) } } });
+    const bucket = client.storage.from("pictures");
+
+    expect((await bucket.upload("a/1.webp", bytes(2))).error).toMatchObject({ statusCode: "409" });
+    expect((await bucket.download("a/2.webp")).data).toBeNull();
+    expect(objects.pictures["a/1.webp"]).toEqual(bytes(1));
+  });
+
+  it("fails only the calls the failStorage option selects", async () => {
+    const { client, objects } = fakeSupabase({}, { failStorage: (call) => call.operation === "upload" });
+
+    const result = await client.storage.from("pictures").upload("a/1.webp", bytes(1));
+
+    expect(result).toEqual({ data: null, error: { message: "private storage failure" } });
+    expect(objects).toEqual({ pictures: {} });
+  });
+});

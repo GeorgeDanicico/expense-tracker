@@ -17,11 +17,11 @@ export function getSupabaseConfig() {
 }
 
 /**
- * The project URL and the secret key, for the admin client in `auth-admin.ts` only.
+ * The project URL and the secret key, for the admin client in `admin-client.ts` only.
  *
  * SECURITY: the secret key bypasses every database rule (RLS). It is server-only and optional:
  * it is read here, when the admin client is needed, so the app starts without it and only the
- * features that need it (kid accounts, username sign-in) fail. Never log it or pass it on.
+ * features that need it (kid accounts, username sign-in, profile pictures) fail. Never log it or pass it on.
  */
 export function getSupabaseAdminConfig() {
   const secretKey = process.env.SUPABASE_SECRET_KEY;

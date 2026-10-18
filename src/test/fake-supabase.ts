@@ -26,6 +26,18 @@ export type RecordedQuery = {
 
 export type RecordedRpc = { fn: string; args: Row };
 
+/** One Storage call: `upload` and `download` name one path, `remove` names a list. */
+export type RecordedStorageCall = {
+  bucket: string;
+  operation: "upload" | "download" | "remove";
+  paths: string[];
+  /** The `upload` options, such as `{ contentType, upsert }`. */
+  options?: Row;
+};
+
+/** Stored objects by bucket, then by path. */
+export type StoredObjects = Record<string, Record<string, Uint8Array>>;
+
 export type FakeSupabaseOptions = {
   /** The most rows a single `range` page returns, like PostgREST's `max-rows`. */
   pageCap?: number;
@@ -38,9 +50,19 @@ export type FakeSupabaseOptions = {
   fail?: (query: RecordedQuery, index: number) => boolean | { code?: string; message: string };
   /** Answers `rpc(fn, args)` calls; without it, every call returns `{ data: null, error: null }`. */
   rpc?: (fn: string, args: Row) => { data: unknown; error: unknown };
+  /** Objects already in Storage, by bucket and path. */
+  objects?: StoredObjects;
+  /**
+   * Returns true for a Storage call (by its position in `storageCalls`) that should fail with a generic
+   * Storage error, or the error itself.
+   */
+  failStorage?: (call: RecordedStorageCall, index: number) => boolean | { message: string; statusCode?: string };
 };
 
 const DATABASE_ERROR = { message: "private database failure" };
+const STORAGE_ERROR = { message: "private storage failure" };
+const NOT_FOUND = { message: "Object not found", statusCode: "404" };
+const DUPLICATE = { message: "The resource already exists", statusCode: "409" };
 
 /** A column's value; a dotted `table.column` reads an embedded row seeded on `row[table]`. */
 function read(row: Row, column: string): unknown {
@@ -225,5 +247,53 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
     return options.rpc?.(fn, args) ?? { data: null, error: null };
   }
 
-  return { client: { from: (table: string) => new Query(table), rpc }, queries, rpcs, tables };
+  const objects: StoredObjects = options.objects ?? {};
+  const storageCalls: RecordedStorageCall[] = [];
+
+  /** Records a Storage call and returns its configured failure, if any. */
+  function storageCall(call: RecordedStorageCall) {
+    storageCalls.push(call);
+    const failure = options.failStorage?.(call, storageCalls.length - 1);
+    return failure ? (failure === true ? STORAGE_ERROR : failure) : null;
+  }
+
+  /**
+   * `storage.from(bucket)`, covering `upload`, `download` and `remove`. Like Storage, an upload without
+   * `upsert: true` fails on an existing path, a download of a missing path fails, and `remove` skips
+   * missing paths and returns the objects it deleted.
+   */
+  function bucket(name: string) {
+    const files = (objects[name] ??= {});
+    return {
+      async upload(path: string, body: Uint8Array, uploadOptions: { contentType?: string; upsert?: boolean } = {}) {
+        const error = storageCall({ bucket: name, operation: "upload", paths: [path], options: uploadOptions });
+        if (error) return { data: null, error };
+        if (files[path] && !uploadOptions.upsert) return { data: null, error: DUPLICATE };
+        files[path] = body;
+        return { data: { id: `object-${nextId++}`, path, fullPath: `${name}/${path}` }, error: null };
+      },
+      async download(path: string) {
+        const error = storageCall({ bucket: name, operation: "download", paths: [path] });
+        if (error) return { data: null, error };
+        const body = files[path];
+        return body ? { data: new Blob([body.slice()]), error: null } : { data: null, error: NOT_FOUND };
+      },
+      async remove(paths: string[]) {
+        const error = storageCall({ bucket: name, operation: "remove", paths });
+        if (error) return { data: null, error };
+        const removed = paths.filter((path) => path in files);
+        for (const path of removed) delete files[path];
+        return { data: removed.map((path) => ({ name: path })), error: null };
+      },
+    };
+  }
+
+  return {
+    client: { from: (table: string) => new Query(table), rpc, storage: { from: bucket } },
+    queries,
+    rpcs,
+    tables,
+    objects,
+    storageCalls,
+  };
 }
