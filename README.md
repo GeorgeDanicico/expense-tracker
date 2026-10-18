@@ -178,7 +178,7 @@ The Chakra theme in `src/components/ui/theme/` is the single source of styling (
 - **Type:** pick a `textStyle` (`pageTitle`, `sectionTitle`, `body`, `bodySm`, `label`, `caption`, `amountHero`, `amount`, `amountSm`, …) instead of setting `fontSize`/`fontWeight`. One `amountHero` figure per screen.
 - **Colour:** use semantic tokens (`bg.surface`, `fg.muted`, `border`, `status.warning.fg`, `category.<key>.fg`) and the palettes `brand`, `neutral`, `danger`, `success`, `warning`, `info`. No hex values in components.
 - **Actions:** one primary action per view (`variant="solid" colorPalette="brand"`); everything else is `outline` (the default) or `ghost`.
-- **Building blocks:** `Card`, `PageHeader`, `SectionHeader`, `AppDialog`, `ConfirmDialog`, `FormField`/`FormRow`, `FormActions`, `Stat`/`StatGroup`, `Amount`, `ListRow`, `EmptyState`, `InlineAlert`, `StatusBadge`/`CategoryBadge`, `SegmentedControl`, `Toolbar`, `IconButton` and the `ICON` sizes.
+- **Building blocks:** `Avatar`, `Card`, `PageHeader`, `SectionHeader`, `AppDialog`, `ConfirmDialog`, `FormField`/`FormRow`, `FormActions`, `Stat`/`StatGroup`, `Amount`, `ListRow`, `EmptyState`, `InlineAlert`, `StatusBadge`/`CategoryBadge`, `SegmentedControl`, `Toolbar`, `IconButton` and the `ICON` sizes.
 - **Guardrails:** `npm run lint` rejects hex colours, unknown colour palettes, radius overrides on controls and forced 44px minimum heights outside `src/components/ui/`.
 
 In development, `/dev/ui` shows every primitive, size, tone and token, and `/dev/preview/<screen>` (`dashboard`, `expenses`, `investments`, `net-worth`, `settings`) renders the real screens with fixture data so they can be reviewed without signing in. Both routes return 404 in production builds.

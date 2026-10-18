@@ -1,6 +1,6 @@
 import { Flex, Stack, Text } from "@chakra-ui/react";
 
-import { MemberSwatch } from "@/components/family/member-swatch";
+import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -30,7 +30,7 @@ function MemberRow({ member, color }: { member: FamilyMember; color: string | un
     <ListRow
       title={
         <Flex as="span" align="center" gap="2" minW="0">
-          <MemberSwatch color={color} />
+          <Avatar size="sm" name={name} src={member.avatarUrl} color={color} />
           <Text as="span" truncate>
             {name}
           </Text>

@@ -121,6 +121,11 @@ export function afterPasswordChange(mutate: ScopedMutator) {
   return mutate<AccountData>(ACCOUNT_API_KEY, (current) => current && { ...current, mustChangePassword: false });
 }
 
+/** After the caller's picture changes: their account (sidebar, settings) and the family list. */
+export function invalidateAfterAvatarChange(mutate: ScopedMutator) {
+  return Promise.all([mutate(ACCOUNT_API_KEY), mutate(FAMILY_API_KEY)]);
+}
+
 /** Clears every cached response without refetching. */
 export function afterSignOut(mutate: ScopedMutator) {
   return mutate(() => true, undefined, { revalidate: false });
