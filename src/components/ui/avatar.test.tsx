@@ -27,6 +27,12 @@ describe("Avatar", () => {
     expect(html).toMatch(/<img[^>]*src="\/apple-icon.png"/);
   });
 
+  it("falls back to neutral for a colour that isn't a palette slot", () => {
+    // Members past the eighth share `fg.subtle`, which has no `.fg` text token.
+    expect(render(<Avatar name="Ana Pop" color="fg.subtle" />)).toBe(render(<Avatar name="Ana Pop" />));
+    expect(render(<Avatar name="Ana Pop" color="member.3" />)).not.toBe(render(<Avatar name="Ana Pop" />));
+  });
+
   it("treats a null picture as none", () => {
     expect(render(<Avatar name="Ana Pop" src={null} />)).not.toContain("<img");
   });

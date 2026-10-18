@@ -11,7 +11,8 @@ const RECIPE_SIZE = { xs: "2xs", sm: "xs", md: "md", lg: "2xl" } as const satisf
  * A person's picture, or their initials on their member colour when they have none (or it fails to
  * load). `name` is required even with a picture: it's the image's alt text and the fallback.
  * `color` is a member colour token (`member.3`, from `useMemberColors()`); the initials use its
- * paired `member.<n>.fg` token. Without one the fallback is neutral.
+ * paired `member.<n>.fg` token. Without one, or with a colour that isn't a palette slot (members past
+ * the eighth share `fg.subtle`, which has no paired text colour), the fallback is neutral.
  */
 export function Avatar({
   name,
@@ -24,12 +25,13 @@ export function Avatar({
   color?: string;
   size?: AvatarSize;
 }) {
+  const slot = color && /^member\.[1-8]$/.test(color) ? color : null;
   return (
     <ChakraAvatar.Root
       size={RECIPE_SIZE[size]}
       shape="full"
-      bg={color ?? "bg.muted"}
-      color={color ? `${color}.fg` : "fg.muted"}
+      bg={slot ?? "bg.muted"}
+      color={slot ? `${slot}.fg` : "fg.muted"}
     >
       <ChakraAvatar.Fallback name={name} role="img" aria-label={name} />
       {src ? <ChakraAvatar.Image src={src} alt={name} /> : null}
