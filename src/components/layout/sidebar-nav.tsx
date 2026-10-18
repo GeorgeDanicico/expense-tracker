@@ -12,7 +12,7 @@ import { Avatar } from "@/components/ui/avatar";
 function AccountRow({ email, avatarUrl }: { email: string; avatarUrl: string | null }) {
   return (
     <Flex position="relative" align="center" gap="2" ps="2" pe="1" py="1.5">
-      <Avatar size="xs" name={email} src={avatarUrl} />
+      <Avatar size="xs" name={email} src={avatarUrl} decorative />
       <Text flex="1" minW="0" textStyle="bodySm" color="fg.muted" truncate title={email}>
         {email}
       </Text>

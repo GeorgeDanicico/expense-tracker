@@ -33,6 +33,16 @@ describe("Avatar", () => {
     expect(render(<Avatar name="Ana Pop" color="member.3" />)).not.toBe(render(<Avatar name="Ana Pop" />));
   });
 
+  it("hides a decorative avatar from screen readers", () => {
+    const initials = render(<Avatar name="Ana Pop" decorative />);
+    expect(initials).toContain('aria-hidden="true"');
+    expect(initials).not.toContain('aria-label="Ana Pop"');
+    expect(initials).not.toContain('role="img"');
+
+    expect(render(<Avatar name="Ana Pop" src="/apple-icon.png" decorative />)).toMatch(/<img[^>]*alt=""/);
+    expect(render(<Avatar name="Ana Pop" />)).not.toContain("aria-hidden");
+  });
+
   it("treats a null picture as none", () => {
     expect(render(<Avatar name="Ana Pop" src={null} />)).not.toContain("<img");
   });
