@@ -20,10 +20,12 @@ const PUBLIC_ROUTES = ["auth", "auth/google", "mcp"];
 // under src/app/api means adding it here, so a route without auth fails below.
 const PROTECTED_ROUTES: Record<string, string[]> = {
   account: ["GET", "PATCH"],
+  "account/avatar": ["DELETE", "PUT"],
   "account/email": ["PATCH"],
   "account/notices": ["GET"],
   "account/notices/[id]/dismiss": ["POST"],
   "account/password": ["POST"],
+  "avatars/[userId]/[file]": ["GET"],
   dashboard: ["GET"],
   "expense-tabs": ["GET", "POST"],
   "expense-tabs/[id]": ["DELETE", "PATCH"],
@@ -87,7 +89,7 @@ describe("protected REST routes", () => {
 
   it.each(cases)("rejects an anonymous %s /api/%s with 401", async (method, route) => {
     const handler = (await loadHandlers(route))[method];
-    const url = `http://localhost/api/${route.replaceAll("[id]", ID)}`;
+    const url = `http://localhost/api/${route.replaceAll(/\[\w+\]/g, ID)}`;
     const response = await handler(new NextRequest(url, { method }), { params: Promise.resolve({ id: ID }) });
 
     expect(response.status).toBe(401);

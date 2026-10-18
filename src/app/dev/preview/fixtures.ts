@@ -238,7 +238,7 @@ const FAMILY_VIEWING: Viewing = { memberId: ALL_MEMBERS, displayName: null, curr
 // "George" is the previewing account; each member's sample month is the template scaled and trimmed.
 const FAMILY_MEMBERS = [
   { memberId: "m-george", name: "George", role: "parent", scale: 1, keep: 14, currency: "EUR" },
-  { memberId: "m-maria", name: "Maria", role: "parent", scale: 0.7, keep: 11, currency: "EUR", color: 6 },
+  { memberId: "m-maria", name: "Maria", role: "parent", scale: 0.7, keep: 11, currency: "EUR", color: 6, avatarUrl: "/apple-icon.png" },
   { memberId: "m-ana", name: "Ana", role: "kid", scale: 0.18, keep: 7, currency: "EUR" },
   { memberId: "m-luca", name: "Luca", role: "kid", scale: 0.12, keep: 5, currency: "RON" },
 ] as const;
@@ -255,6 +255,7 @@ const ACCOUNT: AccountData = {
     permissions: PARENT_PERMISSIONS,
   },
   mustChangePassword: false,
+  avatarUrl: null,
 };
 
 const FAMILY: FamilyResponse = {
@@ -269,6 +270,8 @@ const FAMILY: FamilyResponse = {
       username: member.role === "kid" ? member.name.toLowerCase() : null,
       currency: member.currency,
       color: "color" in member ? member.color : null,
+      // A static image stands in for `/api/avatars/…`, which needs a signed-in session.
+      avatarUrl: "avatarUrl" in member ? member.avatarUrl : null,
       joinedAt: `2026-01-0${index + 4}T10:00:00.000Z`,
     })),
   },

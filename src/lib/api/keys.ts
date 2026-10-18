@@ -23,6 +23,8 @@ export function withMember(url: string, member?: string | null) {
 export const ACCOUNT_API_KEY = "/api/account";
 /** POST only: `{ password }` → 204. Not fetched with SWR; refresh `ACCOUNT_API_KEY` afterwards. */
 export const ACCOUNT_PASSWORD_API_URL = "/api/account/password";
+/** PUT raw JPG/PNG bytes (`Content-Type: image/jpeg|image/png`) → `{ avatarUrl }`; DELETE → 204. Refresh `ACCOUNT_API_KEY` and `FAMILY_API_KEY` afterwards. */
+export const ACCOUNT_AVATAR_API_URL = "/api/account/avatar";
 /** PATCH only: `{ email }` → 204. The change applies once the link sent to the new address is opened. */
 export const ACCOUNT_EMAIL_API_URL = "/api/account/email";
 /** GET → {@link NoticesResponse}: the unseen notices, oldest first. 404 while the family flag is off. */

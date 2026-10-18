@@ -25,7 +25,7 @@ function render() {
 }
 
 function anAccount(membership: AccountMembership | null): AccountData {
-  return { email: "user@example.com", currency: "EUR", features: { family: true }, membership, mustChangePassword: false };
+  return { email: "user@example.com", currency: "EUR", features: { family: true }, membership, mustChangePassword: false, avatarUrl: null };
 }
 
 const kid = { role: "kid" as const };

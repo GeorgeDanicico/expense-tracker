@@ -25,4 +25,6 @@ export type AccountData = {
    * reset). Not behind the family flag; always `false` for an ordinary account.
    */
   mustChangePassword: boolean;
+  /** The caller's picture as an `/api/avatars/…` URL, or `null` without one. Not behind the family flag. */
+  avatarUrl: string | null;
 };

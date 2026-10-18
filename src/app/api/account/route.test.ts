@@ -37,7 +37,7 @@ describe("GET /api/account", () => {
   it("returns the default currency when the user has not chosen one", async () => {
     const response = await callRoute(GET);
 
-    expect(response.body).toEqual({ email: user.email, currency: "EUR", features: { family: false }, membership: null, mustChangePassword: false });
+    expect(response.body).toEqual({ email: user.email, currency: "EUR", features: { family: false }, membership: null, mustChangePassword: false, avatarUrl: null });
   });
 
   it("reports the family feature as on when FAMILY_ENABLED is true", async () => {
@@ -68,6 +68,33 @@ describe("GET /api/account", () => {
     const response = await callRoute(GET);
 
     expect(response.body).toMatchObject({ features: { family: false } });
+  });
+
+  it("returns the URL of the caller's picture", async () => {
+    repositories.avatars.paths.set(user.id, `${user.id}/20000000-0000-4000-8000-0000000000a1.webp`);
+
+    const response = await callRoute(GET);
+
+    expect(response).toMatchObject({
+      status: 200,
+      body: { avatarUrl: `/api/avatars/${user.id}/20000000-0000-4000-8000-0000000000a1` },
+    });
+  });
+
+  it("returns no picture URL for another user's picture", async () => {
+    repositories.avatars.paths.set("10000000-0000-4000-8000-000000000099", "10000000-0000-4000-8000-000000000099/20000000-0000-4000-8000-0000000000a1.webp");
+
+    const response = await callRoute(GET);
+
+    expect(response.body).toMatchObject({ avatarUrl: null });
+  });
+
+  it("hides a picture lookup failure behind a generic message", async () => {
+    vi.spyOn(repositories.avatars, "getPath").mockRejectedValue(new Error("private database failure"));
+
+    const response = await callRoute(GET);
+
+    expect(response).toMatchObject({ status: 500, body: { error: "Unable to load account settings." } });
   });
 
   it("answers privately, so the account is never cached", async () => {
@@ -192,7 +219,7 @@ describe("PATCH /api/account", () => {
   it("returns the family feature as off when FAMILY_ENABLED is false", async () => {
     const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
 
-    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: false }, membership: null, mustChangePassword: false });
+    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: false }, membership: null, mustChangePassword: false, avatarUrl: null });
   });
 
   it("returns the family feature as on when FAMILY_ENABLED is true", async () => {
@@ -200,7 +227,7 @@ describe("PATCH /api/account", () => {
 
     const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
 
-    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: true }, membership: null, mustChangePassword: false });
+    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: true }, membership: null, mustChangePassword: false, avatarUrl: null });
   });
 
   it("returns the membership with the updated account", async () => {

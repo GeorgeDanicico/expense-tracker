@@ -51,6 +51,7 @@ function aMember(overrides: Partial<FamilyMember>): FamilyMember {
     username: null,
     currency: "EUR",
     color: null,
+    avatarUrl: null,
     joinedAt: "2026-10-01T00:00:00Z",
     ...overrides,
   };
@@ -67,7 +68,7 @@ function membership(overrides: Partial<AccountMembership> = {}): AccountMembersh
 }
 
 function anAccount(m: AccountMembership | null): AccountData {
-  return { email: "me@example.com", currency: "EUR", features: { family: true }, membership: m, mustChangePassword: false };
+  return { email: "me@example.com", currency: "EUR", features: { family: true }, membership: m, mustChangePassword: false, avatarUrl: null };
 }
 
 function html(node: React.ReactNode) {
