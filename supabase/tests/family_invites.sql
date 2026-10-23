@@ -62,7 +62,7 @@ insert into public.family_invites
   (id, family_id, code_hash, role, permissions, created_by, created_at, expires_at, used_at, used_by, revoked_at)
 values
   ('f0800000-0000-4000-8000-0000000000c1', 'f0800000-0000-4000-8000-0000000000a1', pg_temp.h('c1'), 'kid',
-   '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}',
+   '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}',
    'f0800000-0000-4000-8000-000000000001', now() - interval '8 days', now() - interval '1 day', null, null, null),
   ('f0800000-0000-4000-8000-0000000000c2', 'f0800000-0000-4000-8000-0000000000a1', pg_temp.h('c2'), 'parent', null,
    'f0800000-0000-4000-8000-000000000001', now() - interval '2 hours', now() + interval '46 hours',
@@ -73,7 +73,7 @@ values
   ('f0800000-0000-4000-8000-0000000000c4', 'f0800000-0000-4000-8000-0000000000a1', pg_temp.h('c4'), 'parent', null,
    'f0800000-0000-4000-8000-000000000002', now() - interval '1 hour', now() + interval '47 hours', null, null, null),
   ('f0800000-0000-4000-8000-0000000000d1', 'f0800000-0000-4000-8000-0000000000b1', pg_temp.h('d1'), 'kid',
-   '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off"}',
+   '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off"}',
    'f0800000-0000-4000-8000-000000000004', now() - interval '1 hour', now() + interval '167 hours', null, null, null);
 
 -- Labels for every invite, seeded and created, so assertions can name them.
@@ -190,7 +190,7 @@ select throws_ok(
 select throws_ok(
   $$ insert into public.family_invites (family_id, code_hash, role, permissions, expires_at)
      values ('f0800000-0000-4000-8000-0000000000a1', pg_temp.h('t2'), 'parent',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}', now()) $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}', now()) $$,
   '23514', null, 'the table refuses a parent invite with permissions'
 );
 select throws_ok(
@@ -218,7 +218,7 @@ select throws_ok(
 );
 select throws_ok(
   $$ select * from public.create_family_invite('kid',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}', pg_temp.h('kid-kid')) $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}', pg_temp.h('kid-kid')) $$,
   '42501', 'Only parents can invite people to the family.',
   'a kid cannot create a kid invite'
 );
@@ -302,7 +302,7 @@ select throws_ok(
 );
 select throws_ok(
   $$ select * from public.create_family_invite('parent',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}', pg_temp.h('parent-perms')) $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}', pg_temp.h('parent-perms')) $$,
   '23514', 'Parents always have full access, so a parent invite can''t have permissions.',
   'a parent invite with permissions is refused'
 );
@@ -329,13 +329,13 @@ select throws_ok(
 );
 select throws_ok(
   $$ select * from public.create_family_invite('kid',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"edit"}', pg_temp.h('kid-level')) $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"edit","mcp":"off"}', pg_temp.h('kid-level')) $$,
   '23514', 'Choose an allowed level for every module.',
   'a kid invite with a level the module does not allow is refused'
 );
 select throws_ok(
   $$ select * from public.create_family_invite('kid',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","boats":"off"}', pg_temp.h('kid-extra')) $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","boats":"off"}', pg_temp.h('kid-extra')) $$,
   '23514', 'Choose an allowed level for every module.',
   'a kid invite with an unknown module is refused'
 );
@@ -371,7 +371,7 @@ select throws_ok(
 );
 select throws_ok(
   $$ select * from public.create_family_invite('kid',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}', pg_temp.h('d1')) $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}', pg_temp.h('d1')) $$,
   '23505', 'That invite code is already in use.',
   'a code hash used by another family is refused with 23505'
 );
@@ -392,14 +392,14 @@ from public.create_family_invite('parent', 'null', pg_temp.h('pj')) r;
 insert into invite_labels (label, invite_id, expires_at)
 select 'k1', r.invite_id, r.expires_at
 from public.create_family_invite('kid',
-  '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off"}', pg_temp.h('k1')) r;
+  '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off"}', pg_temp.h('k1')) r;
 
 -- The creator creates k2, and Dana creates p2.
 select set_config('request.jwt.claims', '{"sub":"f0800000-0000-4000-8000-000000000001","role":"authenticated"}', true);
 insert into invite_labels (label, invite_id, expires_at)
 select 'k2', r.invite_id, r.expires_at
 from public.create_family_invite('kid',
-  '{"family_finance":"view","net_worth":"off","investments":"off","expenses":"edit"}', pg_temp.h('k2')) r;
+  '{"family_finance":"view","mcp":"off","net_worth":"off","investments":"off","expenses":"edit"}', pg_temp.h('k2')) r;
 
 select set_config('request.jwt.claims', '{"sub":"f0800000-0000-4000-8000-000000000006","role":"authenticated"}', true);
 insert into invite_labels (label, invite_id, expires_at)
@@ -450,13 +450,13 @@ select is(
 select is(
   (select i.permissions from public.family_invites i
    join invite_labels l on l.invite_id = i.id where l.label = 'k1'),
-  '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off"}'::jsonb,
+  '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off"}'::jsonb,
   'a kid invite stores its permissions'
 );
 select is(
   (select i.permissions from public.family_invites i
    join invite_labels l on l.invite_id = i.id where l.label = 'k2'),
-  '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"view"}'::jsonb,
+  '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"view","mcp":"off"}'::jsonb,
   'a kid invite stores permissions given in any key order'
 );
 
@@ -494,7 +494,7 @@ select is(
 select is(
   (select r.permissions from public.list_family_invites() r
    join invite_labels l on l.invite_id = r.invite_id where l.label = 'k1'),
-  '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off"}'::jsonb,
+  '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off"}'::jsonb,
   'a listed kid invite shows its permissions'
 );
 select ok(

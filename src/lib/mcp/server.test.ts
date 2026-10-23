@@ -246,8 +246,8 @@ describe("MCP family permissions", () => {
   const FORBIDDEN = "You don't have access to this.";
   const fuel = { description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel" };
   const order = { brokerId: "xtb", instrument: "VWCE.DE", currency: "EUR", side: "buy", amount: "150", quantity: "1.5", unitPrice: "100", executedAt: "2026-01-01T10:00:00Z" };
-  const kidWithoutInvestments = () => aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off" } });
-  const kidWithNothing = () => aKid({ permissions: { expenses: "off", investments: "off", net_worth: "off", family_finance: "off" } });
+  const kidWithoutInvestments = () => aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off" } });
+  const kidWithNothing = () => aKid({ permissions: { expenses: "off", investments: "off", net_worth: "off", family_finance: "off", mcp: "off" } });
 
   const investmentMethods = [
     "listAccountsWithTransactions", "getAssetHistory", "listAssetTransactions", "getOrCreateAccount",

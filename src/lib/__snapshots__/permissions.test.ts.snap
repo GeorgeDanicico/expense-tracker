@@ -60,18 +60,33 @@ exports[`permission catalogue > lists the same modules, levels, labels and defau
       ],
       "module": "family_finance",
     },
+    {
+      "defaultForNewKid": "off",
+      "label": "AI assistants",
+      "levelLabels": {
+        "edit": "On",
+        "off": "Off",
+      },
+      "levels": [
+        "off",
+        "edit",
+      ],
+      "module": "mcp",
+    },
   ],
   "presets": {
     "teen": {
       "expenses": "edit",
       "family_finance": "off",
       "investments": "edit",
+      "mcp": "off",
       "net_worth": "edit",
     },
     "young_kid": {
       "expenses": "edit",
       "family_finance": "off",
       "investments": "off",
+      "mcp": "off",
       "net_worth": "off",
     },
   },

@@ -327,7 +327,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-000000000003","role":"authenticated"}', true);
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000006',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   '42501', 'Only parents can add a kid.',
   'a kid cannot add a kid, even one marked for their family'
 );
@@ -335,7 +335,7 @@ select throws_ok(
 select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-000000000008","role":"authenticated"}', true);
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000006',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   '42501', 'Only parents can add a kid.',
   'a user without a family cannot add a kid'
 );
@@ -343,7 +343,7 @@ select throws_ok(
 select set_config('request.jwt.claims', '{"role":"authenticated"}', true);
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000006',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   '42501', 'Only parents can add a kid.',
   'a caller without a user id cannot add a kid'
 );
@@ -356,37 +356,37 @@ select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-0000000
 
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000007',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   'P0002', 'That account wasn''t found.',
   'an account marked for another family is not found'
 );
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000008',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   'P0002', 'That account wasn''t found.',
   'an unmarked account is not found'
 );
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000010',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   'P0002', 'That account wasn''t found.',
   'an account without a profile row is not found'
 );
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-00000000ffff',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   'P0002', 'That account wasn''t found.',
   'an unknown user is not found'
 );
 select throws_ok(
   $$ select public.add_managed_kid(null,
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   'P0002', 'That account wasn''t found.',
   'a null user id is not found'
 );
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000009',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   '23505', 'That account is already in a family.',
   'an account marked for the family but already in another family is refused'
 );
@@ -398,7 +398,7 @@ select throws_ok(
 );
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000006',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"edit"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"edit","mcp":"off"}') $$,
   '23514', 'Choose an allowed level for every module.',
   'a level the module does not allow is refused'
 );
@@ -424,7 +424,7 @@ select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-0000000
 select lives_ok(
   $$ select set_config('f13.new_member_id',
        public.add_managed_kid('f1300000-0000-4000-8000-000000000006',
-         '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view"}')::text,
+         '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off"}')::text,
        true) $$,
   'a parent can add an account marked for their family'
 );
@@ -436,7 +436,7 @@ select is(current_setting('f13.new_member_id')::uuid,
   pg_temp.member_id('f1300000-0000-4000-8000-000000000006'),
   'add_managed_kid returns the new member id');
 select is(pg_temp.permissions_of('f1300000-0000-4000-8000-000000000006'),
-  array['expenses=edit', 'family_finance=view', 'investments=off', 'net_worth=edit'],
+  array['expenses=edit', 'family_finance=view', 'investments=off', 'mcp=off', 'net_worth=edit'],
   'a permission row is written for every module');
 select is(pg_temp.kid_state('f1300000-0000-4000-8000-000000000006'), 'a1:true',
   'the account stays marked and must still change its password');
@@ -445,7 +445,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-000000000001","role":"authenticated"}', true);
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000006',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   '23505', 'That account is already in a family.',
   'adding the same account twice is refused'
 );
@@ -454,7 +454,7 @@ select throws_ok(
 select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-000000000004","role":"authenticated"}', true);
 select lives_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000007',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   'a creator can add an account marked for their family'
 );
 reset role;
@@ -578,7 +578,7 @@ select is(pg_temp.kid_state('f1300000-0000-4000-8000-000000000006'), '-:true',
 select set_config('request.jwt.claims', '{"sub":"f1300000-0000-4000-8000-000000000002","role":"authenticated"}', true);
 select throws_ok(
   $$ select public.add_managed_kid('f1300000-0000-4000-8000-000000000006',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
   'P0002', 'That account wasn''t found.',
   'a parent cannot re-add a removed kid'
 );
