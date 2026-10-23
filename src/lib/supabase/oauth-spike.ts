@@ -158,3 +158,27 @@ export async function sessionForAppToken(token: string): Promise<AuthSession | n
     return null;
   }
 }
+
+/** [p1-spike] Q4: the signed-in user's OAuth grants. */
+export async function listGrants(): Promise<{ clientId: string; clientName: string; scopes: string[]; grantedAt: string }[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.oauth.listGrants();
+  if (error || !data) {
+    console.log("[p1-spike] listGrants failed", { code: error?.code, status: error?.status, message: error?.message });
+    return [];
+  }
+  return data.map((grant) => ({
+    clientId: grant.client.id,
+    clientName: grant.client.name,
+    scopes: grant.scopes,
+    grantedAt: grant.granted_at,
+  }));
+}
+
+/** [p1-spike] Q4: revokes one client's grant for the signed-in user. */
+export async function revokeGrant(clientId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.oauth.revokeGrant({ clientId });
+  console.log("[p1-spike] revokeGrant", { clientId, ok: !error, code: error?.code, message: error?.message, at: new Date().toISOString() });
+  return !error;
+}

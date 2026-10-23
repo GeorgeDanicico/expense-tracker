@@ -34,6 +34,8 @@ export {
   decideConsent as spikeDecideConsent,
   getAuthIssuer as spikeAuthIssuer,
   getConsentRequest as spikeConsentRequest,
+  listGrants as spikeListGrants,
+  revokeGrant as spikeRevokeGrant,
   sessionForAppToken as spikeSessionForAppToken,
   type SpikeConsentRequest,
 } from "@/lib/supabase/oauth-spike";
