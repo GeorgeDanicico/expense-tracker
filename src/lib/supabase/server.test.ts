@@ -9,7 +9,7 @@ vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.createServerClient }
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
 vi.mock("@/lib/supabase/config", () => ({ getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "publishable" }) }));
 
-import { createClient, getBearerToken, runWithSupabaseClient } from "@/lib/supabase/server";
+import { createAppTokenClient, createClient, getBearerToken, getScopedAppToken, runWithSupabaseClient } from "@/lib/supabase/server";
 
 const cookieClient = { kind: "cookie" };
 const tokenClient = { kind: "token" };
@@ -112,5 +112,36 @@ describe("getBearerToken", () => {
 
     expect(await runWithSupabaseClient(scoped, () => getBearerToken())).toBeNull();
     expect(mocks.headers).not.toHaveBeenCalled();
+  });
+});
+
+describe("app-token clients", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.createSupabaseClient.mockImplementation(() => ({ kind: "app-token" }));
+  });
+
+  it("builds a non-persistent client carrying the app token", () => {
+    createAppTokenClient("app-token");
+
+    expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "publishable", {
+      global: { headers: { Authorization: "Bearer app-token" } },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+  });
+
+  it("gives the app token only inside a run scoped to that client", () => {
+    const client = createAppTokenClient("app-token");
+
+    expect(getScopedAppToken()).toBeNull();
+    expect(runWithSupabaseClient(client, () => getScopedAppToken())).toBe("app-token");
+    expect(runWithSupabaseClient(scoped, () => getScopedAppToken())).toBeNull();
+  });
+
+  it("never marks the REST path's bearer client as an app-token client", async () => {
+    withAuthorization("Bearer app-token");
+    const restClient = await createClient();
+
+    expect(runWithSupabaseClient(restClient, () => getScopedAppToken())).toBeNull();
   });
 });

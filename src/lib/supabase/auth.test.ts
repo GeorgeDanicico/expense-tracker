@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  createAppTokenClient: vi.fn(),
   createClient: vi.fn(),
   createSupabaseClient: vi.fn(),
   getBearerToken: vi.fn(),
+  getScopedAppToken: vi.fn(),
   runWithSupabaseClient: vi.fn(),
 }));
 vi.mock("@/lib/supabase/server", () => ({
+  createAppTokenClient: mocks.createAppTokenClient,
   createClient: mocks.createClient,
   getBearerToken: mocks.getBearerToken,
+  getScopedAppToken: mocks.getScopedAppToken,
   runWithSupabaseClient: mocks.runWithSupabaseClient,
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
@@ -30,6 +34,7 @@ describe("supabaseAuth", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.getBearerToken.mockResolvedValue(null);
+    mocks.getScopedAppToken.mockReturnValue(null);
   });
 
   describe("getCurrentUser", () => {
@@ -51,6 +56,29 @@ describe("supabaseAuth", () => {
     it("returns null for an expired or invalid bearer token", async () => {
       mocks.getBearerToken.mockResolvedValue("expired-token");
       mockAuth({ getClaims: { data: null, error: { message: "JWT has expired" } } });
+
+      expect(await supabaseAuth.getCurrentUser()).toBeNull();
+    });
+
+    it("refuses an OAuth app's token sent as a bearer token, so the REST API answers 401", async () => {
+      mocks.getBearerToken.mockResolvedValue("app-token");
+      mockAuth({ getClaims: { data: { claims: { sub: "user-2", email: "b@example.test", client_id: "client-1" } }, error: null } });
+
+      expect(await supabaseAuth.getCurrentUser()).toBeNull();
+    });
+
+    it("returns the app token's user inside an app-token run, without reading the request's bearer token", async () => {
+      mocks.getScopedAppToken.mockReturnValue("app-token");
+      const auth = mockAuth({ getClaims: { data: { claims: { sub: "user-2", email: "b@example.test", client_id: "client-1" } }, error: null } });
+
+      expect(await supabaseAuth.getCurrentUser()).toEqual({ id: "user-2", email: "b@example.test" });
+      expect(auth.getClaims).toHaveBeenCalledExactlyOnceWith("app-token");
+      expect(mocks.getBearerToken).not.toHaveBeenCalled();
+    });
+
+    it("returns null inside an app-token run once the token is refused", async () => {
+      mocks.getScopedAppToken.mockReturnValue("app-token");
+      mockAuth({ getClaims: { data: null, error: { message: "Auth session missing!" } } });
 
       expect(await supabaseAuth.getCurrentUser()).toBeNull();
     });
@@ -223,6 +251,120 @@ describe("supabaseAuth", () => {
       mockAuth({ verifyOtp: { data: {}, error: PROVIDER_ERROR } });
 
       expect(await supabaseAuth.completeEmailLink({ tokenHash: "hash-1", type: "signup" })).toEqual({ ok: false, reason: "provider says no" });
+    });
+  });
+
+  describe("verifyAppToken", () => {
+    const APP_CLAIMS = { sub: "user-2", email: "b@example.test", client_id: "client-1", session_id: "session-1" };
+
+    function mockTokenClient({
+      claims = { data: { claims: APP_CLAIMS }, error: null } as unknown,
+      user = { data: { user: { id: "user-2", email: "b@example.test" } }, error: null } as unknown,
+    } = {}) {
+      const client = { auth: { getClaims: vi.fn().mockResolvedValue(claims), getUser: vi.fn().mockResolvedValue(user) } };
+      mocks.createAppTokenClient.mockReturnValue(client);
+      return client;
+    }
+
+    it("checks the claims, then that the session is live, on a client built from the token", async () => {
+      const client = mockTokenClient();
+
+      expect(await supabaseAuth.verifyAppToken("app-token")).toEqual({ userId: "user-2", email: "b@example.test", clientId: "client-1" });
+      expect(mocks.createAppTokenClient).toHaveBeenCalledExactlyOnceWith("app-token");
+      expect(client.auth.getClaims).toHaveBeenCalledExactlyOnceWith("app-token");
+      expect(client.auth.getUser).toHaveBeenCalledExactlyOnceWith("app-token");
+      expect(mocks.createClient).not.toHaveBeenCalled();
+    });
+
+    it("refuses a web session's JWT, which has no client_id, without asking for the user", async () => {
+      const client = mockTokenClient({ claims: { data: { claims: { sub: "user-2", email: "b@example.test" } }, error: null } });
+
+      expect(await supabaseAuth.verifyAppToken("web-token")).toBeNull();
+      expect(client.auth.getUser).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["an invalid or expired token", { data: null, error: { message: "JWT has expired" } }],
+      ["no subject", { data: { claims: { client_id: "client-1" } }, error: null }],
+      ["an empty client_id", { data: { claims: { ...APP_CLAIMS, client_id: "" } }, error: null }],
+    ])("refuses %s", async (_, claims) => {
+      mockTokenClient({ claims });
+
+      expect(await supabaseAuth.verifyAppToken("app-token")).toBeNull();
+    });
+
+    it("refuses a token whose session has ended (the app was disconnected)", async () => {
+      mockTokenClient({ user: { data: { user: null }, error: { message: "Auth session missing!", status: 403 } } });
+
+      expect(await supabaseAuth.verifyAppToken("app-token")).toBeNull();
+    });
+
+    it("refuses a token whose user isn't its subject", async () => {
+      mockTokenClient({ user: { data: { user: { id: "user-3", email: "c@example.test" } }, error: null } });
+
+      expect(await supabaseAuth.verifyAppToken("app-token")).toBeNull();
+    });
+
+    it("uses an empty email when the user has none", async () => {
+      mockTokenClient({ user: { data: { user: { id: "user-2" } }, error: null } });
+
+      expect(await supabaseAuth.verifyAppToken("app-token")).toMatchObject({ email: "" });
+    });
+
+    it("returns null when the provider throws", async () => {
+      const client = mockTokenClient();
+      client.auth.getClaims.mockRejectedValue(new Error("network down"));
+
+      expect(await supabaseAuth.verifyAppToken("app-token")).toBeNull();
+    });
+  });
+
+  describe("sessionForAppToken", () => {
+    const jwt = (claims: object) => `header.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.signature`;
+    const TOKEN = jwt({ sub: "user-2", email: "b@example.test", client_id: "client-1" });
+
+    function mockTokenClient(user: unknown = { data: { user: { id: "user-2", email: "b@example.test" } }, error: null }) {
+      const client = {
+        auth: {
+          getClaims: vi.fn().mockResolvedValue({ data: { claims: { sub: "user-2", client_id: "client-1" } }, error: null }),
+          getUser: vi.fn().mockResolvedValue(user),
+        },
+      };
+      mocks.createAppTokenClient.mockReturnValue(client);
+      return client;
+    }
+
+    it("is the token's user", () => {
+      mockTokenClient();
+
+      expect(supabaseAuth.sessionForAppToken(TOKEN)).toMatchObject({ userId: "user-2", email: "b@example.test" });
+    });
+
+    it("runs callbacks with a client built from the token in scope", () => {
+      const client = mockTokenClient();
+      mocks.runWithSupabaseClient.mockImplementation((_client: unknown, fn: () => unknown) => fn());
+
+      expect(supabaseAuth.sessionForAppToken(TOKEN).run(() => "result")).toBe("result");
+      expect(mocks.createAppTokenClient).toHaveBeenCalledWith(TOKEN);
+      expect(mocks.runWithSupabaseClient).toHaveBeenCalledWith(client, expect.any(Function));
+    });
+
+    it("is active while the token's session is live", async () => {
+      mockTokenClient();
+
+      expect(await supabaseAuth.sessionForAppToken(TOKEN).isActive()).toBe(true);
+    });
+
+    it("is not active once the session has ended", async () => {
+      mockTokenClient({ data: { user: null }, error: { message: "Auth session missing!" } });
+
+      expect(await supabaseAuth.sessionForAppToken(TOKEN).isActive()).toBe(false);
+    });
+
+    it("has no user for a token that isn't a JWT", () => {
+      mockTokenClient();
+
+      expect(supabaseAuth.sessionForAppToken("not-a-jwt")).toMatchObject({ userId: "", email: "" });
     });
   });
 

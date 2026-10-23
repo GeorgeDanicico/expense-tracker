@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import type { AuthAdmin, CreatedUser, CreateUserInput } from "@/lib/auth/admin";
 import type {
+  AppTokenUser,
   AuthenticatedUser,
   AuthFailure,
   AuthFailureKind,
@@ -35,6 +36,10 @@ export type FakeAuthOptions = {
  *
  * `fail(method, reason, kind?)` makes the next call of that method fail like the provider would.
  * Inside a session's `run`, `getCurrentUser()` returns that session's user.
+ *
+ * OAuth app tokens: `issueAppToken(user, clientId)` returns a token `verifyAppToken` accepts until
+ * `revokeAppTokens` (what disconnecting the app does) ends it. Like the real one, an app token is
+ * never `currentUser`: only `sessionForAppToken(token).run` acts as its user.
  */
 export class FakeAuth implements AuthService {
   readonly accounts: FakeAccount[] = [];
@@ -49,11 +54,14 @@ export class FakeAuth implements AuthService {
   lastOAuth: { provider: OAuthProvider; callbackUrl: string } | null = null;
   /** Every session handed out by `startSession`, oldest first. */
   readonly sessions: FakeAuthSession[] = [];
+  /** Live OAuth app tokens, by token. */
+  readonly appTokens = new Map<string, AppTokenUser>();
 
   private readonly sessionUser = new AsyncLocalStorage<AuthenticatedUser>();
   private readonly failures = new Map<keyof AuthService, Omit<AuthFailure, "ok">>();
   private readonly requireEmailConfirmation: boolean;
   private nextId = 1;
+  private nextAppToken = 1;
 
   constructor({ requireEmailConfirmation = true }: FakeAuthOptions = {}) {
     this.requireEmailConfirmation = requireEmailConfirmation;
@@ -165,6 +173,37 @@ export class FakeAuth implements AuthService {
     };
     this.sessions.push(session);
     return session;
+  }
+
+  /** A live OAuth access token for `user`, issued to the app `clientId`. */
+  issueAppToken(user: AuthenticatedUser, clientId: string): string {
+    const token = `app-token-${this.nextAppToken++}`;
+    this.appTokens.set(token, { userId: user.id, email: user.email, clientId });
+    return token;
+  }
+
+  /** Ends every app token `clientId` holds for `userId`, as disconnecting the app does. */
+  revokeAppTokens(userId: string, clientId: string) {
+    for (const [token, owner] of this.appTokens) {
+      if (owner.userId === userId && owner.clientId === clientId) this.appTokens.delete(token);
+    }
+  }
+
+  async verifyAppToken(token: string): Promise<AppTokenUser | null> {
+    const owner = this.appTokens.get(token);
+    return owner ? { ...owner } : null;
+  }
+
+  /** A session for an app token; `isActive` is false once the token is revoked. */
+  sessionForAppToken(token: string): AuthSession {
+    const owner = this.appTokens.get(token);
+    const user = { id: owner?.userId ?? "", email: owner?.email ?? "" };
+    return {
+      userId: user.id,
+      email: user.email,
+      run: (fn) => this.sessionUser.run(user, fn),
+      isActive: async () => this.appTokens.has(token),
+    };
   }
 
   private createAccount(email: string, password: string, confirmed: boolean): AuthenticatedUser {

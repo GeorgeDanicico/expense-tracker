@@ -40,6 +40,31 @@ function createTokenClient(token: string): SupabaseClient<Database> {
   });
 }
 
+// The OAuth app token each app-token client was built from. Such a client holds no session, so
+// `getClaims()` without an argument finds no one; `getCurrentUser` verifies this token instead.
+const appTokens = new WeakMap<SupabaseClient<Database>, string>();
+
+/**
+ * A token client for an OAuth app's access token, to scope over an MCP call with
+ * `runWithSupabaseClient`. Unlike the REST path's token client, it remembers its token, which
+ * marks the run as an app-token run (see `getScopedAppToken`).
+ */
+export function createAppTokenClient(token: string): SupabaseClient<Database> {
+  const client = createTokenClient(token);
+  appTokens.set(client, token);
+  return client;
+}
+
+/**
+ * The app token behind the scoped client, when the scoped client came from `createAppTokenClient`;
+ * otherwise null (no scope, or a password session's client). Only an MCP call scopes a client, so a
+ * REST request never gets one.
+ */
+export function getScopedAppToken(): string | null {
+  const scoped = scopedClient.getStore();
+  return scoped ? (appTokens.get(scoped) ?? null) : null;
+}
+
 /**
  * The request's client, in this order: the scoped client (MCP), then a client built from the
  * request's bearer token, then the cookie session. A bearer request never reads the cookies.
