@@ -3,10 +3,10 @@ import { resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { AccountNotice } from "@/lib/account/notice-repository";
-import type { OAuthApp } from "@/lib/auth/oauth-consent";
+import type { ConnectedApp, OAuthApp } from "@/lib/auth/oauth-consent";
 import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
 import { MEMBER_PARAM } from "@/lib/family/viewing";
-import type { McpAccess } from "@/lib/mcp/token-repository";
+import type { McpAccess, McpToken } from "@/lib/mcp/token-repository";
 
 /**
  * Adds `?member=<memberId>` (or `&member=`) to a finance read's URL so it shows that member's data.
@@ -186,3 +186,46 @@ export type OAuthAuthorizationResponse =
   | { kind: "refused"; email: string; reason: Exclude<McpAccess["status"], "ok">; app: OAuthApp | null };
 /** Where to send the browser next: back to the app, with a one-time code or `access_denied`. */
 export type OAuthDecisionResponse = { redirectUrl: string };
+
+/**
+ * GET → {@link McpSettingsResponse}: the AI assistants switch, the caller's access, their personal
+ * tokens and their connected apps. PATCH `{ enabled }` → the same shape; 403 with the reason for a kid
+ * who can't turn it on.
+ */
+export const MCP_SETTINGS_API_KEY = "/api/account/mcp";
+/**
+ * POST only: `{ name, expiry }` → {@link CreatedMcpToken} (201). 403 for kids, 409 at 10 live tokens.
+ * Refresh `MCP_SETTINGS_API_KEY` afterwards; never put the response in the SWR cache.
+ */
+export const MCP_TOKENS_API_URL = `${MCP_SETTINGS_API_KEY}/tokens`;
+
+/** DELETE only → 204: revokes the token. 404 when it isn't the caller's or is already revoked. */
+export function mcpTokenApiUrl(id: string) {
+  return `${MCP_TOKENS_API_URL}/${encodeURIComponent(id)}`;
+}
+
+/** POST only: `{ expiry }` → {@link CreatedMcpToken}. 404 when it isn't the caller's or is revoked. */
+export function mcpTokenRegenerateApiUrl(id: string) {
+  return `${mcpTokenApiUrl(id)}/regenerate`;
+}
+
+/** GET → {@link McpAppsResponse}: the caller's connected apps. */
+export const MCP_APPS_API_KEY = `${MCP_SETTINGS_API_KEY}/apps`;
+
+/** DELETE only → 204: disconnects that one app (one registration; others with the same name stay). 404 when it isn't connected. */
+export function mcpAppApiUrl(clientId: string) {
+  return `${MCP_APPS_API_KEY}/${encodeURIComponent(clientId)}`;
+}
+
+export type McpSettingsResponse = {
+  /** The caller's switch (`profiles.mcp_enabled`). */
+  enabled: boolean;
+  access: McpAccess;
+  /** Null when the caller can't hold personal tokens (kids). Never carries a secret. */
+  tokens: McpToken[] | null;
+  /** The same app can appear once per registration; each has its own client id. */
+  apps: ConnectedApp[];
+};
+export type McpAppsResponse = { apps: ConnectedApp[] };
+/** The only response that ever carries a token's secret: shown once, never stored or listed again. */
+export type CreatedMcpToken = { token: McpToken; secret: string };

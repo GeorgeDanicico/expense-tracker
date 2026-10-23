@@ -2,10 +2,8 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import { DEFAULT_MCP_TOKEN_EXPIRY, MCP_TOKEN_EXPIRIES, MCP_TOKEN_EXPIRY_LABELS } from "@/lib/mcp/token-expiry";
 import {
-  DEFAULT_MCP_TOKEN_EXPIRY,
-  MCP_TOKEN_EXPIRIES,
-  MCP_TOKEN_EXPIRY_LABELS,
   generateMcpToken,
   hasMcpTokenPrefix,
   hashMcpToken,

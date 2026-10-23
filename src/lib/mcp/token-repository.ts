@@ -1,4 +1,4 @@
-import type { McpTokenExpiry } from "@/lib/mcp/tokens";
+import type { McpTokenExpiry } from "@/lib/mcp/token-expiry";
 
 /** A personal token as its owner sees it: never the secret or its hash. */
 export type McpToken = {
