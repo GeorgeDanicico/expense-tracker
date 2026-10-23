@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: mocks.createClient,
   getBearerToken: mocks.getBearerToken,
+  getScopedClientToken: () => null,
   runWithSupabaseClient: mocks.runWithSupabaseClient,
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));

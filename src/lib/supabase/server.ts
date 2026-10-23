@@ -31,13 +31,25 @@ export async function getBearerToken(): Promise<string | null> {
   return /^\S+$/.test(token) ? token : "";
 }
 
+// [p1-spike] The token each token client was built from, so `getCurrentUser` can verify it when the
+// client is scoped over an MCP request (a token client holds no session for `getClaims()` to read).
+const clientTokens = new WeakMap<SupabaseClient<Database>, string>();
+
+/** The bearer token behind the scoped client, when it is a token client (the MCP OAuth path). */
+export function getScopedClientToken(): string | null {
+  const scoped = scopedClient.getStore();
+  return scoped ? (clientTokens.get(scoped) ?? null) : null;
+}
+
 /** A client that acts as the bearer token's user. It never stores or refreshes a session. */
-function createTokenClient(token: string): SupabaseClient<Database> {
+export function createTokenClient(token: string): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
-  return createSupabaseClient<Database>(url, publishableKey, {
+  const client = createSupabaseClient<Database>(url, publishableKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
+  clientTokens.set(client, token);
+  return client;
 }
 
 /**

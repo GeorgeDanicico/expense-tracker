@@ -28,3 +28,12 @@ export function getAuthAdmin(): AuthAdmin {
 
 /** The signed-in user, read once per request. */
 export const getAuthenticatedUser = cache(async (): Promise<AuthenticatedUser | null> => getAuth().getCurrentUser());
+
+// [p1-spike] Supabase OAuth server pieces for the spike only; M3 puts them behind real interfaces.
+export {
+  decideConsent as spikeDecideConsent,
+  getAuthIssuer as spikeAuthIssuer,
+  getConsentRequest as spikeConsentRequest,
+  sessionForAppToken as spikeSessionForAppToken,
+  type SpikeConsentRequest,
+} from "@/lib/supabase/oauth-spike";

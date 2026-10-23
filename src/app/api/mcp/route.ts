@@ -1,7 +1,9 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 
+import { type AuthSession, spikeSessionForAppToken } from "@/lib/auth";
 import { json, PRIVATE_HEADERS } from "@/lib/http/route";
 import { getMcpSession, parseBasicCredentials } from "@/lib/mcp/auth";
+import { bearerChallenge, mcpOrigin } from "@/lib/mcp/oauth-spike";
 import { createMcpServer } from "@/lib/mcp/server";
 
 // AsyncLocalStorage (the session's run) and node:crypto (auth) need the Node runtime.
@@ -51,16 +53,34 @@ async function handle(request: Request) {
     return json({ error: "Forbidden" }, 403);
   }
 
-  const credentials = parseBasicCredentials(request);
-  const auth = credentials ? await getMcpSession(credentials, clientIp(request)) : { status: "unauthorized" as const };
-  if (auth.status === "throttled") {
-    return json({ error: "Too many failed attempts. Try again later." }, 429);
-  }
-  if (auth.status !== "ok") {
-    return json(
-      { error: "Unauthorized" },
-      { status: 401, headers: { "WWW-Authenticate": 'Basic realm="expense-tracker"' } },
-    );
+  const authorization = request.headers.get("authorization");
+  const bearer = authorization?.match(/^Bearer\s+(\S+)$/i)?.[1];
+  let session: AuthSession;
+  if (bearer) {
+    // [p1-spike] The OAuth path: a Supabase OAuth access token.
+    const appSession = await spikeSessionForAppToken(bearer);
+    if (!appSession) {
+      return json(
+        { error: "Unauthorized" },
+        { status: 401, headers: { "WWW-Authenticate": bearerChallenge(mcpOrigin(request)) } },
+      );
+    }
+    console.log("[p1-spike] /api/mcp OAuth request ok", { userId: appSession.userId });
+    session = appSession;
+  } else {
+    const credentials = parseBasicCredentials(request);
+    const auth = credentials ? await getMcpSession(credentials, clientIp(request)) : { status: "unauthorized" as const };
+    if (auth.status === "throttled") {
+      return json({ error: "Too many failed attempts. Try again later." }, 429);
+    }
+    if (auth.status !== "ok") {
+      const headers = new Headers();
+      // Bearer first: MCP clients read the first challenge's scheme to find resource_metadata.
+      if (!authorization) headers.append("WWW-Authenticate", bearerChallenge(mcpOrigin(request)));
+      headers.append("WWW-Authenticate", 'Basic realm="expense-tracker"');
+      return json({ error: "Unauthorized" }, { status: 401, headers });
+    }
+    session = auth.session;
   }
 
   // Stateless mode has no standalone SSE stream or session to delete. The raw transport would
@@ -72,7 +92,6 @@ async function handle(request: Request) {
     );
   }
 
-  const { session } = auth;
   const server = createMcpServer({ userId: session.userId, email: session.email });
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);

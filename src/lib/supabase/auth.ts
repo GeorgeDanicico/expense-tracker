@@ -15,7 +15,7 @@ import type {
 } from "@/lib/auth/service";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
-import { createClient, getBearerToken, runWithSupabaseClient } from "@/lib/supabase/server";
+import { createClient, getBearerToken, getScopedClientToken, runWithSupabaseClient } from "@/lib/supabase/server";
 
 type ProviderError = { message: string; code?: string; status?: number };
 
@@ -66,7 +66,7 @@ export const supabaseAuth: AuthService = {
    * null (a 401), even when the request also carries a valid cookie session.
    */
   async getCurrentUser(): Promise<AuthenticatedUser | null> {
-    const token = await getBearerToken();
+    const token = (await getBearerToken()) ?? getScopedClientToken();
     if (token === "") return null;
 
     const supabase = await createClient();

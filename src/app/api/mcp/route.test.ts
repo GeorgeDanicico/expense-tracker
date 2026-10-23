@@ -78,12 +78,14 @@ describe("/api/mcp", () => {
     vi.unstubAllEnvs();
   });
 
-  it("returns 401 with a Basic challenge when credentials are missing", async () => {
+  it("returns 401 with Bearer and Basic challenges when credentials are missing", async () => {
     mocks.parseBasicCredentials.mockReturnValue(null);
     const response = await POST(rpc(initialize, { Authorization: "" }));
 
     expect(response.status).toBe(401);
-    expect(response.headers.get("www-authenticate")).toBe('Basic realm="expense-tracker"');
+    expect(response.headers.get("www-authenticate")).toBe(
+      'Bearer resource_metadata="http://localhost/.well-known/oauth-protected-resource/api/mcp", Basic realm="expense-tracker"',
+    );
     expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
     expect(await response.json()).toEqual({ error: "Unauthorized" });
     expect(mocks.getMcpSession).not.toHaveBeenCalled();
