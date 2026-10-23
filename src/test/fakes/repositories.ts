@@ -6,6 +6,7 @@ import { FakeExpenseTabRepository } from "./expense-tabs";
 import { FakeFamilyRepository } from "./family";
 import { FakeInvestmentRepository } from "./investments";
 import { FakeExpenseRepository } from "./expenses";
+import { FakeMcpTokenRepository } from "./mcp-tokens";
 import { FakeNetWorthRepository } from "./net-worth";
 import { FakeNoticeRepository } from "./notices";
 
@@ -25,6 +26,7 @@ export type FakeRepositories = {
   family: FakeFamilyRepository;
   investments: FakeInvestmentRepository;
   expenses: FakeExpenseRepository;
+  mcpTokens: FakeMcpTokenRepository;
   netWorth: FakeNetWorthRepository;
   notices: FakeNoticeRepository;
 };
@@ -39,6 +41,7 @@ export function resetFakeRepositories(): FakeRepositories {
     family: new FakeFamilyRepository(),
     investments: new FakeInvestmentRepository(),
     expenses: new FakeExpenseRepository(),
+    mcpTokens: new FakeMcpTokenRepository(),
     netWorth: new FakeNetWorthRepository(),
     notices: new FakeNoticeRepository(),
   };
