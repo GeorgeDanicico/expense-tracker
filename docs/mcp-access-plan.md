@@ -197,6 +197,58 @@ protected-resource file, and `/api/mcp` accepting an OAuth JWT. Then George runs
 7. Does Next serve `/.well-known/oauth-protected-resource/api/mcp`, and does `src/proxy.ts` leave it
    alone? (Read the Next guide in `node_modules/next/dist/docs/` for route conventions first.)
 
+#### Spike findings (2026-10-23)
+
+Run against the dev server on `localhost:3000` and the live project, with Claude Code. The spike
+code stays on `family/p1-oauth-spike` (not merged): a bare consent page, the protected-resource
+route, `/api/mcp` accepting OAuth tokens, and a throwaway connected-apps page.
+
+1. **Yes, the flow works end to end.** Claude Code read the protected-resource file, registered at
+   Supabase (client name "Claude Code (<server name>)", redirect `http://localhost:<port>/callback`,
+   no client URI), landed on `/oauth/consent?authorization_id=…` (the only query key), and after
+   Allow called `/api/mcp` with a token we accepted; the tools ran as the user under RLS.
+   - It asks for **`email` only**. `scopes_supported` should be `["email"]`.
+   - The `resource` parameter never reaches us and Supabase ignores it: the token's `aud` is
+     `authenticated`, not our URL. Don't check the audience against `/api/mcp`.
+   - The access token carries `client_id`, `scope: "email"`, a `session_id`, and
+     `amr: [{ method: "oauth_provider/authorization_code" }]`; it lasts 1 hour.
+   - Supabase's metadata only lists `registration_endpoint` once dynamic registration is saved on.
+2. **No asymmetric key yet**: the JWKS is empty and tokens are HS256. Not a blocker, since Claude
+   Code never asks for `openid`. But until there is one, `getClaims(token)` is a round trip to
+   Supabase Auth on every request. Adding an ES256 key is worth doing later; see 4 for what it
+   changes.
+3. **Auto-approve wasn't seen.** Clearing authentication in Claude Code makes it **register a new
+   client** each time, so Supabase shows the consent page again and the old grant stays behind (two
+   "Claude Code (simple-ledger-spike)" grants after one reconnect). Without clearing, Claude Code
+   reuses its client. After a revoke, reconnecting the same client shows the consent page again. A
+   `redirect_url` from `getAuthorizationDetails` for a client with a live grant is still untested,
+   so M7 keeps handling it.
+4. **Yes, a revoke is refused on the very next call**, with 56 minutes left on the access token.
+   The refusal came from `getClaims` (HS256, so it asks Supabase), with "Auth session missing!".
+   **Once the project has an asymmetric key, `getClaims` verifies locally and would accept a revoked
+   token until it expires**, so the `getUser(token)` call in `verifyAppToken` is what makes
+   disconnecting immediate. It must stay on every request.
+5. **Refresh after an hour: assumed, not tested.** George chose not to wait the hour. Checkpoint 2
+   checks it on the deployed app.
+6. **`generateLink` + `verifyOtp`: not tested.** `.env.local` has no `SUPABASE_SECRET_KEY` yet. M4
+   is built against mocks as planned; George adds the key locally and checkpoint 2 proves it.
+7. **Yes.** `src/app/.well-known/oauth-protected-resource/[[...path]]/route.ts` serves both URLs;
+   `npm run build` lists it. The proxy matcher should skip `/.well-known/` (the proxy only refreshes
+   cookies, so nothing breaks either way, but there's no cookie to refresh there).
+
+What the spike changes in the tasks below:
+
+- **M3:** inside an OAuth MCP call, `getCurrentUser()` must still find the user. A client created
+  from a bare access token has no session, so `getClaims()` with no argument returns nothing and
+  every repository that calls `getAuthenticatedUser()` (avatars, MCP tokens) would see no one. The
+  spike gives `src/lib/supabase/server.ts` a `createTokenClient(token)` that remembers the token for
+  the scoped run, and `getCurrentUser` falls back to it. M3 does the same.
+- **M6:** `scopes_supported: ["email"]`. Put the `Bearer` challenge **first** when sending both,
+  since MCP clients read `resource_metadata` from the first challenge. `resource` comes from
+  `SITE_URL`, which must be exactly the address clients are given (the Tailscale name in production).
+- **M8/M9:** expect several connected apps with the same name (one per registration). Show when each
+  was connected, and make Disconnect per app, so old ones are easy to clear.
+
 ### M1: The `mcp` kid permission
 
 **Files:** `supabase/migrations/<timestamp>_add_mcp_permission.sql` (the coordinator picks the
@@ -370,7 +422,11 @@ sessionForAppToken(token: string): AuthSession;
 ```
 
 - The Supabase `verifyAppToken` calls `getClaims(token)`, requires `client_id`, then `getUser(token)`
-  so a disconnected app fails at once.
+  so a disconnected app fails at once. Keep `getUser` even after the project gets an asymmetric key:
+  then `getClaims` checks the signature locally and can't see a revoke (spike finding 4).
+- `sessionForAppToken` runs on a client created from the token, and `getCurrentUser` inside that run
+  returns the token's user (spike: `createTokenClient` remembers the token for the scoped run),
+  so repositories that call `getAuthenticatedUser()` keep working inside MCP calls. Test it.
 - The Supabase `OAuthConsent` wraps `supabase.auth.oauth.*` on the request's client (the signed-in
   user), passing `skipBrowserRedirect: true`.
 - **The REST API refuses app tokens:** `getCurrentUser` returns null for a bearer JWT with a
@@ -471,9 +527,12 @@ and tests.
   don't (they're settings to fix, not guesses).
 - **Protected-resource file** (served at both `/.well-known/oauth-protected-resource` and
   `/.well-known/oauth-protected-resource/api/mcp`):
-  `{ resource: "<SITE_URL>/api/mcp", authorization_servers: [issuer], bearer_methods_supported: ["header"], scopes_supported: <from P1> }`.
-- Responses as in "Refusals". Until M10, a request with no `Authorization` header gets both the
-  `Bearer resource_metadata=…` and the `Basic` challenges.
+  `{ resource: "<SITE_URL>/api/mcp", authorization_servers: [issuer], bearer_methods_supported: ["header"], scopes_supported: ["email"] }`.
+  The proxy matcher skips `/.well-known/`.
+- Don't check the token's audience against `/api/mcp`: Supabase sets `aud: "authenticated"` and
+  ignores the `resource` parameter (spike finding 1).
+- Responses as in "Refusals". Until M10, a request with no `Authorization` header gets both
+  challenges in one header, **`Bearer resource_metadata=…` first**, then `Basic`.
 
 **Route tests:** for each path, a valid token lists the owner's expenses, and user A's token never
 sees user B's data. Every refusal in the table. Revoking a personal token after a successful call
@@ -543,7 +602,8 @@ another user's token and app ids.
   with the reason: "A parent can turn on AI assistants for you in Manage family", or "Add and confirm
   an email address above to use AI assistants".
 - **Connected apps** (while the switch is on): each app's name, address and when it was connected,
-  with **Disconnect** behind a confirm. An empty state explains how to connect Claude Code
+  with **Disconnect** behind a confirm. The same app can appear more than once (Claude Code registers
+  again each time its authentication is cleared), so the connected date is what tells them apart. An empty state explains how to connect Claude Code
   (`claude mcp add --transport http simple-ledger <origin>/api/mcp`).
 - **Personal access tokens** (adults, while the switch is on): "For machines without a browser, like
   a server or Claude Code over Remote Control. Use Connected apps wherever you can."
