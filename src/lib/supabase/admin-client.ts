@@ -10,7 +10,7 @@ export type AdminClient = SupabaseClient<Database>;
 /**
  * SECURITY: a client with the secret key. It bypasses RLS and every grant meant for signed-in
  * users, so it is created only on the server, only in `auth-admin.ts` (when an `AuthAdmin` method is
- * about to run), `repositories/avatars.ts` (when the caller's own picture is about to change) and
+ * about to run, including `startSessionForUser`, which uses it only to make the one-time token), `repositories/avatars.ts` (when the caller's own picture is about to change) and
  * `repositories/mcp-tokens.ts` (to check a personal MCP token, which has no signed-in user).
  * It never stores, refreshes or reads a session: it acts as the service, not as a user.
  */

@@ -1,8 +1,10 @@
 import "server-only";
 
 import type { AuthAdmin, CreatedUser, CreateUserInput } from "@/lib/auth/admin";
+import type { AuthSession } from "@/lib/auth/service";
 import { DomainError } from "@/lib/errors";
 import { createAdminClient } from "@/lib/supabase/admin-client";
+import { createSessionClient, sessionFromClient } from "@/lib/supabase/auth";
 
 type ProviderError = { code?: string; message: string };
 
@@ -32,8 +34,8 @@ function profileError(error: ProviderError): Error {
  * `AuthAdmin` on Supabase Auth's admin API and the `profiles` table.
  *
  * SECURITY: every method runs with the secret key and checks nothing about the caller. Routes must
- * check the caller's permission before calling it (F29, F30 and F32 do). Passwords and the key are
- * never logged.
+ * check the caller's permission before calling it (F29, F30 and F32 do; M6 checks a personal token
+ * before `startSessionForUser`). Passwords, one-time tokens and the key are never logged.
  */
 export function createSupabaseAuthAdmin(): AuthAdmin {
   const client = createAdminClient();
@@ -108,6 +110,36 @@ export function createSupabaseAuthAdmin(): AuthAdmin {
         throw new Error("Unable to look up the username.");
       }
       return data.user?.email || null;
+    },
+
+    async startSessionForUser(user): Promise<AuthSession | null> {
+      try {
+        // `generateLink` only builds the magic link and returns its one-time token: unlike
+        // `signInWithOtp`, it sends no email.
+        const { data: link, error: linkError } = await client.auth.admin.generateLink({
+          type: "magiclink",
+          email: user.email,
+        });
+        const tokenHash = link?.properties?.hashed_token;
+        if (linkError || !tokenHash) return null;
+        // The email may have moved to another account since the caller looked it up.
+        if (link.user?.id !== user.id) return null;
+
+        // Redeemed at once on a client of its own, as the user. `email` is the type for a magic
+        // link's token hash (Supabase deprecates `magiclink` for verifyOtp).
+        const sessionClient = createSessionClient();
+        const { data, error } = await sessionClient.auth.verifyOtp({ token_hash: tokenHash, type: "email" });
+        if (error || !data.user || !data.session) return null;
+
+        const session = sessionFromClient(sessionClient, { id: data.user.id, email: data.user.email ?? user.email });
+        if (data.user.id !== user.id) {
+          await session.end();
+          return null;
+        }
+        return session;
+      } catch {
+        return null;
+      }
     },
   };
 }

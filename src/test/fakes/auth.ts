@@ -18,8 +18,11 @@ import { DomainError } from "@/lib/errors";
 
 type FakeAccount = { id: string; email: string; password: string; confirmed: boolean };
 
-/** A session from `startSession`. Set `active` to false to expire it; `checks` counts `isActive` calls. */
-export type FakeAuthSession = AuthSession & { active: boolean; checks: number };
+/**
+ * A session from `startSession` or `FakeAuthAdmin.startSessionForUser`. Set `active` to false to
+ * expire it; `checks` counts `isActive` calls; `ended` is true once `end()` signed it out.
+ */
+export type FakeAuthSession = AuthSession & { active: boolean; checks: number; ended: boolean };
 
 export type FakeAuthOptions = {
   /** When true (the default), new accounts must confirm their email before they can sign in. */
@@ -159,16 +162,25 @@ export class FakeAuth implements AuthService {
     if (this.takeFailure("startSession")) return null;
     const account = this.accounts.find((candidate) => candidate.email === email);
     if (!account || account.password !== password || !account.confirmed) return null;
-    const user = { id: account.id, email: account.email };
+    return this.openSession({ id: account.id, email: account.email });
+  }
+
+  /** A new session for `user`, recorded in `sessions`. `FakeAuthAdmin.startSessionForUser` opens one too. */
+  openSession(user: AuthenticatedUser): FakeAuthSession {
     const session: FakeAuthSession = {
       userId: user.id,
       email: user.email,
       active: true,
       checks: 0,
+      ended: false,
       run: (fn) => this.sessionUser.run(user, fn),
       async isActive() {
         session.checks += 1;
         return session.active;
+      },
+      async end() {
+        session.active = false;
+        session.ended = true;
       },
     };
     this.sessions.push(session);
@@ -203,6 +215,8 @@ export class FakeAuth implements AuthService {
       email: user.email,
       run: (fn) => this.sessionUser.run(user, fn),
       isActive: async () => this.appTokens.has(token),
+      // Like the real one, a no-op: the session belongs to the app.
+      end: async () => {},
     };
   }
 
@@ -240,7 +254,8 @@ export type FakeAdminProfile = {
  * Seed a username account with `createUser`, assert on `profiles`, `auth.accounts` and
  * `deletedUserIds`, and use `fail(method, error)` to make the next call of that method throw `error`.
  * Its errors match the Supabase implementation's: 409 for a taken email or username, 404 for an
- * unknown account.
+ * unknown account. Like the real one, `startSessionForUser` answers null instead of throwing, also
+ * after `fail("startSessionForUser")`; the sessions it opens land in `auth.sessions`.
  */
 export class FakeAuthAdmin implements AuthAdmin {
   /** The profile columns of every account created here, by user id. */
@@ -291,6 +306,14 @@ export class FakeAuthAdmin implements AuthAdmin {
     const wanted = username.trim().toLowerCase();
     const userId = [...this.profiles].find(([, profile]) => profile.username === wanted)?.[0];
     return this.auth.accounts.find((account) => account.id === userId)?.email ?? null;
+  }
+
+  /** A session for the account with this id and email; null when there's none, as when the email moved. */
+  async startSessionForUser(user: AuthenticatedUser): Promise<AuthSession | null> {
+    if (this.failures.delete("startSessionForUser")) return null;
+    const account = this.auth.accounts.find((candidate) => candidate.id === user.id && candidate.email === user.email);
+    if (!account) return null;
+    return this.auth.openSession({ id: account.id, email: account.email });
   }
 
   private throwFailure(method: keyof AuthAdmin) {

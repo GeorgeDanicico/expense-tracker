@@ -6,6 +6,7 @@ import { fakeSupabase, type FakeSupabaseOptions } from "@/test/fake-supabase";
 const mocks = vi.hoisted(() => {
   // config.ts reads the URL when it is first imported; the secret key is read on each use.
   process.env.SUPABASE_URL = "http://supabase.test";
+  process.env.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_test_key";
   return { createSupabaseClient: vi.fn() };
 });
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
@@ -26,10 +27,14 @@ const input = {
   mustChangePassword: true,
 };
 
-type AdminResponses = Partial<Record<"createUser" | "deleteUser" | "updateUserById" | "getUserById", unknown>>;
+type AdminResponses = Partial<Record<"createUser" | "deleteUser" | "updateUserById" | "getUserById" | "generateLink", unknown>>;
 
 const ok = (user: { id: string; email?: string } | null = kid) => ({ data: { user }, error: null });
 const fails = (code: string | undefined, message = "provider says no") => ({ data: { user: null }, error: { code, message } });
+const linked = (user: { id: string; email?: string } = kid) => ({
+  data: { properties: { hashed_token: "hashed-token-1", action_link: "http://supabase.test/verify" }, user },
+  error: null,
+});
 
 /** Builds the admin client the implementation gets: the fake query builder plus mocked `auth.admin` calls. */
 function useAdminClient(
@@ -43,6 +48,7 @@ function useAdminClient(
     deleteUser: vi.fn().mockResolvedValue(responses.deleteUser ?? ok()),
     updateUserById: vi.fn().mockResolvedValue(responses.updateUserById ?? ok()),
     getUserById: vi.fn().mockResolvedValue(responses.getUserById ?? ok()),
+    generateLink: vi.fn().mockResolvedValue(responses.generateLink ?? linked()),
   };
   mocks.createSupabaseClient.mockReturnValue({ ...database.client, auth: { admin } });
   return { ...database, admin };
@@ -274,6 +280,129 @@ describe("Supabase AuthAdmin", () => {
       await expect(createSupabaseAuthAdmin().findEmailByUsername("mia")).rejects.toThrow(
         new Error("Unable to look up the username."),
       );
+    });
+  });
+
+  describe("startSessionForUser", () => {
+    const adult = { id: "10000000-0000-4000-8000-000000002802", email: "sam@example.test" };
+    const PUBLISHABLE_KEY = "sb_publishable_test_key";
+
+    type VerifyResponse = { data: { user: unknown; session: unknown }; error: unknown };
+    const verified = (user: { id: string; email?: string } = adult): VerifyResponse => ({
+      data: { user, session: { access_token: "access-token" } },
+      error: null,
+    });
+
+    /** The admin client for the secret key, and a separate session client for the publishable key. */
+    function useClients({
+      generateLink = linked(adult) as unknown,
+      verifyOtp = verified() as VerifyResponse | Error,
+    } = {}) {
+      const admin = {
+        generateLink: vi.fn().mockResolvedValue(generateLink),
+        createUser: vi.fn(),
+        deleteUser: vi.fn(),
+        updateUserById: vi.fn(),
+        getUserById: vi.fn(),
+      };
+      const sessionAuth = {
+        verifyOtp: verifyOtp instanceof Error ? vi.fn().mockRejectedValue(verifyOtp) : vi.fn().mockResolvedValue(verifyOtp),
+        getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: "access-token" } }, error: null }),
+        signOut: vi.fn().mockResolvedValue({ error: null }),
+        signInWithOtp: vi.fn(),
+      };
+      const adminClient = { auth: { admin, signInWithOtp: vi.fn() } };
+      const sessionClient = { auth: sessionAuth };
+      mocks.createSupabaseClient.mockImplementation((_url: string, key: string) =>
+        key === SECRET_KEY ? adminClient : sessionClient,
+      );
+      return { admin, adminClient, sessionAuth };
+    }
+
+    it("redeems an admin magic link on a fresh session client and returns the user's session", async () => {
+      const { admin, sessionAuth } = useClients();
+
+      const session = await createSupabaseAuthAdmin().startSessionForUser(adult);
+
+      expect(session).toMatchObject({ userId: adult.id, email: adult.email });
+      expect(admin.generateLink).toHaveBeenCalledExactlyOnceWith({ type: "magiclink", email: adult.email });
+      expect(sessionAuth.verifyOtp).toHaveBeenCalledExactlyOnceWith({ token_hash: "hashed-token-1", type: "email" });
+      expect(mocks.createSupabaseClient).toHaveBeenCalledWith("http://supabase.test", PUBLISHABLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
+      });
+      expect(await session?.isActive()).toBe(true);
+    });
+
+    it("runs callbacks as the user, on the session client", async () => {
+      useClients();
+      const session = await createSupabaseAuthAdmin().startSessionForUser(adult);
+
+      expect(session?.run(() => "result")).toBe("result");
+    });
+
+    it("never calls anything that sends an email", async () => {
+      const { adminClient, sessionAuth } = useClients();
+
+      await createSupabaseAuthAdmin().startSessionForUser(adult);
+
+      expect(sessionAuth.signInWithOtp).not.toHaveBeenCalled();
+      expect(adminClient.auth.signInWithOtp).not.toHaveBeenCalled();
+      expect(adminClient.auth.admin.createUser).not.toHaveBeenCalled();
+    });
+
+    it("signs out only its own session on end()", async () => {
+      const { sessionAuth } = useClients();
+      const session = await createSupabaseAuthAdmin().startSessionForUser(adult);
+
+      await session?.end();
+
+      expect(sessionAuth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+    });
+
+    it.each([
+      ["an error", fails("user_not_found")],
+      ["no token", { data: { properties: {}, user: adult }, error: null }],
+    ])("returns null without redeeming anything when generateLink answers with %s", async (_, generateLink) => {
+      const { sessionAuth } = useClients({ generateLink });
+
+      expect(await createSupabaseAuthAdmin().startSessionForUser(adult)).toBeNull();
+      expect(sessionAuth.verifyOtp).not.toHaveBeenCalled();
+    });
+
+    it("returns null when generateLink throws", async () => {
+      const { admin } = useClients();
+      admin.generateLink.mockRejectedValue(new Error("network down"));
+
+      expect(await createSupabaseAuthAdmin().startSessionForUser(adult)).toBeNull();
+    });
+
+    it("refuses when the email now belongs to another account", async () => {
+      const { sessionAuth } = useClients({ generateLink: linked({ id: "someone-else", email: adult.email }) });
+
+      expect(await createSupabaseAuthAdmin().startSessionForUser(adult)).toBeNull();
+      expect(sessionAuth.verifyOtp).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["an error", { data: { user: null, session: null }, error: { message: "Token has expired or is invalid" } }],
+      ["no session", { data: { user: adult, session: null }, error: null }],
+    ])("returns null when verifyOtp answers with %s", async (_, verifyOtp) => {
+      useClients({ verifyOtp });
+
+      expect(await createSupabaseAuthAdmin().startSessionForUser(adult)).toBeNull();
+    });
+
+    it("returns null when verifyOtp throws", async () => {
+      useClients({ verifyOtp: new Error("network down") });
+
+      expect(await createSupabaseAuthAdmin().startSessionForUser(adult)).toBeNull();
+    });
+
+    it("signs out and refuses a session that came back for another user", async () => {
+      const { sessionAuth } = useClients({ verifyOtp: verified({ id: "someone-else", email: adult.email }) });
+
+      expect(await createSupabaseAuthAdmin().startSessionForUser(adult)).toBeNull();
+      expect(sessionAuth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
     });
   });
 });

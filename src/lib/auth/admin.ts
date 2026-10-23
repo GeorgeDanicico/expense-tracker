@@ -1,5 +1,6 @@
 /**
- * Privileged access to the auth provider, for accounts that a parent manages (kid accounts).
+ * Privileged access to the auth provider, for accounts that a parent manages (kid accounts) and for
+ * acting as a user without their password (personal MCP tokens).
  * Routes reach it through `getAuthAdmin()` in `@/lib/auth`; only `src/lib/supabase/auth-admin.ts`
  * knows it is Supabase.
  *
@@ -10,7 +11,10 @@
  *
  * Failures are thrown: a `DomainError` (409 or 422 for input the provider or the database
  * refuses, 404 for an unknown user) or a plain `Error` with a generic message for anything else.
+ * `startSessionForUser` is the exception: it answers null instead.
  */
+
+import type { AuthenticatedUser, AuthSession } from "@/lib/auth/service";
 
 export type CreateUserInput = {
   email: string;
@@ -43,4 +47,13 @@ export interface AuthAdmin {
   setPassword(userId: string, password: string): Promise<void>;
   /** The email of the account with this username, or null when there is none. */
   findEmailByUsername(username: string): Promise<string | null>;
+  /**
+   * Opens a session for this user without their password, for personal MCP tokens. It acts as the
+   * user under RLS, exactly like one from `startSession`. Null when the account doesn't exist or the
+   * provider refuses. No email is sent.
+   *
+   * SECURITY: anyone holding the result acts as that user. Call it only after the caller has proved
+   * they may act for them (a valid, live personal token for that user).
+   */
+  startSessionForUser(user: AuthenticatedUser): Promise<AuthSession | null>;
 }

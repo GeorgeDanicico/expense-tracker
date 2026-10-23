@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type {
   AppTokenUser,
@@ -70,6 +70,45 @@ function unverifiedClaims(token: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A client of its own for one server-side session: the publishable key, never stored, refreshing
+ * itself. `startSession` and `AuthAdmin.startSessionForUser` sign in on one of these.
+ */
+export function createSessionClient(): SupabaseClient<Database> {
+  const { url, publishableKey } = getSupabaseConfig();
+  return createSupabaseClient<Database>(url, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
+  });
+}
+
+/**
+ * The `AuthSession` for a client from `createSessionClient` that has just signed in as `user`.
+ * `startSession` and `AuthAdmin.startSessionForUser` both return one, so the two can't drift.
+ */
+export function sessionFromClient(client: SupabaseClient<Database>, user: AuthenticatedUser): AuthSession {
+  return {
+    userId: user.id,
+    email: user.email,
+    run: (fn) => runWithSupabaseClient(client, fn),
+    async isActive() {
+      try {
+        const { data: current, error } = await client.auth.getSession();
+        return !error && Boolean(current.session);
+      } catch {
+        return false;
+      }
+    },
+    async end() {
+      // `local` ends this session only; the default (`global`) would sign the user out everywhere.
+      try {
+        await client.auth.signOut({ scope: "local" });
+      } catch {
+        // Nothing to do: the session expires on its own.
+      }
+    },
+  };
 }
 
 /**
@@ -199,30 +238,18 @@ export const supabaseAuth: AuthService = {
       async isActive() {
         return (await supabaseAuth.verifyAppToken(token))?.userId === userId;
       },
+      // A no-op: the token's session belongs to the app, and ending it would disconnect the app.
+      // The app refreshes or drops its own token; disconnecting is the user's choice in Settings.
+      async end() {},
     };
   },
 
   async startSession(email, password): Promise<AuthSession | null> {
     try {
-      const { url, publishableKey } = getSupabaseConfig();
-      const client = createSupabaseClient<Database>(url, publishableKey, {
-        auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
-      });
+      const client = createSessionClient();
       const { data, error } = await client.auth.signInWithPassword({ email, password });
       if (error || !data.user) return null;
-      return {
-        userId: data.user.id,
-        email: data.user.email ?? email,
-        run: (fn) => runWithSupabaseClient(client, fn),
-        async isActive() {
-          try {
-            const { data: current, error: sessionError } = await client.auth.getSession();
-            return !sessionError && Boolean(current.session);
-          } catch {
-            return false;
-          }
-        },
-      };
+      return sessionFromClient(client, { id: data.user.id, email: data.user.email ?? email });
     } catch {
       return null;
     }
