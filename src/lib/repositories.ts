@@ -7,6 +7,7 @@ import type { ExpenseRepository } from "@/lib/expenses/repository";
 import type { ExpenseTabRepository } from "@/lib/expenses/tab-repository";
 import type { FamilyRepository } from "@/lib/family/repository";
 import type { InvestmentRepository } from "@/lib/investments/repository";
+import type { McpTokenRepository } from "@/lib/mcp/token-repository";
 import type { NetWorthRepository } from "@/lib/net-worth/repository";
 import { supabaseAccountRepository } from "@/lib/supabase/repositories/account";
 import { supabaseAvatarRepository } from "@/lib/supabase/repositories/avatars";
@@ -14,6 +15,7 @@ import { supabaseExpenseTabRepository } from "@/lib/supabase/repositories/expens
 import { supabaseExpenseRepository } from "@/lib/supabase/repositories/expenses";
 import { supabaseFamilyRepository } from "@/lib/supabase/repositories/family";
 import { supabaseInvestmentRepository } from "@/lib/supabase/repositories/investments";
+import { supabaseMcpTokenRepository } from "@/lib/supabase/repositories/mcp-tokens";
 import { supabaseNetWorthRepository } from "@/lib/supabase/repositories/net-worth";
 import { supabaseNoticeRepository } from "@/lib/supabase/repositories/notices";
 
@@ -25,6 +27,7 @@ export type Repositories = {
   family: FamilyRepository;
   investments: InvestmentRepository;
   expenses: ExpenseRepository;
+  mcpTokens: McpTokenRepository;
   netWorth: NetWorthRepository;
   notices: NoticeRepository;
 };
@@ -43,6 +46,7 @@ export function getRepositories(): Repositories {
     family: supabaseFamilyRepository,
     investments: supabaseInvestmentRepository,
     expenses: supabaseExpenseRepository,
+    mcpTokens: supabaseMcpTokenRepository,
     netWorth: supabaseNetWorthRepository,
     notices: supabaseNoticeRepository,
   };
