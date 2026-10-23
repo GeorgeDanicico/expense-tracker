@@ -79,3 +79,34 @@ describe("FakeAuthAdmin", () => {
     await expect(admin.createUser(kid)).resolves.toMatchObject({ email: kid.email });
   });
 });
+
+describe("FakeAuth app tokens", () => {
+  let auth: FakeAuth;
+
+  beforeEach(() => {
+    auth = new FakeAuth();
+  });
+
+  it("verifies a live app token, and refuses it once the app is disconnected", async () => {
+    const user = auth.addUser("a@example.test", "a long password");
+    const token = auth.issueAppToken(user, "client-1");
+    const other = auth.issueAppToken(user, "client-2");
+
+    expect(await auth.verifyAppToken(token)).toEqual({ userId: user.id, email: user.email, clientId: "client-1" });
+    auth.revokeAppTokens(user.id, "client-1");
+    expect(await auth.verifyAppToken(token)).toBeNull();
+    expect(await auth.verifyAppToken(other)).not.toBeNull();
+    expect(await auth.verifyAppToken("unknown")).toBeNull();
+  });
+
+  it("acts as the token's user only inside the session's run", async () => {
+    const user = auth.addUser("a@example.test", "a long password");
+    const session = auth.sessionForAppToken(auth.issueAppToken(user, "client-1"));
+
+    expect(await session.run(() => auth.getCurrentUser())).toEqual(user);
+    expect(await auth.getCurrentUser()).toBeNull();
+    expect(await session.isActive()).toBe(true);
+    auth.revokeAppTokens(user.id, "client-1");
+    expect(await session.isActive()).toBe(false);
+  });
+});

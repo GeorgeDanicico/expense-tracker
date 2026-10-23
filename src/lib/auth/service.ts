@@ -1,7 +1,8 @@
 /**
  * The app's view of the auth provider. Routes reach it through `getAuth()` in
  * `@/lib/auth`; only `src/lib/supabase/auth.ts` knows it is Supabase.
- * Every method except `startSession` acts on the current request's session.
+ * Every method except `startSession`, `verifyAppToken` and `sessionForAppToken` acts on the current
+ * request's session.
  */
 
 export type AuthenticatedUser = {
@@ -50,6 +51,9 @@ export type AuthSession = {
   isActive(): Promise<boolean>;
 };
 
+/** The user behind an OAuth app's access token, and the app it was issued to. */
+export type AppTokenUser = { userId: string; email: string; clientId: string };
+
 export interface AuthService {
   /** The signed-in user, or null. */
   getCurrentUser(): Promise<AuthenticatedUser | null>;
@@ -68,4 +72,16 @@ export interface AuthService {
   updateEmail(email: string, confirmationUrl: string): Promise<AuthResult>;
   /** Signs in without touching the request's session. Null when the credentials are rejected or the provider fails. */
   startSession(email: string, password: string): Promise<AuthSession | null>;
+  /**
+   * The user behind an OAuth app's access token, or null if it's invalid, not an app token, or its
+   * session has ended (the user disconnected the app). Ask again on every request.
+   */
+  verifyAppToken(token: string): Promise<AppTokenUser | null>;
+  /**
+   * Runs as the user behind an app token, for an MCP call. Inside `run`, `getCurrentUser()` returns
+   * that user; outside it, an app token is never a signed-in user (the REST API refuses it).
+   *
+   * SECURITY: call it only with a token `verifyAppToken` has just accepted.
+   */
+  sessionForAppToken(token: string): AuthSession;
 }
