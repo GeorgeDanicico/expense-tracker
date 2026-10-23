@@ -66,22 +66,30 @@ describe("Supabase MCP token repository", () => {
 
   describe("access", () => {
     it("calls my_mcp_access as the caller and returns its answer", async () => {
-      const { rpcs } = useRpc(() => ({ data: { status: "ok", personalTokens: true }, error: null }));
+      const { rpcs } = useRpc(() => ({ data: { status: "ok", personalTokens: true, blockReason: null }, error: null }));
 
-      expect(await tokens.access()).toEqual({ status: "ok", personalTokens: true });
+      expect(await tokens.access()).toEqual({ status: "ok", personalTokens: true, blockReason: null });
       expect(rpcs).toEqual([{ fn: "my_mcp_access", args: {} }]);
       expect(mocks.createAdminClient).not.toHaveBeenCalled();
     });
 
     it.each(["mcp_off", "not_permitted", "email_required"])("passes on the %s status", async (status) => {
-      useRpc(() => ({ data: { status, personalTokens: false }, error: null }));
+      useRpc(() => ({ data: { status, personalTokens: false, blockReason: null }, error: null }));
 
-      expect(await tokens.access()).toEqual({ status, personalTokens: false });
+      expect(await tokens.access()).toEqual({ status, personalTokens: false, blockReason: null });
+    });
+
+    it.each(["not_permitted", "email_required"])("passes on the %s block reason while the switch is off", async (blockReason) => {
+      useRpc(() => ({ data: { status: "mcp_off", personalTokens: false, blockReason }, error: null }));
+
+      expect(await tokens.access()).toEqual({ status: "mcp_off", personalTokens: false, blockReason });
     });
 
     it.each([
-      ["an unknown status", { status: "maybe", personalTokens: true }],
-      ["a missing personalTokens", { status: "ok" }],
+      ["an unknown status", { status: "maybe", personalTokens: true, blockReason: null }],
+      ["a missing personalTokens", { status: "ok", blockReason: null }],
+      ["a missing blockReason", { status: "ok", personalTokens: true }],
+      ["an unknown blockReason", { status: "mcp_off", personalTokens: false, blockReason: "grounded" }],
       ["no answer", null],
     ])("rejects %s", async (_, data) => {
       useRpc(() => ({ data, error: null }));

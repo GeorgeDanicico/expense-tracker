@@ -41,7 +41,14 @@ import {
   ValueWithChange,
 } from "@/components/ui";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
+import { useOrigin } from "@/components/settings/mcp-command";
+import { McpConnectedAppsCard } from "@/components/settings/mcp-connected-apps";
+import { McpSwitchCard } from "@/components/settings/mcp-switch-card";
+import { McpTokenSecretDialog } from "@/components/settings/mcp-token-secret-dialog";
+import { McpTokensCard } from "@/components/settings/mcp-tokens";
+import type { ConnectedApp } from "@/lib/auth/oauth-consent";
 import { EXPENSE_CATEGORIES } from "@/lib/expenses/categories";
+import type { McpToken } from "@/lib/mcp/token-repository";
 
 import { GalleryRow, GallerySection } from "./gallery-section";
 import { TokenSwatches, TypeScale } from "./gallery-tokens";
@@ -51,9 +58,25 @@ const AVATAR_SIZES = ["xs", "sm", "md", "lg"] as const;
 const MEMBER_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 const AVATAR_NAMES = ["Ana Pop", "Teo", "Maria Ionescu", "Dan", "Ioana Marin", "Radu", "Elena Stan", "Vlad"] as const;
 
+// AI assistants samples, against a fixed clock so the expiry badges don't drift.
+const MCP_NOW = Date.parse("2026-10-23T12:00:00Z");
+const MCP_APPS: ConnectedApp[] = [
+  { clientId: "gallery-a", name: "Claude Code (ifam)", uri: null, logoUri: null, scopes: ["email"], connectedAt: "2026-10-02T09:14:00Z" },
+  { clientId: "gallery-b", name: "Claude Code (ifam)", uri: null, logoUri: null, scopes: ["email"], connectedAt: "2026-10-21T18:40:00Z" },
+];
+const MCP_TOKENS: McpToken[] = [
+  { id: "gallery-t1", name: "Home server", prefix: "sl_mcp_Ab3xQ9", createdAt: "2026-10-20T08:00:00Z", regeneratedAt: null, lastUsedAt: "2026-10-23T07:52:00Z", expiresAt: "2027-01-20T08:00:00Z" },
+  { id: "gallery-t2", name: "Backup box", prefix: "sl_mcp_Zq81kP", createdAt: "2026-07-27T08:00:00Z", regeneratedAt: null, lastUsedAt: "2026-10-01T22:10:00Z", expiresAt: "2026-10-27T08:00:00Z" },
+  { id: "gallery-t3", name: "Old laptop", prefix: "sl_mcp_L0p_7t", createdAt: "2026-06-01T08:00:00Z", regeneratedAt: null, lastUsedAt: null, expiresAt: "2026-09-01T08:00:00Z" },
+  { id: "gallery-t4", name: "NAS", prefix: "sl_mcp_n4s-Vv", createdAt: "2026-05-11T08:00:00Z", regeneratedAt: null, lastUsedAt: "2026-10-22T03:00:00Z", expiresAt: null },
+];
+const MCP_SECRET = { token: MCP_TOKENS[0], secret: "sl_mcp_Ab3xQ9fGh2kLmN4pQrS6tUvW8xYz0aBcDeFgHiJkLmN" };
+
 export function UiGallery() {
   const [view, setView] = useState<"summary" | "monthly" | "history">("summary");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [mcpSecretOpen, setMcpSecretOpen] = useState(false);
+  const origin = useOrigin();
 
   return (
     <Container maxW="1200px" px={{ base: "4", md: "6" }} py={{ base: "5", md: "8" }}>
@@ -335,6 +358,24 @@ export function UiGallery() {
               confirmLabel="Delete expense"
               onConfirm={() => setConfirmOpen(false)}
             />
+          </GalleryRow>
+        </GallerySection>
+
+        <GallerySection title="AI assistants" description="Settings → AI assistants: the switch, connected apps, personal tokens and the show-once dialog.">
+          <SimpleGrid columns={{ base: 1, lg: 2 }} gap="4">
+            <McpSwitchCard enabled access={{ blockReason: null }} onChange={() => undefined} />
+            <McpSwitchCard enabled={false} access={{ blockReason: null }} onChange={() => undefined} />
+            <McpSwitchCard enabled={false} access={{ blockReason: "not_permitted" }} onChange={() => undefined} />
+            <McpSwitchCard enabled={false} access={{ blockReason: "email_required" }} onChange={() => undefined} />
+          </SimpleGrid>
+          <McpConnectedAppsCard apps={MCP_APPS} enabled origin={origin} />
+          <McpConnectedAppsCard apps={[]} enabled={false} origin={origin} />
+          <McpTokensCard tokens={MCP_TOKENS} enabled={false} origin={origin} now={MCP_NOW} defaultExpiry="never" />
+          <GalleryRow label="show once">
+            <Button variant="outline" onClick={() => setMcpSecretOpen(true)}>Show the token dialog</Button>
+            {mcpSecretOpen ? (
+              <McpTokenSecretDialog created={MCP_SECRET} origin={origin} onClose={() => setMcpSecretOpen(false)} />
+            ) : null}
           </GalleryRow>
         </GallerySection>
 

@@ -42,15 +42,15 @@ describe("FakeMcpTokenRepository", () => {
     it("is mcp_off with the switch off and ok once an adult turns it on", async () => {
       repository.users.set(owner, { email: "owner@example.test", enabled: false, kid: null });
 
-      expect(await repository.access()).toEqual({ status: "mcp_off", personalTokens: true });
+      expect(await repository.access()).toEqual({ status: "mcp_off", personalTokens: true, blockReason: null });
       await repository.setEnabled(true);
-      expect(await repository.access()).toEqual({ status: "ok", personalTokens: true });
+      expect(await repository.access()).toEqual({ status: "ok", personalTokens: true, blockReason: null });
     });
 
     it("treats an unseeded account as an adult with the switch off", async () => {
       repository.caller = { userId: other };
 
-      expect(await repository.access()).toEqual({ status: "mcp_off", personalTokens: true });
+      expect(await repository.access()).toEqual({ status: "mcp_off", personalTokens: true, blockReason: null });
     });
 
     it("refuses a kid without the permission, then one without a real email, and lets a kid with both turn it on", async () => {
@@ -64,18 +64,21 @@ describe("FakeMcpTokenRepository", () => {
       );
       kid.email = "mia@example.test";
       await repository.setEnabled(true);
-      expect(await repository.access()).toEqual({ status: "ok", personalTokens: false });
+      expect(await repository.access()).toEqual({ status: "ok", personalTokens: false, blockReason: null });
     });
 
-    it("reports a kid's block reason only once the switch is on, like access_status", async () => {
+    it("reports a kid's block reason in the status only once the switch is on, like access_status, and always in blockReason", async () => {
       repository.users.set(owner, { email: "mia@kids.ifam.invalid", enabled: false, kid: { mcp: true } });
-      expect(await repository.access()).toEqual({ status: "mcp_off", personalTokens: false });
+      expect(await repository.access()).toEqual({ status: "mcp_off", personalTokens: false, blockReason: "email_required" });
+
+      repository.users.set(owner, { email: "mia@example.test", enabled: false, kid: { mcp: false } });
+      expect(await repository.access()).toEqual({ status: "mcp_off", personalTokens: false, blockReason: "not_permitted" });
 
       repository.users.set(owner, { email: "mia@kids.ifam.invalid", enabled: true, kid: { mcp: true } });
-      expect(await repository.access()).toEqual({ status: "email_required", personalTokens: false });
+      expect(await repository.access()).toEqual({ status: "email_required", personalTokens: false, blockReason: "email_required" });
 
       repository.users.set(owner, { email: "mia@example.test", enabled: true, kid: { mcp: false } });
-      expect(await repository.access()).toEqual({ status: "not_permitted", personalTokens: false });
+      expect(await repository.access()).toEqual({ status: "not_permitted", personalTokens: false, blockReason: "not_permitted" });
     });
 
     it("always lets anyone turn the switch off", async () => {

@@ -8,15 +8,19 @@ import type { AccountData } from "@/lib/account/types";
 
 export type SettingsTab = { href: string; label: string };
 
+const AI_ASSISTANTS_TAB: SettingsTab = { href: "/settings/mcp", label: "AI assistants" };
+
 /**
- * The settings tabs for this account. Account is always there; the family tabs only when the family
- * module is on, and Manage family only for parents.
+ * The settings tabs for this account. Account and AI assistants are always there; the family tabs
+ * only when the family module is on, and Manage family only for parents.
  */
 export function settingsTabs(account: Pick<AccountData, "features" | "membership">): SettingsTab[] {
   const tabs: SettingsTab[] = [{ href: "/settings", label: "Account" }];
-  if (!account.features.family) return tabs;
-  tabs.push({ href: "/settings/family", label: "Family" }, { href: "/settings/permissions", label: "My permissions" });
-  if (account.membership?.role === "parent") tabs.push({ href: "/settings/family/manage", label: "Manage family" });
+  if (account.features.family) {
+    tabs.push({ href: "/settings/family", label: "Family" }, { href: "/settings/permissions", label: "My permissions" });
+    if (account.membership?.role === "parent") tabs.push({ href: "/settings/family/manage", label: "Manage family" });
+  }
+  tabs.push(AI_ASSISTANTS_TAB);
   return tabs;
 }
 
