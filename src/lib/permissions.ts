@@ -7,7 +7,7 @@
 export const FAMILY_ROLES = ["parent", "kid"] as const;
 export type FamilyRole = (typeof FAMILY_ROLES)[number];
 
-export const MODULE_KEYS = ["expenses", "investments", "net_worth", "family_finance"] as const;
+export const MODULE_KEYS = ["expenses", "investments", "net_worth", "family_finance", "mcp"] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 /** Every level, lowest first: `off < view < edit`. */
@@ -22,6 +22,7 @@ export const MODULE_LEVELS = {
   investments: ["off", "edit"],
   net_worth: ["off", "edit"],
   family_finance: ["off", "view"],
+  mcp: ["off", "edit"],
 } as const satisfies Record<ModuleKey, readonly PermissionLevel[]>;
 
 export type ModuleLevel<M extends ModuleKey> = (typeof MODULE_LEVELS)[M][number];
@@ -34,6 +35,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   investments: "Investments",
   net_worth: "Net worth",
   family_finance: "Family finance",
+  mcp: "AI assistants",
 };
 
 /** How each allowed level is shown in the UI. */
@@ -42,6 +44,7 @@ export const MODULE_LEVEL_LABELS: { [M in ModuleKey]: Record<ModuleLevel<M>, str
   investments: { off: "Off", edit: "On" },
   net_worth: { off: "Off", edit: "On" },
   family_finance: { off: "Off", view: "Can see" },
+  mcp: { off: "Off", edit: "On" },
 };
 
 export const DEFAULT_KID_PERMISSIONS: Permissions = {
@@ -49,6 +52,7 @@ export const DEFAULT_KID_PERMISSIONS: Permissions = {
   investments: "off",
   net_worth: "off",
   family_finance: "off",
+  mcp: "off",
 };
 
 export const PERMISSION_PRESET_KEYS = ["young_kid", "teen"] as const;
@@ -56,7 +60,7 @@ export type PermissionPreset = (typeof PERMISSION_PRESET_KEYS)[number];
 
 export const PERMISSION_PRESETS: Record<PermissionPreset, Permissions> = {
   young_kid: DEFAULT_KID_PERMISSIONS,
-  teen: { expenses: "edit", investments: "edit", net_worth: "edit", family_finance: "off" },
+  teen: { expenses: "edit", investments: "edit", net_worth: "edit", family_finance: "off", mcp: "off" },
 };
 
 /** A member as permission checks see them; `permissions` may omit modules (missing rows). */
@@ -82,5 +86,6 @@ export function normalizePermissions(partial: Partial<Permissions>): Permissions
     investments: partial.investments ?? "off",
     net_worth: partial.net_worth ?? "off",
     family_finance: partial.family_finance ?? "off",
+    mcp: partial.mcp ?? "off",
   };
 }

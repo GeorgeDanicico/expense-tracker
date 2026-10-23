@@ -44,14 +44,14 @@ describe("withPermission", () => {
   });
 
   it("returns 403 without calling the handler when a kid lacks the module", async () => {
-    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "edit", family_finance: "view" } });
+    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "edit", family_finance: "view", mcp: "off" } });
 
     expect(await call()).toEqual({ status: 403, body: { error: "You don't have access to this." } });
     expect(handler).not.toHaveBeenCalled();
   });
 
   it("runs the handler for a kid with the module", async () => {
-    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "off", family_finance: "off" } });
+    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "off", family_finance: "off", mcp: "off" } });
 
     expect(await call()).toEqual({ status: 200, body: { ok: true } });
   });
@@ -69,7 +69,7 @@ describe("withPermission", () => {
 
   it("runs the handler without reading the membership while the family flag is off", async () => {
     vi.stubEnv("FAMILY_ENABLED", "false");
-    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "off", net_worth: "off", family_finance: "off" } });
+    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "off", net_worth: "off", family_finance: "off", mcp: "off" } });
 
     expect(await call()).toEqual({ status: 200, body: { ok: true } });
     expect(repositories.family.calls).toEqual([]);
@@ -85,7 +85,7 @@ describe("withPermission", () => {
   });
 
   it("passes the membership it checked to the handler, without reading it twice", async () => {
-    const kid = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "off", family_finance: "off" } });
+    const kid = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "off", family_finance: "off", mcp: "off" } });
     repositories.family.membership = kid;
 
     await call();

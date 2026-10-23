@@ -63,7 +63,7 @@ describe("useCan", () => {
       role: "kid",
       isCreator: false,
       familyName: "The Smiths",
-      permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off" },
+      permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off" },
     });
 
     expect(renderUseCan("expenses", "edit")).toBe(true);

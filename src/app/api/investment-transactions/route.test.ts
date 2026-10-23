@@ -149,7 +149,7 @@ describe("investment transactions in a family", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("refuses a kid with investments off and saves nothing", async () => {
-    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off" } });
+    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off" } });
 
     const response = await createOrder(order);
 
@@ -158,7 +158,7 @@ describe("investment transactions in a family", () => {
   });
 
   it("refuses a kid with investments off when deleting an order", async () => {
-    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off" } });
+    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off" } });
     seedAccount(user.id);
 
     const response = await deleteOrder(transaction.id);
@@ -168,7 +168,7 @@ describe("investment transactions in a family", () => {
   });
 
   it("saves the order for a kid with investments on", async () => {
-    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "off", family_finance: "off" } });
+    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "off", family_finance: "off", mcp: "off" } });
 
     expect((await createOrder(order)).status).toBe(201);
   });

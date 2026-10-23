@@ -18,7 +18,7 @@ const OUTSIDER_MEMBER_ID = "60000000-0000-4000-8000-000000000099";
 
 const kidUser = { id: KID.userId, email: "kid@example.test" };
 const finance = (family_finance: Permissions["family_finance"]): Permissions =>
-  ({ expenses: "edit", investments: "off", net_worth: "off", family_finance });
+  ({ expenses: "edit", investments: "off", net_worth: "off", family_finance, mcp: "off" });
 
 /** The Smiths as a parent sees them: two parents and two kids. */
 function smiths(): FamilyData {

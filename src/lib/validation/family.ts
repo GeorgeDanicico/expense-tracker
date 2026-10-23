@@ -14,6 +14,7 @@ export const permissionsSchema = z.strictObject(
     investments: moduleLevel("investments"),
     net_worth: moduleLevel("net_worth"),
     family_finance: moduleLevel("family_finance"),
+    mcp: moduleLevel("mcp"),
   } satisfies Record<ModuleKey, z.ZodType>,
   "Permissions may only list known modules.",
 );
