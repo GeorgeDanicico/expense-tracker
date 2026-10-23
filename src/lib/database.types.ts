@@ -134,6 +134,34 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["member_permissions"]["Insert"]>;
         Relationships: [];
       };
+      mcp_tokens: {
+        Row: {
+          created_at: string;
+          expires_at: string | null;
+          id: string;
+          last_used_at: string | null;
+          name: string;
+          prefix: string;
+          regenerated_at: string | null;
+          revoked_at: string | null;
+          token_hash: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          expires_at?: string | null;
+          id?: string;
+          last_used_at?: string | null;
+          name: string;
+          prefix: string;
+          regenerated_at?: string | null;
+          revoked_at?: string | null;
+          token_hash: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["mcp_tokens"]["Insert"]>;
+        Relationships: [];
+      };
       net_worth_items: {
         Row: {
           archived_at: string | null;
@@ -277,6 +305,7 @@ export type Database = {
           full_name: string | null;
           id: string;
           managed_by_family: string | null;
+          mcp_enabled: boolean;
           must_change_password: boolean;
           updated_at: string;
           username: string | null;
@@ -291,6 +320,7 @@ export type Database = {
           full_name?: string | null;
           id: string;
           managed_by_family?: string | null;
+          mcp_enabled?: boolean;
           must_change_password?: boolean;
           updated_at?: string;
           username?: string | null;
@@ -307,6 +337,15 @@ export type Database = {
           p_user_id: string;
         };
         Returns: string;
+      };
+      authenticate_mcp_token: {
+        Args: { p_token_hash: string };
+        Returns: {
+          email: string | null;
+          status: string;
+          token_id: string | null;
+          user_id: string | null;
+        }[];
       };
       complete_password_change: {
         Args: never;
@@ -327,6 +366,25 @@ export type Database = {
         Returns: {
           expires_at: string;
           invite_id: string;
+        }[];
+      };
+      create_mcp_token: {
+        Args: {
+          p_expiry: string;
+          p_name: string;
+          p_prefix: string;
+          p_token_hash: string;
+        };
+        Returns: {
+          created_at: string;
+          expires_at: string | null;
+          id: string;
+          last_used_at: string | null;
+          name: string;
+          prefix: string;
+          regenerated_at: string | null;
+          revoked_at: string | null;
+          user_id: string;
         }[];
       };
       create_net_worth_item_with_valuation: {
@@ -394,6 +452,10 @@ export type Database = {
           role: string;
         }[];
       };
+      my_mcp_access: {
+        Args: never;
+        Returns: Json;
+      };
       preview_family_invite: {
         Args: { p_code_hash: string };
         Returns: {
@@ -408,6 +470,25 @@ export type Database = {
         Args: { p_code_hash: string };
         Returns: string;
       };
+      regenerate_mcp_token: {
+        Args: {
+          p_expiry: string;
+          p_id: string;
+          p_prefix: string;
+          p_token_hash: string;
+        };
+        Returns: {
+          created_at: string;
+          expires_at: string | null;
+          id: string;
+          last_used_at: string | null;
+          name: string;
+          prefix: string;
+          regenerated_at: string | null;
+          revoked_at: string | null;
+          user_id: string;
+        }[];
+      };
       remove_family_member: {
         Args: { p_member_id: string };
         Returns: undefined;
@@ -419,6 +500,10 @@ export type Database = {
       revoke_family_invite: {
         Args: { p_invite_id: string };
         Returns: undefined;
+      };
+      revoke_mcp_token: {
+        Args: { p_id: string };
+        Returns: boolean;
       };
       set_member_color: {
         Args: {
