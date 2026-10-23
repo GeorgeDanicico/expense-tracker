@@ -114,6 +114,8 @@ Each phase gets its own task breakdown (like [family-phase-1-tasks.md](family-ph
 
 Today MCP clients sign in with **Basic auth carrying your real email and password** (`src/lib/mcp/auth.ts`). The server signs in with them and caches the session in memory. This phase replaces that with personal access tokens, and makes MCP something each user turns on in Settings. MCP keeps working on the caller's own data only (decision 3).
 
+**Status (23 October 2026): replanned** in [mcp-access-plan.md](mcp-access-plan.md) (tasks P1 and M1–M10). MCP clients connect through **OAuth**, run by Supabase Auth's OAuth 2.1 server behind our own interfaces, or with **personal access tokens** for machines without a browser (adults only). One switch per user, off by default; a kid also needs a parent's permission and a confirmed real email. The steps below are kept as first written; the plan supersedes them.
+
 | Step | What | Done when |
 | --- | --- | --- |
 | **3.1** | **Schema**: `profiles.mcp_enabled` (default `false`) and `mcp_tokens (id, user_id, name, token_hash, prefix, created_at, last_used_at, expires_at, revoked_at)`. A token is 32 random bytes with a short recognisable prefix. It's shown once at creation and only its SHA-256 hash is stored. Users read and revoke only their own tokens; only the server creates them and sets `last_used_at`. Add an **MCP** kid permission (off / on, default off). | SQL tests: a user can't read or revoke another user's tokens, and a kid can't turn MCP on while the permission is off. |
@@ -276,7 +278,7 @@ Each PR should include:
 | **Email provider** | Your call before 5.2: a transactional provider such as Resend or Amazon SES, or the SMTP account Supabase Auth already sends from | Reminder emails need a sender, a verified domain (SPF and DKIM) and a way to unsubscribe. |
 | **One to-do board or several** | Several, each with its own visibility, plus a "Family" board every family gets | A single board can't keep a parents-only or private list apart. |
 | **Banks and formats for statement import** | Open, needed before 7.2: which banks, and whether each gives CSV, PDF or both | Every bank needs its own parser and fixtures. |
-| **How MCP tokens act as the user** | Settle in phase 3's task plan; prefer a short-lived user JWT so RLS keeps applying | Using the secret key instead would bypass RLS for every MCP call. |
+| **How MCP clients sign in** | Decided: OAuth through Supabase Auth's OAuth 2.1 server, behind our own interfaces so leaving Supabase stays cheap, plus personal access tokens (1, 3 or 6 months, or never with a warning) for headless machines. Kids: OAuth only, with a parent's permission and a confirmed real email. See [mcp-access-plan.md](mcp-access-plan.md) | Using the secret key to read data would bypass RLS for every MCP call; a home-made OAuth server would still need Supabase to act as the user. |
 | **AI provider, cost and privacy** | Open, discuss when phase 8 starts | Sending financial data to a third party needs opt-in and masking. |
 | **Mac calendar** | Decided: an ICS feed out (6.4) and two-way Google sync; no CalDAV | A Mac calendar synced with Google gets the app's events through Google. |
 | **Reminder rules** | Decided: see the table in phase 5 | |
