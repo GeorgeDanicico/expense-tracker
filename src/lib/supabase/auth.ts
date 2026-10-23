@@ -15,6 +15,7 @@ import type {
   SignUpResult,
 } from "@/lib/auth/service";
 import type { Database } from "@/lib/database.types";
+import { hasMcpTokenPrefix } from "@/lib/mcp/tokens";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import {
   createAppTokenClient,
@@ -124,11 +125,14 @@ export const supabaseAuth: AuthService = {
    * An OAuth app's token (a JWT with a `client_id` claim) gives null too, so the REST API refuses
    * it: an app is allowed MCP, not the whole API. Only inside `sessionForAppToken(...).run`, whose
    * scoped client carries that token and no session, is it the caller.
+   *
+   * A personal MCP token (`sl_mcp_…`) gives null without reaching the provider: it isn't a JWT, and
+   * it's for `/api/mcp` only.
    */
   async getCurrentUser(): Promise<AuthenticatedUser | null> {
     const appToken = getScopedAppToken();
     const token = appToken ?? (await getBearerToken());
-    if (token === "") return null;
+    if (token === "" || (token !== null && hasMcpTokenPrefix(token))) return null;
 
     const supabase = await createClient();
     const { data, error } = token === null ? await supabase.auth.getClaims() : await supabase.auth.getClaims(token);

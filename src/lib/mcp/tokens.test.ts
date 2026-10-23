@@ -7,7 +7,9 @@ import {
   MCP_TOKEN_EXPIRIES,
   MCP_TOKEN_EXPIRY_LABELS,
   generateMcpToken,
+  hasMcpTokenPrefix,
   hashMcpToken,
+  mcpTokenDisplayPrefix,
   parseMcpToken,
 } from "@/lib/mcp/tokens";
 
@@ -53,6 +55,17 @@ describe("MCP token helpers", () => {
     ["a JWT", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"],
   ])("refuses %s", (_, value) => {
     expect(parseMcpToken(value)).toBeNull();
+  });
+
+  it("recognizes the sl_mcp_ prefix on well-formed and malformed values alike", () => {
+    expect(hasMcpTokenPrefix(generateMcpToken().token)).toBe(true);
+    expect(hasMcpTokenPrefix("sl_mcp_short")).toBe(true);
+    expect(hasMcpTokenPrefix("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl")).toBe(false);
+    expect(hasMcpTokenPrefix(" sl_mcp_")).toBe(false);
+  });
+
+  it("takes the 13-character display prefix", () => {
+    expect(mcpTokenDisplayPrefix(`sl_mcp_Ab3xQ9${"a".repeat(37)}`)).toBe("sl_mcp_Ab3xQ9");
   });
 
   it("lists the four expiries, defaulting to 3 months, each with a label", () => {
