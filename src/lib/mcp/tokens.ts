@@ -3,22 +3,12 @@ import { createHash, randomBytes } from "node:crypto";
 /**
  * Personal MCP access tokens (docs/mcp-access-plan.md, "Personal access tokens"): `sl_mcp_` and 43
  * base64url characters (256 random bits). Only the SHA-256 hash and the 13-character display prefix
- * are ever stored; the plain token is shown to its owner once.
+ * are ever stored; the plain token is shown to its owner once. The expiry choices are in
+ * `@/lib/mcp/token-expiry`, which the browser can import.
  */
 const TOKEN_PREFIX = "sl_mcp_";
 const DISPLAY_PREFIX_LENGTH = 13;
 const TOKEN_PATTERN = /^sl_mcp_[A-Za-z0-9_-]{43}$/;
-
-/** How long a new or regenerated token lasts. The database accepts exactly these four. */
-export const MCP_TOKEN_EXPIRIES = ["1m", "3m", "6m", "never"] as const;
-export type McpTokenExpiry = (typeof MCP_TOKEN_EXPIRIES)[number];
-export const DEFAULT_MCP_TOKEN_EXPIRY: McpTokenExpiry = "3m";
-export const MCP_TOKEN_EXPIRY_LABELS: Record<McpTokenExpiry, string> = {
-  "1m": "1 month",
-  "3m": "3 months",
-  "6m": "6 months",
-  never: "Never",
-};
 
 /** Lowercase hex SHA-256 of the whole token: what `mcp_tokens.token_hash` holds. */
 export function hashMcpToken(token: string): string {

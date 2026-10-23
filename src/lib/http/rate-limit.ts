@@ -96,6 +96,23 @@ export const avatarUploadAttempts = createFailureLimiter({
   windowMs: AVATAR_UPLOAD_WINDOW_MS,
 });
 
+/** Personal token changes allowed per user in `MCP_TOKEN_CHANGE_WINDOW_MS`, counting every attempt. */
+export const MCP_TOKEN_CHANGE_MAX_ATTEMPTS = 30;
+export const MCP_TOKEN_CHANGE_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Creating, regenerating and revoking personal MCP tokens, per user id, across
+ * `POST /api/account/mcp/tokens`, `POST /api/account/mcp/tokens/[id]/regenerate` and
+ * `DELETE /api/account/mcp/tokens/[id]` together. Like the avatar limiter, it records every attempt.
+ */
+export const mcpTokenChangeAttempts = createFailureLimiter({
+  maxFailures: MCP_TOKEN_CHANGE_MAX_ATTEMPTS,
+  windowMs: MCP_TOKEN_CHANGE_WINDOW_MS,
+});
+
+/** What the token routes answer, with status 429, past `MCP_TOKEN_CHANGE_MAX_ATTEMPTS`. */
+export const TOO_MANY_MCP_TOKEN_CHANGES = "You've changed your tokens a lot recently. Try again in an hour.";
+
 /** What a route answers, with status 429, to a key over its limit. */
 export const TOO_MANY_ATTEMPTS_MESSAGE = "Too many codes that didn't work. Try again in a few minutes.";
 

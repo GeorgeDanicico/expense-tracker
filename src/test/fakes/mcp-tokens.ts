@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { DomainError } from "@/lib/errors";
 import { KID_EMAIL_DOMAIN } from "@/lib/family/kid-account";
 import type { McpAccess, McpToken, McpTokenCheck, McpTokenRepository } from "@/lib/mcp/token-repository";
-import { MCP_TOKEN_EXPIRIES, type McpTokenExpiry } from "@/lib/mcp/tokens";
+import { MCP_TOKEN_EXPIRIES, type McpTokenExpiry } from "@/lib/mcp/token-expiry";
 
 /** What the fake knows about an account: its email, its switch, and for a kid member their `mcp` permission. */
 export type FakeMcpUser = { email: string; enabled: boolean; kid: { mcp: boolean } | null };
