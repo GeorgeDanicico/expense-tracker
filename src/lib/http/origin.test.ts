@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { safeNextPath } from "@/lib/http/origin";
 
 describe("safeNextPath", () => {
-  it.each(["/expenses", "/join/ABCD2345", "/settings/family?tab=1"])("keeps the same-site path %s", (path) => {
+  it.each(["/expenses", "/join/ABCD2345", "/settings/family?tab=1", "/oauth/consent?authorization_id=abc_DEF-123"])("keeps the same-site path %s", (path) => {
     expect(safeNextPath(path)).toBe(path);
   });
 

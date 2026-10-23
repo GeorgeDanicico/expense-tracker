@@ -51,6 +51,9 @@ const PROTECTED_ROUTES: Record<string, string[]> = {
   "net-worth/items/[id]": ["PATCH"],
   "net-worth/items/[id]/valuations": ["POST"],
   "net-worth/valuations/[id]": ["PATCH"],
+  "oauth/authorizations/[id]": ["GET"],
+  "oauth/authorizations/[id]/approve": ["POST"],
+  "oauth/authorizations/[id]/deny": ["POST"],
 };
 
 type Handler = (request: NextRequest, context: { params: Promise<{ id: string }> }) => Promise<Response>;

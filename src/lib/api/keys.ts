@@ -3,8 +3,10 @@ import { resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { AccountNotice } from "@/lib/account/notice-repository";
+import type { OAuthApp } from "@/lib/auth/oauth-consent";
 import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
 import { MEMBER_PARAM } from "@/lib/family/viewing";
+import type { McpAccess } from "@/lib/mcp/token-repository";
 
 /**
  * Adds `?member=<memberId>` (or `&member=`) to a finance read's URL so it shows that member's data.
@@ -154,3 +156,33 @@ export const FAMILY_KIDS_API_URL = "/api/family/kids";
 export function familyMemberPasswordApiUrl(memberId: string) {
   return `/api/family/members/${encodeURIComponent(memberId)}/password`;
 }
+
+/**
+ * GET → {@link OAuthAuthorizationResponse}: an OAuth app's request to use the caller's account, for
+ * the consent page. 404 when it doesn't exist, has expired or is someone else's.
+ */
+export function oauthAuthorizationApiKey(authorizationId: string) {
+  return `/api/oauth/authorizations/${encodeURIComponent(authorizationId)}`;
+}
+
+/** POST only → {@link OAuthDecisionResponse}. 403 with the reason when the caller can't use AI assistants. */
+export function oauthApproveApiUrl(authorizationId: string) {
+  return `${oauthAuthorizationApiKey(authorizationId)}/approve`;
+}
+
+/** POST only → {@link OAuthDecisionResponse}, whose URL carries `access_denied` back to the app. */
+export function oauthDenyApiUrl(authorizationId: string) {
+  return `${oauthAuthorizationApiKey(authorizationId)}/deny`;
+}
+
+/**
+ * What the consent page shows: the request to answer, the URL to follow for an app the caller already
+ * allowed (only while their access is `ok`), or why they can't allow any app right now.
+ */
+export type OAuthAuthorizationResponse =
+  | { kind: "consent"; email: string; app: OAuthApp; redirectUri: string; scopes: string[] }
+  | { kind: "approved"; redirectUrl: string }
+  /** `app` is null when Supabase already approved the request and sent no details. */
+  | { kind: "refused"; email: string; reason: Exclude<McpAccess["status"], "ok">; app: OAuthApp | null };
+/** Where to send the browser next: back to the app, with a one-time code or `access_denied`. */
+export type OAuthDecisionResponse = { redirectUrl: string };

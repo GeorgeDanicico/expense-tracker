@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 
 import { type AuthSession, getAuth, getAuthAdmin } from "@/lib/auth";
+import { MCP_REFUSALS } from "@/lib/mcp/refusals";
 import type { McpTokenCheck } from "@/lib/mcp/token-repository";
 import { hashMcpToken, hasMcpTokenPrefix, mcpTokenDisplayPrefix, parseMcpToken } from "@/lib/mcp/tokens";
 import { getRepositories } from "@/lib/repositories";
@@ -25,16 +26,6 @@ export type McpAuthResult =
   | { status: "forbidden"; message: string }
   /** The token is valid but no session could be opened (or the secret key is missing): retry later. */
   | { status: "unavailable" };
-
-type Refusal = Exclude<McpTokenCheck["status"], "ok" | "unknown" | "revoked" | "expired">;
-
-// The "Refusals" table in docs/mcp-access-plan.md.
-const REFUSALS: Record<Refusal, string> = {
-  mcp_off: "MCP is turned off for this account. Turn it on in Settings → AI assistants.",
-  not_permitted: "A parent needs to turn on AI assistants for you.",
-  email_required: "Add and confirm an email address in Settings to use AI assistants.",
-  kid_token: "Kids connect AI assistants through the app's sign-in page, not with tokens.",
-};
 
 const MAX_SESSIONS = 20;
 const MAX_FAILURES = 5;
@@ -191,7 +182,7 @@ export async function getMcpTokenSession(value: string, clientIp: string | null)
       recordFailure(keys);
       return { status: "unauthorized" };
     }
-    return { status: "forbidden", message: REFUSALS[check.status] };
+    return { status: "forbidden", message: MCP_REFUSALS[check.status] };
   }
 
   const { user } = check;
@@ -218,7 +209,7 @@ export async function getMcpAppSession(token: string): Promise<McpAuthResult> {
 
   const session = auth.sessionForAppToken(token);
   const access = await session.run(() => getRepositories().mcpTokens.access());
-  if (access.status !== "ok") return { status: "forbidden", message: REFUSALS[access.status] };
+  if (access.status !== "ok") return { status: "forbidden", message: MCP_REFUSALS[access.status] };
   return { status: "ok", session };
 }
 
