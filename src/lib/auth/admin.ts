@@ -49,8 +49,8 @@ export interface AuthAdmin {
   findEmailByUsername(username: string): Promise<string | null>;
   /**
    * Opens a session for this user without their password, for personal MCP tokens. It acts as the
-   * user under RLS, exactly like one from `startSession`. Null when the account doesn't exist or the
-   * provider refuses. No email is sent.
+   * user under RLS, exactly like a signed-in browser session. Null when the account doesn't exist or
+   * the provider refuses. No email is sent.
    *
    * SECURITY: anyone holding the result acts as that user. Call it only after the caller has proved
    * they may act for them (a valid, live personal token for that user).

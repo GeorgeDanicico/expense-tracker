@@ -1,22 +1,15 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
-
-import { z } from "zod";
-
 import { type AuthSession, getAuth, getAuthAdmin } from "@/lib/auth";
 import { MCP_REFUSALS } from "@/lib/mcp/refusals";
 import type { McpTokenCheck } from "@/lib/mcp/token-repository";
 import { hashMcpToken, hasMcpTokenPrefix, mcpTokenDisplayPrefix, parseMcpToken } from "@/lib/mcp/tokens";
 import { getRepositories } from "@/lib/repositories";
 
-type McpCredentials = { email: string; password: string };
-
 /** What a request's `Authorization` header asks for (docs/mcp-access-plan.md, M6). */
 export type McpAuthorization =
   | { kind: "personal"; token: string }
   | { kind: "app"; token: string }
-  | { kind: "basic"; credentials: McpCredentials | null }
   | { kind: "none" };
 
 export type McpAuthResult =
@@ -31,36 +24,17 @@ const MAX_SESSIONS = 20;
 const MAX_FAILURES = 5;
 const FAILURE_WINDOW_MS = 15 * 60_000;
 
-// Same limits as the login route's authSchema.
-const credentialsSchema = z.object({
-  email: z.email(),
-  password: z.string().min(8).max(128),
-});
-
 /**
- * Open sessions, shared by Basic (`cred:<hash of email and password>`) and personal tokens
- * (`token:<token hash>`, so a revoked or regenerated token's entry can be found without its id).
- * Oldest first; at most `MAX_SESSIONS`.
+ * Open sessions for personal tokens, by `token:<token hash>`, so a revoked or regenerated token's
+ * entry can be found without its id. Oldest first; at most `MAX_SESSIONS`.
  */
 const sessions = new Map<string, Promise<AuthSession | null>>();
 const failures = new Map<string, number[]>();
 
-export function parseBasicCredentials(request: Request): McpCredentials | null {
-  const match = request.headers.get("authorization")?.match(/^Basic\s+(\S+)$/i);
-  if (!match) return null;
-  const decoded = Buffer.from(match[1], "base64").toString("utf8");
-  const separator = decoded.indexOf(":");
-  if (separator < 0) return null;
-  const parsed = credentialsSchema.safeParse({
-    email: decoded.slice(0, separator),
-    password: decoded.slice(separator + 1),
-  });
-  return parsed.success ? parsed.data : null;
-}
-
 /**
  * Routes on the header: `Bearer sl_mcp_…` is a personal token, any other `Bearer` an OAuth app's
- * access token, `Basic` a password (until M10). A `Bearer` with no token is an app token that fails.
+ * access token. A `Bearer` with no token is an app token that fails. Any other scheme, `Basic`
+ * included (passwords were removed in M10), is no credentials at all.
  */
 export function readMcpAuthorization(request: Request): McpAuthorization {
   const header = request.headers.get("authorization");
@@ -69,12 +43,7 @@ export function readMcpAuthorization(request: Request): McpAuthorization {
     const token = bearer[1]?.trim() ?? "";
     return hasMcpTokenPrefix(token) ? { kind: "personal", token } : { kind: "app", token };
   }
-  if (header && /^Basic(?:\s|$)/i.test(header)) return { kind: "basic", credentials: parseBasicCredentials(request) };
   return { kind: "none" };
-}
-
-function credentialKey({ email, password }: McpCredentials) {
-  return createHash("sha256").update(`${email}\0${password}`).digest("hex");
 }
 
 function failureKeys(key: string, clientIp: string | null) {
@@ -135,19 +104,6 @@ async function dropSession(key: string) {
   if (!cached) return;
   sessions.delete(key);
   await endSession(cached);
-}
-
-export async function getMcpSession(credentials: McpCredentials, clientIp: string | null): Promise<McpAuthResult> {
-  const key = `cred:${credentialKey(credentials)}`;
-  const keys = failureKeys(key, clientIp);
-  if (isThrottled(keys)) return { status: "throttled" };
-
-  const session = await cachedSession(key, () => getAuth().startSession(credentials.email, credentials.password));
-  if (!session) {
-    recordFailure(keys);
-    return { status: "unauthorized" };
-  }
-  return { status: "ok", session };
 }
 
 /**
@@ -220,10 +176,6 @@ export function authenticateMcpRequest(authorization: McpAuthorization, clientIp
       return getMcpTokenSession(authorization.token, clientIp);
     case "app":
       return getMcpAppSession(authorization.token);
-    case "basic":
-      return authorization.credentials
-        ? getMcpSession(authorization.credentials, clientIp)
-        : Promise.resolve({ status: "unauthorized" });
     case "none":
       return Promise.resolve({ status: "unauthorized" });
   }

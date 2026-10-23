@@ -22,7 +22,7 @@ A private, mobile-first family app, starting with an expense tracker. Built with
 
 ## Run locally
 
-The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. Set `PRICE_SERVICE_URL` to the base URL of the investment price service. `FAMILY_ENABLED=true` turns on the family features described under [Family hub](#family-hub); leave it `false` (or unset) to keep them off. `SUPABASE_SECRET_KEY` (the project's secret API key) is optional: the app starts without it, but creating kid accounts and signing in with a username need it. It bypasses every database rule, so keep it only in server env files, never in the browser or in logs. For another project, copy `.env.example` to `.env.local` and replace the values. Keep these variables server-only; do not add a `NEXT_PUBLIC_` prefix.
+The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. Set `PRICE_SERVICE_URL` to the base URL of the investment price service. `FAMILY_ENABLED=true` turns on the family features described under [Family hub](#family-hub); leave it `false` (or unset) to keep them off. `SUPABASE_SECRET_KEY` (the project's secret API key) is optional: the app starts without it, but creating kid accounts, signing in with a username and personal MCP tokens need it. It bypasses every database rule, so keep it only in server env files, never in the browser or in logs. For another project, copy `.env.example` to `.env.local` and replace the values. Keep these variables server-only; do not add a `NEXT_PUBLIC_` prefix.
 
 ```bash
 npm install
@@ -69,15 +69,16 @@ Migrations live in `supabase/migrations`. They add or upgrade the expense ledger
 The family hub lets people share the app as a family. Someone creates a family and becomes its creator, then invites others with a parent or kid code or link. Parents can see everyone's expenses, investments and net worth, switch between members, and manage the family. Kids see only what their parents allow, set per module, and parents can create and remove kid accounts, reset their passwords, and delete the family. Phase 1 is described in [docs/family-hub-roadmap.md](docs/family-hub-roadmap.md).
 
 - **`FAMILY_ENABLED`:** set it to `true` to turn the family features on. When it is `false` or unset, none of the family code runs, its API routes answer 404, and the app behaves as a single-user ledger.
-- **`SUPABASE_SECRET_KEY`:** the project's secret API key, server-only. Creating a kid account and signing in with a username need it; without it the app still starts and email sign-in works, but those two fail safely. It bypasses every database rule, so never expose it to the browser or logs.
+- **`SUPABASE_SECRET_KEY`:** the project's secret API key, server-only. Creating a kid account and signing in with a username need it, as do personal MCP tokens; without it the app still starts and email sign-in works, but those fail safely. It bypasses every database rule, so never expose it to the browser or logs.
 - **Kid sign-in by username:** a kid has no email address. A parent picks a username and a first password, and the kid signs in with that username on the normal sign-in page and must choose a new password straight away. Behind the scenes the account uses a placeholder email on `kids.ifam.invalid`. A kid can add a real email later.
 
 ## MCP / Claude
 
-The app exposes its ledger to Claude as a remote [MCP](https://modelcontextprotocol.io) server, so Claude Code or Claude Desktop can read and record expenses, tabs, net worth, and investments on your behalf. Every tool runs as the signed-in user under the same Supabase RLS policies as the web app.
+The app exposes its ledger to Claude as a remote [MCP](https://modelcontextprotocol.io) server, so Claude Code or another MCP client can read and record expenses, tabs, net worth, and investments on your behalf. Every tool runs as you under the same Supabase RLS policies as the web app. The full design is in [docs/mcp-access-plan.md](docs/mcp-access-plan.md).
 
 - **Endpoint:** `/api/mcp`, stateless Streamable HTTP. Only `POST` is served; `GET` and `DELETE` return 405.
-- **Auth:** every request carries `Authorization: Basic base64(email:password)` for your iFam account. Missing or wrong credentials return 401 with `WWW-Authenticate`.
+- **Turn it on first:** **Settings → AI assistants → "Let AI assistants use your account"**. It's off by default, for everyone. While it's off, every connected app and every personal token of yours is refused with 403; turning it back on lets them in again.
+- **Two ways in:** connect an app through **OAuth** (anything with a browser), or use a **personal access token** on a machine without one. There are no passwords: an MCP client never sees yours.
 
 Tools (the destructive ones carry the MCP `destructiveHint` annotation):
 
@@ -87,36 +88,45 @@ Tools (the destructive ones carry the MCP `destructiveHint` annotation):
 - **Net worth:** `get_net_worth`, `add_net_worth_item`, `update_net_worth_item`, `add_net_worth_valuation`, `update_net_worth_valuation`
 - **Investments:** `get_investments`, `list_investment_transactions`, `add_investment_transaction`, `delete_investment_transaction` (destructive)
 
-Claude Code:
+### Connecting through OAuth
+
+OAuth is run by Supabase Auth's OAuth 2.1 server; the app serves the consent page and `/.well-known/oauth-protected-resource`. In Claude Code:
 
 ```bash
-claude mcp add --transport http expense-tracker https://<app>/api/mcp -s user \
-  --header "Authorization: Basic $(printf '%s' 'you@example.com:password' | base64)"
+claude mcp add --transport http ifam <SITE_URL>/api/mcp
 ```
 
-Claude Desktop, through `mcp-remote` in `claude_desktop_config.json`:
+Then run `/mcp` in Claude Code, pick `ifam` and **Authenticate**. Your browser opens the iFam sign-in page if you're signed out, then a page saying "Claude Code (ifam) wants to use your iFam account". Check that it sends you back to `localhost`, and click **Allow**. The connection then refreshes itself. Settings → AI assistants lists every connected app with when it was connected; **Disconnect** refuses that app's very next call. Claude Code registers itself again each time its authentication is cleared, so the same name can appear more than once: disconnect the old ones.
 
-```json
-{
-  "mcpServers": {
-    "expense-tracker": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://<app>/api/mcp", "--header", "Authorization:${AUTH}"],
-      "env": { "AUTH": "Basic <base64>" }
-    }
-  }
-}
-```
+While you have no connected apps, Settings → AI assistants shows this command with your address filled in.
 
-Security notes:
+### Personal access tokens, for machines without a browser
 
-- Production must be served over HTTPS; a Basic header over plain HTTP exposes the password.
-- The deploy workflow binds the container to `127.0.0.1:3000`. For private access from your own devices, run `sudo tailscale serve --bg 3000` on the VPS and set `SITE_URL` to the resulting `https://<host>.<tailnet>.ts.net` origin; use that URL in place of `<app>` above.
-- The credentials live in your local Claude config, so keep those files private.
-- After 5 failed sign-ins within 15 minutes, requests return 429 until the window passes.
-- Changing your password invalidates the cached session; update the header afterwards.
-- The signed-in session is cached in server memory. A restart or redeploy only means one fresh sign-in on the next request.
-- Browser requests with an `Origin` other than `SITE_URL` are rejected with 403 (DNS-rebinding guard). Without `SITE_URL`, only localhost origins are accepted; Claude Code and `mcp-remote` send no `Origin`.
+For a server, or Claude Code over Remote Control, where the OAuth redirect to `localhost` can't complete. Use OAuth wherever you can.
+
+1. In **Settings → AI assistants → Personal access tokens**, create a token with a name and an expiry: 1 month, 3 months (the default), 6 months, or never (not recommended: a leaked token keeps working until you revoke it).
+2. Copy it straight away. The token (`sl_mcp_…`) is **shown once**; only its hash is stored, so a lost token can't be recovered. Regenerate it instead.
+3. Add it to the client:
+
+   ```bash
+   claude mcp add --transport http ifam <SITE_URL>/api/mcp --header "Authorization: Bearer sl_mcp_…"
+   ```
+
+The list shows each token's prefix, when it was created and last used, and its expiry. **Regenerate** stops the old value at once; **Revoke** refuses the next call. You can have at most 10 live tokens. Personal tokens need **`SUPABASE_SECRET_KEY`** on the server; without it, a token request answers 503 and OAuth still works.
+
+### Kids
+
+A kid can use AI assistants only when all three hold: a parent has turned on their **AI assistants** permission in Manage family (off by default), the kid has added and confirmed a real email address (not the generated `kids.ifam.invalid` one), and the kid has turned their own switch on. Kids connect through **OAuth only**; they can't create personal tokens, and an adult's tokens stop working if that adult joins a family as a kid.
+
+### Security notes
+
+- Every request is checked again: turning your switch off, a parent turning a kid's permission off, disconnecting an app or revoking a token all take effect on the next call.
+- OAuth tokens and personal tokens work only on `/api/mcp`; the REST API refuses both, and neither can sign in to the web app or change a password.
+- Production must be served over HTTPS. The deploy workflow binds the container to `127.0.0.1:3000`. For private access from your own devices, run `sudo tailscale serve --bg 3000` on the VPS and set `SITE_URL` to the resulting `https://<host>.<tailnet>.ts.net` origin. `SITE_URL` must be exactly the address clients are given, since the OAuth challenge points at it.
+- Personal tokens live in your local Claude config, so keep those files private.
+- After 5 bad tokens within 15 minutes from one IP or with one token prefix, requests return 429 until the window passes.
+- A personal token's session is cached in server memory. A restart or redeploy only means a fresh session on the next request.
+- Browser requests with an `Origin` other than `SITE_URL` are rejected with 403 (DNS-rebinding guard). Without `SITE_URL`, only localhost origins are accepted; Claude Code sends no `Origin`.
 
 ## Docker on a VPS
 
@@ -133,7 +143,7 @@ access for npm packages and Google fonts, but no Supabase credentials.
 
 Create `/etc/expense-tracker/.env.production` on the VPS with `SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, `PRICE_SERVICE_URL`, and `SITE_URL` (your public HTTPS origin). Add
-`SUPABASE_SECRET_KEY` when kid accounts and username sign-in are in use; it bypasses every database
+`SUPABASE_SECRET_KEY` when kid accounts, username sign-in or personal MCP tokens are in use; it bypasses every database
 rule, so make the file readable only by the runner user (`chmod 600`). The
 self-hosted GitHub Actions runner must be able to read this file.
 Environment files are excluded from the build context and supplied at runtime:

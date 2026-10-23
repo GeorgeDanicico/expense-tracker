@@ -19,7 +19,7 @@ import { DomainError } from "@/lib/errors";
 type FakeAccount = { id: string; email: string; password: string; confirmed: boolean };
 
 /**
- * A session from `startSession` or `FakeAuthAdmin.startSessionForUser`. Set `active` to false to
+ * A session from `openSession`, which `FakeAuthAdmin.startSessionForUser` uses. Set `active` to false to
  * expire it; `checks` counts `isActive` calls; `ended` is true once `end()` signed it out.
  */
 export type FakeAuthSession = AuthSession & { active: boolean; checks: number; ended: boolean };
@@ -55,7 +55,7 @@ export class FakeAuth implements AuthService {
   lastEmailChange: { email: string; confirmationUrl: string } | null = null;
   /** The provider and callback URL passed to the last `oauthSignInUrl`. */
   lastOAuth: { provider: OAuthProvider; callbackUrl: string } | null = null;
-  /** Every session handed out by `startSession`, oldest first. */
+  /** Every session handed out by `openSession`, oldest first. */
   readonly sessions: FakeAuthSession[] = [];
   /** Live OAuth app tokens, by token. */
   readonly appTokens = new Map<string, AppTokenUser>();
@@ -158,14 +158,7 @@ export class FakeAuth implements AuthService {
     return { ok: true };
   }
 
-  async startSession(email: string, password: string): Promise<AuthSession | null> {
-    if (this.takeFailure("startSession")) return null;
-    const account = this.accounts.find((candidate) => candidate.email === email);
-    if (!account || account.password !== password || !account.confirmed) return null;
-    return this.openSession({ id: account.id, email: account.email });
-  }
-
-  /** A new session for `user`, recorded in `sessions`. `FakeAuthAdmin.startSessionForUser` opens one too. */
+  /** A new session for `user`, recorded in `sessions`. `FakeAuthAdmin.startSessionForUser` opens one. */
   openSession(user: AuthenticatedUser): FakeAuthSession {
     const session: FakeAuthSession = {
       userId: user.id,

@@ -20,7 +20,7 @@ vi.mock("@/lib/supabase/config", () => ({
   getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "pk" }),
 }));
 
-import { supabaseAuth } from "@/lib/supabase/auth";
+import { createSessionClient, sessionFromClient, supabaseAuth } from "@/lib/supabase/auth";
 
 const PROVIDER_ERROR = { message: "provider says no" };
 
@@ -386,16 +386,12 @@ describe("supabaseAuth", () => {
     });
   });
 
-  describe("startSession", () => {
+  describe("createSessionClient and sessionFromClient", () => {
     const USER = { id: "user-1", email: "a@example.test" };
 
-    function mockSessionClient({
-      signIn = { data: { user: USER }, error: null } as unknown,
-      session = { data: { session: { access_token: "token" } }, error: null } as unknown,
-    } = {}) {
+    function mockSessionClient(session: unknown = { data: { session: { access_token: "token" } }, error: null }) {
       const client = {
         auth: {
-          signInWithPassword: vi.fn().mockResolvedValue(signIn),
           getSession: vi.fn().mockResolvedValue(session),
           signOut: vi.fn().mockResolvedValue({ error: null }),
         },
@@ -404,79 +400,55 @@ describe("supabaseAuth", () => {
       return client;
     }
 
-    it("signs in with its own non-persistent, auto-refreshing client", async () => {
-      const client = mockSessionClient();
+    /** A session for `USER` on a fresh session client, as `AuthAdmin.startSessionForUser` builds it. */
+    function session() {
+      return sessionFromClient(createSessionClient(), USER);
+    }
 
-      expect(await supabaseAuth.startSession("a@example.test", "secret-1")).toMatchObject({ userId: "user-1", email: "a@example.test" });
+    it("creates its own non-persistent, auto-refreshing client", () => {
+      mockSessionClient();
+
+      expect(session()).toMatchObject({ userId: "user-1", email: "a@example.test" });
       expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "pk", {
         auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
       });
-      expect(client.auth.signInWithPassword).toHaveBeenCalledWith({ email: "a@example.test", password: "secret-1" });
       expect(mocks.createClient).not.toHaveBeenCalled();
     });
 
-    it("uses the given email when the user has none", async () => {
-      mockSessionClient({ signIn: { data: { user: { id: "user-1" } }, error: null } });
-
-      expect(await supabaseAuth.startSession("a@example.test", "secret-1")).toMatchObject({ email: "a@example.test" });
-    });
-
-    it.each([
-      ["an error", { data: { user: null }, error: PROVIDER_ERROR }],
-      ["no user", { data: { user: null }, error: null }],
-    ])("returns null on %s", async (_, signIn) => {
-      mockSessionClient({ signIn });
-
-      expect(await supabaseAuth.startSession("a@example.test", "secret-1")).toBeNull();
-    });
-
-    it("returns null when the provider throws", async () => {
-      mocks.createSupabaseClient.mockImplementation(() => {
-        throw new Error("network down");
-      });
-
-      expect(await supabaseAuth.startSession("a@example.test", "secret-1")).toBeNull();
-    });
-
-    it("runs callbacks with the session's client in scope", async () => {
+    it("runs callbacks with the session's client in scope", () => {
       const client = mockSessionClient();
       mocks.runWithSupabaseClient.mockImplementation((_client: unknown, fn: () => unknown) => fn());
-      const session = await supabaseAuth.startSession("a@example.test", "secret-1");
 
-      expect(session?.run(() => "result")).toBe("result");
+      expect(session().run(() => "result")).toBe("result");
       expect(mocks.runWithSupabaseClient).toHaveBeenCalledWith(client, expect.any(Function));
     });
 
     it("is active while the client still has a session", async () => {
       mockSessionClient();
-      const session = await supabaseAuth.startSession("a@example.test", "secret-1");
 
-      expect(await session?.isActive()).toBe(true);
+      expect(await session().isActive()).toBe(true);
     });
 
     it.each([
       ["no session", { data: { session: null }, error: null }],
       ["a refresh error", { data: { session: null }, error: { message: "Refresh failed" } }],
     ])("is not active with %s", async (_, response) => {
-      mockSessionClient({ session: response });
-      const session = await supabaseAuth.startSession("a@example.test", "secret-1");
+      mockSessionClient(response);
 
-      expect(await session?.isActive()).toBe(false);
+      expect(await session().isActive()).toBe(false);
     });
 
     it("is not active when the session check throws", async () => {
       const client = mockSessionClient();
-      const session = await supabaseAuth.startSession("a@example.test", "secret-1");
       client.auth.getSession.mockRejectedValue(new Error("network down"));
 
-      expect(await session?.isActive()).toBe(false);
+      expect(await session().isActive()).toBe(false);
     });
 
     it("signs out only this session on end()", async () => {
       const client = mockSessionClient();
-      const session = await supabaseAuth.startSession("a@example.test", "secret-1");
 
-      await session?.end();
+      await session().end();
 
       expect(client.auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
     });
@@ -486,10 +458,9 @@ describe("supabaseAuth", () => {
       ["throws", (signOut: ReturnType<typeof vi.fn>) => signOut.mockRejectedValue(new Error("network down"))],
     ])("swallows the failure when signing out %s", async (_, fail) => {
       const client = mockSessionClient();
-      const session = await supabaseAuth.startSession("a@example.test", "secret-1");
       fail(client.auth.signOut);
 
-      await expect(session?.end()).resolves.toBeUndefined();
+      await expect(session().end()).resolves.toBeUndefined();
     });
   });
 });

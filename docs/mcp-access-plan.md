@@ -6,9 +6,9 @@ browser. It also makes MCP something each user turns on in Settings. It replaces
 [family-hub-roadmap.md](family-hub-roadmap.md); making `/api/mcp` reachable from the internet (for
 claude.ai, the Claude phone app and ChatGPT) is a later step, described at the end.
 
-Today an MCP client sends `Authorization: Basic base64(email:password)` on every request
-([src/lib/mcp/auth.ts](../src/lib/mcp/auth.ts)). Your real password sits in every MCP client's
-config, and anyone who reads that config can sign in to the web app as you.
+Before this plan, an MCP client sent `Authorization: Basic base64(email:password)` on every request
+([src/lib/mcp/auth.ts](../src/lib/mcp/auth.ts)). Your real password sat in every MCP client's
+config, and anyone who read that config could sign in to the web app as you. M10 removed it.
 
 ## Decisions
 
