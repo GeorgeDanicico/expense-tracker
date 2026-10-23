@@ -78,6 +78,29 @@ describe("FakeAuthAdmin", () => {
     await expect(admin.createUser(kid)).rejects.toThrow("down");
     await expect(admin.createUser(kid)).resolves.toMatchObject({ email: kid.email });
   });
+
+  it("opens a session for a user without their password, which end() signs out", async () => {
+    const user = auth.addUser("a@example.test", "a long password");
+
+    const session = await admin.startSessionForUser(user);
+
+    expect(session).toMatchObject({ userId: user.id, email: user.email });
+    expect(await session?.run(() => auth.getCurrentUser())).toEqual(user);
+    expect(auth.sessions).toEqual([session]);
+    await session?.end();
+    expect(await session?.isActive()).toBe(false);
+    expect(auth.sessions[0].ended).toBe(true);
+  });
+
+  it("opens no session for an unknown account, a moved email, or after fail()", async () => {
+    const user = auth.addUser("a@example.test", "a long password");
+
+    expect(await admin.startSessionForUser({ id: "unknown", email: user.email })).toBeNull();
+    expect(await admin.startSessionForUser({ id: user.id, email: "b@example.test" })).toBeNull();
+    admin.fail("startSessionForUser");
+    expect(await admin.startSessionForUser(user)).toBeNull();
+    expect(await admin.startSessionForUser(user)).not.toBeNull();
+  });
 });
 
 describe("FakeAuth app tokens", () => {
@@ -108,5 +131,14 @@ describe("FakeAuth app tokens", () => {
     expect(await session.isActive()).toBe(true);
     auth.revokeAppTokens(user.id, "client-1");
     expect(await session.isActive()).toBe(false);
+  });
+
+  it("leaves the app's token alone when its session is ended", async () => {
+    const user = auth.addUser("a@example.test", "a long password");
+    const token = auth.issueAppToken(user, "client-1");
+
+    await auth.sessionForAppToken(token).end();
+
+    expect(await auth.verifyAppToken(token)).not.toBeNull();
   });
 });

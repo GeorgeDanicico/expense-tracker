@@ -49,6 +49,12 @@ export type AuthSession = {
   run<T>(fn: () => T): T;
   /** Whether the session can still be used, refreshing it if the provider needs to. */
   isActive(): Promise<boolean>;
+  /**
+   * Signs this session out, and only this one: the user's other sessions stay signed in. It never
+   * throws; a session that can't be signed out simply expires. An app token's session ignores it,
+   * since that session belongs to the app (see `sessionForAppToken`).
+   */
+  end(): Promise<void>;
 };
 
 /** The user behind an OAuth app's access token, and the app it was issued to. */
@@ -80,6 +86,8 @@ export interface AuthService {
   /**
    * Runs as the user behind an app token, for an MCP call. Inside `run`, `getCurrentUser()` returns
    * that user; outside it, an app token is never a signed-in user (the REST API refuses it).
+   *
+   * Its `end()` does nothing: ending the app's session would disconnect the app.
    *
    * SECURITY: call it only with a token `verifyAppToken` has just accepted.
    */

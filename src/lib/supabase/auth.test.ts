@@ -366,6 +366,17 @@ describe("supabaseAuth", () => {
 
       expect(supabaseAuth.sessionForAppToken("not-a-jwt")).toMatchObject({ userId: "", email: "" });
     });
+
+    it("leaves the app's session alone on end(), since ending it would disconnect the app", async () => {
+      const client = mockTokenClient();
+      const signOut = vi.fn();
+      Object.assign(client.auth, { signOut });
+
+      await supabaseAuth.sessionForAppToken(TOKEN).end();
+
+      expect(signOut).not.toHaveBeenCalled();
+      expect(client.auth.getUser).not.toHaveBeenCalled();
+    });
   });
 
   describe("startSession", () => {
@@ -376,7 +387,11 @@ describe("supabaseAuth", () => {
       session = { data: { session: { access_token: "token" } }, error: null } as unknown,
     } = {}) {
       const client = {
-        auth: { signInWithPassword: vi.fn().mockResolvedValue(signIn), getSession: vi.fn().mockResolvedValue(session) },
+        auth: {
+          signInWithPassword: vi.fn().mockResolvedValue(signIn),
+          getSession: vi.fn().mockResolvedValue(session),
+          signOut: vi.fn().mockResolvedValue({ error: null }),
+        },
       };
       mocks.createSupabaseClient.mockReturnValue(client);
       return client;
@@ -448,6 +463,26 @@ describe("supabaseAuth", () => {
       client.auth.getSession.mockRejectedValue(new Error("network down"));
 
       expect(await session?.isActive()).toBe(false);
+    });
+
+    it("signs out only this session on end()", async () => {
+      const client = mockSessionClient();
+      const session = await supabaseAuth.startSession("a@example.test", "secret-1");
+
+      await session?.end();
+
+      expect(client.auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+    });
+
+    it.each([
+      ["answers with an error", (signOut: ReturnType<typeof vi.fn>) => signOut.mockResolvedValue({ error: PROVIDER_ERROR })],
+      ["throws", (signOut: ReturnType<typeof vi.fn>) => signOut.mockRejectedValue(new Error("network down"))],
+    ])("swallows the failure when signing out %s", async (_, fail) => {
+      const client = mockSessionClient();
+      const session = await supabaseAuth.startSession("a@example.test", "secret-1");
+      fail(client.auth.signOut);
+
+      await expect(session?.end()).resolves.toBeUndefined();
     });
   });
 });
