@@ -13,8 +13,9 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { account } = useAccount();
   const tabs = account ? settingsTabs(account) : [];
-  // With the family module off only the account page exists; the family pages send you back to it.
-  const hidden = account !== undefined && !account.features.family && pathname !== "/settings";
+  // With the family module off only the account and AI assistant pages exist (exactly the tabs); the
+  // family pages send you back to the account page.
+  const hidden = account !== undefined && !account.features.family && !tabs.some((tab) => tab.href === pathname);
 
   useEffect(() => {
     if (hidden) router.replace("/settings");

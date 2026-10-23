@@ -7,7 +7,7 @@ import { mcpSwitchSchema } from "@/lib/validation/mcp";
 /**
  * The caller's AI assistant settings. `enabled` is derived from `access`: the access rule answers
  * `mcp_off` exactly when `profiles.mcp_enabled` is off, before any kid rule, so a kid who is both
- * switched off and blocked reads `mcp_off` (and learns the block reason from PATCH's 403).
+ * switched off and blocked reads `mcp_off`; `access.blockReason` says why they can't turn it on.
  */
 async function loadSettings(): Promise<McpSettingsResponse> {
   const { mcpTokens } = getRepositories();

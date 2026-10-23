@@ -17,7 +17,16 @@ export type McpAccess = {
   status: "ok" | "mcp_off" | "not_permitted" | "email_required";
   /** False for kids, who connect through OAuth only. */
   personalTokens: boolean;
+  /**
+   * Why a kid can't use AI assistants whatever their switch says, or null (adults, and kids who pass
+   * both rules). Unlike `status`, it's set while the switch is off, so the page can say why a kid
+   * can't turn it on.
+   */
+  blockReason: McpBlockReason | null;
 };
+
+/** Why a kid is blocked: their parent hasn't turned the permission on, or they have no confirmed real email. */
+export type McpBlockReason = "not_permitted" | "email_required";
 
 /** What `check` finds for a token, in the database's order: unknown, revoked, expired, kid_token, then access. */
 export type McpTokenCheck =

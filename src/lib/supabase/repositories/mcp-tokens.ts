@@ -20,6 +20,7 @@ const TOKEN_INVALID = "That token isn't valid.";
 const TOKEN_COLUMNS = "id, name, prefix, created_at, regenerated_at, last_used_at, expires_at";
 
 const ACCESS_STATUSES: readonly string[] = ["ok", "mcp_off", "not_permitted", "email_required"];
+const BLOCK_REASONS: readonly unknown[] = [null, "not_permitted", "email_required"];
 const REFUSED_STATUSES: readonly string[] = ["unknown", "revoked", "expired", "kid_token", "mcp_off", "not_permitted", "email_required"];
 
 type TokenRow = {
@@ -67,7 +68,7 @@ function firstToken(data: TokenRow[] | null): McpToken {
 
 /**
  * `McpTokenRepository` on `profiles.mcp_enabled`, `mcp_tokens` and the M2 functions
- * (supabase/migrations/20261023000200_create_mcp_access.sql). Everything but `check` acts as the
+ * (supabase/migrations/20261023000200_create_mcp_access.sql, and 20261023000300_add_mcp_block_reason.sql for `blockReason`). Everything but `check` acts as the
  * request's caller, under RLS.
  */
 export const supabaseMcpTokenRepository: McpTokenRepository = {
@@ -76,15 +77,20 @@ export const supabaseMcpTokenRepository: McpTokenRepository = {
     const { data, error } = await supabase.rpc("my_mcp_access");
 
     if (error) throw translateDatabaseError(error, ACCESS_ERROR);
-    const access = data as { status?: unknown; personalTokens?: unknown } | null;
+    const access = data as { status?: unknown; personalTokens?: unknown; blockReason?: unknown } | null;
     if (
       typeof access?.status !== "string" ||
       !ACCESS_STATUSES.includes(access.status) ||
-      typeof access.personalTokens !== "boolean"
+      typeof access.personalTokens !== "boolean" ||
+      !BLOCK_REASONS.includes(access.blockReason)
     ) {
       throw new Error(ACCESS_ERROR);
     }
-    return { status: access.status as McpAccess["status"], personalTokens: access.personalTokens };
+    return {
+      status: access.status as McpAccess["status"],
+      personalTokens: access.personalTokens,
+      blockReason: access.blockReason as McpAccess["blockReason"],
+    };
   },
 
   /** On the caller's own profile row; the switch guard trigger refuses a kid who can't turn it on (42501). */

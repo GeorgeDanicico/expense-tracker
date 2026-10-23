@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap;
-select plan(65);
+select plan(69);
 
 -- M2: the MCP switch (profiles.mcp_enabled), the access rule, its guard,
 -- personal tokens and authenticate_mcp_token.
@@ -131,8 +131,8 @@ select lives_ok(
   $$ update public.profiles set mcp_enabled = true where id = 'e2000000-0000-4000-8000-000000000002' $$,
   'an adult in a family can turn the switch on'
 );
-select is(public.my_mcp_access(), '{"status":"ok","personalTokens":true}'::jsonb,
-  'my_mcp_access for that adult: ok, with personal tokens');
+select is(public.my_mcp_access(), '{"status":"ok","personalTokens":true,"blockReason":null}'::jsonb,
+  'my_mcp_access for that adult: ok, with personal tokens, no block reason');
 
 select pg_temp.sign_in('01');
 select lives_ok(
@@ -146,8 +146,8 @@ select throws_ok(
   '42501', 'A parent needs to turn on AI assistants for you.',
   'a kid with the permission off cannot turn the switch on'
 );
-select is(public.my_mcp_access(), '{"status":"mcp_off","personalTokens":false}'::jsonb,
-  'my_mcp_access for that kid: mcp_off, without personal tokens');
+select is(public.my_mcp_access(), '{"status":"mcp_off","personalTokens":false,"blockReason":"not_permitted"}'::jsonb,
+  'my_mcp_access for that kid: mcp_off, without personal tokens, blocked as not_permitted');
 
 select pg_temp.sign_in('04');
 select throws_ok(
@@ -155,14 +155,16 @@ select throws_ok(
   '42501', 'Add and confirm an email address in Settings to use AI assistants.',
   'a kid with the generated email cannot turn the switch on'
 );
+select is(public.my_mcp_access(), '{"status":"mcp_off","personalTokens":false,"blockReason":"email_required"}'::jsonb,
+  'my_mcp_access for that kid: mcp_off, blocked as email_required');
 
 select pg_temp.sign_in('05');
 select lives_ok(
   $$ update public.profiles set mcp_enabled = true where id = 'e2000000-0000-4000-8000-000000000005' $$,
   'a kid with the permission and a real email can turn the switch on'
 );
-select is(public.my_mcp_access(), '{"status":"ok","personalTokens":false}'::jsonb,
-  'my_mcp_access for that kid: ok, still without personal tokens');
+select is(public.my_mcp_access(), '{"status":"ok","personalTokens":false,"blockReason":null}'::jsonb,
+  'my_mcp_access for that kid: ok, still without personal tokens, no block reason');
 
 -- A kid can't get around the guard by inserting a fresh profile row.
 select pg_temp.sign_in('03');
@@ -178,6 +180,17 @@ reset role;
 select pg_temp.set_switch('03', true);
 select pg_temp.set_switch('04', true);
 set local role authenticated;
+
+-- With the switch on (set past the guard), status and blockReason agree.
+select pg_temp.sign_in('03');
+select is(public.my_mcp_access(), '{"status":"not_permitted","personalTokens":false,"blockReason":"not_permitted"}'::jsonb,
+  'my_mcp_access for a switched-on kid with the permission off: not_permitted twice');
+select pg_temp.sign_in('04');
+select is(public.my_mcp_access(), '{"status":"email_required","personalTokens":false,"blockReason":"email_required"}'::jsonb,
+  'my_mcp_access for a switched-on kid with the generated email: email_required twice');
+select pg_temp.sign_in('01');
+select is(public.my_mcp_access(), '{"status":"ok","personalTokens":true,"blockReason":null}'::jsonb,
+  'my_mcp_access for a user with no family: no block reason');
 
 select pg_temp.sign_in('03');
 select lives_ok(

@@ -21,8 +21,8 @@ const ROLE_ITEMS = [
   { value: "kid", label: "Kid" },
 ] as const;
 
-/** A button that copies `text` and says so for a moment. */
-export function CopyButton({ text, label }: { text: string; label: string }) {
+/** A button that copies `text` and says so for a moment. `onCopied` runs once the clipboard has it. */
+export function CopyButton({ text, label, onCopied }: { text: string; label: string; onCopied?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -31,6 +31,7 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
       await navigator.clipboard.writeText(text);
       setFailed(false);
       setCopied(true);
+      onCopied?.();
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);

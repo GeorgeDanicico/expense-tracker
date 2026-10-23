@@ -101,7 +101,7 @@ export class FakeMcpTokenRepository implements McpTokenRepository {
   async access(): Promise<McpAccess> {
     this.calls.push("access");
     const user = this.user(this.caller.userId);
-    return { status: this.accessStatus(user), personalTokens: user.kid === null };
+    return { status: this.accessStatus(user), personalTokens: user.kid === null, blockReason: this.kidBlockReason(user) };
   }
 
   /** Like the switch guard: a kid who can't use MCP can't turn it on; turning it off always works. */

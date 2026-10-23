@@ -106,7 +106,7 @@ describe("GET /api/account/mcp", () => {
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.body).toMatchObject({
       enabled: true,
-      access: { status: "ok", personalTokens: true },
+      access: { status: "ok", personalTokens: true, blockReason: null },
       tokens: [{ name: "Seed", prefix: "sl_mcp_Seed00" }],
       // The same app twice, once per registration, each with its own client id and date.
       apps: [
@@ -129,18 +129,18 @@ describe("GET /api/account/mcp", () => {
   });
 
   it.each([
-    ["a user with no family", roles["a user with no family"], { enabled: false, access: { status: "mcp_off", personalTokens: true }, tokens: [] }],
-    ["a parent", roles["a parent"], { enabled: false, access: { status: "mcp_off", personalTokens: true }, tokens: [] }],
-    ["a kid with the permission off", roles["a kid with the permission off"], { enabled: false, access: { status: "mcp_off", personalTokens: false }, tokens: null }],
+    ["a user with no family", roles["a user with no family"], { enabled: false, access: { status: "mcp_off", personalTokens: true, blockReason: null }, tokens: [] }],
+    ["a parent", roles["a parent"], { enabled: false, access: { status: "mcp_off", personalTokens: true, blockReason: null }, tokens: [] }],
+    ["a kid with the permission off", roles["a kid with the permission off"], { enabled: false, access: { status: "mcp_off", personalTokens: false, blockReason: "not_permitted" }, tokens: null }],
     [
       "a kid with the permission on and no real email",
       roles["a kid with the permission on and no real email"],
-      { enabled: false, access: { status: "mcp_off", personalTokens: false }, tokens: null },
+      { enabled: false, access: { status: "mcp_off", personalTokens: false, blockReason: "email_required" }, tokens: null },
     ],
     [
       "a kid with the permission on and a real email",
       roles["a kid with the permission on and a real email"],
-      { enabled: false, access: { status: "mcp_off", personalTokens: false }, tokens: null },
+      { enabled: false, access: { status: "mcp_off", personalTokens: false, blockReason: null }, tokens: null },
     ],
   ])("shows %s with the switch off", async (_role, state, expected) => {
     setUser(state);
@@ -153,7 +153,7 @@ describe("GET /api/account/mcp", () => {
 
     expect((await settings()).body).toMatchObject({
       enabled: true,
-      access: { status: "not_permitted", personalTokens: false },
+      access: { status: "not_permitted", personalTokens: false, blockReason: "not_permitted" },
       tokens: null,
     });
   });
