@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FakeAuth } from "@/test/fakes/auth";
+import { FakeAuth, FakeAuthAdmin } from "@/test/fakes/auth";
 
 let auth: FakeAuth;
-vi.mock("@/lib/auth", () => ({ getAuth: () => auth }));
+let admin: FakeAuthAdmin;
+vi.mock("@/lib/auth", () => ({ getAuth: () => auth, getAuthAdmin: () => admin }));
+vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
-import { getMcpSession, parseBasicCredentials, resetMcpAuthForTests } from "@/lib/mcp/auth";
+import {
+  getMcpSession,
+  getMcpTokenSession,
+  parseBasicCredentials,
+  readMcpAuthorization,
+  resetMcpAuthForTests,
+} from "@/lib/mcp/auth";
+import { generateMcpToken } from "@/lib/mcp/tokens";
+import { resetFakeRepositories } from "@/test/fakes/repositories";
 
 const credentials = { email: "user@example.com", password: "correct-horse" };
 
@@ -35,6 +45,59 @@ describe("parseBasicCredentials", () => {
     ["a short password", basic("user@example.com:short")],
   ])("rejects %s", (_, header) => {
     expect(parseBasicCredentials(request(header))).toBeNull();
+  });
+});
+
+describe("readMcpAuthorization", () => {
+  const personal = `sl_mcp_${"a".repeat(43)}`;
+
+  it.each([
+    ["a personal token", `Bearer ${personal}`, { kind: "personal", token: personal }],
+    ["a malformed personal token", "Bearer sl_mcp_short", { kind: "personal", token: "sl_mcp_short" }],
+    ["any other bearer token", "Bearer eyJ.abc.def", { kind: "app", token: "eyJ.abc.def" }],
+    ["a lowercase scheme", `bearer ${personal}`, { kind: "personal", token: personal }],
+    ["a Bearer with no token", "Bearer", { kind: "app", token: "" }],
+    ["Basic credentials", basic("user@example.com:password1"), {
+      kind: "basic", credentials: { email: "user@example.com", password: "password1" },
+    }],
+    ["bad Basic credentials", basic("no-colon"), { kind: "basic", credentials: null }],
+    ["no header", undefined, { kind: "none" }],
+    ["another scheme", "Digest abc", { kind: "none" }],
+  ])("reads %s", (_, header, expected) => {
+    expect(readMcpAuthorization(request(header))).toEqual(expected);
+  });
+});
+
+describe("the session cache", () => {
+  beforeEach(() => {
+    resetMcpAuthForTests();
+    auth = new FakeAuth();
+    admin = new FakeAuthAdmin(auth);
+  });
+
+  it("keeps at most 20 sessions, shared by Basic and personal tokens, ending the oldest", async () => {
+    const repositories = resetFakeRepositories();
+    auth.addUser(credentials.email, credentials.password);
+    expect(await getMcpSession(credentials, null)).toMatchObject({ status: "ok" });
+
+    for (let index = 0; index < 20; index += 1) {
+      const user = auth.addUser(`user${index}@example.test`, "password-1");
+      repositories.mcpTokens.users.set(user.id, { email: user.email, enabled: true, kid: null });
+      const { token, prefix, hash } = generateMcpToken();
+      repositories.mcpTokens.tokens.push({
+        id: `token-${index}`, userId: user.id, name: "VPS", prefix, hash, createdAt: "2026-10-01T00:00:00Z",
+        regeneratedAt: null, lastUsedAt: null, expiresAt: null, revokedAt: null,
+      });
+      expect(await getMcpTokenSession(token, null)).toMatchObject({ status: "ok" });
+    }
+    await new Promise((resolve) => setTimeout(resolve));
+
+    // The Basic session was the oldest of 21: it's ended, and the next Basic call signs in again.
+    expect(auth.sessions[0].ended).toBe(true);
+    expect(auth.sessions.slice(1).every((session) => !session.ended)).toBe(true);
+    expect(await getMcpSession(credentials, null)).toMatchObject({ status: "ok" });
+    expect(auth.sessions).toHaveLength(22);
+    expect(auth.sessions[1].ended).toBe(true);
   });
 });
 

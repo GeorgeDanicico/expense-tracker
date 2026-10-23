@@ -67,6 +67,13 @@ describe("supabaseAuth", () => {
       expect(await supabaseAuth.getCurrentUser()).toBeNull();
     });
 
+    it("refuses a personal MCP token sent as a bearer token without asking the provider, so the REST API answers 401", async () => {
+      mocks.getBearerToken.mockResolvedValue(`sl_mcp_${"a".repeat(43)}`);
+
+      expect(await supabaseAuth.getCurrentUser()).toBeNull();
+      expect(mocks.createClient).not.toHaveBeenCalled();
+    });
+
     it("returns the app token's user inside an app-token run, without reading the request's bearer token", async () => {
       mocks.getScopedAppToken.mockReturnValue("app-token");
       const auth = mockAuth({ getClaims: { data: { claims: { sub: "user-2", email: "b@example.test", client_id: "client-1" } }, error: null } });

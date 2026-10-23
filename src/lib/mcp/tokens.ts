@@ -31,7 +31,20 @@ export function hashMcpToken(token: string): string {
  */
 export function generateMcpToken(): { token: string; prefix: string; hash: string } {
   const token = `${TOKEN_PREFIX}${randomBytes(32).toString("base64url")}`;
-  return { token, prefix: token.slice(0, DISPLAY_PREFIX_LENGTH), hash: hashMcpToken(token) };
+  return { token, prefix: mcpTokenDisplayPrefix(token), hash: hashMcpToken(token) };
+}
+
+/**
+ * Whether the value claims to be one of our tokens (`sl_mcp_…`), well-formed or not. `/api/mcp` routes
+ * on this: such a bearer value is a personal token, never an OAuth access token.
+ */
+export function hasMcpTokenPrefix(value: string): boolean {
+  return value.startsWith(TOKEN_PREFIX);
+}
+
+/** The first 13 characters (`sl_mcp_Ab3xQ9`), as stored and shown in the token list. */
+export function mcpTokenDisplayPrefix(token: string): string {
+  return token.slice(0, DISPLAY_PREFIX_LENGTH);
 }
 
 /** The value when it has the shape of one of our tokens, else null, so a stray value never reaches the database. */
