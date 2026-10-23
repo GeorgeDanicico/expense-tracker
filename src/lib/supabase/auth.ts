@@ -75,7 +75,7 @@ function unverifiedClaims(token: string): Record<string, unknown> | null {
 
 /**
  * A client of its own for one server-side session: the publishable key, never stored, refreshing
- * itself. `startSession` and `AuthAdmin.startSessionForUser` sign in on one of these.
+ * itself. `AuthAdmin.startSessionForUser` signs in on one of these.
  */
 export function createSessionClient(): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
@@ -86,7 +86,7 @@ export function createSessionClient(): SupabaseClient<Database> {
 
 /**
  * The `AuthSession` for a client from `createSessionClient` that has just signed in as `user`.
- * `startSession` and `AuthAdmin.startSessionForUser` both return one, so the two can't drift.
+ * `AuthAdmin.startSessionForUser` returns one.
  */
 export function sessionFromClient(client: SupabaseClient<Database>, user: AuthenticatedUser): AuthSession {
   return {
@@ -115,7 +115,6 @@ export function sessionFromClient(client: SupabaseClient<Database>, user: Authen
 /**
  * `AuthService` on Supabase Auth, using the request's client: the scoped MCP client, the
  * `Authorization: Bearer` token's client, or the cookie session (see `createClient`).
- * `startSession` is the exception: it signs in with its own client, which `run` scopes over its callback.
  */
 export const supabaseAuth: AuthService = {
   /**
@@ -246,16 +245,5 @@ export const supabaseAuth: AuthService = {
       // The app refreshes or drops its own token; disconnecting is the user's choice in Settings.
       async end() {},
     };
-  },
-
-  async startSession(email, password): Promise<AuthSession | null> {
-    try {
-      const client = createSessionClient();
-      const { data, error } = await client.auth.signInWithPassword({ email, password });
-      if (error || !data.user) return null;
-      return sessionFromClient(client, { id: data.user.id, email: data.user.email ?? email });
-    } catch {
-      return null;
-    }
   },
 };

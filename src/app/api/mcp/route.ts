@@ -1,14 +1,13 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 
 import { json, PRIVATE_HEADERS } from "@/lib/http/route";
-import { authenticateMcpRequest, type McpAuthorization, readMcpAuthorization } from "@/lib/mcp/auth";
+import { authenticateMcpRequest, readMcpAuthorization } from "@/lib/mcp/auth";
 import { mcpBearerChallenge, mcpResourceOrigin } from "@/lib/mcp/authorization-server";
 import { createMcpServer } from "@/lib/mcp/server";
 
 // AsyncLocalStorage (the session's run) and node:crypto (auth) need the Node runtime.
 export const runtime = "nodejs";
 
-const BASIC_CHALLENGE = 'Basic realm="expense-tracker"';
 const LOCALHOST_NAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 function isAllowedOrigin(origin: string) {
@@ -46,17 +45,6 @@ function withPrivateHeaders(response: Response) {
   }
 }
 
-/**
- * The 401's challenges: `Bearer` for a token, `Basic` for a password, and both when the request sent
- * neither, `Bearer` first since MCP clients read `resource_metadata` from the first one.
- */
-function challengeHeaders(authorization: McpAuthorization, request: Request) {
-  const headers = new Headers();
-  if (authorization.kind !== "basic") headers.append("WWW-Authenticate", mcpBearerChallenge(mcpResourceOrigin(request)));
-  if (authorization.kind === "basic" || authorization.kind === "none") headers.append("WWW-Authenticate", BASIC_CHALLENGE);
-  return headers;
-}
-
 async function handle(request: Request) {
   // MCP spec DNS-rebinding guard. Claude Code and mcp-remote send no Origin.
   const origin = request.headers.get("origin");
@@ -64,8 +52,7 @@ async function handle(request: Request) {
     return json({ error: "Forbidden" }, 403);
   }
 
-  const authorization = readMcpAuthorization(request);
-  const auth = await authenticateMcpRequest(authorization, clientIp(request));
+  const auth = await authenticateMcpRequest(readMcpAuthorization(request), clientIp(request));
   if (auth.status === "throttled") {
     return json({ error: "Too many failed attempts. Try again later." }, 429);
   }
@@ -80,7 +67,12 @@ async function handle(request: Request) {
     );
   }
   if (auth.status !== "ok") {
-    return json({ error: "Unauthorized" }, { status: 401, headers: challengeHeaders(authorization, request) });
+    // Only the Bearer challenge, whatever the request sent (Basic included): its `resource_metadata`
+    // is how an MCP client finds the authorization server.
+    return json(
+      { error: "Unauthorized" },
+      { status: 401, headers: { "WWW-Authenticate": mcpBearerChallenge(mcpResourceOrigin(request)) } },
+    );
   }
 
   // Stateless mode has no standalone SSE stream or session to delete. The raw transport would

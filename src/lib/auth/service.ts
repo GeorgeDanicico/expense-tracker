@@ -1,7 +1,7 @@
 /**
  * The app's view of the auth provider. Routes reach it through `getAuth()` in
  * `@/lib/auth`; only `src/lib/supabase/auth.ts` knows it is Supabase.
- * Every method except `startSession`, `verifyAppToken` and `sessionForAppToken` acts on the current
+ * Every method except `verifyAppToken` and `sessionForAppToken` acts on the current
  * request's session.
  */
 
@@ -76,8 +76,6 @@ export interface AuthService {
   updatePassword(password: string): Promise<AuthResult>;
   /** Asks to change the signed-in user's email; the link sent to the new address goes to `confirmationUrl`. */
   updateEmail(email: string, confirmationUrl: string): Promise<AuthResult>;
-  /** Signs in without touching the request's session. Null when the credentials are rejected or the provider fails. */
-  startSession(email: string, password: string): Promise<AuthSession | null>;
   /**
    * The user behind an OAuth app's access token, or null if it's invalid, not an app token, or its
    * session has ended (the user disconnected the app). Ask again on every request.

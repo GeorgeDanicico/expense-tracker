@@ -12,7 +12,7 @@ These facts shape the plan:
 - **`profiles` already exists** (`id`, `email`, `currency`). Display name and avatar can go there.
 - **The browser never talks to Supabase directly.** Next.js route handlers in `src/app/api/**` use `withUser` (`src/lib/http/route.ts`), which reads the user from **cookies**. The Supabase keys are server-only. A native app can't use cookies the same way, so the API has to accept a bearer token as well (step 1.2).
 - **The domain logic is already separate from the UI.** Zod schemas (`src/lib/validation`), types and calculations (`src/lib/expenses`, `src/lib/net-worth`, `src/lib/investments`) don't depend on Chakra, so the Expo app can reuse them.
-- **MCP signs in with Basic auth.** MCP clients send the user's real email and password on every request (`src/lib/mcp/auth.ts`), and MCP is on for everyone. Phase 3 replaces this with per-user tokens and a Settings switch.
+- **MCP connects through OAuth or personal access tokens** (phase 3, [mcp-access-plan.md](mcp-access-plan.md)), and each user turns it on in Settings → AI assistants. MCP clients used to send the user's real email and password (Basic auth); that was removed in M10.
 - **The production VPS is reachable only over Tailscale.** This matters for phones, which need Tailscale, and for Google Calendar push webhooks, which need a public HTTPS URL (see "Decisions you need to make").
 - **Tests:** Vitest for units and routes, plus SQL RLS tests in `supabase/tests` run by `npm run test:db`. The only workflows are deploy and VPS notification. Nothing runs checks on pull requests yet.
 
@@ -112,9 +112,9 @@ Each phase gets its own task breakdown (like [family-phase-1-tasks.md](family-ph
 
 ## Phase 3: MCP access tokens and a per-user switch
 
-Today MCP clients sign in with **Basic auth carrying your real email and password** (`src/lib/mcp/auth.ts`). The server signs in with them and caches the session in memory. This phase replaces that with personal access tokens, and makes MCP something each user turns on in Settings. MCP keeps working on the caller's own data only (decision 3).
+Before this phase, MCP clients signed in with **Basic auth carrying your real email and password** (`src/lib/mcp/auth.ts`). The server signed in with them and cached the session in memory. This phase replaces that with personal access tokens, and makes MCP something each user turns on in Settings. MCP keeps working on the caller's own data only (decision 3).
 
-**Status (23 October 2026): replanned** in [mcp-access-plan.md](mcp-access-plan.md) (tasks P1 and M1–M10). MCP clients connect through **OAuth**, run by Supabase Auth's OAuth 2.1 server behind our own interfaces, or with **personal access tokens** for machines without a browser (adults only). One switch per user, off by default; a kid also needs a parent's permission and a confirmed real email. The steps below are kept as first written; the plan supersedes them.
+**Status (23 October 2026): done; Basic auth is removed (M10).** Replanned in [mcp-access-plan.md](mcp-access-plan.md) (tasks P1 and M1–M10). MCP clients connect through **OAuth**, run by Supabase Auth's OAuth 2.1 server behind our own interfaces, or with **personal access tokens** for machines without a browser (adults only). One switch per user, off by default; a kid also needs a parent's permission and a confirmed real email. The steps below are kept as first written; the plan supersedes them.
 
 | Step | What | Done when |
 | --- | --- | --- |

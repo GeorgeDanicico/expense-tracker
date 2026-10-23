@@ -28,7 +28,6 @@ import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repos
 
 const PASSWORD = "correct-horse";
 const BEARER_CHALLENGE = 'Bearer resource_metadata="https://expenses.example.com/.well-known/oauth-protected-resource/api/mcp"';
-const BASIC_CHALLENGE = 'Basic realm="expense-tracker"';
 const MESSAGES = {
   mcp_off: "MCP is turned off for this account. Turn it on in Settings → AI assistants.",
   not_permitted: "A parent needs to turn on AI assistants for you.",
@@ -142,11 +141,11 @@ describe("/api/mcp", () => {
   });
 
   describe("with no credentials", () => {
-    it("answers 401 with the Bearer challenge first, then Basic", async () => {
+    it("answers 401 with only the Bearer challenge", async () => {
       const response = await POST(rpc(initialize));
 
       expect(response.status).toBe(401);
-      expect(response.headers.get("www-authenticate")).toBe(`${BEARER_CHALLENGE}, ${BASIC_CHALLENGE}`);
+      expect(response.headers.get("www-authenticate")).toBe(BEARER_CHALLENGE);
       expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
       expect(await response.json()).toEqual({ error: "Unauthorized" });
     });
@@ -366,48 +365,38 @@ describe("/api/mcp", () => {
   });
 
   describe("with Basic credentials", () => {
-    it("still lists the user's expenses, and only theirs", async () => {
-      expect(await listedExpenseIds(basic(userA.email))).toEqual(["expense-a"]);
-      expect(await listedExpenseIds(basic(userB.email))).toEqual(["expense-b"]);
-    });
-
-    it("answers 401 with only the Basic challenge for a wrong password", async () => {
-      const response = await POST(rpc(initialize, basic(userA.email, "wrong-password")));
+    it("answers 401 with only the Bearer challenge, even for the right password", async () => {
+      const response = await POST(rpc(initialize, basic(userA.email)));
 
       expect(response.status).toBe(401);
-      expect(response.headers.get("www-authenticate")).toBe(BASIC_CHALLENGE);
-    });
-
-    it("answers 429 after five wrong passwords from one IP", async () => {
-      const ip = { "X-Forwarded-For": "203.0.113.7" };
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        await POST(rpc(initialize, { ...basic(userA.email, `wrong-password-${attempt}`), ...ip }));
-      }
-
-      expect((await POST(rpc(initialize, { ...basic(userA.email), ...ip }))).status).toBe(429);
+      expect(response.headers.get("www-authenticate")).toBe(BEARER_CHALLENGE);
+      expect(await response.json()).toEqual({ error: "Unauthorized" });
+      expect(auth.sessions).toHaveLength(0);
     });
   });
 
   describe("transport", () => {
+    const signedIn = () => bearer(personalToken(userA).token);
+
     it("returns 403 for a foreign Origin before checking credentials", async () => {
-      const response = await POST(rpc(initialize, { ...basic(userA.email), Origin: "https://evil.example" }));
+      const response = await POST(rpc(initialize, { ...signedIn(), Origin: "https://evil.example" }));
 
       expect(response.status).toBe(403);
       expect(auth.sessions).toHaveLength(0);
     });
 
     it("allows the configured site Origin", async () => {
-      expect((await POST(rpc(initialize, { ...basic(userA.email), Origin: "https://expenses.example.com" }))).status).toBe(200);
+      expect((await POST(rpc(initialize, { ...signedIn(), Origin: "https://expenses.example.com" }))).status).toBe(200);
     });
 
     it("allows only localhost origins when SITE_URL is not configured", async () => {
       vi.stubEnv("SITE_URL", "");
-      expect((await POST(rpc(initialize, { ...basic(userA.email), Origin: "http://localhost:3000" }))).status).toBe(200);
-      expect((await POST(rpc(initialize, { ...basic(userA.email), Origin: "https://expenses.example.com" }))).status).toBe(403);
+      expect((await POST(rpc(initialize, { ...signedIn(), Origin: "http://localhost:3000" }))).status).toBe(200);
+      expect((await POST(rpc(initialize, { ...signedIn(), Origin: "https://expenses.example.com" }))).status).toBe(403);
     });
 
     it("answers initialize over the streaming transport with private cache headers", async () => {
-      const response = await POST(rpc(initialize, basic(userA.email)));
+      const response = await POST(rpc(initialize, signedIn()));
 
       expect(response.status).toBe(200);
       expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
@@ -417,7 +406,7 @@ describe("/api/mcp", () => {
 
     it("rejects GET and DELETE with 405 in stateless mode", async () => {
       for (const handler of [GET, DELETE]) {
-        const response = await handler(rpc(undefined, basic(userA.email), handler === GET ? "GET" : "DELETE"));
+        const response = await handler(rpc(undefined, signedIn(), handler === GET ? "GET" : "DELETE"));
         expect(response.status).toBe(405);
         expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
       }
