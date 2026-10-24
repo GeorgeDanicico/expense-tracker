@@ -24,11 +24,14 @@ import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 import {
   filterTodos,
   hasTodoFilters,
+  hiddenByFilterNotice,
+  hidingFilter,
   parseTodoFilters,
+  quickAddFields,
   todoFiltersHref,
   type TodoFilters,
 } from "@/lib/todos/filters";
-import type { Todo } from "@/lib/todos/types";
+import type { Todo, TodoStatus } from "@/lib/todos/types";
 
 /** Shown to a user without a family, who has no board. */
 export function NoFamilyBoard() {
@@ -88,6 +91,13 @@ export function TodoBoardScreen() {
   );
   // The native History API syncs `useSearchParams` without a server round trip (filtering is
   // client-side), and replacing keeps chip clicks out of the back button's history.
+  // Quick add pre-fills from the filters so the new card stays in view; when it can't (Overdue),
+  // it says the card was added but is hidden rather than letting it vanish.
+  const addFiltered = async (title: string, status: TodoStatus) => {
+    const todo = await board.add(title, status, quickAddFields(filters, myMemberId));
+    const hiddenBy = hidingFilter(todo, filters, myMemberId);
+    return hiddenBy ? hiddenByFilterNotice(hiddenBy) : undefined;
+  };
   const setFilters = (next: TodoFilters) => window.history.replaceState(null, "", todoFiltersHref(pathname, searchParams, next));
 
   const header = <PageHeader title="To-dos" description={account?.membership?.familyName ? `Shared by everyone in ${account.membership.familyName}` : undefined} />;
@@ -141,7 +151,7 @@ export function TodoBoardScreen() {
       <TodoBoard
         todos={visible}
         singleColumn={phone}
-        onAdd={board.add}
+        onAdd={addFiltered}
         onMove={board.move}
         onOpen={(todo: Todo) => setOpenId(todo.id)}
         onDraggingChange={board.setDragging}

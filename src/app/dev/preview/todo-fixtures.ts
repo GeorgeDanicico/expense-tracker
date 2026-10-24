@@ -88,14 +88,14 @@ function find(id: string) {
 }
 
 export const previewTodoApi: TodoApi = {
-  async create({ title, status }) {
+  async create({ title, status, assigneeMemberId = null, dueDate = null }) {
     await delay(250);
     const first = groupTodos(todos())[status][0];
     const now = new Date().toISOString();
     const todo: Todo = {
       id: `todo-new-${++counter}`, title, notes: "", status,
       position: positionBetween(null, first?.position ?? null),
-      assignee: null, dueDate: null, createdBy: "u-m-george", createdAt: now, updatedAt: now,
+      assignee: assigneeMemberId ? MEMBERS[assigneeMemberId] ?? null : null, dueDate, createdBy: "u-m-george", createdAt: now, updatedAt: now,
       completedAt: status === "done" ? now : null, completedBy: status === "done" ? "u-m-george" : null,
     };
     store = [...todos(), todo];

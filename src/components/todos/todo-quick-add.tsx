@@ -16,12 +16,14 @@ export function TodoQuickAdd({
   onAdd,
 }: {
   status: TodoStatus;
-  onAdd: (title: string, status: TodoStatus) => Promise<unknown>;
+  /** A returned string is shown under the field as a notice (the new card is hidden by a filter). */
+  onAdd: (title: string, status: TodoStatus) => Promise<string | void>;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const button = useRef<HTMLButtonElement>(null);
   const label = `Add a card to ${TODO_STATUS_LABELS[status]}`;
 
@@ -29,6 +31,7 @@ export function TodoQuickAdd({
     setOpen(false);
     setTitle("");
     setError("");
+    setNotice("");
     requestAnimationFrame(() => button.current?.focus());
   }
 
@@ -38,7 +41,8 @@ export function TodoQuickAdd({
     setPending(true);
     setError("");
     try {
-      await onAdd(trimmed, status);
+      const added = await onAdd(trimmed, status);
+      setNotice(typeof added === "string" ? added : "");
       setTitle("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The card could not be added.");
@@ -75,7 +79,10 @@ export function TodoQuickAdd({
         aria-label={label}
         aria-invalid={error ? true : undefined}
         aria-busy={pending || undefined}
-        onChange={(event) => setTitle(event.target.value)}
+        onChange={(event) => {
+          setTitle(event.target.value);
+          setNotice("");
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();
@@ -93,7 +100,10 @@ export function TodoQuickAdd({
       {error ? (
         <Text textStyle="caption" color="fg.error" role="alert">{error}</Text>
       ) : (
-        <Text textStyle="caption">Enter to add, Escape to cancel.</Text>
+        // A status region, so "Added — hidden by the Overdue filter." is announced.
+        <Text textStyle="caption" color={notice ? "fg" : undefined} role="status">
+          {notice || "Enter to add, Escape to cancel."}
+        </Text>
       )}
     </Stack>
   );

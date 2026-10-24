@@ -31,7 +31,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Badge, Box, Flex, Heading, Menu, Portal, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import { ArrowRightLeft } from "lucide-react";
-import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoQuickAdd } from "@/components/todos/todo-quick-add";
@@ -69,7 +69,8 @@ const SCREEN_READER_INSTRUCTIONS = {
 
 export type TodoBoardProps = {
   todos: readonly Todo[];
-  onAdd: (title: string, status: TodoStatus) => Promise<unknown>;
+  /** Adds a card; a returned string is a notice quick add shows (the filters hide the new card). */
+  onAdd: (title: string, status: TodoStatus) => Promise<string | void>;
   onMove: (id: string, move: TodoMove) => Promise<unknown>;
   onOpen: (todo: Todo) => void;
   /** Called with true when a drag starts and false when it ends, so polling can wait. */
@@ -84,6 +85,13 @@ export type TodoBoardProps = {
 };
 
 const SEGMENTS = TODO_STATUSES.map((status) => ({ value: status, label: TODO_STATUS_LABELS[status] }));
+
+/** The card to focus once `id` leaves `column`: the one below it, else the one above, else none. */
+export function focusAfterLeaving(column: readonly string[], id: string): string | null {
+  const index = column.indexOf(id);
+  if (index === -1) return null;
+  return column[index + 1] ?? column[index - 1] ?? null;
+}
 
 /** The move "Move to…" sends: the top of `status`, anchored on nothing. */
 export function moveToTop(status: TodoStatus): TodoMove {
@@ -107,6 +115,21 @@ export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, done
   const columns = draft ?? saved;
   const [shown, setShown] = useState<TodoStatus>("todo");
   const [moved, setMoved] = useState("");
+  // After "Move to…" the card leaves the shown column: focus goes to the card below it (or above,
+  // when it was last), else the column's "Add a card", never the page body.
+  const single = useRef<HTMLDivElement>(null);
+  const focusAfterMove = useRef<{ movedId: string; nextId: string | null } | null>(null);
+
+  useEffect(() => {
+    const pending = focusAfterMove.current;
+    const container = single.current;
+    if (!pending || !container || columns[shown].includes(pending.movedId)) return;
+    focusAfterMove.current = null;
+    const next = pending.nextId
+      ? container.querySelector<HTMLElement>(`[data-todo-id="${globalThis.CSS.escape(pending.nextId)}"]`)
+      : null;
+    (next ?? container.querySelector<HTMLElement>("section button"))?.focus();
+  }, [columns, shown]);
 
   const sensors = useSensors(
     useSensor(MouseOrPenSensor, { activationConstraint: { distance: 5 } }),
@@ -214,6 +237,7 @@ export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, done
   const active = activeId ? byId.get(activeId) : undefined;
 
   function moveTo(todo: Todo, status: TodoStatus) {
+    focusAfterMove.current = { movedId: todo.id, nextId: focusAfterLeaving(columns[todo.status], todo.id) };
     setMoved(`Moved ${todo.title} to the top of ${TODO_STATUS_LABELS[status]}.`);
     void onMove(todo.id, moveToTop(status));
   }
@@ -241,7 +265,7 @@ export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, done
       accessibility={{ announcements, screenReaderInstructions: SCREEN_READER_INSTRUCTIONS }}
     >
       {singleColumn ? (
-        <Stack gap="3">
+        <Stack gap="3" ref={single}>
           <SegmentedControl items={SEGMENTS} value={shown} onValueChange={setShown} fullWidth aria-label="Column" />
           {column(shown)}
           <Text role="status" className="sr-only">{moved}</Text>
@@ -268,7 +292,7 @@ function TodoColumn({
 }: {
   status: TodoStatus;
   todos: Todo[];
-  onAdd: (title: string, status: TodoStatus) => Promise<unknown>;
+  onAdd: (title: string, status: TodoStatus) => Promise<string | void>;
   onOpen: (todo: Todo) => void;
   onMoveTo?: (todo: Todo, status: TodoStatus) => void;
   footer?: React.ReactNode;
@@ -339,6 +363,7 @@ function SortableTodoCard({
       <TodoCard
         ref={setNodeRef}
         todo={todo}
+        data-todo-id={todo.id}
         placeholder={isDragging}
         reserveCorner={Boolean(onMoveTo)}
         style={{ transform: CSS.Translate.toString(transform), transition }}

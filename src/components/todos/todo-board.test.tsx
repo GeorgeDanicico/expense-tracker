@@ -4,7 +4,7 @@ import { SWRConfig } from "swr";
 import { describe, expect, it } from "vitest";
 
 import { formatDueDate } from "@/components/todos/todo-card";
-import { moveToTop, TodoBoard } from "@/components/todos/todo-board";
+import { focusAfterLeaving, moveToTop, TodoBoard } from "@/components/todos/todo-board";
 import { TodoFilterChips } from "@/components/todos/todo-filters";
 import { NoFamilyBoard } from "@/components/todos/todo-board-screen";
 import { todoChanges } from "@/components/todos/todo-dialog";
@@ -101,6 +101,15 @@ describe("TodoBoard", () => {
     expect(html).not.toContain('id="todo-column-in_progress"');
     expect(html).not.toContain("Painting");
     expect(html).toContain('aria-label="Move Buy milk to…"');
+  });
+});
+
+describe("focusAfterLeaving", () => {
+  it("picks the card below, the one above when it was last, and nothing when it was alone", () => {
+    expect(focusAfterLeaving(["a", "b", "c"], "b")).toBe("c");
+    expect(focusAfterLeaving(["a", "b", "c"], "c")).toBe("b");
+    expect(focusAfterLeaving(["a"], "a")).toBeNull();
+    expect(focusAfterLeaving(["a"], "x")).toBeNull();
   });
 });
 

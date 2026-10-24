@@ -4,10 +4,13 @@ import {
   DEFAULT_TODO_FILTERS,
   filterTodos,
   hasTodoFilters,
+  hiddenByFilterNotice,
+  hidingFilter,
   isDueToday,
   isOverdue,
   matchesAssignee,
   parseTodoFilters,
+  quickAddFields,
   todoFiltersHref,
 } from "@/lib/todos/filters";
 import type { Todo, TodoStatus } from "@/lib/todos/types";
@@ -144,5 +147,46 @@ describe("filters in the URL", () => {
     expect(parseTodoFilters(params(href.split("?")[1]))).toEqual(filters);
     expect(hasTodoFilters(filters)).toBe(true);
     expect(hasTodoFilters(DEFAULT_TODO_FILTERS)).toBe(false);
+  });
+});
+
+describe("quick add under a filter", () => {
+  it("pre-fills nothing without filters", () => {
+    expect(quickAddFields(DEFAULT_TODO_FILTERS, ME, NOON_UTC)).toEqual({});
+  });
+
+  it("assigns the caller under Me, the member under their chip, nobody under Unassigned", () => {
+    expect(quickAddFields({ assignee: "me", due: "any" }, ME, NOON_UTC)).toEqual({ assigneeMemberId: ME });
+    expect(quickAddFields({ assignee: ANA, due: "any" }, ME, NOON_UTC)).toEqual({ assigneeMemberId: ANA });
+    expect(quickAddFields({ assignee: "unassigned", due: "any" }, ME, NOON_UTC)).toEqual({ assigneeMemberId: null });
+  });
+
+  it("dates the card today in Bucharest under Due today, and leaves Overdue alone", () => {
+    expect(quickAddFields({ assignee: "me", due: "today" }, ME, LATE_EVENING_UTC)).toEqual({ assigneeMemberId: ME, dueDate: "2026-10-25" });
+    expect(quickAddFields({ assignee: "all", due: "overdue" }, ME, NOON_UTC)).toEqual({});
+  });
+
+  it("keeps the pre-filled card visible, except under Overdue", () => {
+    const filters = [
+      { assignee: "me", due: "today" },
+      { assignee: ANA, due: "any" },
+      { assignee: "unassigned", due: "today" },
+    ] as const;
+    for (const filter of filters) {
+      const fields = quickAddFields(filter, ME, NOON_UTC);
+      const card = todo("new", {
+        assignee: fields.assigneeMemberId ? assigned(fields.assigneeMemberId) : null,
+        dueDate: fields.dueDate ?? null,
+      });
+      expect(hidingFilter(card, filter, ME, NOON_UTC)).toBeNull();
+    }
+    expect(hidingFilter(todo("new"), { assignee: "all", due: "overdue" }, ME, NOON_UTC)).toBe("Overdue");
+  });
+
+  it("names the chip that hides a card", () => {
+    expect(hidingFilter(todo("x"), { assignee: "me", due: "any" }, null, NOON_UTC)).toBe("Me");
+    expect(hidingFilter(todo("x", { assignee: assigned(ANA) }), { assignee: "unassigned", due: "any" }, ME, NOON_UTC)).toBe("Unassigned");
+    expect(hidingFilter(todo("x"), { assignee: "all", due: "today" }, ME, NOON_UTC)).toBe("Due today");
+    expect(hiddenByFilterNotice("Overdue")).toBe("Added — hidden by the Overdue filter.");
   });
 });

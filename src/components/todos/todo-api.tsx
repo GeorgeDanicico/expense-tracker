@@ -22,7 +22,7 @@ export type TodoChanges = Partial<{
 
 /** The board's writes. The page uses the REST API; `/dev/preview` swaps in an in-memory one. */
 export type TodoApi = {
-  create(input: { title: string; status: TodoStatus }): Promise<Todo>;
+  create(input: { title: string; status: TodoStatus; assigneeMemberId?: string | null; dueDate?: string }): Promise<Todo>;
   update(id: string, changes: TodoChanges): Promise<Todo>;
   remove(id: string): Promise<void>;
   move(id: string, move: TodoMove): Promise<Todo>;
