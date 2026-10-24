@@ -828,5 +828,211 @@ exports[`MCP tool surface > lists the same tools, schemas and annotations 1`] = 
     "name": "update_net_worth_valuation",
     "title": "Update net worth valuation",
   },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Cards on the family to-do board, in board order. Done shows the last 30 days unless includeOlderDone.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "assignee": {
+          "description": "A member's name, "me" or "unassigned"; omit for everyone",
+          "minLength": 1,
+          "type": "string",
+        },
+        "due": {
+          "enum": [
+            "today",
+            "overdue",
+          ],
+          "type": "string",
+        },
+        "includeOlderDone": {
+          "default": false,
+          "description": "Include Done cards completed more than 30 days ago",
+          "type": "boolean",
+        },
+        "status": {
+          "enum": [
+            "todo",
+            "in_progress",
+            "done",
+          ],
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "list_todos",
+    "title": "List to-dos",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Add a card at the top of its column on the family board.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "assignee": {
+          "description": "A member's name or "me"; omit for unassigned",
+          "minLength": 1,
+          "type": "string",
+        },
+        "dueDate": {
+          "description": "YYYY-MM-DD",
+          "type": "string",
+        },
+        "notes": {
+          "type": "string",
+        },
+        "status": {
+          "description": "Defaults to todo",
+          "enum": [
+            "todo",
+            "in_progress",
+            "done",
+          ],
+          "type": "string",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "title",
+      ],
+      "type": "object",
+    },
+    "name": "add_todo",
+    "title": "Add to-do",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Move a card to a column, at its top or bottom.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "status": {
+          "enum": [
+            "todo",
+            "in_progress",
+            "done",
+          ],
+          "type": "string",
+        },
+        "where": {
+          "default": "top",
+          "description": "Where in the column the card goes",
+          "enum": [
+            "top",
+            "bottom",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "status",
+      ],
+      "type": "object",
+    },
+    "name": "move_todo",
+    "title": "Move to-do",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Change a card's title, notes, assignee or due date. Use move_todo to change its column.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "assignee": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "description": "A member's name or "me"; null to unassign",
+        },
+        "dueDate": {
+          "anyOf": [
+            {
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "description": "YYYY-MM-DD; null to clear",
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "notes": {
+          "type": "string",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "update_todo",
+    "title": "Update to-do",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Permanently delete a card from the family board.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "delete_todo",
+    "title": "Delete to-do",
+  },
 ]
 `;

@@ -96,6 +96,21 @@ describe("MCP server", () => {
       expect(await annotationsOf("add_expense")).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: false });
     });
 
+    it("adds the five to-do tools only while the family flag is on", async () => {
+      const todoTools = async () => (await listTools()).map((tool) => tool.name).filter((name) => name.endsWith("_todo") || name.endsWith("_todos"));
+      try {
+        vi.stubEnv("FAMILY_ENABLED", "false");
+        expect(await todoTools()).toEqual([]);
+
+        vi.stubEnv("FAMILY_ENABLED", "true");
+        expect(await todoTools()).toEqual(["list_todos", "add_todo", "move_todo", "update_todo", "delete_todo"]);
+        expect(await annotationsOf("delete_todo")).toMatchObject({ destructiveHint: true });
+        expect(await annotationsOf("list_todos")).toMatchObject({ readOnlyHint: true });
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it("never accepts a userId input", async () => {
       const inputs = (await listTools()).flatMap((tool) => Object.keys((tool.inputSchema.properties ?? {}) as object));
 
