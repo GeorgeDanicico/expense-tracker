@@ -9,6 +9,7 @@ import { FakeExpenseRepository } from "./expenses";
 import { FakeMcpTokenRepository } from "./mcp-tokens";
 import { FakeNetWorthRepository } from "./net-worth";
 import { FakeNoticeRepository } from "./notices";
+import { FakeTodoRepository } from "./todos";
 
 /**
  * In-memory stand-in for `@/lib/repositories`. A route or MCP test swaps it in with one line,
@@ -29,21 +30,25 @@ export type FakeRepositories = {
   mcpTokens: FakeMcpTokenRepository;
   netWorth: FakeNetWorthRepository;
   notices: FakeNoticeRepository;
+  todos: FakeTodoRepository;
 };
 
 let current: FakeRepositories | undefined;
 
 export function resetFakeRepositories(): FakeRepositories {
+  const family = new FakeFamilyRepository();
   current = {
     account: new FakeAccountRepository(),
     avatars: new FakeAvatarRepository(),
     expenseTabs: new FakeExpenseTabRepository(),
-    family: new FakeFamilyRepository(),
+    family,
     investments: new FakeInvestmentRepository(),
     expenses: new FakeExpenseRepository(),
     mcpTokens: new FakeMcpTokenRepository(),
     netWorth: new FakeNetWorthRepository(),
     notices: new FakeNoticeRepository(),
+    // Acts as the caller the family fake describes: seed `family.membership` and `family.family` first.
+    todos: new FakeTodoRepository(family),
   };
   return current;
 }
