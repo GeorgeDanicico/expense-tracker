@@ -328,6 +328,40 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
         Relationships: [];
       };
+      todos: {
+        Row: {
+          assignee_member_id: string | null;
+          completed_at: string | null;
+          completed_by: string | null;
+          created_at: string;
+          created_by: string | null;
+          due_date: string | null;
+          family_id: string;
+          id: string;
+          notes: string;
+          position: string;
+          status: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          assignee_member_id?: string | null;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          due_date?: string | null;
+          family_id: string;
+          id?: string;
+          notes?: string;
+          position: string;
+          status?: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["todos"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
