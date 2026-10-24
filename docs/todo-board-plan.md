@@ -29,18 +29,22 @@ chips filter the board to one member's cards. It replaces steps 4.1–4.5 in
 ```
 Client  ──POST /api/todos/<id>/move { status, beforeId | null, afterId | null }──▶ route
   route: auth → family feature → load card (RLS)
-         → load neighbours; both must be in the caller's family, in `status`, and adjacent
-           (nothing between them) — otherwise 409 { error } so the client re-syncs
-         → key = generateKeyBetween(before.position, after.position)
+         → slot = slotNear(status, { beforeId, afterId }, id): the actual keys around the anchor,
+           hidden cards included; a named anchor missing, in another family or column, or the
+           moved card itself → 409 { error } so the client re-syncs
+         → key = positionBetween(slot.before, slot.after)
          → update status + position
-           · unique (family_id, status, position) violated by a racing move → re-read, retry (≤ 3)
+           · unique (family_id, status, position) violated by a racing move → slotNear again, retry (≤ 3)
          → 200 { todo }
 ```
 
-`beforeId` is the card that will sit **above** the moved card, `afterId` the one **below**. Both
-`null` means an empty column. In a filtered view the client sends the nearest visible neighbours;
-the server accepts them only if nothing hidden sits between them, and otherwise answers 409, so
-moves in a filtered view fall back to "drop at the top or bottom of the column" (see T5).
+`beforeId` is the visible card that will sit **above** the moved card, `afterId` the visible one
+**below**. The client may not see every card (Done cards older than 30 days, cards a filter hides),
+so the server anchors rather than checking adjacency: with `beforeId`, the card goes directly below
+that card (before the next card in the column, hidden or not, and `afterId` is only checked to
+exist); with only `afterId`, directly above that card; with both `null`, at the top of the column.
+The moved card itself is left out of the column, so a drop where it already sits gets a fresh key
+between its neighbours. The only 409 is for an anchor that isn't there any more.
 
 ## Decisions
 
@@ -144,8 +148,8 @@ Pure code, no Supabase, so it can run alongside T1.
 Follow `ExpenseTabRepository` (`src/lib/expenses/tab-repository.ts`):
 
 - Interface in `src/lib/todos/repository.ts`: `list({ doneSince })`, `get(id)`, `create`,
-  `update`, `delete`, `getNeighbours(status, beforeId, afterId)`, `setPosition(id, status,
-  position)`. The family comes from the caller's membership, never from the client. Unique
+  `update`, `delete`, `slotNear(status, { beforeId, afterId }, movingId)`, `setPosition(id,
+  status, position)`. The family comes from the caller's membership, never from the client. Unique
   violations surface as a typed `PositionTakenError`; an assignee outside the family as 422.
 - Supabase implementation in `src/lib/supabase/repositories/todos.ts`, acting as the caller.
 - Fake in `src/test/fakes/` that keeps cards to the caller's family closely enough for route tests (shared file:
@@ -168,7 +172,8 @@ Every route calls `requireFamilyFeature()` and uses `withUser`; a caller without
 
 Route tests for a parent, a kid editing and deleting a parent's card (200), another family's
 member (404), a user with no family (404), and the family flag off (404). Include: assigning a
-member of another family (422), a stale neighbour (409), and two moves racing for the same slot
+member of another family (422), an anchor that was deleted or moved to another column (409), a
+drop into Done anchored next to hidden older Done cards (200), and two moves racing for the same slot
 (one retries, both end up ordered).
 
 **Done when** the route tests pass and `protected-routes.test.ts` lists the new routes.
@@ -194,8 +199,8 @@ a failed move rolls back.
 ### T6: Filters, phones and the nav item
 
 - Filter chips above the board (Everyone, Me, each member, Unassigned; Due today, Overdue), in the
-  URL. While a filter hides cards, a drop goes to the top or bottom of the target column, whichever
-  is closer, so it never needs a hidden neighbour.
+  URL. While a filter hides cards, a drop still sends the visible neighbours: the server anchors on
+  the card above (or below, when dropped first), so hidden cards never cause a 409.
 - **Phones (< 768 px):** one column at a time behind a `SegmentedControl` (To do / In progress /
   Done), drag within the column only, and a "Move to…" menu on each card for the other columns.
 - `NAV_ITEMS.todos` (`/todos`, "To-dos", a `SquareKanban` icon) in a new **Family** section of
