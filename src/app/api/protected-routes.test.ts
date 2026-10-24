@@ -60,6 +60,9 @@ const PROTECTED_ROUTES: Record<string, string[]> = {
   "oauth/authorizations/[id]": ["GET"],
   "oauth/authorizations/[id]/approve": ["POST"],
   "oauth/authorizations/[id]/deny": ["POST"],
+  todos: ["GET", "POST"],
+  "todos/[id]": ["DELETE", "PATCH"],
+  "todos/[id]/move": ["POST"],
 };
 
 type Handler = (request: NextRequest, context: { params: Promise<{ id: string }> }) => Promise<Response>;
