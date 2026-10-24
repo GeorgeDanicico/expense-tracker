@@ -8,9 +8,12 @@ import ExpensesPage from "@/app/(app)/expenses/page";
 import InvestmentsPage from "@/app/(app)/investments/page";
 import NetWorthPage from "@/app/(app)/net-worth/page";
 import SettingsPage from "@/app/(app)/settings/page";
+import TodosPage from "@/app/(app)/todos/page";
 import { AppShell } from "@/components/layout/app-shell";
+import { TodoApiProvider } from "@/components/todos/todo-api";
 
 import { fixtureFor } from "../fixtures";
+import { previewTodoApi } from "../todo-fixtures";
 import type { PreviewScreen } from "./screens";
 
 const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
@@ -19,7 +22,17 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   investments: InvestmentsPage,
   "net-worth": NetWorthPage,
   settings: SettingsPage,
+  todos: TodosPreview,
 };
+
+/** The board with its writes kept in memory (see `todo-fixtures.ts`). */
+function TodosPreview() {
+  return (
+    <TodoApiProvider api={previewTodoApi}>
+      <TodosPage />
+    </TodoApiProvider>
+  );
+}
 
 
 /** Replaces every fetcher (including explicit ones) with the fixture resolver. */
