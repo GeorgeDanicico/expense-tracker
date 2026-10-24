@@ -21,6 +21,8 @@ import { ALL_MEMBERS, type Viewing } from "@/lib/family/viewing";
 import type { FamilyInvestmentsOverview } from "@/lib/investments/types";
 import type { FamilyNetWorthOverview } from "@/lib/net-worth/types";
 
+import { previewTodos } from "./todo-fixtures";
+
 import { dateInMonth, daysInMonth, formatMonth, getBucharestMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
 
 /** Deterministic sample data for the development screen preview. */
@@ -381,5 +383,6 @@ export function fixtureFor(key: string): unknown {
   if (path === "/api/investments") return family ? familyInvestments() : INVESTMENTS;
   if (path === "/api/investment-transactions") return transactions(key);
   if (path === "/api/net-worth") return family ? familyNetWorth() : NET_WORTH;
+  if (path === "/api/todos") return previewTodos();
   throw new Error(`No preview fixture for ${key}`);
 }

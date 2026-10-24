@@ -7,6 +7,7 @@ import type { ConnectedApp, OAuthApp } from "@/lib/auth/oauth-consent";
 import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
 import { MEMBER_PARAM } from "@/lib/family/viewing";
 import type { McpAccess, McpToken } from "@/lib/mcp/token-repository";
+import type { Todo } from "@/lib/todos/types";
 
 /**
  * Adds `?member=<memberId>` (or `&member=`) to a finance read's URL so it shows that member's data.
@@ -229,3 +230,28 @@ export type McpSettingsResponse = {
 export type McpAppsResponse = { apps: ConnectedApp[] };
 /** The only response that ever carries a token's secret: shown once, never stored or listed again. */
 export type CreatedMcpToken = { token: McpToken; secret: string };
+
+/**
+ * GET → {@link TodosResponse}: the family board, To do and In progress whole and Done completed at
+ * or after `doneSince` (the last 30 days when absent). 404 for a caller without a family.
+ * POST `{ title, status? }` → {@link TodoResponse} (201), added at the top of its column.
+ */
+export const TODOS_API_KEY = "/api/todos";
+
+/** {@link TODOS_API_KEY}, reaching back to `doneSince` (an ISO timestamp) in the Done column. */
+export function todosApiKey(doneSince?: string | null) {
+  return doneSince ? `${TODOS_API_KEY}?doneSince=${encodeURIComponent(doneSince)}` : TODOS_API_KEY;
+}
+
+/** PATCH (any of title, notes, assigneeMemberId, dueDate) → {@link TodoResponse}; DELETE → `{ success: true }`. */
+export function todoApiUrl(id: string) {
+  return `${TODOS_API_KEY}/${encodeURIComponent(id)}`;
+}
+
+/** POST `{ status, beforeId, afterId }` → {@link TodoResponse}; 409 when an anchor is gone. */
+export function todoMoveApiUrl(id: string) {
+  return `${todoApiUrl(id)}/move`;
+}
+
+export type TodosResponse = { todos: Todo[] };
+export type TodoResponse = { todo: Todo };
