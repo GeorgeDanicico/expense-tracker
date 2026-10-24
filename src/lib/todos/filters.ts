@@ -43,3 +43,44 @@ export function filterTodos<T extends Todo>(
     && (filters.due === "any"
       || (filters.due === "today" ? isDueToday(todo, now) : isOverdue(todo, now))));
 }
+
+/** The query parameters the board keeps its filters in: `?member=` (assignee) and `?due=`. */
+export const TODO_MEMBER_PARAM = "member";
+export const TODO_DUE_PARAM = "due";
+
+/**
+ * The filters in a board URL. A missing or empty `?member=` is everyone, and `?due=` other than
+ * `today` or `overdue` is ignored. `memberIds`, once the family has loaded, turns a `?member=` that
+ * names nobody in the family (someone who left, a mistyped link) back into everyone, so the board
+ * never sits empty behind a chip that isn't there.
+ */
+export function parseTodoFilters(
+  params: { get(name: string): string | null },
+  memberIds?: readonly string[],
+): TodoFilters {
+  const member = params.get(TODO_MEMBER_PARAM)?.trim() ?? "";
+  const due = params.get(TODO_DUE_PARAM);
+  let assignee: TodoAssigneeFilter = DEFAULT_TODO_FILTERS.assignee;
+  if (member === "me" || member === "unassigned") assignee = member;
+  else if (member && member !== "all") {
+    const known = memberIds?.find((id) => id.toLowerCase() === member.toLowerCase());
+    assignee = memberIds === undefined ? member : (known ?? DEFAULT_TODO_FILTERS.assignee);
+  }
+  return { assignee, due: due === "today" || due === "overdue" ? due : DEFAULT_TODO_FILTERS.due };
+}
+
+/** The board URL for `filters`, keeping any other query parameters; defaults leave the URL clean. */
+export function todoFiltersHref(pathname: string, current: { toString(): string }, filters: TodoFilters) {
+  const params = new URLSearchParams(current.toString());
+  if (filters.assignee === "all") params.delete(TODO_MEMBER_PARAM);
+  else params.set(TODO_MEMBER_PARAM, filters.assignee);
+  if (filters.due === "any") params.delete(TODO_DUE_PARAM);
+  else params.set(TODO_DUE_PARAM, filters.due);
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+/** Whether any filter is on, so the board says how many cards it is hiding. */
+export function hasTodoFilters(filters: TodoFilters) {
+  return filters.assignee !== DEFAULT_TODO_FILTERS.assignee || filters.due !== DEFAULT_TODO_FILTERS.due;
+}

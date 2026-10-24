@@ -365,12 +365,17 @@ function familyNetWorth(): FamilyNetWorthOverview {
   };
 }
 
+function previewsNoFamily() {
+  return typeof window !== "undefined" && new URLSearchParams(window.location.search).has("noFamily");
+}
+
 /** Resolves an SWR key to fixture data, mirroring the API routes' shapes. */
 export function fixtureFor(key: string): unknown {
   const [path, query = ""] = key.split("?");
   const params = new URLSearchParams(query);
   const family = params.get("member") === "all";
-  if (path === "/api/account") return ACCOUNT;
+  // `?noFamily=1` previews a user without a family: no To-dos nav item, and the board's "join a family".
+  if (path === "/api/account") return previewsNoFamily() ? { ...ACCOUNT, membership: null } : ACCOUNT;
   if (path === "/api/family") return FAMILY;
   if (path === "/api/dashboard") return family ? familyDashboard() : dashboard();
   if (path === "/api/expenses") {

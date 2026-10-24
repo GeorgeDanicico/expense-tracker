@@ -33,6 +33,8 @@ type TodoCardProps = Omit<ComponentPropsWithoutRef<"div">, "color"> & {
   placeholder?: boolean;
   /** The copy that follows the pointer while dragging. */
   overlay?: boolean;
+  /** Keeps the top-right corner clear for the "Move to…" button the phone board lays over it. */
+  reserveCorner?: boolean;
 };
 
 /**
@@ -40,7 +42,7 @@ type TodoCardProps = Omit<ComponentPropsWithoutRef<"div">, "color"> & {
  * draggable and clickable; this only draws it.
  */
 export const TodoCard = forwardRef<HTMLDivElement, TodoCardProps>(function TodoCard(
-  { todo, placeholder = false, overlay = false, ...props },
+  { todo, placeholder = false, overlay = false, reserveCorner = false, ...props },
   ref,
 ) {
   const colorOf = useMemberColors();
@@ -54,7 +56,8 @@ export const TodoCard = forwardRef<HTMLDivElement, TodoCardProps>(function TodoC
       borderColor={overlay ? "border.strong" : "border"}
       borderRadius="l3"
       boxShadow={overlay ? "overlay" : "xs"}
-      px="3"
+      ps="3"
+      pe={reserveCorner ? "10" : "3"}
       py="2.5"
       cursor={overlay ? "grabbing" : "pointer"}
       opacity={placeholder ? 0.4 : 1}

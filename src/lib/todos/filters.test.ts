@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_TODO_FILTERS, filterTodos, isDueToday, isOverdue, matchesAssignee } from "@/lib/todos/filters";
+import {
+  DEFAULT_TODO_FILTERS,
+  filterTodos,
+  hasTodoFilters,
+  isDueToday,
+  isOverdue,
+  matchesAssignee,
+  parseTodoFilters,
+  todoFiltersHref,
+} from "@/lib/todos/filters";
 import type { Todo, TodoStatus } from "@/lib/todos/types";
 
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -100,5 +109,40 @@ describe("filterTodos", () => {
     expect(ids(filterTodos(cards, { assignee: "all", due: "overdue" }, ME, NOON_UTC)))
       .toEqual(["mine-overdue", "anas-overdue"]);
     expect(ids(filterTodos(cards, { assignee: ANA, due: "any" }, ME, NOON_UTC))).toEqual(["anas-overdue"]);
+  });
+});
+
+describe("filters in the URL", () => {
+  const params = (query: string) => new URLSearchParams(query);
+
+  it("reads everyone and any due date from a bare URL", () => {
+    expect(parseTodoFilters(params(""))).toEqual(DEFAULT_TODO_FILTERS);
+    expect(parseTodoFilters(params("member=all&due=soon"))).toEqual(DEFAULT_TODO_FILTERS);
+  });
+
+  it("reads me, unassigned, a member and the due chips", () => {
+    expect(parseTodoFilters(params("member=me&due=today"))).toEqual({ assignee: "me", due: "today" });
+    expect(parseTodoFilters(params("member=unassigned&due=overdue"))).toEqual({ assignee: "unassigned", due: "overdue" });
+    expect(parseTodoFilters(params(`member=${ANA}`))).toEqual({ assignee: ANA, due: "any" });
+  });
+
+  it("matches a member id case-insensitively once the family is known, and drops a stranger", () => {
+    expect(parseTodoFilters(params(`member=${ANA.toUpperCase()}`), [ME, ANA]).assignee).toBe(ANA);
+    expect(parseTodoFilters(params("member=33333333-3333-4333-8333-333333333333"), [ME, ANA]).assignee).toBe("all");
+  });
+
+  it("writes only the filters that are on and keeps other parameters", () => {
+    expect(todoFiltersHref("/todos", params(""), DEFAULT_TODO_FILTERS)).toBe("/todos");
+    expect(todoFiltersHref("/todos", params("member=me&failMoves=1"), { assignee: "all", due: "overdue" }))
+      .toBe("/todos?failMoves=1&due=overdue");
+    expect(todoFiltersHref("/todos", params("due=today"), { assignee: ANA, due: "any" })).toBe(`/todos?member=${ANA}`);
+  });
+
+  it("round-trips through the URL", () => {
+    const filters = { assignee: "unassigned", due: "today" } as const;
+    const href = todoFiltersHref("/todos", params(""), filters);
+    expect(parseTodoFilters(params(href.split("?")[1]))).toEqual(filters);
+    expect(hasTodoFilters(filters)).toBe(true);
+    expect(hasTodoFilters(DEFAULT_TODO_FILTERS)).toBe(false);
   });
 });

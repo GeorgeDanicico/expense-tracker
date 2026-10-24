@@ -29,11 +29,15 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Badge, Box, Flex, Heading, SimpleGrid, Stack, Text } from "@chakra-ui/react";
+import { Badge, Box, Flex, Heading, Menu, Portal, SimpleGrid, Stack, Text } from "@chakra-ui/react";
+import { ArrowRightLeft } from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoQuickAdd } from "@/components/todos/todo-quick-add";
+import { IconButton } from "@/components/ui/icon-button";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   columnOf,
   columnsOf,
@@ -72,13 +76,25 @@ export type TodoBoardProps = {
   onDraggingChange?: (dragging: boolean) => void;
   /** Rendered under the Done column's cards: the "Show older" control. */
   doneFooter?: React.ReactNode;
+  /**
+   * Phones: one column at a time behind a segmented control, drags stay within it, and each card
+   * gets a "Move to…" menu that puts it at the top of another column.
+   */
+  singleColumn?: boolean;
 };
+
+const SEGMENTS = TODO_STATUSES.map((status) => ({ value: status, label: TODO_STATUS_LABELS[status] }));
+
+/** The move "Move to…" sends: the top of `status`, anchored on nothing. */
+export function moveToTop(status: TodoStatus): TodoMove {
+  return { status, beforeId: null, afterId: null };
+}
 
 /**
  * The three columns with drag and drop: pointer, long-press touch and keyboard, with screen-reader
  * announcements. A drop is reported as the card's column and the visible cards above and below it.
  */
-export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, doneFooter }: TodoBoardProps) {
+export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, doneFooter, singleColumn = false }: TodoBoardProps) {
   const byId = useMemo(() => new Map(todos.map((todo) => [todo.id, todo])), [todos]);
   const saved = useMemo(() => columnsOf(todos), [todos]);
   const [draft, setDraft] = useState<BoardColumns | null>(null);
@@ -89,6 +105,8 @@ export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, done
   const projected = useRef<BoardColumns>(saved);
   const justDragged = useRef(false);
   const columns = draft ?? saved;
+  const [shown, setShown] = useState<TodoStatus>("todo");
+  const [moved, setMoved] = useState("");
 
   const sensors = useSensors(
     useSensor(MouseOrPenSensor, { activationConstraint: { distance: 5 } }),
@@ -195,6 +213,23 @@ export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, done
 
   const active = activeId ? byId.get(activeId) : undefined;
 
+  function moveTo(todo: Todo, status: TodoStatus) {
+    setMoved(`Moved ${todo.title} to the top of ${TODO_STATUS_LABELS[status]}.`);
+    void onMove(todo.id, moveToTop(status));
+  }
+
+  const column = (status: TodoStatus) => (
+    <TodoColumn
+      key={status}
+      status={status}
+      todos={columns[status].map((id) => byId.get(id)).filter((todo): todo is Todo => Boolean(todo))}
+      onAdd={onAdd}
+      onOpen={(todo) => { if (!justDragged.current) onOpen(todo); }}
+      onMoveTo={singleColumn ? moveTo : undefined}
+      footer={status === "done" ? doneFooter : null}
+    />
+  );
+
   return (
     <DndContext
       sensors={sensors}
@@ -205,18 +240,17 @@ export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, done
       onDragCancel={handleDragCancel}
       accessibility={{ announcements, screenReaderInstructions: SCREEN_READER_INSTRUCTIONS }}
     >
-      <SimpleGrid columns={{ base: 1, md: 3 }} gap="4" alignItems="start">
-        {TODO_STATUSES.map((status) => (
-          <TodoColumn
-            key={status}
-            status={status}
-            todos={columns[status].map((id) => byId.get(id)).filter((todo): todo is Todo => Boolean(todo))}
-            onAdd={onAdd}
-            onOpen={(todo) => { if (!justDragged.current) onOpen(todo); }}
-            footer={status === "done" ? doneFooter : null}
-          />
-        ))}
-      </SimpleGrid>
+      {singleColumn ? (
+        <Stack gap="3">
+          <SegmentedControl items={SEGMENTS} value={shown} onValueChange={setShown} fullWidth aria-label="Column" />
+          {column(shown)}
+          <Text role="status" className="sr-only">{moved}</Text>
+        </Stack>
+      ) : (
+        <SimpleGrid columns={{ base: 1, md: 3 }} gap="4" alignItems="start">
+          {TODO_STATUSES.map(column)}
+        </SimpleGrid>
+      )}
       <DragOverlay>
         {active ? <TodoCard todo={active} overlay /> : null}
       </DragOverlay>
@@ -229,12 +263,14 @@ function TodoColumn({
   todos,
   onAdd,
   onOpen,
+  onMoveTo,
   footer,
 }: {
   status: TodoStatus;
   todos: Todo[];
   onAdd: (title: string, status: TodoStatus) => Promise<unknown>;
   onOpen: (todo: Todo) => void;
+  onMoveTo?: (todo: Todo, status: TodoStatus) => void;
   footer?: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
@@ -264,7 +300,7 @@ function TodoColumn({
       <SortableContext id={status} items={ids} strategy={verticalListSortingStrategy}>
         <Stack ref={setNodeRef} as="ul" gap="2" mt="2" minH="16" listStyleType="none" aria-labelledby={headingId}>
           {todos.map((todo) => (
-            <SortableTodoCard key={todo.id} todo={todo} onOpen={onOpen} />
+            <SortableTodoCard key={todo.id} todo={todo} onOpen={onOpen} onMoveTo={onMoveTo} />
           ))}
           {todos.length === 0 ? (
             <Text as="li" textStyle="caption" textAlign="center" py="4" borderWidth="1px" borderStyle="dashed" borderColor="border" borderRadius="l3">
@@ -278,7 +314,15 @@ function TodoColumn({
   );
 }
 
-function SortableTodoCard({ todo, onOpen }: { todo: Todo; onOpen: (todo: Todo) => void }) {
+function SortableTodoCard({
+  todo,
+  onOpen,
+  onMoveTo,
+}: {
+  todo: Todo;
+  onOpen: (todo: Todo) => void;
+  onMoveTo?: (todo: Todo, status: TodoStatus) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: todo.id });
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -291,11 +335,12 @@ function SortableTodoCard({ todo, onOpen }: { todo: Todo; onOpen: (todo: Todo) =
   }
 
   return (
-    <li>
+    <Box as="li" position="relative">
       <TodoCard
         ref={setNodeRef}
         todo={todo}
         placeholder={isDragging}
+        reserveCorner={Boolean(onMoveTo)}
         style={{ transform: CSS.Translate.toString(transform), transition }}
         {...attributes}
         aria-roledescription="draggable card"
@@ -303,6 +348,40 @@ function SortableTodoCard({ todo, onOpen }: { todo: Todo; onOpen: (todo: Todo) =
         onKeyDown={handleKeyDown}
         onClick={() => onOpen(todo)}
       />
-    </li>
+      {onMoveTo && !isDragging ? <MoveToMenu todo={todo} onMoveTo={onMoveTo} /> : null}
+    </Box>
+  );
+}
+
+/** "Move to…" on a phone card: the other columns, each putting the card at its top. */
+function MoveToMenu({ todo, onMoveTo }: { todo: Todo; onMoveTo: (todo: Todo, status: TodoStatus) => void }) {
+  const targets = TODO_STATUSES.filter((status) => status !== todo.status);
+  return (
+    <Box position="absolute" top="1.5" insetEnd="1.5">
+      <Menu.Root
+        positioning={{ placement: "bottom-end" }}
+        onSelect={({ value }) => onMoveTo(todo, value as TodoStatus)}
+      >
+        <Menu.Trigger asChild>
+          <IconButton aria-label={`Move ${todo.title} to…`} size="xs">
+            <ArrowRightLeft size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
+          </IconButton>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner>
+            <Menu.Content minW="44">
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel>Move to</Menu.ItemGroupLabel>
+                {targets.map((status) => (
+                  <Menu.Item key={status} value={status}>
+                    {TODO_STATUS_LABELS[status]}
+                  </Menu.Item>
+                ))}
+              </Menu.ItemGroup>
+            </Menu.Content>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+    </Box>
   );
 }

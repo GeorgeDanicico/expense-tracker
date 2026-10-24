@@ -4,11 +4,14 @@ import { SWRConfig } from "swr";
 import { describe, expect, it } from "vitest";
 
 import { formatDueDate } from "@/components/todos/todo-card";
-import { TodoBoard } from "@/components/todos/todo-board";
+import { moveToTop, TodoBoard } from "@/components/todos/todo-board";
+import { TodoFilterChips } from "@/components/todos/todo-filters";
 import { NoFamilyBoard } from "@/components/todos/todo-board-screen";
 import { todoChanges } from "@/components/todos/todo-dialog";
 import { doneSinceForStep, OLDER_DONE_STEPS } from "@/components/todos/use-todo-board";
 import { ledgerSystem } from "@/components/ui/theme";
+import type { FamilyMember } from "@/lib/family/repository";
+import { DEFAULT_TODO_FILTERS, type TodoFilters } from "@/lib/todos/filters";
 import type { Todo } from "@/lib/todos/types";
 
 const NOW = new Date("2026-10-24T09:00:00Z");
@@ -52,11 +55,11 @@ describe("todoChanges", () => {
 });
 
 describe("TodoBoard", () => {
-  function render(todos: Todo[]) {
+  function render(todos: Todo[], singleColumn = false) {
     return renderToStaticMarkup(
       <ChakraProvider value={ledgerSystem}>
         <SWRConfig value={{ fetcher: () => new Promise(() => {}) }}>
-          <TodoBoard todos={todos} onAdd={async () => {}} onMove={async () => {}} onOpen={() => {}} />
+          <TodoBoard todos={todos} onAdd={async () => {}} onMove={async () => {}} onOpen={() => {}} singleColumn={singleColumn} />
         </SWRConfig>
       </ChakraProvider>,
     );
@@ -79,6 +82,66 @@ describe("TodoBoard", () => {
   it("marks an overdue card for screen readers", () => {
     const html = render([card({ dueDate: "2020-01-01" })]);
     expect(html).toContain("Overdue, due");
+  });
+
+  it("counts only the cards it is given, so a filtered view counts what it shows", () => {
+    const html = render([card({ id: "a" })]);
+    expect(html).toContain('aria-label="1 card"');
+    expect(html).not.toContain('aria-label="2 cards"');
+  });
+
+  it("has no Move to… menu on the desktop board", () => {
+    expect(render([card({})])).not.toContain("Move Buy milk to…");
+  });
+
+  it("shows one column behind the column switcher on a phone, with Move to… on each card", () => {
+    const html = render([card({}), card({ id: "p", title: "Painting", status: "in_progress" })], true);
+    expect(html).toContain('aria-label="Column"');
+    expect(html).toContain('id="todo-column-todo"');
+    expect(html).not.toContain('id="todo-column-in_progress"');
+    expect(html).not.toContain("Painting");
+    expect(html).toContain('aria-label="Move Buy milk to…"');
+  });
+});
+
+describe("moveToTop", () => {
+  it("anchors on nothing, so the server puts the card at the top of the column", () => {
+    expect(moveToTop("done")).toEqual({ status: "done", beforeId: null, afterId: null });
+  });
+});
+
+describe("TodoFilterChips", () => {
+  const member = (memberId: string, displayName: string): FamilyMember => ({
+    memberId, userId: `u-${memberId}`, role: "parent", isCreator: false, displayName, username: null,
+    currency: "EUR", color: null, avatarUrl: null, joinedAt: "2026-01-01T00:00:00Z",
+  } as FamilyMember);
+
+  function render(filters: TodoFilters) {
+    return renderToStaticMarkup(
+      <ChakraProvider value={ledgerSystem}>
+        <TodoFilterChips
+          filters={filters}
+          members={[member("m-me", "George"), member("m-ana", "Ana")]}
+          myMemberId="m-me"
+          colorOf={() => undefined}
+          onChange={() => {}}
+        />
+      </ChakraProvider>,
+    );
+  }
+  // Each pressed chip's label: the text after its icon or avatar (whose initials come first).
+  const pressed = (html: string) => [...html.matchAll(/<button[^>]*aria-pressed="true"[^>]*>([\s\S]*?)<\/button>/g)]
+    .map((match) => match[1].split(/<[^>]*>/).filter(Boolean).at(-1));
+
+  it("offers Everyone, Me, the other members, Unassigned and the due chips, without the caller twice", () => {
+    const html = render(DEFAULT_TODO_FILTERS);
+    for (const label of ["Everyone", "Me", "Ana", "Unassigned", "Due today", "Overdue"]) expect(html).toContain(`>${label}<`);
+    expect(html).not.toContain(">George<");
+    expect(pressed(html)).toEqual(["Everyone"]);
+  });
+
+  it("presses the assignee chip and the due chip together", () => {
+    expect(pressed(render({ assignee: "m-ana", due: "overdue" }))).toEqual(["Ana", "Overdue"]);
   });
 });
 

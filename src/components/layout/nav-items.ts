@@ -3,6 +3,7 @@ import {
   House,
   Scale,
   Settings2,
+  SquareKanban,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
@@ -10,8 +11,12 @@ import {
 import type { AccountMembership } from "@/lib/account/types";
 import { can, type ModuleKey } from "@/lib/permissions";
 
-/** `module` is the permission module a destination needs at `edit`; items without one are always shown. */
-export type NavItemConfig = { href: string; label: string; icon: LucideIcon; module?: ModuleKey };
+/**
+ * `module` is the permission module a destination needs at `edit`; `requiresFamily` hides it from a
+ * user without a family (the family features: their pages only mean something inside a family).
+ * Items with neither are always shown.
+ */
+export type NavItemConfig = { href: string; label: string; icon: LucideIcon; module?: ModuleKey; requiresFamily?: boolean };
 export type NavSection = { label: string; items: NavItemConfig[] };
 
 export const NAV_ITEMS = {
@@ -19,6 +24,7 @@ export const NAV_ITEMS = {
   expenses: { href: "/expenses", label: "Expenses", icon: CreditCard, module: "expenses" },
   investments: { href: "/investments", label: "Investments", icon: TrendingUp, module: "investments" },
   netWorth: { href: "/net-worth", label: "Net worth", icon: Scale, module: "net_worth" },
+  todos: { href: "/todos", label: "To-dos", icon: SquareKanban, requiresFamily: true },
   settings: { href: "/settings", label: "Settings", icon: Settings2 },
 } satisfies Record<string, NavItemConfig>;
 
@@ -28,9 +34,14 @@ export const NAV_ITEMS = {
  */
 export const NAV_SECTIONS: NavSection[] = [
   { label: "Finance", items: [NAV_ITEMS.expenses, NAV_ITEMS.investments, NAV_ITEMS.netWorth] },
+  { label: "Family", items: [NAV_ITEMS.todos] },
 ];
 
-/** Shown in the mobile tab bar; everything else lives in the More sheet. */
+/**
+ * Shown in the mobile tab bar; everything else lives in the More sheet. Only destinations every user
+ * reaches belong here (To-dos needs a family, so it would come and go), and two plus More keeps each
+ * tab wide enough for its label at 320 px.
+ */
 export const TAB_BAR_ITEMS = [NAV_ITEMS.home, NAV_ITEMS.expenses];
 
 /** The More sheet's sections: each section minus the destinations the tab bar already shows. */
@@ -41,13 +52,17 @@ export const MORE_SECTIONS: NavSection[] = NAV_SECTIONS
 export const MORE_ITEMS = [...MORE_SECTIONS.flatMap((section) => section.items), NAV_ITEMS.settings];
 
 /**
- * The navigation a user can reach. `membership` is `undefined` while the account is loading, which
- * shows everything rather than flashing items in; the server and the page guards enforce access.
- * A section with no visible items disappears.
+ * The navigation a user can reach. `membership` is `undefined` while the account is loading: module
+ * items show then rather than flash in, since most users reach them. Family-only items wait for the
+ * account instead (a user without a family, the common case, would otherwise see them flash in and
+ * out), and sit in the last section, so the sections above them never move. The server and the page
+ * guards enforce access either way. A section with no visible items disappears.
  */
 export function navigationFor(membership: AccountMembership | null | undefined) {
-  const reachable = (item: NavItemConfig) =>
-    membership === undefined || !item.module || can(membership, item.module, "edit");
+  const reachable = (item: NavItemConfig) => {
+    if (item.requiresFamily && !membership) return false;
+    return membership === undefined || !item.module || can(membership, item.module, "edit");
+  };
   const sections = (list: NavSection[]) =>
     list.map((section) => ({ ...section, items: section.items.filter(reachable) })).filter((section) => section.items.length > 0);
   const tabBarItems = TAB_BAR_ITEMS.filter(reachable);
