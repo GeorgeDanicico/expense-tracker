@@ -45,3 +45,10 @@ export const moveSchema = z.object({
 });
 
 export type TodoMove = z.output<typeof moveSchema>;
+
+/** `GET /api/todos` query: `doneSince`, an ISO timestamp (UTC or with an offset), or absent for the default window. */
+export const todoListQuerySchema = z.object({
+  doneSince: z.iso.datetime({ offset: true, error: "Use an ISO timestamp for doneSince." })
+    .transform((value) => new Date(value).toISOString())
+    .optional(),
+});
