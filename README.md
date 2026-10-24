@@ -87,6 +87,7 @@ Tools (the destructive ones carry the MCP `destructiveHint` annotation):
 - **Expense tabs:** `list_expense_tabs`, `get_expense_tab_expenses`, `create_expense_tab`, `update_expense_tab`, `delete_expense_tab` (destructive)
 - **Net worth:** `get_net_worth`, `add_net_worth_item`, `update_net_worth_item`, `add_net_worth_valuation`, `update_net_worth_valuation`
 - **Investments:** `get_investments`, `list_investment_transactions`, `add_investment_transaction`, `delete_investment_transaction` (destructive)
+- **Family to-do board** (only while `FAMILY_ENABLED` is on; a caller without a family is refused): `list_todos`, `add_todo`, `move_todo`, `update_todo`, `delete_todo` (destructive). Assignees are given by member name or `me`.
 
 ### Connecting through OAuth
 
