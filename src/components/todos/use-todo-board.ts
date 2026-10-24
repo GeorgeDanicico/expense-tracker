@@ -7,6 +7,7 @@ import { useTodoApi, type TodoChanges } from "@/components/todos/todo-api";
 import { ApiError } from "@/lib/api/client";
 import { todosApiKey, type TodosResponse } from "@/lib/api/keys";
 import { applyMove, upsertTodo } from "@/lib/todos/board";
+import type { QuickAddFields } from "@/lib/todos/filters";
 import type { TodoStatus } from "@/lib/todos/types";
 import type { TodoMove } from "@/lib/validation/todo";
 
@@ -59,8 +60,8 @@ export function useTodoBoard({ enabled = true }: { enabled?: boolean } = {}) {
     setDoneSince(doneSinceForStep(next));
   }, [olderStep]);
 
-  const add = useCallback(async (title: string, status: TodoStatus) => {
-    const todo = await api.create({ title, status });
+  const add = useCallback(async (title: string, status: TodoStatus, fields: QuickAddFields = {}) => {
+    const todo = await api.create({ title, status, ...fields });
     await mutate((current) => ({ todos: upsertTodo(current?.todos ?? [], todo) }), { revalidate: false });
     return todo;
   }, [api, mutate]);

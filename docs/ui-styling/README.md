@@ -49,3 +49,24 @@ in memory (`src/app/dev/preview/todo-fixtures.ts`).
 | `todo-board-edit-dialog-1280.jpg` | The card dialog: title, notes, assignee, due date, delete |
 | `todo-board-delete-confirm-1280.jpg` | The delete confirmation |
 | `todo-board-move-rolled-back-1280.jpg` | `?failMoves=1`: a refused move went back, with the notice |
+
+## To-do board filters, phones and nav (family T6)
+
+Same capture as T5, from `/dev/preview/todos`: 1280 × 800 (saved at 800 × 500) and 390 × 844
+(saved at 390 × 844 or 780 × 1688). `?noFamily=1` previews an account without a family.
+
+| Image | Shows |
+|---|---|
+| `todo-board-filter-me-1280.jpg` | `?member=me`: the Me chip, "Showing 3 of 9 cards", counts for the filtered view, after a keyboard move within the filtered To do column |
+| `todo-board-filter-member-overdue-1280.jpg` | `?member=m-maria&due=overdue`: a member chip combined with Overdue |
+| `todo-board-phone-390.jpg` | The phone board: whose-cards chips in one sideways-scrolling row, the due chips in a second, the To do / In progress / Done switcher, one column, "Move to…" on each card |
+| `todo-board-chips-scrolled-390.jpg` | The chip row scrolled to its end (Unassigned); the page itself doesn't scroll sideways |
+| `todo-board-move-to-menu-390.jpg` | The "Move to…" menu on a card, listing the other two columns |
+| `todo-board-phone-done-after-moves-390.jpg` | Done after "Move to… Done" (Buy milk at the top) and a long-press touch drag within the column (Return the library books to the top) |
+| `todo-board-quick-add-prefill-390.jpg` | Quick add under Ana + Due today: the new card is assigned to Ana, due today, and stays in view |
+| `todo-board-quick-add-hidden-notice-390.jpg` | Quick add under Overdue: "Added — hidden by the Overdue filter." instead of the card silently vanishing |
+| `todo-board-focus-after-move-390.jpg` | After "Move to…" on the last card, focus is on the card above it |
+| `todo-board-focus-empty-column-390.jpg` | After moving a column's only card away, focus is on its "Add a card" |
+| `todo-nav-more-sheet-390.jpg` | The More sheet for a family member: To-dos in a Family section |
+| `todo-nav-no-family-390.jpg` | `?noFamily=1`: no Family section in the More sheet, and the board's "join a family" state |
+| `todo-nav-no-family-1280.jpg` | `?noFamily=1`: no Family section in the sidebar |
