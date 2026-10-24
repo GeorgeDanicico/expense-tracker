@@ -165,34 +165,42 @@ export const supabaseTodoRepository: TodoRepository = {
     return data !== null;
   },
 
-  async getNeighbours(status, beforeId, afterId, movingId) {
+  async slotNear(status, { beforeId, afterId }, movingId) {
     if (movingId !== undefined && (beforeId === movingId || afterId === movingId)) return null;
 
     const supabase = await createClient();
-    const neighbour = async (id: string | null) => {
+    const anchor = async (id: string | null) => {
       if (id === null) return { found: true, position: null };
       const { data, error } = await supabase.from("todos").select("position")
         .eq("id", id).eq("status", status).maybeSingle();
       if (error) throw new Error(MOVE_ERROR);
       return { found: data !== null, position: data?.position ?? null };
     };
-    const [before, after] = await Promise.all([neighbour(beforeId), neighbour(afterId)]);
+    const [before, after] = await Promise.all([anchor(beforeId), anchor(afterId)]);
     if (!before.found || !after.found) return null;
-    if (before.position !== null && after.position !== null && !(before.position < after.position)) {
-      return { before: before.position, after: after.position, adjacent: false };
+
+    // The keys next to the anchor, nearest first. Keys are unique in a column, so after leaving out
+    // the anchor itself and the moving card, the first remaining row is the actual neighbour.
+    const nearest = async (query: PromiseLike<{ data: { id: string; position: string }[] | null; error: unknown }>) => {
+      const { data, error } = await query;
+      if (error || !data) throw new Error(MOVE_ERROR);
+      return data.find((row) => row.id !== beforeId && row.id !== movingId)?.position ?? null;
+    };
+    const column = () => supabase.from("todos").select("id, position").eq("status", status);
+
+    if (before.position !== null) {
+      // Directly below `before`: from its key down, it, maybe the moving card, then the next card.
+      const next = await nearest(column().gte("position", before.position).order("position").limit(3));
+      return { before: before.position, after: next };
     }
-
-    // The cards from `before` (inclusive) up to `after` (exclusive). Keys are unique in a column, so
-    // these are `before` itself, maybe the moving card, and anything in between: three rows are
-    // enough to see whether there's anything else.
-    let between = supabase.from("todos").select("id").eq("status", status);
-    if (before.position !== null) between = between.gte("position", before.position);
-    if (after.position !== null) between = between.lt("position", after.position);
-    const { data, error } = await between.order("position").limit(3);
-    if (error) throw new Error(MOVE_ERROR);
-
-    const others = data.filter((row) => row.id !== beforeId && row.id !== movingId);
-    return { before: before.position, after: after.position, adjacent: others.length === 0 };
+    if (after.position !== null) {
+      // Directly above `after`: the cards above it, nearest first, maybe the moving card, then the previous one.
+      const previous = await nearest(column().lt("position", after.position).order("position", { ascending: false }).limit(2));
+      return { before: previous, after: after.position };
+    }
+    // The top of the column, as `create` places a card.
+    const first = await nearest(column().order("position").limit(2));
+    return { before: null, after: first };
   },
 
   async setPosition(id, status, position) {

@@ -101,30 +101,29 @@ describe("FakeTodoRepository", () => {
     expect(await todos.setPosition(card.id, "todo", "a0")).toMatchObject({ completedAt: null, completedBy: null });
   });
 
-  it("finds adjacent neighbours, ignoring the moving card and other families", async () => {
+  it("finds the slot next to an anchor, counting hidden cards and ignoring the moving card and other families", async () => {
     const a = todos.seed({ position: "a0" });
     const moving = todos.seed({ position: "a1" });
-    const b = todos.seed({ position: "a2" });
+    const hidden = todos.seed({ position: "a2" });
     todos.seed({ familyId: otherFamilyId, position: "a3" });
     const c = todos.seed({ position: "a4" });
 
-    expect(await todos.getNeighbours("todo", a.id, b.id, moving.id)).toEqual({ before: "a0", after: "a2", adjacent: true });
-    expect(await todos.getNeighbours("todo", a.id, b.id)).toMatchObject({ adjacent: false });
-    expect(await todos.getNeighbours("todo", b.id, c.id)).toMatchObject({ adjacent: true });
-    expect(await todos.getNeighbours("todo", c.id, null)).toEqual({ before: "a4", after: null, adjacent: true });
-    expect(await todos.getNeighbours("todo", null, a.id)).toMatchObject({ adjacent: true });
-    expect(await todos.getNeighbours("in_progress", null, null)).toMatchObject({ adjacent: true });
-    expect(await todos.getNeighbours("todo", null, null)).toMatchObject({ adjacent: false });
-    expect(await todos.getNeighbours("todo", b.id, a.id)).toMatchObject({ adjacent: false });
+    expect(await todos.slotNear("todo", { beforeId: a.id, afterId: c.id }, moving.id)).toEqual({ before: "a0", after: "a2" });
+    expect(await todos.slotNear("todo", { beforeId: a.id, afterId: null })).toEqual({ before: "a0", after: "a1" });
+    expect(await todos.slotNear("todo", { beforeId: hidden.id, afterId: null })).toEqual({ before: "a2", after: "a4" });
+    expect(await todos.slotNear("todo", { beforeId: null, afterId: c.id })).toEqual({ before: "a2", after: "a4" });
+    expect(await todos.slotNear("todo", { beforeId: c.id, afterId: null })).toEqual({ before: "a4", after: null });
+    expect(await todos.slotNear("todo", { beforeId: null, afterId: null }, a.id)).toEqual({ before: null, after: "a1" });
+    expect(await todos.slotNear("in_progress", { beforeId: null, afterId: null })).toEqual({ before: null, after: null });
   });
 
-  it("returns null for a neighbour that is missing, foreign, in another column or the moving card", async () => {
+  it("returns null for an anchor that is missing, foreign, in another column or the moving card", async () => {
     const a = todos.seed({ position: "a0" });
     const foreign = todos.seed({ familyId: otherFamilyId, position: "a1" });
 
-    expect(await todos.getNeighbours("done", a.id, null)).toBeNull();
-    expect(await todos.getNeighbours("todo", foreign.id, null)).toBeNull();
-    expect(await todos.getNeighbours("todo", null, "missing")).toBeNull();
-    expect(await todos.getNeighbours("todo", a.id, null, a.id)).toBeNull();
+    expect(await todos.slotNear("done", { beforeId: a.id, afterId: null })).toBeNull();
+    expect(await todos.slotNear("todo", { beforeId: foreign.id, afterId: null })).toBeNull();
+    expect(await todos.slotNear("todo", { beforeId: a.id, afterId: "missing" })).toBeNull();
+    expect(await todos.slotNear("todo", { beforeId: a.id, afterId: null }, a.id)).toBeNull();
   });
 });

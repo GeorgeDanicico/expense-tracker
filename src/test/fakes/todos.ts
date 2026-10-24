@@ -6,8 +6,9 @@ import {
   assigneeOutsideFamilyError,
   noFamilyError,
   todoAssignee,
-  type TodoNeighbours,
+  type TodoAnchors,
   type TodoRepository,
+  type TodoSlot,
 } from "@/lib/todos/repository";
 import { TODO_STATUSES, type Todo, type TodoStatus } from "@/lib/todos/types";
 import type { TodoInput, TodoPatch } from "@/lib/validation/todo";
@@ -27,6 +28,8 @@ const byPosition = (a: { position: string }, b: { position: string }) =>
  * Like the database, it keeps every method to the caller's family (another family's card counts as
  * missing), refuses an assignee outside the family (422), keeps `(family, status, position)` unique
  * (`PositionTakenError`), and sets `completedAt`/`completedBy` when a card enters or leaves Done.
+ *
+ * `slotNear` sees every card of the column, hidden or not, like the database.
  *
  * Seed cards with `seed({ title, status, position, ... })` (the caller's family by default) or push
  * onto `rows` directly. `failNextWrite` makes the next `create` or `setPosition` throw
@@ -123,29 +126,23 @@ export class FakeTodoRepository implements TodoRepository {
     return true;
   }
 
-  async getNeighbours(
-    status: TodoStatus,
-    beforeId: string | null,
-    afterId: string | null,
-    movingId?: string,
-  ): Promise<TodoNeighbours | null> {
+  async slotNear(status: TodoStatus, { beforeId, afterId }: TodoAnchors, movingId?: string): Promise<TodoSlot | null> {
     if (movingId !== undefined && (beforeId === movingId || afterId === movingId)) return null;
-    const neighbour = (id: string | null) => (id === null ? null : this.find(id));
-    const before = neighbour(beforeId);
-    const after = neighbour(afterId);
+    const anchor = (id: string | null) => (id === null ? null : this.find(id));
+    const before = anchor(beforeId);
+    const after = anchor(afterId);
     if ((beforeId !== null && before?.status !== status) || (afterId !== null && after?.status !== status)) {
       return null;
     }
 
-    const lower = before?.position ?? null;
-    const upper = after?.position ?? null;
-    if (lower !== null && upper !== null && !(lower < upper)) return { before: lower, after: upper, adjacent: false };
-
     const familyId = this.family.membership?.familyId;
-    const between = this.rows.filter((row) =>
-      row.familyId === familyId && row.status === status && row.id !== movingId &&
-      (lower === null || row.position > lower) && (upper === null || row.position < upper));
-    return { before: lower, after: upper, adjacent: between.length === 0 };
+    const column = this.rows
+      .filter((row) => row.familyId === familyId && row.status === status && row.id !== movingId)
+      .map((row) => row.position)
+      .toSorted((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    if (before) return { before: before.position, after: column.find((key) => key > before.position) ?? null };
+    if (after) return { before: column.findLast((key) => key < after.position) ?? null, after: after.position };
+    return { before: null, after: column[0] ?? null };
   }
 
   async setPosition(id: string, status: TodoStatus, position: string) {

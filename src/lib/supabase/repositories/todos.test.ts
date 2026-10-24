@@ -208,56 +208,63 @@ describe("Supabase to-do repository", () => {
     });
   });
 
-  describe("getNeighbours", () => {
-    it("reports two adjacent cards with their positions", async () => {
+  describe("slotNear", () => {
+    it("goes directly below `before`, even with hidden cards after it and a gap to `after`", async () => {
       const a = aRow({ position: "a0" });
-      const b = aRow({ position: "a1" });
-      useDatabase([a, b, aRow({ position: "a2" })]);
+      const hidden = aRow({ position: "a1" });
+      const b = aRow({ position: "a2" });
+      useDatabase([b, hidden, a]);
 
-      expect(await todos.getNeighbours("todo", a.id, b.id)).toEqual({ before: "a0", after: "a1", adjacent: true });
+      expect(await todos.slotNear("todo", { beforeId: a.id, afterId: b.id })).toEqual({ before: "a0", after: "a1" });
+      expect(await todos.slotNear("todo", { beforeId: b.id, afterId: null })).toEqual({ before: "a2", after: null });
     });
 
-    it("reports a card between the neighbours, ignoring the moving card", async () => {
+    it("goes directly above `after` when there is no `before`", async () => {
+      const a = aRow({ position: "a0" });
+      const b = aRow({ position: "a1" });
+      const c = aRow({ position: "a2" });
+      useDatabase([a, b, c]);
+
+      expect(await todos.slotNear("todo", { beforeId: null, afterId: c.id })).toEqual({ before: "a1", after: "a2" });
+      expect(await todos.slotNear("todo", { beforeId: null, afterId: a.id })).toEqual({ before: null, after: "a0" });
+    });
+
+    it("anchors a drop into Done on the first visible card, with older Done cards hidden above it", async () => {
+      const old = aRow({ status: "done", position: "a0", completed_at: "2026-08-01T00:00:00Z" });
+      const visible = aRow({ status: "done", position: "a1", completed_at: "2026-10-20T00:00:00Z" });
+      useDatabase([old, visible]);
+
+      expect(await todos.slotNear("done", { beforeId: null, afterId: visible.id })).toEqual({ before: "a0", after: "a1" });
+    });
+
+    it("puts a card at the top of the column without anchors", async () => {
+      const a = aRow({ position: "a0" });
+      useDatabase([a]);
+
+      expect(await todos.slotNear("todo", { beforeId: null, afterId: null })).toEqual({ before: null, after: "a0" });
+      expect(await todos.slotNear("in_progress", { beforeId: null, afterId: null })).toEqual({ before: null, after: null });
+    });
+
+    it("leaves the moving card out of the column", async () => {
       const a = aRow({ position: "a0" });
       const moving = aRow({ position: "a1" });
       const b = aRow({ position: "a2" });
-      const c = aRow({ position: "a3" });
-      useDatabase([a, moving, b, c]);
+      useDatabase([a, moving, b]);
 
-      expect(await todos.getNeighbours("todo", a.id, b.id, moving.id)).toMatchObject({ adjacent: true });
-      expect(await todos.getNeighbours("todo", a.id, c.id, moving.id)).toMatchObject({ adjacent: false });
+      expect(await todos.slotNear("todo", { beforeId: a.id, afterId: b.id }, moving.id)).toEqual({ before: "a0", after: "a2" });
+      expect(await todos.slotNear("todo", { beforeId: null, afterId: b.id }, moving.id)).toEqual({ before: "a0", after: "a2" });
+      expect(await todos.slotNear("todo", { beforeId: null, afterId: null }, a.id)).toEqual({ before: null, after: "a1" });
     });
 
-    it("checks the top, the bottom and an empty column", async () => {
-      const a = aRow({ position: "a0" });
-      const b = aRow({ position: "a1" });
-      useDatabase([a, b]);
-
-      expect(await todos.getNeighbours("todo", null, a.id)).toEqual({ before: null, after: "a0", adjacent: true });
-      expect(await todos.getNeighbours("todo", null, b.id)).toMatchObject({ adjacent: false });
-      expect(await todos.getNeighbours("todo", b.id, null)).toEqual({ before: "a1", after: null, adjacent: true });
-      expect(await todos.getNeighbours("todo", a.id, null)).toMatchObject({ adjacent: false });
-      expect(await todos.getNeighbours("in_progress", null, null)).toEqual({ before: null, after: null, adjacent: true });
-      expect(await todos.getNeighbours("todo", null, null)).toMatchObject({ adjacent: false });
-      expect(await todos.getNeighbours("todo", null, null, a.id)).toMatchObject({ adjacent: false });
-    });
-
-    it("returns null for a neighbour in another column, hidden by RLS, or the moving card itself", async () => {
+    it("returns null for an anchor in another column, hidden by RLS, or the moving card itself", async () => {
       const a = aRow({ position: "a0" });
       const moving = aRow({ position: "a1" });
       useDatabase([a, moving]);
 
-      expect(await todos.getNeighbours("done", a.id, null)).toBeNull();
-      expect(await todos.getNeighbours("todo", null, "40000000-0000-4000-8000-000000000999")).toBeNull();
-      expect(await todos.getNeighbours("todo", moving.id, null, moving.id)).toBeNull();
-    });
-
-    it("reports neighbours given out of order as not adjacent", async () => {
-      const a = aRow({ position: "a0" });
-      const b = aRow({ position: "a1" });
-      useDatabase([a, b]);
-
-      expect(await todos.getNeighbours("todo", b.id, a.id)).toEqual({ before: "a1", after: "a0", adjacent: false });
+      expect(await todos.slotNear("done", { beforeId: a.id, afterId: null })).toBeNull();
+      expect(await todos.slotNear("todo", { beforeId: a.id, afterId: "40000000-0000-4000-8000-000000000999" })).toBeNull();
+      expect(await todos.slotNear("todo", { beforeId: null, afterId: "40000000-0000-4000-8000-000000000999" })).toBeNull();
+      expect(await todos.slotNear("todo", { beforeId: moving.id, afterId: null }, moving.id)).toBeNull();
     });
   });
 

@@ -39,8 +39,9 @@ export function todoAssignee(members: readonly FamilyMember[], memberId: string 
 
 /**
  * Another card already holds this `(family, status, position)` slot, usually because a racing write
- * took it first. Re-read the neighbours, compute a new key and retry (a few times). It is a 409
- * `DomainError`, so if it escapes the retries the client gets a 409 and re-syncs.
+ * took it first. Retry a few times: for a move, call `slotNear` again for fresh keys; for `create`,
+ * call it again. It is a 409 `DomainError`, so if it escapes the retries the client gets a 409 and
+ * re-syncs.
  */
 export class PositionTakenError extends DomainError {
   constructor() {
@@ -50,15 +51,19 @@ export class PositionTakenError extends DomainError {
 }
 
 /**
- * The cards around a move target in one column, as `getNeighbours` reports them. `before` and
- * `after` are the positions of the cards that will sit above and below (null for none).
- * `adjacent` is true when nothing else sits strictly between them, so a key between the two is
- * the requested spot; false means the client's view is stale (answer 409).
+ * Where a moved card goes, as `slotNear` finds it: the keys of the cards that will actually sit
+ * directly above (`before`) and below (`after`) it in the column, hidden cards included (null for
+ * none). The route stores `positionBetween(slot.before, slot.after)`.
  */
-export type TodoNeighbours = {
+export type TodoSlot = {
   before: string | null;
   after: string | null;
-  adjacent: boolean;
+};
+
+/** The client's anchors for a move: the visible card that will sit above it, and the one below. */
+export type TodoAnchors = {
+  beforeId: string | null;
+  afterId: string | null;
 };
 
 /**
@@ -94,24 +99,26 @@ export interface TodoRepository {
   /** Deletes the card, returning false when the caller's family has no such card. */
   delete(id: string): Promise<boolean>;
   /**
-   * The positions of the cards that would sit above (`beforeId`) and below (`afterId`) a card moved
-   * into `status`, and whether they are adjacent there. `movingId`, the card being moved, is ignored
-   * when looking for cards in between, so dropping a card where it already is stays adjacent. With
-   * both ids null, `adjacent` says whether the column is empty (apart from `movingId`).
+   * The slot for a card moved into `status`, anchored on the cards the client saw around the drop
+   * (it may not see every card: old Done cards and filtered views hide some). Cards never need to be
+   * adjacent, so a hidden card between the anchors is fine:
+   * - `beforeId` given: directly below that card. `after` is the next key in the column after it.
+   *   `afterId` is then only checked to exist in the column.
+   * - Only `afterId` given: directly above that card. `before` is the previous key in the column.
+   * - Both null: the top of the column, as `create` places a card.
+   * The moving card (`movingId`) is left out of the column when looking for the next or previous key,
+   * so a drop where it already sits gets a fresh key between its neighbours (possibly its current
+   * one; writing the same key back is harmless).
    *
-   * Returns null when a named neighbour isn't a card of the caller's family in `status`, or is the
-   * moving card itself. Neighbours given out of order are reported as not adjacent.
+   * Returns null (answer 409 so the client re-syncs) only when a named anchor isn't a card of the
+   * caller's family in `status`, or is the moving card itself.
    */
-  getNeighbours(
-    status: TodoStatus,
-    beforeId: string | null,
-    afterId: string | null,
-    movingId?: string,
-  ): Promise<TodoNeighbours | null>;
+  slotNear(status: TodoStatus, anchors: TodoAnchors, movingId?: string): Promise<TodoSlot | null>;
   /**
-   * Moves the card to `status` at `position` (computed by the caller with `positionBetween`).
-   * Returns null when the caller's family has no such card. Throws `PositionTakenError` when another
-   * card already holds that key in that column (re-read the neighbours and retry).
+   * Moves the card to `status` at `position` (the caller's `positionBetween(slot.before, slot.after)`
+   * from `slotNear`). Returns null when the caller's family has no such card. Throws
+   * `PositionTakenError` when another card already holds that key in that column (call `slotNear`
+   * again and retry).
    */
   setPosition(id: string, status: TodoStatus, position: string): Promise<Todo | null>;
 }
