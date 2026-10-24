@@ -65,11 +65,11 @@ The step-by-step task breakdown is in [family-phase-1-tasks.md](family-phase-1-t
 | --- | --- | --- |
 | Expenses, Investments, Net worth (the kid's own data) | off / on | Expenses on, the rest off |
 | Family finance (the other members' data) | off / view | off |
-| To-dos, Calendar (phases 4 and 6) | off / view / edit | edit |
+| Calendar (phase 6) | off / view / edit | edit |
 | MCP (phase 3) | off / on | off |
 | Cars, Houses, Devices (phases 10 and 11) | off / view / edit | view |
 
-Parents always have every permission, and no one can restrict a parent. A module that's off is hidden from the navigation **and** refused by the API with 403. Hiding the navigation alone isn't enough. Reminders (phase 5) aren't a module here: every member has them. Statement import (phase 7) follows Expenses.
+Parents always have every permission, and no one can restrict a parent. A module that's off is hidden from the navigation **and** refused by the API with 403. Hiding the navigation alone isn't enough. Reminders (phase 5) and the to-do board (phase 4) aren't modules here: every member has them. Statement import (phase 7) follows Expenses.
 
 ### Steps
 
@@ -127,6 +127,8 @@ Before this phase, MCP clients signed in with **Basic auth carrying your real em
 ## Phase 4: Family to-do board
 
 To-dos work like a GitHub project board: **three fixed columns, "To do", "In progress" and "Done"**, with cards dragged between and within columns.
+
+**Status (24 October 2026): planned** in [todo-board-plan.md](todo-board-plan.md) (tasks T1–T7). The plan changes the steps below: **one board per family** with member filter chips instead of several boards, **no kid permission or per-card rules** (every member can add, edit, move and delete any card on their family's board), **no feature flag** (the nav item lands last), and **no recurring to-dos**. The steps below are kept as first written; the plan supersedes them.
 
 | Step | What | Done when |
 | --- | --- | --- |
@@ -276,7 +278,7 @@ Each PR should include:
 | **New product name** | Your call, needed by step 0.3 | It sets the app ID and bundle ID for the stores. Those are hard to change after TestFlight. |
 | **Public HTTPS or Tailscale only** | Stay on Tailscale through phase 8. Decide before 3.5, 6.9 or the store releases. | Phones need the Tailscale app to reach the API. claude.ai MCP connectors (3.5), Google subscribing to the ICS feed (6.4), Google push webhooks (6.9) and some OAuth redirects need a public URL (Tailscale Funnel or a Cloudflare Tunnel both work). Web Push needs HTTPS but not a public URL. |
 | **Email provider** | Your call before 5.2: a transactional provider such as Resend or Amazon SES, or the SMTP account Supabase Auth already sends from | Reminder emails need a sender, a verified domain (SPF and DKIM) and a way to unsubscribe. |
-| **One to-do board or several** | Several, each with its own visibility, plus a "Family" board every family gets | A single board can't keep a parents-only or private list apart. |
+| **One to-do board or several** | Decided: one board per family, filtered by member; no private cards. See [todo-board-plan.md](todo-board-plan.md) | Simpler for a family, and member chips cover "show me Ana's to-dos". |
 | **Banks and formats for statement import** | Open, needed before 7.2: which banks, and whether each gives CSV, PDF or both | Every bank needs its own parser and fixtures. |
 | **How MCP clients sign in** | Decided: OAuth through Supabase Auth's OAuth 2.1 server, behind our own interfaces so leaving Supabase stays cheap, plus personal access tokens (1, 3 or 6 months, or never with a warning) for headless machines. Kids: OAuth only, with a parent's permission and a confirmed real email. See [mcp-access-plan.md](mcp-access-plan.md) | Using the secret key to read data would bypass RLS for every MCP call; a home-made OAuth server would still need Supabase to act as the user. |
 | **AI provider, cost and privacy** | Open, discuss when phase 8 starts | Sending financial data to a third party needs opt-in and masking. |
