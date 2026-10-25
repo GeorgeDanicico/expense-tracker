@@ -70,3 +70,25 @@ Same capture as T5, from `/dev/preview/todos`: 1280 × 800 (saved at 800 × 500)
 | `todo-nav-more-sheet-390.jpg` | The More sheet for a family member: To-dos in a Family section |
 | `todo-nav-no-family-390.jpg` | `?noFamily=1`: no Family section in the More sheet, and the board's "join a family" state |
 | `todo-nav-no-family-1280.jpg` | `?noFamily=1`: no Family section in the sidebar |
+
+## Reminders page (reminders R5)
+
+Captured with the in-app browser from `/dev/preview/reminders`, whose reminders and writes are kept
+in memory around the current time (`src/app/dev/preview/reminder-fixtures.ts`): 1280 × 800 (saved
+at 800 × 500) and 390 × 844. `?failWrites=1` refuses every mark done and snooze; `?noReminders=1`
+starts empty. The page isn't linked from the navigation yet (R9).
+
+| Image | Shows |
+|---|---|
+| `reminders-upcoming-1280-light.jpg` | Upcoming: "Pay the rent" due today at the top, highlighted, with a Today badge; a snoozed reminder with its snooze; a muted one; the repeat of each |
+| `reminders-upcoming-1280-dark.jpg` | The same with `prefers-color-scheme: dark`; the app forces its light theme, so it matches |
+| `reminders-monthly-done-1280.jpg` | After Mark done on the monthly "Pay the rent": it moved from Sun 25 Oct to Wed 25 Nov |
+| `reminders-overdue-1280-light.jpg` | Overdue with its count: "2 days late", "3 hours late" |
+| `reminders-snooze-menu-1280.jpg` | Snooze: for an hour, until tomorrow 09:00, or a chosen time |
+| `reminders-done-1280-light.jpg` | Done: the completions of the last 30 days, with the occurrence and what's next |
+| `reminders-edit-dialog-1280.jpg` | The edit dialog: title, notes, first date, time, repeat with interval, lead-time chips (three chosen, the rest disabled), mute, delete |
+| `reminders-delete-confirm-1280.jpg` | The delete confirmation |
+| `reminders-rolled-back-1280.jpg` | `?failWrites=1`: a refused mark done went back, with the notice |
+| `reminders-upcoming-390-light.jpg` | The phone width: the actions wrap under each row; no sideways scroll |
+| `reminders-add-dialog-390.jpg` | The add dialog as a bottom sheet at 390 px |
+| `reminders-overdue-390-dark.jpg` | Overdue at 390 px in dark (forced light), including a reminder just added for 09:00 today |
