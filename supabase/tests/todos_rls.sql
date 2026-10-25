@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap;
-select plan(71);
+select plan(79);
 
 -- T1 (docs/todo-board-plan.md): the family to-do board.
 --
@@ -95,6 +95,18 @@ as $$
   select coalesce(array_agg(right(t.id::text, 2)::integer order by t.id), '{}')
   from public.todos t
   where t.id::text like 'd7100000-%'
+$$;
+
+-- The user numbers with a todo_assigned notification for card n, one entry
+-- per row. Read it as the table owner: users can't read the outbox.
+create function pg_temp.queued(n integer)
+returns integer[]
+language sql
+as $$
+  select coalesce(array_agg(right(q.user_id::text, 2)::integer order by q.user_id), '{}')
+  from public.notifications q
+  where q.kind = 'todo_assigned'
+    and q.payload ->> 'todoId' = pg_temp.cid(n)::text
 $$;
 
 -- Runs a statement and reports "rows:<n>" or "error:<sqlstate>".
@@ -351,6 +363,63 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
+-- Assignment notifications (docs/reminders-plan.md, R1)
+-- ---------------------------------------------------------------------------
+
+-- So far the parent added 11 for the kid, unassigned it and assigned it to
+-- the kid again; the kid added 12 for the parent and assigned 01 to
+-- themselves.
+reset role;
+select is(pg_temp.queued(11), array[2, 2],
+  'assigning a card to another member queues a todo_assigned row for them, each time');
+select is(pg_temp.queued(2), array[3], 'reassigning a card queues one for the new assignee');
+select is(pg_temp.queued(12), array[1], 'a kid assigning a parent queues one for the parent');
+select is(pg_temp.queued(1), '{}'::integer[], 'assigning yourself queues nothing');
+
+set local role authenticated;
+select pg_temp.act_as(1);
+select pg_temp.attempt(format($q$insert into public.todos (id, family_id, title, position, created_by)
+  values (%L, 'd7100000-0000-4000-8000-0000000000fa', 'Mow the lawn', 'a8', %L)$q$, pg_temp.cid(14), pg_temp.uid(1)));
+reset role;
+select is(pg_temp.queued(14), '{}'::integer[], 'adding an unassigned card queues nothing');
+
+set local role authenticated;
+select pg_temp.act_as(1);
+select pg_temp.attempt(format('update public.todos set assignee_member_id = %L where id = %L', pg_temp.mid(3), pg_temp.cid(14)));
+reset role;
+select is(
+  (select q.payload from public.notifications q
+   where q.kind = 'todo_assigned' and q.payload ->> 'todoId' = pg_temp.cid(14)::text),
+  jsonb_build_object(
+    'title', 't1-user-1 assigned you',
+    'body', 'Mow the lawn',
+    'url', '/todos?card=' || pg_temp.cid(14),
+    'tag', 'todo:' || pg_temp.cid(14),
+    'todoId', pg_temp.cid(14),
+    'todoTitle', 'Mow the lawn',
+    'assignerName', 't1-user-1'
+  ),
+  'the notification names the card and the assigner'
+);
+
+set local role authenticated;
+select pg_temp.act_as(1);
+select pg_temp.attempt(format('update public.todos set assignee_member_id = %L where id = %L', pg_temp.mid(1), pg_temp.cid(14)));
+select pg_temp.attempt(format($q$update public.todos set title = 'Mow the lawn today' where id = %L$q$, pg_temp.cid(14)));
+select pg_temp.attempt(format('update public.todos set assignee_member_id = null where id = %L', pg_temp.cid(14)));
+reset role;
+select is(pg_temp.queued(14), array[3],
+  'assigning yourself, editing the card and unassigning it queue nothing more');
+
+set local role authenticated;
+select pg_temp.act_as(3);
+select pg_temp.attempt(format('update public.todos set assignee_member_id = %L where id = %L', pg_temp.mid(3), pg_temp.cid(14)));
+reset role;
+select is(pg_temp.queued(14), array[3], 'a member picking up a card for themselves queues nothing');
+
+set local role authenticated;
+
+-- ---------------------------------------------------------------------------
 -- Another family's members see and change nothing
 -- ---------------------------------------------------------------------------
 
@@ -479,7 +548,7 @@ set local role authenticated;
 select pg_temp.act_as(2);
 select is(pg_temp.visible(), '{}'::integer[], 'the removed kid no longer sees the board');
 select pg_temp.act_as(3);
-select is(pg_temp.visible(), array[1, 2, 11, 12, 13], 'the board still shows every card to the family');
+select is(pg_temp.visible(), array[1, 2, 11, 12, 13, 14], 'the board still shows every card to the family');
 reset role;
 
 -- Deleting the kid's user clears created_by and completed_by but keeps the cards.
