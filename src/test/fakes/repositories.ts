@@ -9,6 +9,8 @@ import { FakeExpenseRepository } from "./expenses";
 import { FakeMcpTokenRepository } from "./mcp-tokens";
 import { FakeNetWorthRepository } from "./net-worth";
 import { FakeNoticeRepository } from "./notices";
+import { FakeNotificationSettingsRepository } from "./notification-settings";
+import { FakeReminderRepository } from "./reminders";
 import { FakeTodoRepository } from "./todos";
 
 /**
@@ -30,6 +32,8 @@ export type FakeRepositories = {
   mcpTokens: FakeMcpTokenRepository;
   netWorth: FakeNetWorthRepository;
   notices: FakeNoticeRepository;
+  notificationSettings: FakeNotificationSettingsRepository;
+  reminders: FakeReminderRepository;
   todos: FakeTodoRepository;
 };
 
@@ -47,6 +51,8 @@ export function resetFakeRepositories(): FakeRepositories {
     mcpTokens: new FakeMcpTokenRepository(),
     netWorth: new FakeNetWorthRepository(),
     notices: new FakeNoticeRepository(),
+    notificationSettings: new FakeNotificationSettingsRepository(),
+    reminders: new FakeReminderRepository(),
     // Acts as the caller the family fake describes: seed `family.membership` and `family.family` first.
     todos: new FakeTodoRepository(family),
   };
