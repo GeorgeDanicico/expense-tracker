@@ -14,6 +14,7 @@ next-env.d.ts
 coverage
 out
 build
+dist
 docs
 Dockerfile*
 compose*.yml
