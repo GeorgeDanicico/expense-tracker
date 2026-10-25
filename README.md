@@ -160,7 +160,9 @@ docker run -d --name expense-tracker \
 
 The same image also holds the notifications worker (`worker.js`, bundled by
 `npm run build:worker`). It needs `SUPABASE_URL` and `SUPABASE_SECRET_KEY`, has no port, and
-writes a heartbeat to `worker_heartbeats` every 30 seconds. Run it next to the web container:
+writes a heartbeat to `worker_heartbeats` every 30 seconds. Every tick it sends the due
+notifications as Web Push to each of the recipient's browsers, and once a day it deletes sent and
+skipped notifications older than 30 days. Run it next to the web container:
 
 ```bash
 docker run -d --name expense-tracker-worker \
@@ -171,6 +173,28 @@ docker run -d --name expense-tracker-worker \
 ```
 
 `docker stop` lets the current tick finish before the worker exits.
+
+#### Web Push (VAPID) keys
+
+Browser notifications are signed with a VAPID key pair. Generate it once with
+`npx web-push generate-vapid-keys` and put these in the env file both containers read:
+
+- **`VAPID_PUBLIC_KEY`:** the public key. The web app hands it to browsers
+  (`GET /api/notifications/push-key`) when they subscribe; it isn't secret.
+- **`VAPID_PRIVATE_KEY`:** the private key, read only by the worker. Secret: never commit, log or
+  expose it. Changing the pair makes every existing browser subscription stop working, so each
+  device has to press **Enable on this device** again.
+- **`VAPID_SUBJECT`:** a contact for the push services, `mailto:you@example.com` or an `https:` URL.
+
+Without them the web app answers 503 to the push-key request (Settings → Notifications can't
+enable a device) and the worker logs `push_not_configured` every tick, leaving notifications
+pending until the keys are set; it doesn't exit. Web Push needs HTTPS (or `localhost`).
+
+To try push locally, generate a separate pair for development (never reuse the production keys),
+add the three variables and `NEXT_PUBLIC_SW_IN_DEV=true` to `.env.local`, run `npm run dev`, and run
+the worker with `npm run build:worker && node --env-file=.env.local dist/worker.js`.
+`NEXT_PUBLIC_SW_IN_DEV=true` registers the service worker in development too; it's off by default
+so the offline page doesn't get in the way of everyday development.
 
 Point a host-based HTTPS reverse proxy at `127.0.0.1:3000`. Preserve Next.js cache
 headers, avoid shared caching of authenticated pages and API responses, and disable
@@ -208,7 +232,7 @@ The Chakra theme in `src/components/ui/theme/` is the single source of styling (
 - **Building blocks:** `Avatar`, `Card`, `PageHeader`, `SectionHeader`, `AppDialog`, `ConfirmDialog`, `FormField`/`FormRow`, `FormActions`, `Stat`/`StatGroup`, `Amount`, `ListRow`, `EmptyState`, `InlineAlert`, `StatusBadge`/`CategoryBadge`, `SegmentedControl`, `Toolbar`, `IconButton` and the `ICON` sizes.
 - **Guardrails:** `npm run lint` rejects hex colours, unknown colour palettes, radius overrides on controls and forced 44px minimum heights outside `src/components/ui/`.
 
-In development, `/dev/ui` shows every primitive, size, tone and token, and `/dev/preview/<screen>` (`dashboard`, `expenses`, `investments`, `net-worth`, `settings`) renders the real screens with fixture data so they can be reviewed without signing in. Both routes return 404 in production builds.
+In development, `/dev/ui` shows every primitive, size, tone and token, and `/dev/preview/<screen>` (`dashboard`, `expenses`, `investments`, `net-worth`, `settings`, `todos`, `reminders`, `notifications`) renders the real screens with fixture data so they can be reviewed without signing in. Both routes return 404 in production builds.
 
 ## Verification
 

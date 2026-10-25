@@ -7,6 +7,7 @@ import type { ConnectedApp, OAuthApp } from "@/lib/auth/oauth-consent";
 import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
 import { MEMBER_PARAM } from "@/lib/family/viewing";
 import type { McpAccess, McpToken } from "@/lib/mcp/token-repository";
+import type { NotificationSettings } from "@/lib/notifications/settings-repository";
 import type { ReminderCompletion, ReminderSummary } from "@/lib/reminders/repository";
 import type { ListedReminder } from "@/lib/reminders/list";
 import type { Todo } from "@/lib/todos/types";
@@ -286,3 +287,25 @@ export function reminderSnoozeApiUrl(id: string) {
 export type RemindersResponse = { reminders: ListedReminder[]; completions: ReminderCompletion[] };
 export type ReminderResponse = { reminder: ListedReminder };
 export type RemindersSummaryResponse = ReminderSummary;
+
+/**
+ * GET → {@link NotificationSettingsResponse}: the caller's switches and device count. PATCH any of
+ * `{ pushEnabled, remindersEnabled, todosEnabled }` → the same shape.
+ */
+export const NOTIFICATION_SETTINGS_API_KEY = "/api/notifications/settings";
+/**
+ * POST `PushSubscription.toJSON()` → {@link NotificationSettingsResponse} (201), registering this
+ * browser; DELETE `{ endpoint }` → {@link NotificationSettingsResponse}, unregistering it.
+ */
+export const PUSH_SUBSCRIPTIONS_API_URL = "/api/notifications/push-subscriptions";
+/** GET → {@link PushKeyResponse}; 503 while the server has no VAPID key. */
+export const PUSH_KEY_API_URL = "/api/notifications/push-key";
+/** POST only → {@link TestNotificationResponse}: 202 when queued, 200 with a message within the minute. */
+export const TEST_NOTIFICATION_API_URL = "/api/notifications/test";
+
+export type NotificationSettingsResponse = NotificationSettings;
+export type PushKeyResponse = { publicKey: string };
+export type TestNotificationResponse = { queued: true } | { queued: false; message: string };
+
+/** What the test route says when a test was already queued within the minute. */
+export const TEST_ALREADY_SENT = "A test was sent less than a minute ago. Wait a minute to send another.";

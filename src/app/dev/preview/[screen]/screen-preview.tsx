@@ -8,6 +8,8 @@ import ExpensesPage from "@/app/(app)/expenses/page";
 import InvestmentsPage from "@/app/(app)/investments/page";
 import NetWorthPage from "@/app/(app)/net-worth/page";
 import RemindersPage from "@/app/(app)/reminders/page";
+import SettingsLayout from "@/app/(app)/settings/layout";
+import NotificationsSettingsPage from "@/app/(app)/settings/notifications/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import TodosPage from "@/app/(app)/todos/page";
 import { AppShell } from "@/components/layout/app-shell";
@@ -27,7 +29,17 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   settings: SettingsPage,
   todos: TodosPreview,
   reminders: RemindersPreview,
+  notifications: NotificationsPreview,
 };
+
+/** Settings → Notifications with its tabs. Its writes reach the real API (and fail when signed out). */
+function NotificationsPreview() {
+  return (
+    <SettingsLayout>
+      <NotificationsSettingsPage />
+    </SettingsLayout>
+  );
+}
 
 /** The board with its writes kept in memory (see `todo-fixtures.ts`). */
 function TodosPreview() {

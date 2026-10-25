@@ -8,7 +8,7 @@
  * `!inner`, a filter drops a row whose list no longer has any rows.
  */
 type Row = Record<string, unknown>;
-type Filter = [operator: "eq" | "is" | "gte" | "lt" | "lte" | "or", column: string, value: unknown];
+type Filter = [operator: "eq" | "is" | "in" | "gte" | "lt" | "lte" | "or", column: string, value: unknown];
 type Result = { data: Row[] | null; error: unknown; count: number | null };
 
 export type RecordedQuery = {
@@ -90,6 +90,7 @@ function matches(row: Row, [operator, column, value]: Filter) {
   // An embedded list was already narrowed to the matching rows (see `embed`).
   if (Array.isArray(embeddedList)) return embeddedList.length > 0;
   if (operator === "eq" || operator === "is") return read(row, column) === value;
+  if (operator === "in") return (value as unknown[]).includes(read(row, column));
   if (operator === "gte") return String(read(row, column)) >= String(value);
   if (operator === "lt") return String(read(row, column)) < String(value);
   // Like SQL, a null never matches a comparison.
@@ -122,9 +123,11 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
       return this.write("upsert", values);
     }
     update(values: Row) { return this.write("update", values); }
-    delete() { return this.write("delete"); }
+    // The count option is ignored: deletes always report their count.
+    delete(options?: unknown) { void options; return this.write("delete"); }
     eq(column: string, value: unknown) { return this.filter("eq", column, value); }
     is(column: string, value: null) { return this.filter("is", column, value); }
+    in(column: string, values: unknown[]) { return this.filter("in", column, values); }
     gte(column: string, value: string) { return this.filter("gte", column, value); }
     lt(column: string, value: string) { return this.filter("lt", column, value); }
     lte(column: string, value: string) { return this.filter("lte", column, value); }
