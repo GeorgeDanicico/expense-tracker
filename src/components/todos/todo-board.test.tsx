@@ -8,10 +8,11 @@ import { focusAfterLeaving, moveToTop, TodoBoard } from "@/components/todos/todo
 import { TodoFilterChips } from "@/components/todos/todo-filters";
 import { NoFamilyBoard } from "@/components/todos/todo-board-screen";
 import { todoChanges } from "@/components/todos/todo-dialog";
+import { useLinkedCard } from "@/components/todos/use-linked-card";
 import { doneSinceForStep, OLDER_DONE_STEPS } from "@/components/todos/use-todo-board";
 import { ledgerSystem } from "@/components/ui/theme";
 import type { FamilyMember } from "@/lib/family/repository";
-import { DEFAULT_TODO_FILTERS, type TodoFilters } from "@/lib/todos/filters";
+import { DEFAULT_TODO_FILTERS, linkedCard, withoutCardHref, type TodoFilters } from "@/lib/todos/filters";
 import type { Todo } from "@/lib/todos/types";
 
 const NOW = new Date("2026-10-24T09:00:00Z");
@@ -162,5 +163,42 @@ describe("NoFamilyBoard", () => {
       </ChakraProvider>,
     );
     expect(html).toContain('href="/settings/family"');
+  });
+});
+
+describe("the board with ?card=<id>", () => {
+  const cards = [card({ id: "8f0c2e4a-0000-4000-8000-000000000001", title: "Buy milk" }), card({ id: "t2", title: "Fix the tap" })];
+
+  /** The card id the board's dialog shows on its first render, or "none". */
+  function Probe({ todos, cardParam }: { todos?: Todo[]; cardParam: string | null }) {
+    const { openId } = useLinkedCard(todos, cardParam, "/todos");
+    return <output>{openId ?? "none"}</output>;
+  }
+  const opened = (todos: Todo[] | undefined, cardParam: string | null) =>
+    renderToStaticMarkup(<Probe todos={todos} cardParam={cardParam} />).replace(/<\/?output>/g, "");
+
+  it("opens the named card's dialog once the board has loaded", () => {
+    expect(opened(cards, "t2")).toBe("t2");
+    // Any case, as a UUID can be written either way.
+    expect(opened(cards, "8F0C2E4A-0000-4000-8000-000000000001")).toBe(cards[0].id);
+  });
+
+  it("opens nothing for an unknown id, no param, or before the board loads", () => {
+    expect(opened(cards, "gone")).toBe("none");
+    expect(opened(cards, "")).toBe("none");
+    expect(opened(cards, null)).toBe("none");
+    expect(opened(undefined, "t2")).toBe("none");
+  });
+
+  it("finds the card whatever the filters hide", () => {
+    expect(linkedCard("t2", cards)?.title).toBe("Fix the tap");
+    expect(linkedCard(" t2 ", cards)?.title).toBe("Fix the tap");
+    expect(linkedCard("t3", cards)).toBeNull();
+  });
+
+  it("drops only ?card= from the URL when the dialog closes", () => {
+    expect(withoutCardHref("/todos", "?card=t2")).toBe("/todos");
+    expect(withoutCardHref("/todos", "?member=me&card=t2&due=today")).toBe("/todos?member=me&due=today");
+    expect(withoutCardHref("/todos", "")).toBe("/todos");
   });
 });

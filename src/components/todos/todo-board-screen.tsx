@@ -4,12 +4,13 @@ import { Button, Flex, Stack, Text } from "@chakra-ui/react";
 import { History, SquareKanban, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import useSWR from "swr";
 
 import { TodoBoard } from "@/components/todos/todo-board";
 import { TodoDialog } from "@/components/todos/todo-dialog";
 import { TodoFilterChips } from "@/components/todos/todo-filters";
+import { useLinkedCard } from "@/components/todos/use-linked-card";
 import { useTodoBoard } from "@/components/todos/use-todo-board";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -28,6 +29,7 @@ import {
   hidingFilter,
   parseTodoFilters,
   quickAddFields,
+  TODO_CARD_PARAM,
   todoFiltersHref,
   type TodoFilters,
 } from "@/lib/todos/filters";
@@ -68,6 +70,10 @@ function FilterSummary({ shown, total, onClear }: { shown: number; total: number
  * The family to-do board page: header, the filter chips (kept in the URL as `?member=` and
  * `?due=`), the three columns (one at a time on a phone) and the card dialog. Needs a Suspense
  * boundary above it for `useSearchParams`.
+ *
+ * `?card=<id>` (where a to-do notification leads) opens that card's dialog once the board has
+ * loaded, whatever the filters show. The param goes when the dialog closes; an id the board doesn't
+ * have (a deleted card, an old done one not loaded) is dropped from the URL and nothing opens.
  */
 export function TodoBoardScreen() {
   const { account } = useAccount();
@@ -80,8 +86,8 @@ export function TodoBoardScreen() {
   const board = useTodoBoard({ enabled: hasFamily });
   const { data: family } = useSWR<FamilyResponse>(hasFamily ? FAMILY_API_KEY : null);
   const members = family?.family?.members;
-  const [openId, setOpenId] = useState<string | null>(null);
-  const opened = openId ? board.todos?.find((todo) => todo.id === openId) : undefined;
+  const card = useLinkedCard(board.todos, searchParams.get(TODO_CARD_PARAM), pathname);
+  const opened = card.openId ? board.todos?.find((todo) => todo.id === card.openId) : undefined;
 
   const { assignee, due } = parseTodoFilters(searchParams, members?.map((member) => member.memberId));
   const filters = useMemo<TodoFilters>(() => ({ assignee, due }), [assignee, due]);
@@ -153,7 +159,7 @@ export function TodoBoardScreen() {
         singleColumn={phone}
         onAdd={addFiltered}
         onMove={board.move}
-        onOpen={(todo: Todo) => setOpenId(todo.id)}
+        onOpen={(todo: Todo) => card.open(todo.id)}
         onDraggingChange={board.setDragging}
         doneFooter={board.canShowOlder ? (
           <Flex justify="center" mt="2">
@@ -172,7 +178,7 @@ export function TodoBoardScreen() {
           todo={opened}
           members={family?.family?.members ?? []}
           open
-          onOpenChange={(open) => { if (!open) setOpenId(null); }}
+          onOpenChange={(open) => { if (!open) card.close(); }}
           onSave={board.update}
           onDelete={board.remove}
         />

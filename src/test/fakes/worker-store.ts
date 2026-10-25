@@ -3,6 +3,7 @@ import type {
   ClaimedReminder,
   DeviceSubscription,
   DueCounts,
+  DueTodo,
   Heartbeat,
   NewNotification,
   NotificationOutcome,
@@ -39,6 +40,17 @@ export type FakeReminder = ReminderSchedule & {
   lockedUntil: Date | null;
 };
 
+/** A to-do card as the fake keeps it: what the due-today read looks at. */
+export type FakeTodo = {
+  id: string;
+  title: string;
+  /** `YYYY-MM-DD` in Bucharest, or null. */
+  dueDate: string | null;
+  status: "todo" | "in_progress" | "done";
+  /** The assignee's user (the fake skips the `family_members` hop), or null when unassigned. */
+  assigneeUserId: string | null;
+};
+
 export type FakeDevice = DeviceSubscription & { lastSuccessAt: Date | null };
 
 const LEASE_MS = 2 * 60_000;
@@ -62,6 +74,9 @@ export class FakeWorkerStore implements WorkerStore {
   /** Cut-offs `deleteOldNotifications` was called with. */
   cleanups: Date[] = [];
   reminders: FakeReminder[] = [];
+  todos: FakeTodo[] = [];
+  /** Dates `listOpenTodosDueOn` was called with. */
+  todoReads: string[] = [];
   failWith: Error | null = null;
   beforeAdvance: ((reminder: ClaimedReminder) => void) | null = null;
   now: () => Date = () => new Date();
@@ -137,6 +152,34 @@ export class FakeWorkerStore implements WorkerStore {
   /** The `reminder` outbox rows, oldest first. */
   reminderNotifications() {
     return this.notifications.filter((row) => row.kind === "reminder");
+  }
+
+  /** Adds a to-do card (defaults: "Buy milk", to do, no due date, unassigned); returns it. */
+  addTodo(values: Partial<FakeTodo> = {}): FakeTodo {
+    const todo: FakeTodo = { id: `t${this.nextId++}`, title: "Buy milk", dueDate: null, status: "todo", assigneeUserId: null, ...values };
+    this.todos.push(todo);
+    return todo;
+  }
+
+  /**
+   * Queues the row the `todos_notify_assignee` trigger inserts when `assignerName` assigns `todo`
+   * to `assigneeUserId` (no dedupe key, extra fields in the payload); returns it.
+   */
+  assignTodo(todo: FakeTodo, assigneeUserId: string, assignerName: string): FakeNotification {
+    todo.assigneeUserId = assigneeUserId;
+    return this.queue({
+      userId: assigneeUserId,
+      kind: "todo_assigned",
+      payload: {
+        title: `${assignerName} assigned you`,
+        body: todo.title,
+        url: `/todos?card=${todo.id}`,
+        tag: `todo:${todo.id}`,
+        todoId: todo.id,
+        todoTitle: todo.title,
+        assignerName,
+      },
+    });
   }
 
   /** Queues a pending outbox row (send now unless `sendAt` says otherwise); returns it. */
@@ -265,6 +308,14 @@ export class FakeWorkerStore implements WorkerStore {
     reminder.lockedUntil = null;
     reminder.updatedAt = this.stamp();
     return "advanced" as const;
+  }
+
+  async listOpenTodosDueOn(date: string): Promise<DueTodo[]> {
+    this.check();
+    this.todoReads.push(date);
+    return this.todos
+      .filter((todo) => todo.dueDate === date && todo.status !== "done" && todo.assigneeUserId !== null)
+      .map(({ id, title, assigneeUserId }) => ({ id, title, assigneeUserId: assigneeUserId! }));
   }
 
   async deleteOldNotifications(before: Date) {

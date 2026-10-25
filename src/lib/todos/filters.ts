@@ -125,3 +125,21 @@ export function hidingFilter(
 export function hiddenByFilterNotice(filter: string) {
   return `Added — hidden by the ${filter} filter.`;
 }
+
+/** `/todos?card=<id>`, where a to-do notification leads: the board opens that card's dialog. */
+export const TODO_CARD_PARAM = "card";
+
+/** The card `?card=` names, when the board has it; null for no param or an unknown id. */
+export function linkedCard<T extends { id: string }>(cardId: string | null, todos: readonly T[]): T | null {
+  const id = cardId?.trim();
+  if (!id) return null;
+  return todos.find((todo) => todo.id.toLowerCase() === id.toLowerCase()) ?? null;
+}
+
+/** The board URL without `?card=`, keeping the filters and any other query parameters. */
+export function withoutCardHref(pathname: string, current: { toString(): string }) {
+  const params = new URLSearchParams(current.toString());
+  params.delete(TODO_CARD_PARAM);
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
