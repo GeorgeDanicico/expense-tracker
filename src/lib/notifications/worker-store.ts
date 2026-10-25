@@ -1,3 +1,5 @@
+import type { NotifiableReminder } from "@/lib/reminders/notification";
+
 /** How many rows are due at a moment: what the next claims would pick up, leases aside. */
 export type DueCounts = {
   /** Pending outbox rows whose `send_at` has passed. */
@@ -27,6 +29,28 @@ export type ClaimedNotification = {
   payload: unknown;
   /** How many sends were already tried. */
   attempts: number;
+};
+
+/**
+ * A reminder the worker has claimed (`claim_due_reminders`): its schedule as stored, with the
+ * values that tell whether it changed since the claim.
+ */
+export type ClaimedReminder = NotifiableReminder & {
+  userId: string;
+  /** The stored `next_notify_at` the claim found due. */
+  nextNotifyAt: Date;
+  /** `updated_at` as the claim left it; any later edit, mark done or snooze changes it. */
+  updatedAt: string;
+  /** The lease the claim set (`notify_locked_until`). */
+  lockedUntil: string;
+};
+
+/** A notification the worker queues itself (a reminder's), deduplicated by `dedupeKey`. */
+export type NewNotification = {
+  userId: string;
+  kind: NotificationKind;
+  payload: { title: string; body: string; url: string; tag: string };
+  dedupeKey: string;
 };
 
 /** A user's switches, as the worker reads them; a user without a row has every switch on. */
@@ -80,4 +104,21 @@ export interface WorkerStore {
   finishNotification(id: string, outcome: NotificationOutcome): Promise<void>;
   /** Deletes `sent` and `skipped` rows created before `before`; returns how many. */
   deleteOldNotifications(before: Date): Promise<number>;
+  /**
+   * Leases up to `batch` unmuted reminders whose `next_notify_at` has passed for 2 minutes
+   * (`claim_due_reminders`) and returns them.
+   */
+  claimDueReminders(batch: number): Promise<ClaimedReminder[]>;
+  /**
+   * Inserts a pending outbox row to send now. `duplicate` when a row with its `dedupeKey` already
+   * exists (an earlier run queued it), which is not an error.
+   */
+  enqueueNotification(notification: NewNotification): Promise<"queued" | "duplicate">;
+  /**
+   * Stores `nextNotifyAt` on a claimed reminder and releases its lease, only while it is as
+   * claimed: the same `updated_at`, not muted and with an open occurrence. Otherwise it leaves the
+   * reminder alone, apart from releasing this claim's lease if it still holds, and answers
+   * `changed`: an edit, mark done or snooze in between already stored its own `next_notify_at`.
+   */
+  advanceReminder(reminder: ClaimedReminder, nextNotifyAt: Date | null): Promise<"advanced" | "changed">;
 }

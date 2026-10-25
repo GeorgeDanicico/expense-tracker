@@ -100,6 +100,38 @@ describe("RemindersScreen", () => {
   });
 });
 
+describe("RemindersScreen with ?focus=<id>", () => {
+  // States are worked out at the real time the screen renders, so the dates are far off.
+  const late = reminder({ id: "late", title: "Renew the passport", repeatUnit: "none", startsOn: "2020-01-10", nextDueOn: "2020-01-10" });
+  const soon = reminder({ id: "soon", title: "Pay the rent", startsOn: "2099-01-31", nextDueOn: "2099-01-31" });
+  const finished = reminder({ id: "finished", title: "Book the dentist", repeatUnit: "none", startsOn: "2020-01-05", nextDueOn: null });
+  const data: RemindersResponse = {
+    reminders: [late, soon, finished],
+    completions: [
+      { id: "c1", reminderId: "finished", occurrenceOn: "2020-01-05", doneAt: "2020-01-05T08:00:00.000Z", expenseId: null },
+    ],
+  };
+
+  /** The selected tab's label and the rows marked focused. */
+  function focus(focusId: string | null) {
+    const html = render(<RemindersScreen focusId={focusId} />, data);
+    const selected = html.match(/aria-selected="true"[^>]*>([A-Za-z]+)/)?.[1];
+    const focused = [...html.matchAll(/data-reminder-id="([^"]+)" data-focused=""/g)].map((match) => match[1]);
+    return { selected, focused };
+  }
+
+  it("opens the tab that lists the reminder and highlights its row", () => {
+    expect(focus("late")).toEqual({ selected: "Overdue", focused: ["late"] });
+    expect(focus("soon")).toEqual({ selected: "Upcoming", focused: ["soon"] });
+    expect(focus("finished")).toEqual({ selected: "Done", focused: ["finished"] });
+  });
+
+  it("stays on Upcoming with nothing highlighted for an unknown reminder or no focus", () => {
+    expect(focus("deleted")).toEqual({ selected: "Upcoming", focused: [] });
+    expect(focus(null)).toEqual({ selected: "Upcoming", focused: [] });
+  });
+});
+
 describe("the reminder form", () => {
   it("starts a new reminder today at 09:00, once, notifying at the time", () => {
     expect(draftFor(undefined, "2026-10-24")).toEqual({

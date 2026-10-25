@@ -1,7 +1,14 @@
 import "server-only";
 
-import type { NotificationOutcome, RecipientSettings, WorkerStore } from "@/lib/notifications/worker-store";
+import type { Database } from "@/lib/database.types";
+import type { ClaimedReminder, NotificationOutcome, RecipientSettings, WorkerStore } from "@/lib/notifications/worker-store";
+import { REPEAT_UNITS, type RepeatUnit } from "@/lib/reminders/types";
 import { createAdminClient, type AdminClient } from "@/lib/supabase/admin-client";
+
+type ReminderRow = Database["public"]["Tables"]["reminders"]["Row"];
+
+/** Postgres' unique_violation: here, a `dedupe_key` that's already queued. */
+const UNIQUE_VIOLATION = "23505";
 
 /**
  * `WorkerStore` on `worker_heartbeats`, `notifications`, `reminders`, `notification_settings` and
@@ -99,6 +106,50 @@ export function createSupabaseWorkerStore(client: AdminClient = createAdminClien
       if (error) throw new Error(`Unable to update a notification: ${error.message}`);
     },
 
+    async claimDueReminders(batch) {
+      const { data, error } = await client.rpc("claim_due_reminders", { p_batch: batch });
+      if (error) throw new Error(`Unable to claim due reminders: ${error.message}`);
+      return (data ?? []).flatMap((row) => {
+        const reminder = toClaimedReminder(row);
+        return reminder ? [reminder] : [];
+      });
+    },
+
+    async enqueueNotification({ userId, kind, payload, dedupeKey }) {
+      const { error } = await client
+        .from("notifications")
+        .insert({ user_id: userId, kind, payload, dedupe_key: dedupeKey });
+      if (!error) return "queued";
+      if (error.code === UNIQUE_VIOLATION) return "duplicate";
+      throw new Error(`Unable to queue a notification: ${error.message}`);
+    },
+
+    /**
+     * One conditional update: it matches only while `updated_at` is the claim's (every write to a
+     * reminder sets it, the claim included), the reminder isn't muted and has an open occurrence.
+     * When nothing matched, the claim's own lease is released if it's still there.
+     */
+    async advanceReminder(reminder, nextNotifyAt) {
+      const { data, error } = await client
+        .from("reminders")
+        .update({ next_notify_at: nextNotifyAt?.toISOString() ?? null, notify_locked_until: null })
+        .eq("id", reminder.id)
+        .eq("updated_at", reminder.updatedAt)
+        .eq("notifications_muted", false)
+        .not("next_due_on", "is", null)
+        .select("id");
+      if (error) throw new Error(`Unable to advance a reminder: ${error.message}`);
+      if (data.length > 0) return "advanced";
+
+      const released = await client
+        .from("reminders")
+        .update({ notify_locked_until: null })
+        .eq("id", reminder.id)
+        .eq("notify_locked_until", reminder.lockedUntil);
+      if (released.error) throw new Error(`Unable to release a reminder: ${released.error.message}`);
+      return "changed";
+    },
+
     async deleteOldNotifications(before) {
       const { count, error } = await client
         .from("notifications")
@@ -108,6 +159,34 @@ export function createSupabaseWorkerStore(client: AdminClient = createAdminClien
       if (error) throw new Error(`Unable to delete old notifications: ${error.message}`);
       return count ?? 0;
     },
+  };
+}
+
+/**
+ * A claimed row as the worker reads it. A row the claim returned without a due time or lease, or
+ * with a repeat unit this code doesn't know, is left to its lease (null).
+ */
+function toClaimedReminder(row: ReminderRow): ClaimedReminder | null {
+  if (row.next_notify_at === null || row.notify_locked_until === null) return null;
+  if (!(REPEAT_UNITS as readonly string[]).includes(row.repeat_unit)) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    startsOn: row.starts_on,
+    // A `time` column comes back as `HH:MM:SS`.
+    timeOfDay: row.time_of_day.slice(0, 5),
+    timezone: row.timezone,
+    repeatUnit: row.repeat_unit as RepeatUnit,
+    repeatInterval: row.repeat_interval,
+    leadMinutes: row.lead_minutes,
+    notificationsMuted: row.notifications_muted,
+    nextDueOn: row.next_due_on,
+    snoozedUntil: row.snoozed_until === null ? null : new Date(row.snoozed_until).toISOString(),
+    nextNotifyAt: new Date(row.next_notify_at),
+    // Kept exactly as Postgres wrote them: the conditional update compares them.
+    updatedAt: row.updated_at,
+    lockedUntil: row.notify_locked_until,
   };
 }
 

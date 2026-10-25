@@ -59,16 +59,35 @@ function Meta({ children, color = "fg.muted" }: { children: ReactNode; color?: s
   );
 }
 
-function RowFrame({ highlight = false, children }: { highlight?: boolean; children: ReactNode }) {
+/**
+ * One list row. `reminderId` lets the page find it (`/reminders?focus=<id>`); `focused` rings it
+ * briefly when a notification opened the page on it.
+ */
+function RowFrame({
+  reminderId,
+  highlight = false,
+  focused = false,
+  children,
+}: {
+  reminderId: string;
+  highlight?: boolean;
+  focused?: boolean;
+  children: ReactNode;
+}) {
   return (
     <Box
       as="li"
+      data-reminder-id={reminderId}
+      data-focused={focused ? "" : undefined}
       listStyleType="none"
       px={{ base: "3", md: "4" }}
       py="3"
       borderBottomWidth="1px"
       borderColor="border"
-      bg={highlight ? "brand.subtle" : undefined}
+      bg={focused ? "brand.muted" : highlight ? "brand.subtle" : undefined}
+      boxShadow={focused ? "inset 0 0 0 2px {colors.brand.focusRing}" : undefined}
+      transition="background-color 0.6s ease, box-shadow 0.6s ease"
+      scrollMarginBlock="6rem"
       _last={{ borderBottomWidth: "0" }}
     >
       <Flex align="center" gap="3" wrap="wrap" rowGap="2">
@@ -112,6 +131,7 @@ export function ReminderRow({
   reminder,
   now,
   busy = false,
+  focused = false,
   onComplete,
   onSnooze,
   onEdit,
@@ -120,6 +140,8 @@ export function ReminderRow({
   now: Date;
   /** A write for this reminder is in flight: its actions wait. */
   busy?: boolean;
+  /** A notification opened the page on this reminder: highlight it for a moment. */
+  focused?: boolean;
   onComplete: (reminder: ListedReminder) => void;
   onSnooze: (reminder: ListedReminder, choice: SnoozeChoice) => void;
   onEdit: (reminder: ListedReminder) => void;
@@ -129,7 +151,7 @@ export function ReminderRow({
   const snoozed = state === "snoozed" ? snoozedText(reminder, now) : null;
 
   return (
-    <RowFrame highlight={state === "due"}>
+    <RowFrame reminderId={reminder.id} highlight={state === "due"} focused={focused}>
       <Leading state={state} />
       <Flex direction="column" gap="0.5" flex="1 1 14rem" minW="0">
         <Flex align="center" gap="2" minW="0">
@@ -176,10 +198,21 @@ export function ReminderRow({
 }
 
 /** One occurrence marked done: the reminder's title, when it was done, and the occurrence's date. */
-export function DoneRow({ entry, now, onEdit }: { entry: DoneEntry; now: Date; onEdit: (reminder: DoneEntry["reminder"]) => void }) {
+export function DoneRow({
+  entry,
+  now,
+  focused = false,
+  onEdit,
+}: {
+  entry: DoneEntry;
+  now: Date;
+  /** A notification opened the page on this reminder: highlight it for a moment. */
+  focused?: boolean;
+  onEdit: (reminder: DoneEntry["reminder"]) => void;
+}) {
   const { completion, reminder } = entry;
   return (
-    <RowFrame>
+    <RowFrame reminderId={reminder.id} focused={focused}>
       <Leading state="done" />
       <Flex direction="column" gap="0.5" flex="1 1 14rem" minW="0">
         <TitleButton title={reminder.title} onClick={() => onEdit(reminder)} />

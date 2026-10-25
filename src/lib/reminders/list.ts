@@ -102,3 +102,19 @@ export function snoozeLocally(reminder: ListedReminder, snooze: SnoozeInput, now
     state: stateOf(snoozed, now),
   };
 }
+
+/**
+ * The tab that lists reminder `id` (for `/reminders?focus=<id>`): Overdue or Upcoming while it's
+ * open, Done for a one-off marked done with a completion still shown; null when it isn't listed
+ * (deleted, or done before the Done tab's window).
+ */
+export function tabOf(
+  id: string,
+  groups: ReturnType<typeof groupReminders>,
+  done: readonly DoneEntry[],
+): ReminderTab | null {
+  if (groups.overdue.some((reminder) => reminder.id === id)) return "overdue";
+  if (groups.upcoming.some((reminder) => reminder.id === id)) return "upcoming";
+  if (done.some((entry) => entry.reminder.id === id)) return "done";
+  return null;
+}
