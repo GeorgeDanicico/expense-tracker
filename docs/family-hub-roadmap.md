@@ -1,6 +1,6 @@
 # Family hub roadmap
 
-Prepared 15 October 2026, updated 25 October 2026. This plan grows Simple Ledger from a single-user expense tracker into a family app: families and roles, profile pictures, safer MCP access, a to-do board, private reminders with browser notifications, a shared calendar with an ICS feed and two-way Google Calendar sync, statement import, AI features (still open), cars, houses, smart-home devices, and native iOS/Android apps built with Expo. Everything up to and including AI ships on the web before the native apps start (see "Order before the native apps").
+Prepared 15 October 2026, updated 26 October 2026. This plan grows Simple Ledger from a single-user expense tracker into a family app: families and roles, profile pictures, safer MCP access, a to-do board, private reminders with browser notifications, a shared calendar with an ICS feed and two-way Google Calendar sync, statement import, AI assistance with a hard cost limit, production hardening, logging, performance and a simpler UI, cars, houses, smart-home devices, and native iOS/Android apps built with Expo. Everything up to and including AI ships on the web before the native apps start (see "Order before the native apps").
 
 Every numbered step below is meant to be **one pull request** that can be reviewed on its own, merged, and deployed without breaking what already works. Unfinished modules stay hidden behind a flag, so `main` is always shippable.
 
@@ -104,7 +104,15 @@ Everything in phases 3–8 ships on the web before the Expo work in phase 9 star
 3. **Phase 5, the worker, push notifications and reminders.** The background worker and the notification layer are built once here, then reused by the calendar, to-dos and later the phone. Email notifications come in a later step.
 4. **Phase 6, the calendar.** The app's own calendar, an ICS feed for other calendar apps, then two-way Google sync on the worker from phase 5.
 5. **Phase 7, statement import.** CSV first, then PDF.
-6. **Phase 8, AI.** Still an open discussion; nothing is planned in detail yet.
+6. **Phase 8, AI assistance**, with the cost gate and kill switch.
+
+Phases 14–17 come **before phase 6**, in this order, because the app is in daily use and should be safe, observable, fast and simple before it grows:
+- **Phase 14, production hardening and security.**
+- **Phase 15, logging and tracing,** which also measures phase 16.
+- **Phase 16, performance and loading.**
+- **Phase 17, the simpler UI, mobile first.** This includes swipe-to-delete on phones.
+
+Phase 18 (clean-up and fewer tests) is optional and can run whenever there's a lull. So the full order is 14 → 15 → 16 → 17 → 6 → 7 → 8.
 
 Display-name editing (the rest of 2.1) is small and can slot in anywhere.
 
@@ -140,7 +148,7 @@ To-dos work like a GitHub project board: **three fixed columns, "To do", "In pro
 
 ## Phase 5: Background worker, push notifications and reminders
 
-**Status (25 October 2026): planned** in [reminders-plan.md](reminders-plan.md) (tasks R1–R12). The plan changes a few details below: repeats are stored as structured columns instead of an RRULE, reminders are scheduled through `next_notify_at` on the reminder instead of outbox rows written on save, and the worker locks rows with `FOR UPDATE SKIP LOCKED` instead of a job lock table. The plan supersedes the steps below.
+**Status (26 October 2026): done** (tasks R1–R12 in [reminders-plan.md](reminders-plan.md), merged in #122–#134 and deployed), apart from the smoke test on real devices. Production images are now built on GitHub and pulled by the VPS (#135, vps-apps#10), because `next build` ran the VPS out of memory. The plan changes a few details below: repeats are stored as structured columns instead of an RRULE, reminders are scheduled through `next_notify_at` on the reminder instead of outbox rows written on save, and the worker locks rows with `FOR UPDATE SKIP LOCKED` instead of a job lock table. The plan supersedes the steps below.
 
 **Reminders** are personal nudges that aren't calendar events: "pay the rent", "pay the taxes", "renew the insurance". Most repeat. The phase also builds what any scheduled notification needs: a background worker and a notification layer. On the web the only channel is **browser notifications (Web Push)**; the phone's push notifications join as a second channel in phase 9. ntfy and other stopgap push apps are left out on purpose, because the native app replaces them.
 
@@ -214,15 +222,35 @@ Upload a bank statement and turn it into expenses inside the app. Whatever the f
 | **7.4** | **PDF statements with text**: extract the text and parse it with the same per-bank parsers. | Each PDF fixture parses to the expected rows. |
 | **7.5** | (AI, see phase 8) **Unknown layouts**: let an LLM extract rows from statements no parser recognises, with account numbers masked in the extracted text before it's sent. Opt-in per user, because it sends financial data to a third party. The rows still go through the review step. | An unrecognised statement produces draft rows only after the user opts in. |
 
-## Phase 8: AI in the app (open for discussion)
+## Phase 8: AI assistance, with a hard cost limit
 
-Nothing here is planned in detail yet. The direction so far:
+AI helps where it saves typing or thinking. It's built so the spend can't run away: every call goes through one gate that checks a budget, records the cost, and is switched off by a feature flag when usage gets high.
 
-- **Plain insights first, without an LLM**: month-over-month changes, category spikes, detected recurring payments and subscriptions, and "this looks like a monthly bill, make it a reminder?". Most of the value, with no API cost and no data leaving the app.
-- **Statement extraction** (7.5) is likely the first real LLM feature.
-- **Then perhaps**: a monthly summary with suggestions, or asking questions about your spending inside the app. MCP (phase 3) already lets Claude analyse your data from outside.
+**What AI does**, cheapest and most useful first:
+- **Quick add in plain language:** "lunch 45 yesterday", "remind me to pay rent on the 25th every month" or "Ana: clean her room by Friday" become a pre-filled expense, reminder or to-do for you to confirm. Nothing is saved without a tap.
+- **Category suggestions** for expenses that the existing merchant rules don't recognise.
+- **An assistant inside the app** that answers questions about your own data ("how much did we spend on food this month compared with last?") by calling the **same tools as MCP** (phase 3), with your permissions. Read-only at first; writes need a confirm.
+- **A monthly summary** with spending changes and recurring payments ("this looks like a monthly bill, make it a reminder?"). Plain calculations do the work; AI only writes the text.
+- Later: **receipt photos** to an expense, and statement extraction (7.5).
 
-To decide before planning: which provider, who pays and how much, opting in per user, what data is sent (and masked), and whether kids get it at all.
+**How cost is kept under control:**
+- **One gate:** every model call goes through `src/lib/ai/client.ts`. It sets `max_tokens` per feature, a timeout, at most N tool steps per assistant turn, prompt caching for the tool definitions, and the cheapest model that does the job (a small model for parsing and categories, a larger one only for the assistant). Model ids come from env.
+- **A usage ledger:** `ai_usage (user_id, feature, model, input_tokens, output_tokens, cache_tokens, cost_micros, created_at)`, priced from a table in config.
+- **Budgets:** a per-user daily and monthly cap, and a global monthly budget (`AI_MONTHLY_BUDGET_USD`). They're checked before every call with an estimate and settled after it.
+- **The kill switch is a feature flag:** `app_flags.ai_enabled`, which an env value can override. The gate turns it **off automatically** when global spend reaches the budget, and warns at 80% through the phase 5 notification layer. A user who hits their own cap is paused until the next day or month. The flag can be flipped by hand on an admin page.
+- **Monitoring:** an admin page with spend per day, feature and user, the remaining budget and the flag. Every call also logs its tokens and cost (phase 15). As a last line of defence, set a monthly spend limit in the Anthropic console too.
+- **Privacy:** AI is opt-in per user, like the MCP switch. Kids need a parent's permission. Only the data a feature needs is sent, and API data isn't used for training.
+
+| Step | What | Done when |
+| --- | --- | --- |
+| **8.1** | **Flags, ledger and budget gate**, with no AI yet: `app_flags`, `ai_usage`, the budget checks and the automatic switch-off, all tested with a fake model. | Tests show calls are refused over each cap and the flag turns off at the global budget. |
+| **8.2** | **AI client**: the Claude API behind the gate, with timeouts, retries, logging, prompt caching and per-feature limits. The per-user opt-in in Settings, with the kid permission. | A test call is recorded with its exact token counts and cost. |
+| **8.3** | **Admin usage page and alerts**: spend charts, per-user caps, the flag toggle, and the 80% and 100% notifications. Who counts as an admin is set by env (`APP_ADMIN_USER_IDS`). | Crossing a test budget notifies the admin and turns AI off. |
+| **8.4** | **Quick add in plain language** for expenses, reminders and to-dos, with a confirm step. | Ten example sentences parse correctly in tests (with recorded responses). |
+| **8.5** | **Category suggestions** for unrecognised merchants, shown as a suggestion, never applied silently. | The suggestion appears on new uncategorised expenses. |
+| **8.6** | **Assistant chat** on the MCP tools: read-only first, then writes behind a confirm. Each conversation has a cost limit. | It answers spending questions and stays within its cost limit. |
+| **8.7** | **Monthly summary**: the numbers computed in code, the text written by the model. | Generated once a month per opted-in user, within budget. |
+| **8.8** | (Optional) **Receipt photo to expense**. | A photo of a receipt pre-fills an expense. |
 
 ## Phase 9: Native apps (Expo), first vertical slice
 
@@ -234,7 +262,7 @@ The idea is to ship one small, useful native feature end to end before adding an
 | **9.2** | **Typed API client in `packages/core`**: `createApiClient({ baseUrl, getToken })`, used by web (cookies, no token) and mobile (bearer). Move the web SWR fetchers onto it. | The web app still passes. The client has unit tests. |
 | **9.3** | **`apps/mobile` Expo skeleton**: Expo Router, TypeScript, EAS config, environment-specific API URL, light and dark themes matching the web tokens. Runs in the iOS Simulator and Android emulator. | The app opens to a placeholder screen. CI type-checks it. |
 | **9.4** | **Mobile sign-in**: email/password plus Google through Supabase (PKCE + deep link `appname://auth/callback`). The session is stored in `expo-secure-store`, and the access token is sent as a bearer to the API from step 1.2. | Sign in, sign out and token refresh all work on both platforms. |
-| **9.5** | **Mobile to-do board**: one column at a time, long-press to drag within a column, and the "Move to…" menu between columns, on the shared API client, with pull to refresh and optimistic moves. | You can move a card on the phone and see it on the web. |
+| **9.5** | **Mobile to-do board**: one column at a time, long-press to drag within a column, and the "Move to…" menu between columns, on the shared API client, with pull to refresh, optimistic moves and swipe to delete (`react-native-gesture-handler`, see 17.6). | You can move a card on the phone and see it on the web. |
 | **9.6** | **Push notifications**: `expo-notifications`, registered as an `expo` channel in the phase 5 notification layer, sent through the Expo Push API. Reminders, to-do assignments and event notifications all reach the phone with no new triggers. | A reminder notification arrives on a physical device (development build). |
 | **9.7** | **Mobile reminders**: the reminders list, create, mark done and snooze. | Parity with the web reminders page. |
 | **9.8** | **Mobile calendar**: agenda plus a month view. | Parity with the web for viewing and creating events. |
@@ -263,15 +291,96 @@ After 9.9, every later feature step gets a "web + mobile" pair (for example 10.2
 
 ## Phase 12: Polish that cuts across modules
 
-- **12.1** A home dashboard per role: today's to-dos, upcoming reminders, today's events, car reminders, device alerts. Parents see family finance widgets; kids see only the modules their permissions allow.
+- **12.1** (Folded into 17.4.) A home dashboard per role: today's to-dos, upcoming reminders, today's events, car reminders, device alerts. Parents see family finance widgets; kids see only the modules their permissions allow.
 - **12.2** MCP tools for cars and devices.
 - **12.3** Offline-first reads on mobile (cache with TanStack Query persistence) and an audit log page for parents.
 
 ## Phase 13: Later or optional
 
 - **13.1** Grandparents and other relatives: a third member type with kid-style module permissions, private finance, and the right to leave on their own.
-- **13.2** Account deletion for every user. Kids can't leave their family, so this is also how a grown-up kid gets out. The EU requires it before the app has outside users.
+- **13.2** Account deletion moved to 14.9.
 - **13.3** Optional grace period for family deletion (soft-delete for 7 days before the purge), if an accidental delete ever happens.
+
+## Phase 14: Production hardening and security
+
+The app is used every day and holds family finance data, so before more features it gets the review a real production app needs. **Starting point (26 October 2026):**
+- RLS on every table, Zod on every route, and Supabase calls through supabase-js and RPCs with parameters, with no raw SQL.
+- An in-memory rate limiter on sign-in, joining a family, password changes and MCP tokens.
+- Security headers without a Content-Security-Policy or HSTS.
+- 302 commits of history that have never been scanned for secrets.
+
+| Step | What | Done when |
+| --- | --- | --- |
+| **14.1** | **Secrets**: scan the full Git history and the working tree with gitleaks, and add the scan to CI. Check that no `NEXT_PUBLIC_*` variable holds a secret, and search the built client bundle (`.next/static`) and the GHCR image for secret patterns (`sb_secret_`, the VAPID private key, tokens). Check committed screenshots and fixtures for real emails or data. Rotate anything that ever leaked. | The CI scan is green on the full history. A short report lists what was checked and what was rotated. |
+| **14.2** | **Dependencies and supply chain**: `npm audit --omit=dev` in CI, failing on high and critical. Dependabot for npm, GitHub Actions and the Docker base image. Actions pinned by commit SHA. A Trivy scan of the image in the image workflow. | CI fails on a known vulnerable dependency. No open high or critical findings. |
+| **14.3** | **HTTP security headers**: a Content-Security-Policy with a nonce set in `proxy.ts` (no `unsafe-inline` for scripts; `connect-src 'self'`, because the browser only talks to `/api`). HSTS once the HTTPS origin is final. `frame-ancestors 'none'` and `Cross-Origin-Opener-Policy`. Report-only first, then enforced. | No CSP violations in the logs (phase 15) for a week of report-only mode, then enforced. |
+| **14.4** | **Cookies, sessions and CSRF**: the browser never talks to Supabase, so the auth cookies can be `HttpOnly`, `Secure` and `SameSite=Lax`. Check what `@supabase/ssr` sets and change it. Every mutating `/api` route checks `Origin` (or `Sec-Fetch-Site`) against the app's origin. Session lifetime, refresh and sign-out-everywhere are reviewed. | Route tests show a cross-site POST is refused. The cookie flags can be seen in the browser. |
+| **14.5** | **Injection and input**: audit every PostgREST filter built from strings. For example, `expenses.ts` builds `.or()` from expense-tab category and subtype keys, so make sure only whitelisted keys can reach it. Also audit RPC parameters, `ilike` patterns, request body size limits and upload handling. Add a lint rule against template strings in `.or()`/`.filter()`. | Every filter takes either whitelisted keys or values passed as parameters, with tests. |
+| **14.6** | **Data exposure**: responses carry only the fields the client needs, and no other user's email unless it's needed. Errors never include database messages. Logs redact tokens, cookies and emails. Run the Supabase security and performance advisors and fix their findings. Review every `security definer` function's `search_path` and grants. | The advisors are clean. Snapshot tests of response shapes for the family and account routes. |
+| **14.7** | **Abuse limits**: extend rate limiting to every mutating route (per user) and to anonymous routes (per IP), with `429` and `Retry-After`. | A burst test gets `429` and the app stays responsive. |
+| **14.8** | **Operations**: validate env at startup and fail fast with a clear message. Confirm Supabase backups, and do a test restore into a branch. The containers run read-only with `no-new-privileges`. An uptime and worker-heartbeat alert through Obsy. A written incident checklist (rotate keys, restore, roll back an image tag). | A restore has been rehearsed once. The checklist is in `docs/`. |
+| **14.9** | **Privacy**: account deletion (moved here from 13.2), a data export for your own data, and a short privacy note. | A user can delete their account and download their data. |
+
+## Phase 15: Logging, tracing and a log viewer on the VPS
+
+Logs that let you find out what happened over the last few days, at almost no memory or CPU cost. **No Elasticsearch, Loki or Grafana stack.**
+
+**Design:**
+- **Every process logs one JSON line per event to stdout.** The worker already does this. The web app gets the same small logger: no dependency, or `pino` if measuring shows it's worth it.
+- **"Tracing" means a request id plus timed spans inside the request's log line**, not a tracing backend. Each request gets an id (`x-request-id`, which is also returned to the client and shown in error toasts). Its log line carries `spans: [{ name: "reminders.list", ms: 12 }, …]` for Supabase calls, web-push sends and AI calls. Next's `instrumentation.ts` with OpenTelemetry stays an option, if this ever isn't enough.
+- **Retention is time-based, through journald.** The containers use Docker's `journald` log driver. A journald drop-in on the VPS (`MaxRetentionSec=5day`, `SystemMaxUse=300M`) deletes anything older automatically and keeps the total size capped. `docker logs` and `journalctl CONTAINER_NAME=…` both keep working.
+- **Viewing on the VPS:** a **Logs** page in Obsy, which already reads Docker through its socket. It offers a container picker, level, a time range (last hour, today, 3 days), text or request-id search, and live tail. The same queries also work with `journalctl … -o cat | jq` over SSH.
+
+| Step | What | Done when |
+| --- | --- | --- |
+| **15.1** | **Shared logger**: `src/lib/log.ts` used by the web app and the worker. It writes levels, a timestamp, the request id, route, status, duration and user id (never emails, tokens or bodies), with redaction for known secret fields. `withUser` logs one line per request. | One line per request in `docker logs`, with redaction tests. |
+| **15.2** | **Spans**: a `span(name, fn)` helper that times repository, RPC, push and AI calls into the current request's log line (AsyncLocalStorage). A `slow` warning for requests over 1 s. | The log line of a slow page shows which call was slow. |
+| **15.3** | **Client errors and Web Vitals**: error boundaries, `unhandledrejection` and the Web Vitals (LCP, INP, CLS, TTFB) go to a small, rate-limited, sampled `POST /api/client-log`. CSP reports from 14.3 land in the same place. | A forced client error shows up in the logs with the user's request id. |
+| **15.4** | **Retention**: `scripts/deploy.sh` runs the containers with `--log-driver journald` and a tag. The vps-apps README documents the journald drop-in (George applies it on the VPS). | `journalctl` shows nothing older than the retention window. Disk use stays under the cap. |
+| **15.5** | **Obsy Logs page** (vps-apps): filters, search by request id, live tail, and links from a container's card. It's read-only and only reachable the same way Obsy already is. | A request id from an error toast can be found in Obsy within a few seconds. |
+| **15.6** | (Optional) **Simple metrics from the logs**: requests per minute, p50/p95 per route, error rate and the worker heartbeat's age on Obsy's dashboard. | The numbers match a manual check. |
+
+## Phase 16: Performance, loading and smooth interaction
+
+The goal: pages appear fast, nothing spins forever, errors show up as errors with a retry, and taps respond at once. **Starting point (26 October 2026):**
+- The API client already times out after 15 s.
+- There's one `error.tsx` (for `(app)`), no `loading.tsx`, and no global `SWRConfig`.
+- Pages fetch everything in the browser after load.
+
+| Step | What | Done when |
+| --- | --- | --- |
+| **16.1** | **Measure first**: Web Vitals from real use (15.3), server timings (15.2), the bundle analyzer per route, and the container's memory in Obsy. A baseline table in `docs/`. | The baseline is written down and the budgets below are agreed. |
+| **16.2** | **No endless loading**: a global `SWRConfig` with limited error retries, `loadingTimeout` and `onLoadingSlow` ("This is taking longer than usual", with a retry). A `loading.tsx` with skeletons and an `error.tsx` with retry for every section. Every data state ends in content, empty or error. Auth expiry during a request leads to sign-in, not a spinner. | With the API stopped, every screen shows an error with a retry within 15 s. No screen ever shows a spinner with no end. |
+| **16.3** | **Faster first paint**: load each page's first data on the server and stream it with `Suspense`, instead of fetching after the page has loaded. Prefetch navigation links. Remove request waterfalls (parallel requests, combined endpoints where it helps). Cache stable data (account, family, categories) longer. | LCP under 2.5 s on a mid-range phone for Home, Expenses, To-dos and Reminders. |
+| **16.4** | **Smaller bundles**: dynamically import the heavy parts (charts, dnd-kit, dialogs, the AI chat later). Drop unused dependencies. `next/font` and `next/image` for avatars. Check `optimizePackageImports`. | JS per route is under the agreed budget, as the analyzer shows. |
+| **16.5** | **Database**: indexes for the slow queries the spans show, the Supabase performance advisor, and fewer round trips per page. | No route's p95 is over 300 ms on the server. |
+| **16.6** | **Smooth interaction**: optimistic updates everywhere a write is likely to succeed, no layout shift when data arrives (skeletons sized like the content), transitions that respect `prefers-reduced-motion`, and fewer re-renders on big lists. | INP under 200 ms. CLS under 0.1. |
+| **16.7** | **Lean runtime on the VPS**: a Node heap cap for the web and worker containers, `experimental.preloadEntriesOnStart: false` if memory matters more than the first request after a deploy, and the containers' memory tracked in Obsy. | Steady-state memory is measured and within the VPS budget. |
+
+## Phase 17: A simpler UI, mobile first
+
+The app has grown screen by screen and now shows too much at once, especially on phones. This phase rethinks it before more modules land.
+
+| Step | What | Done when |
+| --- | --- | --- |
+| **17.1** | **Audit**: for each screen, list what it shows, the two or three things people actually do there, and what can be hidden, merged or moved. Includes the navigation (sidebar sections, the phone's bottom bar and More sheet) and the many Settings tabs. | A one-page audit per screen, reviewed with George. |
+| **17.2** | **Direction and mockups**: a short design direction (density, hierarchy, one primary action per screen, progressive disclosure), plus 390 px mockups of the main screens in `/dev/preview` before anything is built. | George signs off the mockups. |
+| **17.3** | **Navigation**: a bottom bar for the daily screens (for example Home, Expenses, Planning, More), fewer Settings tabs, and the same structure in the sidebar. | Screenshots at 390 and 1280 px. |
+| **17.4** | **Home as "today"**: what's due, recent spending and quick add, instead of every widget. Absorbs roadmap 12.1. | Screenshots, and Home fits one phone screen without scrolling for a typical day. |
+| **17.5** | **Screen by screen**: Expenses, Investments, Net worth, To-dos, Reminders and Settings, one PR each, following the mockups. | Screenshots, with George's sign-off per screen. |
+| **17.6** | **Swipe actions on phones**: swipe a to-do card left to **delete** (with an undo toast), and later a reminder row for Done or Snooze. **Phone web: yes.** Pointer events tell a horizontal swipe from vertical scrolling and from the board's long-press drag (dnd-kit): moving 10 px sideways before the 200 ms long-press starts a swipe. **Desktop: no swipe.** Trackpad side-scrolling clashes with it, so cards get a delete icon on hover plus the `Delete` key on a focused card. **Native (9.5):** `react-native-gesture-handler`'s `Swipeable`, which is the natural place for it. | On a phone, swiping deletes with undo, and scrolling and long-press drag still work. On desktop, hover and keyboard delete work. |
+| **17.7** | **Accessibility pass**: contrast, focus order, screen-reader labels and 44 px touch targets on the new screens. | No axe violations on the main screens. |
+
+## Phase 18: Code clean-up and fewer, better tests (optional)
+
+Low priority. **Starting point (26 October 2026):** about 26,000 lines of tests in 162 files for about 34,500 lines of code. Many features are tested at the repository, service and route levels with overlapping cases.
+
+| Step | What | Done when |
+| --- | --- | --- |
+| **18.1** | **Inventory**: a coverage report, the slowest tests, and duplicate cases across the layers. Find dead code with `knip`. | A list of what to merge, delete or keep. |
+| **18.2** | **Test strategy**: behaviour is tested once, at the service level (use cases, with fakes). Each route has one test file for auth, validation and response shape. Repositories are tested for mapping and errors only. SQL RLS tests all stay, because they're security-critical. Table-driven tests replace near-copies. Written into `docs/`. | George agrees the strategy. |
+| **18.3** | **Reduce, module by module**, without lowering behaviour coverage on `src/lib/**`. | Test lines down by roughly 40%, coverage the same, CI faster. |
+| **18.4** | **Refactor** (move-only PRs): shared fakes and fixtures, large files split, patterns made consistent (service and repository), dead code removed. | No behaviour change. Lint, types and tests green. |
 
 ## How every step is reviewed
 
@@ -293,7 +402,10 @@ Each PR should include:
 | **One to-do board or several** | Decided: one board per family, filtered by member; no private cards. See [todo-board-plan.md](todo-board-plan.md) | Simpler for a family, and member chips cover "show me Ana's to-dos". |
 | **Banks and formats for statement import** | Open, needed before 7.2: which banks, and whether each gives CSV, PDF or both | Every bank needs its own parser and fixtures. |
 | **How MCP clients sign in** | Decided: OAuth through Supabase Auth's OAuth 2.1 server, behind our own interfaces so leaving Supabase stays cheap, plus personal access tokens (1, 3 or 6 months, or never with a warning) for headless machines. Kids: OAuth only, with a parent's permission and a confirmed real email. See [mcp-access-plan.md](mcp-access-plan.md) | Using the secret key to read data would bypass RLS for every MCP call; a home-made OAuth server would still need Supabase to act as the user. |
-| **AI provider, cost and privacy** | Open, discuss when phase 8 starts | Sending financial data to a third party needs opt-in and masking. |
+| **AI provider, cost and privacy** | Claude API (a small model for parsing and categories, a larger one for the assistant), opt-in per user, kids with a parent's permission. You choose the global monthly budget and the per-user caps before 8.1. | The budget is what the kill switch enforces. |
+| **Log retention** | 5 days through journald, capped at 300 MB. Your call on the number of days. | Longer means more disk; the cap keeps it bounded either way. |
+| **Who is an admin** | Your own account, by user id in env (`APP_ADMIN_USER_IDS`) | The AI usage page and the kill switch need an owner who isn't tied to a family role. |
+| **UI direction** | Sign off the 17.2 mockups before any screen is rebuilt | Rebuilding screens without an agreed direction would mean doing it twice. |
 | **Mac calendar** | Decided: an ICS feed out (6.4) and two-way Google sync; no CalDAV | A Mac calendar synced with Google gets the app's events through Google. |
 | **Reminder rules** | Decided: reminders are strictly personal; to ask someone else, assign them a to-do (phase 5) | |
 | **Google OAuth consent screen** | Publish the OAuth app "In production" (unverified is fine for family use, under 100 users) | In "Testing" status, Google refresh tokens for sensitive scopes like Calendar **expire after 7 days**, so the sync would keep breaking. |
