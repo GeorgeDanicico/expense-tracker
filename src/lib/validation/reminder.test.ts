@@ -1,0 +1,98 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { reminderSchema, snoozeSchema } from "@/lib/validation/reminder";
+
+describe("reminderSchema", () => {
+  it("trims text and fills defaults", () => {
+    expect(reminderSchema.parse({ title: "  Pay rent ", notes: " flat 3 \n", startsOn: "2026-11-30" })).toEqual({
+      title: "Pay rent",
+      notes: "flat 3",
+      startsOn: "2026-11-30",
+      timeOfDay: "09:00",
+      repeatUnit: "none",
+      repeatInterval: 1,
+      leadMinutes: [0],
+      notificationsMuted: false,
+    });
+  });
+
+  it("accepts a full repeating reminder and sorts its lead times", () => {
+    expect(reminderSchema.parse({
+      title: "Pay rent",
+      startsOn: "2026-01-31",
+      timeOfDay: "18:30",
+      repeatUnit: "month",
+      repeatInterval: 12,
+      leadMinutes: [4320, 0, 1440],
+      notificationsMuted: true,
+    })).toMatchObject({ repeatUnit: "month", repeatInterval: 12, leadMinutes: [0, 1440, 4320], notificationsMuted: true });
+  });
+
+  it("sets a one-off's interval to 1", () => {
+    expect(reminderSchema.parse({ title: "Once", startsOn: "2026-11-30", repeatInterval: 5 }).repeatInterval).toBe(1);
+  });
+
+  it("accepts the limits", () => {
+    expect(reminderSchema.safeParse({
+      title: "x".repeat(200), notes: "y".repeat(2000), startsOn: "2028-02-29", timeOfDay: "23:59", leadMinutes: [],
+    }).success).toBe(true);
+    expect(reminderSchema.safeParse({ title: "Ok", startsOn: "2026-11-30", leadMinutes: [60, 10080, 0] }).success)
+      .toBe(true);
+  });
+
+  it.each([
+    {},
+    { startsOn: "2026-11-30" },
+    { title: "   ", startsOn: "2026-11-30" },
+    { title: "x".repeat(201), startsOn: "2026-11-30" },
+    { title: "Ok", notes: "y".repeat(2001), startsOn: "2026-11-30" },
+    { title: "Ok" },
+    { title: "Ok", startsOn: "2026-02-30" },
+    { title: "Ok", startsOn: "30/11/2026" },
+    { title: "Ok", startsOn: "2026-11-30", timeOfDay: "24:00" },
+    { title: "Ok", startsOn: "2026-11-30", timeOfDay: "9:00" },
+    { title: "Ok", startsOn: "2026-11-30", timeOfDay: "09:00:00" },
+    { title: "Ok", startsOn: "2026-11-30", repeatUnit: "day" },
+    { title: "Ok", startsOn: "2026-11-30", repeatUnit: "month", repeatInterval: 0 },
+    { title: "Ok", startsOn: "2026-11-30", repeatUnit: "month", repeatInterval: 13 },
+    { title: "Ok", startsOn: "2026-11-30", repeatUnit: "week", repeatInterval: 1.5 },
+    { title: "Ok", startsOn: "2026-11-30", leadMinutes: [0, 60, 1440, 4320] },
+    { title: "Ok", startsOn: "2026-11-30", leadMinutes: [0, 0] },
+    { title: "Ok", startsOn: "2026-11-30", leadMinutes: [30] },
+    { title: "Ok", startsOn: "2026-11-30", notificationsMuted: "yes" },
+  ])("rejects %j", (input) => {
+    expect(reminderSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe("snoozeSchema", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-30T08:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("accepts an hour and tomorrow", () => {
+    expect(snoozeSchema.parse({ kind: "hour" })).toEqual({ kind: "hour" });
+    expect(snoozeSchema.parse({ kind: "tomorrow" })).toEqual({ kind: "tomorrow" });
+  });
+
+  it("accepts a future instant and normalizes it to UTC", () => {
+    expect(snoozeSchema.parse({ kind: "until", until: "2026-11-30T12:00:00+02:00" }))
+      .toEqual({ kind: "until", until: "2026-11-30T10:00:00.000Z" });
+  });
+
+  it.each([
+    {},
+    { kind: "week" },
+    { kind: "until" },
+    { kind: "until", until: "tomorrow" },
+    { kind: "until", until: "2026-11-30T08:00:00Z" },
+    { kind: "until", until: "2026-11-29T12:00:00Z" },
+  ])("rejects %j", (input) => {
+    expect(snoozeSchema.safeParse(input).success).toBe(false);
+  });
+});
