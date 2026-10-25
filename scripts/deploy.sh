@@ -24,6 +24,11 @@ WORKER_CONTAINER_NAME="${WORKER_CONTAINER_NAME:-${CONTAINER_NAME}-worker}"
 PREVIOUS_WORKER_CONTAINER="${WORKER_CONTAINER_NAME}-previous"
 WORKER_STARTUP_SECONDS="${WORKER_STARTUP_SECONDS:-5}"
 GIT_SHA="${GIT_SHA:-${GITHUB_SHA:-}}"
+# build: build the image here from the Dockerfile. pull: pull ${IMAGE_NAME}:${IMAGE_TAG}, which the
+# "Build image" workflow pushes to GHCR, so the host never runs the memory-hungry build.
+IMAGE_SOURCE="${IMAGE_SOURCE:-build}"
+PULL_ATTEMPTS="${PULL_ATTEMPTS:-40}"
+PULL_INTERVAL_SECONDS="${PULL_INTERVAL_SECONDS:-15}"
 
 previous_container_renamed=false
 deployment_started=false
@@ -73,6 +78,23 @@ rollback() {
   fi
 
   exit "$exit_code"
+}
+
+# Pulls the image, retrying while the "Build image" workflow may still be pushing it.
+pull_image() {
+  local attempt
+
+  for (( attempt = 1; attempt <= PULL_ATTEMPTS; attempt++ )); do
+    if docker pull "${IMAGE_NAME}:${IMAGE_TAG}"; then
+      docker tag "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}:latest"
+      return 0
+    fi
+
+    echo "Image ${IMAGE_NAME}:${IMAGE_TAG} is not available yet (attempt ${attempt}/${PULL_ATTEMPTS})." >&2
+    sleep "$PULL_INTERVAL_SECONDS"
+  done
+
+  return 1
 }
 
 wait_for_app() {
@@ -166,7 +188,10 @@ deploy_worker() {
 }
 
 command -v docker >/dev/null 2>&1 || die "Docker is not installed or is not on PATH"
-[[ -f "$DOCKERFILE_PATH" ]] || die "Dockerfile not found: $DOCKERFILE_PATH"
+[[ "$IMAGE_SOURCE" == build || "$IMAGE_SOURCE" == pull ]] || die "IMAGE_SOURCE must be build or pull"
+if [[ "$IMAGE_SOURCE" == build ]]; then
+  [[ -f "$DOCKERFILE_PATH" ]] || die "Dockerfile not found: $DOCKERFILE_PATH"
+fi
 [[ -f "$ENV_FILE" ]] || die "Environment file not found: $ENV_FILE"
 docker info >/dev/null 2>&1 || die "Docker daemon is unavailable"
 
@@ -176,18 +201,25 @@ require_positive_integer STOP_TIMEOUT_SECONDS "$STOP_TIMEOUT_SECONDS"
 require_positive_integer HEALTHCHECK_ATTEMPTS "$HEALTHCHECK_ATTEMPTS"
 require_positive_integer HEALTHCHECK_INTERVAL_SECONDS "$HEALTHCHECK_INTERVAL_SECONDS"
 require_positive_integer WORKER_STARTUP_SECONDS "$WORKER_STARTUP_SECONDS"
+require_positive_integer PULL_ATTEMPTS "$PULL_ATTEMPTS"
+require_positive_integer PULL_INTERVAL_SECONDS "$PULL_INTERVAL_SECONDS"
 
 [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || die "IMAGE_TAG contains unsupported characters"
 [[ "$GIT_SHA" =~ ^[A-Za-z0-9]{0,64}$ ]] || die "GIT_SHA must be a commit hash"
 
-echo "Building ${IMAGE_NAME}:${IMAGE_TAG} from ${DOCKERFILE_PATH}."
-docker build \
-  --pull \
-  --file "$DOCKERFILE_PATH" \
-  --build-arg "GIT_SHA=${GIT_SHA}" \
-  --tag "${IMAGE_NAME}:${IMAGE_TAG}" \
-  --tag "${IMAGE_NAME}:latest" \
-  "$PROJECT_DIR"
+if [[ "$IMAGE_SOURCE" == pull ]]; then
+  echo "Pulling ${IMAGE_NAME}:${IMAGE_TAG}."
+  pull_image || die "Image ${IMAGE_NAME}:${IMAGE_TAG} could not be pulled; check the Build image workflow and the registry login"
+else
+  echo "Building ${IMAGE_NAME}:${IMAGE_TAG} from ${DOCKERFILE_PATH}."
+  docker build \
+    --pull \
+    --file "$DOCKERFILE_PATH" \
+    --build-arg "GIT_SHA=${GIT_SHA}" \
+    --tag "${IMAGE_NAME}:${IMAGE_TAG}" \
+    --tag "${IMAGE_NAME}:latest" \
+    "$PROJECT_DIR"
+fi
 
 if container_exists "$PREVIOUS_CONTAINER"; then
   echo "Removing stale rollback container ${PREVIOUS_CONTAINER}."
