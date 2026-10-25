@@ -223,4 +223,105 @@ describe("Supabase worker store", () => {
       expect(tables.notifications.map((row) => row.id)).toEqual(["old-failed", "old-pending", "new-sent"]);
     });
   });
+  describe("claimDueReminders", () => {
+    const row = {
+      id: "r1", user_id: "u1", title: "Pay rent", notes: "", starts_on: "2026-10-31", time_of_day: "09:00:00",
+      timezone: "Europe/Bucharest", repeat_unit: "month", repeat_interval: 1, lead_minutes: [4320, 0],
+      notifications_muted: false, next_due_on: "2026-10-31", next_due_at: "2026-10-31T07:00:00+00:00",
+      snoozed_until: "2026-10-30T08:00:00+00:00", next_notify_at: "2026-10-28T07:00:00+00:00",
+      notify_locked_until: "2026-10-28T07:02:00.123456+00:00", expense_template: null,
+      created_at: "2026-10-01T10:00:00+00:00", updated_at: "2026-10-28T07:00:00.123456+00:00",
+    };
+
+    it("calls claim_due_reminders with the batch size and keeps updated_at and the lease as written", async () => {
+      const { rpcs } = useDatabase({}, { rpc: () => ({ data: [row], error: null }) });
+
+      expect(await createSupabaseWorkerStore().claimDueReminders(50)).toEqual([{
+        id: "r1", userId: "u1", title: "Pay rent", startsOn: "2026-10-31", timeOfDay: "09:00", timezone: "Europe/Bucharest",
+        repeatUnit: "month", repeatInterval: 1, leadMinutes: [4320, 0], notificationsMuted: false, nextDueOn: "2026-10-31",
+        snoozedUntil: "2026-10-30T08:00:00.000Z", nextNotifyAt: new Date("2026-10-28T07:00:00Z"),
+        updatedAt: "2026-10-28T07:00:00.123456+00:00", lockedUntil: "2026-10-28T07:02:00.123456+00:00",
+      }]);
+      expect(rpcs).toEqual([{ fn: "claim_due_reminders", args: { p_batch: 50 } }]);
+    });
+
+    it("throws with the database's message", async () => {
+      useDatabase({}, { rpc: () => ({ data: null, error: { message: "permission denied" } }) });
+      await expect(createSupabaseWorkerStore().claimDueReminders(50)).rejects.toThrow("Unable to claim due reminders: permission denied");
+    });
+  });
+
+  describe("enqueueNotification", () => {
+    const notification = {
+      userId: "u1",
+      kind: "reminder" as const,
+      payload: { title: "Pay rent", body: "Due now", url: "/reminders?focus=r1", tag: "reminder:r1" },
+      dedupeKey: "reminder:r1:2026-10-31T07:00:00.000Z",
+    };
+
+    it("inserts a pending row with its dedupe key", async () => {
+      const { queries } = useDatabase();
+
+      expect(await createSupabaseWorkerStore().enqueueNotification(notification)).toBe("queued");
+      expect(queries).toEqual([expect.objectContaining({
+        table: "notifications",
+        operation: "insert",
+        values: { user_id: "u1", kind: "reminder", payload: notification.payload, dedupe_key: notification.dedupeKey },
+      })]);
+    });
+
+    it("answers duplicate on a unique violation, and throws on any other error", async () => {
+      useDatabase({}, { fail: () => ({ code: "23505", message: "duplicate key value violates unique constraint" }) });
+      expect(await createSupabaseWorkerStore().enqueueNotification(notification)).toBe("duplicate");
+
+      useDatabase({}, { fail: () => ({ code: "42501", message: "permission denied" }) });
+      await expect(createSupabaseWorkerStore().enqueueNotification(notification)).rejects.toThrow("Unable to queue a notification: permission denied");
+    });
+  });
+
+  describe("advanceReminder", () => {
+    const claimed = {
+      id: "r1", userId: "u1", title: "Pay rent", startsOn: "2026-10-31", timeOfDay: "09:00", timezone: "Europe/Bucharest",
+      repeatUnit: "month" as const, repeatInterval: 1, leadMinutes: [0], notificationsMuted: false, nextDueOn: "2026-10-31",
+      snoozedUntil: null, nextNotifyAt: new Date("2026-10-31T07:00:00Z"),
+      updatedAt: "2026-10-31T07:00:00.5+00:00", lockedUntil: "2026-10-31T07:02:00.5+00:00",
+    };
+    const stored = {
+      id: "r1", notifications_muted: false, next_due_on: "2026-10-31", next_notify_at: "2026-10-31T07:00:00+00:00",
+      updated_at: claimed.updatedAt, notify_locked_until: claimed.lockedUntil,
+    };
+
+    it("stores the next notify time and releases the lease while the reminder is as claimed", async () => {
+      const next = new Date("2026-11-27T07:00:00Z");
+      const { queries, tables } = useDatabase({ reminders: [stored] });
+
+      expect(await createSupabaseWorkerStore().advanceReminder(claimed, next)).toBe("advanced");
+      expect(queries).toEqual([expect.objectContaining({
+        table: "reminders",
+        operation: "update",
+        values: { next_notify_at: "2026-11-27T07:00:00.000Z", notify_locked_until: null },
+        filters: [["eq", "id", "r1"], ["eq", "updated_at", claimed.updatedAt], ["eq", "notifications_muted", false], ["not.is", "next_due_on", null]],
+      })]);
+      expect(tables.reminders[0]).toMatchObject({ next_notify_at: "2026-11-27T07:00:00.000Z", notify_locked_until: null });
+    });
+
+    it.each([
+      ["edited", { updated_at: "2026-10-31T07:00:01+00:00", next_notify_at: "2026-10-31T06:00:00+00:00" }],
+      ["muted", { notifications_muted: true, next_notify_at: null }],
+      ["done", { next_due_on: null, next_notify_at: null }],
+    ])("leaves a reminder %s since the claim alone, apart from releasing the lease", async (_, change) => {
+      const { tables } = useDatabase({ reminders: [{ ...stored, ...change }] });
+
+      expect(await createSupabaseWorkerStore().advanceReminder(claimed, null)).toBe("changed");
+      expect(tables.reminders[0]).toEqual({ ...stored, ...change, notify_locked_until: null });
+    });
+
+    it("doesn't release a lease another worker has taken since", async () => {
+      const taken = { ...stored, updated_at: "2026-10-31T07:05:00+00:00", notify_locked_until: "2026-10-31T07:07:00+00:00" };
+      const { tables } = useDatabase({ reminders: [taken] });
+
+      expect(await createSupabaseWorkerStore().advanceReminder(claimed, null)).toBe("changed");
+      expect(tables.reminders[0]).toEqual(taken);
+    });
+  });
 });

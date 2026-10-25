@@ -1,4 +1,5 @@
 import type { PushPayload, PushResult, PushSender } from "@/lib/notifications/push";
+import { planReminderNotification } from "@/lib/reminders/notification";
 import type {
   ClaimedNotification,
   DeviceSubscription,
@@ -16,6 +17,9 @@ export const TICK_INTERVAL_MS = 30_000;
 
 /** The most outbox rows one tick claims. */
 export const NOTIFICATION_BATCH = 50;
+
+/** The most due reminders one tick claims. */
+export const REMINDER_BATCH = 50;
 
 /**
  * When a row whose push the push service throttled (429) or failed (5xx, no answer) is tried again,
@@ -75,9 +79,20 @@ export type DeliveryCounts = {
   devicesRemoved: number;
 };
 
+/** How the claimed reminders of one tick ended. */
+export type ReminderCounts = {
+  claimed: number;
+  /** Outbox rows inserted. */
+  queued: number;
+  /** Notify times an earlier run had already queued (same dedupe key). */
+  duplicates: number;
+  /** Reminders edited, marked done, snoozed or muted since the claim; left as they are. */
+  changed: number;
+};
+
 /** What a tick did, or null when it failed (the failure is logged). */
 export type TickResult =
-  | { pushConfigured: true; delivery: DeliveryCounts; cleaned: number | null }
+  | { pushConfigured: true; reminders: ReminderCounts; delivery: DeliveryCounts; cleaned: number | null }
   | { pushConfigured: false; due: DueCounts }
   | null;
 
@@ -212,6 +227,40 @@ async function deliverDue(deps: TickDependencies & { push: PushSender }): Promis
   return counts;
 }
 
+/**
+ * Claims due reminders and, for each, queues one `reminder` outbox row for the latest notify time
+ * it missed, then stores its next notify time. Claim, queue, advance: a crash after queueing
+ * leaves `next_notify_at` as it was, and the re-run after the lease queues the same dedupe key,
+ * which is a no-op, so a notification is never lost nor sent twice. The advance only applies to a
+ * reminder that hasn't changed since the claim. A failure on one reminder is logged and the rest
+ * go on; its lease runs out and it's claimed again.
+ */
+async function queueDueReminders({ store, clock, log }: TickDependencies): Promise<ReminderCounts> {
+  const counts: ReminderCounts = { claimed: 0, queued: 0, duplicates: 0, changed: 0 };
+  const reminders = await store.claimDueReminders(REMINDER_BATCH);
+  counts.claimed = reminders.length;
+
+  for (const reminder of reminders) {
+    try {
+      const plan = planReminderNotification(reminder, reminder.nextNotifyAt, clock.now());
+      if (plan.notification) {
+        const result = await store.enqueueNotification({
+          userId: reminder.userId,
+          kind: "reminder",
+          payload: plan.notification.payload,
+          dedupeKey: plan.notification.dedupeKey,
+        });
+        if (result === "queued") counts.queued++;
+        else counts.duplicates++;
+      }
+      if ((await store.advanceReminder(reminder, plan.nextNotifyAt)) === "changed") counts.changed++;
+    } catch (error) {
+      log.error("reminder_failed", { id: reminder.id, error: errorMessage(error) });
+    }
+  }
+  return counts;
+}
+
 /** Deletes old `sent` and `skipped` rows on the first tick and then once every 24 hours. */
 async function cleanUp({ store, clock, log, state }: TickDependencies): Promise<number | null> {
   const now = clock.now();
@@ -229,9 +278,11 @@ async function cleanUp({ store, clock, log, state }: TickDependencies): Promise<
 }
 
 /**
- * One pass of the worker: the heartbeat, the daily clean-up, then up to {@link NOTIFICATION_BATCH}
- * outbox rows sent to every device of their recipient. Without VAPID keys (`push` null) it only
- * logs `push_not_configured` with how many rows are waiting, and leaves them pending.
+ * One pass of the worker: the heartbeat, the daily clean-up, up to {@link REMINDER_BATCH} due
+ * reminders queued as outbox rows, then up to {@link NOTIFICATION_BATCH} outbox rows sent to every
+ * device of their recipient. Without VAPID keys (`push` null) it only logs `push_not_configured`
+ * with how many rows are waiting, and leaves them pending; reminders aren't claimed either, and
+ * once the keys are set each sends only its latest missed notify time.
  * It never throws: a failure is logged as one `tick_failed` line and the next tick tries again.
  */
 export async function tick(deps: TickDependencies): Promise<TickResult> {
@@ -251,9 +302,17 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
     }
 
     const cleaned = await cleanUp(deps);
+    const reminders = await queueDueReminders(deps);
     const delivery = await deliverDue({ ...deps, push });
-    log.info("tick", { ...delivery, ms: clock.now().getTime() - startedAt.getTime() });
-    return { pushConfigured: true, delivery, cleaned };
+    log.info("tick", {
+      ...delivery,
+      remindersClaimed: reminders.claimed,
+      remindersQueued: reminders.queued,
+      remindersDuplicate: reminders.duplicates,
+      remindersChanged: reminders.changed,
+      ms: clock.now().getTime() - startedAt.getTime(),
+    });
+    return { pushConfigured: true, reminders, delivery, cleaned };
   } catch (error) {
     log.error("tick_failed", { error: errorMessage(error), ms: clock.now().getTime() - startedAt.getTime() });
     return null;

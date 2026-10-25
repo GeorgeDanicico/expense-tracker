@@ -2,7 +2,7 @@
 
 import { Badge, Box, Button, Stack, Tabs, Text } from "@chakra-ui/react";
 import { BellRing, CircleCheck, PartyPopper, Plus, X } from "lucide-react";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ReminderDialog } from "@/components/reminders/reminder-dialog";
 import { DoneRow, ReminderRow, type SnoozeChoice } from "@/components/reminders/reminder-row";
@@ -15,7 +15,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { doneEntries, groupReminders, type ListedReminder, type ReminderTab } from "@/lib/reminders/list";
+import { doneEntries, groupReminders, tabOf, type ListedReminder, type ReminderTab } from "@/lib/reminders/list";
 import { DONE_WINDOW_DAYS_LABEL } from "@/lib/reminders/format";
 
 function List({ children }: { children: ReactNode }) {
@@ -38,15 +38,31 @@ function Empty({ icon, title, description, action }: { icon: ReactNode; title: s
   );
 }
 
+/** How long a reminder opened from a notification stays highlighted. */
+export const FOCUS_HIGHLIGHT_MS = 2500;
+
+/** Scrolls the reminder's first row into view, at once when the user prefers reduced motion. */
+function scrollToReminder(id: string) {
+  const row = [...document.querySelectorAll<HTMLElement>("[data-reminder-id]")].find((element) => element.dataset.reminderId === id);
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  row?.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+}
+
 /**
  * The reminders page: Upcoming (due today first and highlighted, then upcoming and snoozed ones),
  * Overdue (with its count) and Done (the occurrences marked done in the last 30 days), the add
  * and edit dialog, and Snooze until…. Only the caller's own reminders; nobody else sees them.
+ *
+ * `focusId` (from `/reminders?focus=<id>`, where a notification leads) opens the tab that lists
+ * that reminder once the list has loaded, scrolls to it and highlights it for a moment.
  */
-export function RemindersScreen() {
+export function RemindersScreen({ focusId = null }: { focusId?: string | null }) {
   const now = useNow();
   const reminders = useReminders(now);
   const [tab, setTab] = useState<ReminderTab>("upcoming");
+  // The focus id already acted on, so a refetch or a tab change by hand doesn't jump back.
+  const [handledFocus, setHandledFocus] = useState<string | null>(null);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [snoozingId, setSnoozingId] = useState<string | null>(null);
@@ -57,6 +73,24 @@ export function RemindersScreen() {
     () => doneEntries(reminders.completions ?? [], reminders.reminders ?? []),
     [reminders.completions, reminders.reminders],
   );
+
+  if (focusId && focusId !== handledFocus && reminders.reminders) {
+    // Adjusting state while rendering, once per focus id, so the right tab renders straight away.
+    setHandledFocus(focusId);
+    const focusTab = tabOf(focusId, groups, done);
+    if (focusTab) {
+      setTab(focusTab);
+      setHighlighted(focusId);
+    }
+  }
+
+  useEffect(() => {
+    if (!highlighted) return;
+    scrollToReminder(highlighted);
+    const timer = setTimeout(() => setHighlighted(null), FOCUS_HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlighted]);
+
   const find = (id: string | null) => (id ? reminders.reminders?.find((reminder) => reminder.id === id) : undefined);
   const editing = find(editingId);
   const snoozing = find(snoozingId);
@@ -137,7 +171,7 @@ export function RemindersScreen() {
           {groups.upcoming.length > 0 ? (
             <List>
               {groups.upcoming.map((reminder) => (
-                <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} {...rowProps} />
+                <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} focused={reminder.id === highlighted} {...rowProps} />
               ))}
             </List>
           ) : (
@@ -155,7 +189,7 @@ export function RemindersScreen() {
           {overdueCount > 0 ? (
             <List>
               {groups.overdue.map((reminder) => (
-                <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} {...rowProps} />
+                <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} focused={reminder.id === highlighted} {...rowProps} />
               ))}
             </List>
           ) : (
@@ -170,8 +204,15 @@ export function RemindersScreen() {
           {done.length > 0 ? (
             <Stack gap="2">
               <List>
-                {done.map((entry) => (
-                  <DoneRow key={entry.completion.id} entry={entry} now={now} onEdit={edit} />
+                {done.map((entry, index) => (
+                  <DoneRow
+                    key={entry.completion.id}
+                    entry={entry}
+                    now={now}
+                    // Only its latest completion, the first listed, is highlighted.
+                    focused={entry.reminder.id === highlighted && done.findIndex((other) => other.reminder.id === highlighted) === index}
+                    onEdit={edit}
+                  />
                 ))}
               </List>
               <Text textStyle="caption" textAlign="center">{DONE_WINDOW_DAYS_LABEL}</Text>
