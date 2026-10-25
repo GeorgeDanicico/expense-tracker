@@ -158,6 +158,20 @@ docker run -d --name expense-tracker \
   expense-tracker:latest
 ```
 
+The same image also holds the notifications worker (`worker.js`, bundled by
+`npm run build:worker`). It needs `SUPABASE_URL` and `SUPABASE_SECRET_KEY`, has no port, and
+writes a heartbeat to `worker_heartbeats` every 30 seconds. Run it next to the web container:
+
+```bash
+docker run -d --name expense-tracker-worker \
+  --restart unless-stopped \
+  --env-file /etc/expense-tracker/.env.production \
+  --log-opt max-size=10m --log-opt max-file=3 \
+  expense-tracker:latest node worker.js
+```
+
+`docker stop` lets the current tick finish before the worker exits.
+
 Point a host-based HTTPS reverse proxy at `127.0.0.1:3000`. Preserve Next.js cache
 headers, avoid shared caching of authenticated pages and API responses, and disable
 response buffering for streaming. Update the Supabase Auth redirect URLs to your
@@ -169,7 +183,9 @@ production origin as described above. Expense data stays in hosted Supabase.
 manually. It checks out the latest commit on a self-hosted runner, calls
 `scripts/deploy.sh`, builds the Dockerfile, starts the new image, and verifies that
 the app responds before removing the previous container. If startup fails, the
-script attempts to restore the previous container.
+script attempts to restore the previous container. Once the web container is healthy, it starts
+or replaces the `expense-tracker-worker` container from the same image; if the new worker
+doesn't stay up, it restores the previous worker and warns, without rolling the web app back.
 
 Register a Linux self-hosted runner with Docker access, create the production
 environment file at `/etc/expense-tracker/.env.production`, and ensure the runner

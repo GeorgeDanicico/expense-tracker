@@ -15,6 +15,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
+RUN npm run build:worker
 
 FROM base AS runner
 ENV NODE_ENV=production \
@@ -24,7 +25,14 @@ ENV NODE_ENV=production \
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
+# The notifications worker: a second container from this image runs `node worker.js`.
+COPY --from=builder --chown=node:node /app/dist/worker.js ./worker.js
 RUN mkdir -p .next/cache && chown node:node .next/cache
+
+# The build the worker writes with its heartbeat; empty means the package version. Last, so a new
+# SHA doesn't rebuild the layers above.
+ARG GIT_SHA=""
+ENV GIT_SHA=${GIT_SHA}
 
 USER node
 EXPOSE 3000

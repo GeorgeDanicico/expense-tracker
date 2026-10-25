@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
+    "build:worker": "esbuild src/worker/main.ts --bundle --platform=node --target=node24 --conditions=react-server --outfile=dist/worker.js",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -39,6 +40,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "typescript": "^5",

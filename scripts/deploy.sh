@@ -19,6 +19,11 @@ HEALTHCHECK_INTERVAL_SECONDS="${HEALTHCHECK_INTERVAL_SECONDS:-2}"
 LOG_MAX_SIZE="${LOG_MAX_SIZE:-10m}"
 LOG_MAX_FILES="${LOG_MAX_FILES:-3}"
 PREVIOUS_CONTAINER="${CONTAINER_NAME}-previous"
+# The notifications worker: a second container from the same image running `node worker.js`.
+WORKER_CONTAINER_NAME="${WORKER_CONTAINER_NAME:-${CONTAINER_NAME}-worker}"
+PREVIOUS_WORKER_CONTAINER="${WORKER_CONTAINER_NAME}-previous"
+WORKER_STARTUP_SECONDS="${WORKER_STARTUP_SECONDS:-5}"
+GIT_SHA="${GIT_SHA:-${GITHUB_SHA:-}}"
 
 previous_container_renamed=false
 deployment_started=false
@@ -92,6 +97,74 @@ wait_for_app() {
   return 1
 }
 
+# The worker has no port to probe: it is up when it is still running, never restarted, a few
+# seconds after it started (a missing secret key makes it exit at once).
+worker_is_running() {
+  local state
+
+  sleep "$WORKER_STARTUP_SECONDS"
+  state="$(docker container inspect --format '{{.State.Running}} {{.RestartCount}}' "$WORKER_CONTAINER_NAME" 2>/dev/null || true)"
+  [[ "$state" == "true 0" ]]
+}
+
+# Starts or replaces the worker from the image just deployed. Called only after the web container
+# is healthy, and never fails the deployment: on failure it puts the previous worker back, if there
+# was one, and returns 1 so the caller can warn. `set -e` does not apply inside it (it runs as the
+# left side of `||`), so every step checks its own result.
+deploy_worker() {
+  local had_previous=false
+
+  if container_exists "$PREVIOUS_WORKER_CONTAINER"; then
+    echo "Removing stale rollback container ${PREVIOUS_WORKER_CONTAINER}."
+    docker rm --force "$PREVIOUS_WORKER_CONTAINER" >/dev/null || return 1
+  fi
+
+  if container_exists "$WORKER_CONTAINER_NAME"; then
+    echo "Preparing the current worker for replacement."
+    docker rename "$WORKER_CONTAINER_NAME" "$PREVIOUS_WORKER_CONTAINER" || return 1
+    had_previous=true
+
+    # The worker finishes its current tick on SIGTERM.
+    if ! docker stop --time "$STOP_TIMEOUT_SECONDS" "$PREVIOUS_WORKER_CONTAINER" >/dev/null; then
+      docker rename "$PREVIOUS_WORKER_CONTAINER" "$WORKER_CONTAINER_NAME" >/dev/null 2>&1 || true
+      return 1
+    fi
+  fi
+
+  echo "Starting ${WORKER_CONTAINER_NAME}."
+  if docker run \
+    --detach \
+    --name "$WORKER_CONTAINER_NAME" \
+    --restart unless-stopped \
+    --network expense-network \
+    --env-file "$ENV_FILE" \
+    --log-opt "max-size=${LOG_MAX_SIZE}" \
+    --log-opt "max-file=${LOG_MAX_FILES}" \
+    "${IMAGE_NAME}:${IMAGE_TAG}" \
+    node worker.js >/dev/null && worker_is_running; then
+    echo "Worker is running."
+    if [[ "$had_previous" == true ]]; then
+      docker rm "$PREVIOUS_WORKER_CONTAINER" >/dev/null || true
+    fi
+    return 0
+  fi
+
+  echo "The worker did not start. Recent logs:" >&2
+  docker logs --tail 100 "$WORKER_CONTAINER_NAME" >&2 || true
+  docker rm --force "$WORKER_CONTAINER_NAME" >/dev/null 2>&1 || true
+
+  if [[ "$had_previous" == true ]]; then
+    if docker rename "$PREVIOUS_WORKER_CONTAINER" "$WORKER_CONTAINER_NAME" >/dev/null 2>&1 \
+      && docker start "$WORKER_CONTAINER_NAME" >/dev/null 2>&1; then
+      echo "Previous worker restored." >&2
+    else
+      echo "Warning: the previous worker could not be restored automatically." >&2
+    fi
+  fi
+
+  return 1
+}
+
 command -v docker >/dev/null 2>&1 || die "Docker is not installed or is not on PATH"
 [[ -f "$DOCKERFILE_PATH" ]] || die "Dockerfile not found: $DOCKERFILE_PATH"
 [[ -f "$ENV_FILE" ]] || die "Environment file not found: $ENV_FILE"
@@ -102,13 +175,16 @@ require_positive_integer CONTAINER_PORT "$CONTAINER_PORT"
 require_positive_integer STOP_TIMEOUT_SECONDS "$STOP_TIMEOUT_SECONDS"
 require_positive_integer HEALTHCHECK_ATTEMPTS "$HEALTHCHECK_ATTEMPTS"
 require_positive_integer HEALTHCHECK_INTERVAL_SECONDS "$HEALTHCHECK_INTERVAL_SECONDS"
+require_positive_integer WORKER_STARTUP_SECONDS "$WORKER_STARTUP_SECONDS"
 
 [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || die "IMAGE_TAG contains unsupported characters"
+[[ "$GIT_SHA" =~ ^[A-Za-z0-9]{0,64}$ ]] || die "GIT_SHA must be a commit hash"
 
 echo "Building ${IMAGE_NAME}:${IMAGE_TAG} from ${DOCKERFILE_PATH}."
 docker build \
   --pull \
   --file "$DOCKERFILE_PATH" \
+  --build-arg "GIT_SHA=${GIT_SHA}" \
   --tag "${IMAGE_NAME}:${IMAGE_TAG}" \
   --tag "${IMAGE_NAME}:latest" \
   "$PROJECT_DIR"
@@ -151,4 +227,11 @@ if [[ "$previous_container_renamed" == true ]]; then
 fi
 
 deployment_succeeded=true
+echo "Web deployment complete: ${IMAGE_NAME}:${IMAGE_TAG}."
+
+# The web app is live; a worker failure only warns, so it never rolls the web container back.
+if ! deploy_worker; then
+  echo "Warning: the worker (${WORKER_CONTAINER_NAME}) was not updated. The web app is deployed; check the logs above." >&2
+fi
+
 echo "Deployment complete: ${IMAGE_NAME}:${IMAGE_TAG}."

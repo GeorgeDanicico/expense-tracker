@@ -18,6 +18,14 @@ describe("fakeSupabase", () => {
     expect(data?.map((row) => row.id)).toEqual(["a"]);
   });
 
+  it("applies lte inclusively and never matches a null", async () => {
+    const { client } = fakeSupabase({ people: [...people(), { id: "d", name: "Dan", born: null, team: "red" }] });
+
+    const { data } = await client.from("people").select().lte("born", "2000-06-15");
+
+    expect(data?.map((row) => row.id)).toEqual(["a", "b"]);
+  });
+
   it("orders by each column in turn and honours descending order", async () => {
     const { client } = fakeSupabase({ people: people() });
 

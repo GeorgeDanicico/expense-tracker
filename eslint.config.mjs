@@ -63,6 +63,8 @@ const SUPABASE_BOUNDARY = [
   "src/lib/repositories.ts",
   "src/lib/auth/index.ts",
   "src/proxy.ts",
+  // The worker's entry point wires the Supabase worker store, as repositories.ts does for the app.
+  "src/worker/main.ts",
 ];
 
 const BOUNDARY_MESSAGE =
@@ -89,11 +91,40 @@ const supabaseBoundary = {
   },
 };
 
+/**
+ * The notifications worker is a plain Node process (`node worker.js`, bundled by esbuild): no Next
+ * runtime and no request, so nothing it imports may need either.
+ */
+const WORKER_MESSAGE =
+  "The worker runs outside Next.js with no request: no next/*, request-scoped Supabase clients, auth or getRepositories(). See R6 in docs/reminders-plan.md.";
+
+const workerBoundary = {
+  files: [
+    "src/worker/**",
+    "src/lib/notifications/worker.ts",
+    "src/lib/notifications/worker-store.ts",
+    "src/lib/supabase/worker-store.ts",
+  ],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          { group: ["next", "next/*", "@/lib/supabase/server", "@/lib/auth", "@/lib/auth/*", "@/lib/repositories"], message: WORKER_MESSAGE },
+          // Restated from supabaseBoundary, whose option this rule replaces for these files.
+          { group: ["@supabase/*"], message: BOUNDARY_MESSAGE },
+        ],
+      },
+    ],
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   uiGuardrails,
   supabaseBoundary,
+  workerBoundary,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -104,6 +135,8 @@ const eslintConfig = defineConfig([
     // Agent worktrees and scratch output are not part of this project.
     ".claude/**",
     "tmp/**",
+    // The worker bundle (npm run build:worker).
+    "dist/**",
   ]),
 ]);
 
