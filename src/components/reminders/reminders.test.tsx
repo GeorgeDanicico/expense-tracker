@@ -21,7 +21,7 @@ function reminder(overrides: Partial<ListedReminder> = {}): ListedReminder {
   const base = {
     id: "r1", title: "Pay the rent", notes: "", startsOn: "2026-10-31", timeOfDay: "09:00", timezone: TZ,
     repeatUnit: "month" as const, repeatInterval: 1, leadMinutes: [0, 1440], notificationsMuted: false,
-    nextDueOn: "2026-10-31", snoozedUntil: null, nextNotifyAt: null, createdAt: "", updatedAt: "",
+    nextDueOn: "2026-10-31", snoozedUntil: null, nextNotifyAt: null, expenseTemplate: null, createdAt: "", updatedAt: "",
     ...overrides,
   };
   const nextDueAt = base.nextDueOn === null ? null : dueAt(base, base.nextDueOn).toISOString();
@@ -136,20 +136,21 @@ describe("the reminder form", () => {
   it("starts a new reminder today at 09:00, once, notifying at the time", () => {
     expect(draftFor(undefined, "2026-10-24")).toEqual({
       title: "", notes: "", startsOn: "2026-10-24", timeOfDay: "09:00", repeatUnit: "none", repeatInterval: "1", leadMinutes: [0], notificationsMuted: false,
+      expense: { enabled: false, amount: "", category: "housing", subtype: null },
     });
   });
 
   it("always sends every field, trimmed, for PATCH replaces the whole reminder", () => {
-    const fields = draftToFields({ ...draftFor(reminder({ notes: "Flat 12" }), "2026-10-24"), title: "  Pay rent ", leadMinutes: [1440, 0] });
+    const fields = draftToFields({ ...draftFor(reminder({ notes: "Flat 12" }), "2026-10-24"), title: "  Pay rent ", leadMinutes: [1440, 0] }, "EUR");
     expect(fields).toEqual({
       title: "Pay rent", notes: "Flat 12", startsOn: "2026-10-31", timeOfDay: "09:00", repeatUnit: "month", repeatInterval: 1,
-      leadMinutes: [0, 1440], notificationsMuted: false,
+      leadMinutes: [0, 1440], notificationsMuted: false, expenseTemplate: null,
     });
   });
 
   it("sends an interval of 1 for a one-off", () => {
-    expect(draftToFields({ ...draftFor(undefined, "2026-10-24"), title: "Once", repeatInterval: "5" }).repeatInterval).toBe(1);
-    expect(draftToFields({ ...draftFor(undefined, "2026-10-24"), title: "Fortnightly", repeatUnit: "week", repeatInterval: "2" }).repeatInterval).toBe(2);
+    expect(draftToFields({ ...draftFor(undefined, "2026-10-24"), title: "Once", repeatInterval: "5" }, "EUR").repeatInterval).toBe(1);
+    expect(draftToFields({ ...draftFor(undefined, "2026-10-24"), title: "Fortnightly", repeatUnit: "week", repeatInterval: "2" }, "EUR").repeatInterval).toBe(2);
   });
 
   it("toggles lead times, at most three", () => {

@@ -1,4 +1,5 @@
 import { APPLICATION_TIMEZONE } from "@/lib/calendar";
+import type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
 
 /** How a reminder repeats: a one-off, or every N weeks, months or years from the first date. */
 export const REPEAT_UNITS = ["none", "week", "month", "year"] as const;
@@ -42,6 +43,18 @@ export const REMINDER_STATES = ["upcoming", "due", "overdue", "snoozed", "done"]
 
 export type ReminderState = (typeof REMINDER_STATES)[number];
 
+/**
+ * The expense a reminder can log when it's marked done (R12), stored in `reminders.expense_template`.
+ * Expenses are kept in the account's currency, so `currency` is the account currency the template
+ * was saved in: logging refuses it once the account has moved to another currency.
+ */
+export type ExpenseTemplate = {
+  amount: number;
+  currency: string;
+  category: ExpenseCategory;
+  subtype: ExpenseSubtype | null;
+};
+
 /** A user's private reminder, as the API returns it. Instants are ISO strings. */
 export type Reminder = {
   id: string;
@@ -68,6 +81,8 @@ export type Reminder = {
   snoozedUntil: string | null;
   /** The next time the worker notifies; null when nothing is left to notify or muted. */
   nextNotifyAt: string | null;
+  /** The expense "Mark done" offers to log for each occurrence, or null for none. */
+  expenseTemplate: ExpenseTemplate | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -49,7 +49,9 @@ const fullHeight = (size: keyof typeof MAX_W) => ({
     overflowY: { base: "hidden", md: "auto" },
     pt: { base: "env(safe-area-inset-top)", md: "0" },
   },
-  body: { flex: "1", minH: "0", overflowY: { base: "auto", md: "visible" } },
+  // From `md` the body keeps its height, so a form taller than the screen scrolls the whole dialog
+  // (content) instead of spilling under the footer.
+  body: { flex: "1", minH: { base: "0", md: "auto" }, overflowY: { base: "auto", md: "visible" } },
   footer: {
     pt: { base: "3", md: "0" },
     pb: { base: "calc(1rem + env(safe-area-inset-bottom))", md: "5" },

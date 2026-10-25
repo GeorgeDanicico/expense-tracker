@@ -61,6 +61,12 @@ export async function afterExpenseCreated(mutate: ScopedMutator, month: string, 
   afterExpenseChange(mutate);
 }
 
+/** Refetches every cached month ledger and derived view, after an expense added somewhere else (a reminder). */
+export function afterExpenseLogged(mutate: ScopedMutator) {
+  void mutate(startsWith("/api/expenses?"));
+  afterExpenseChange(mutate);
+}
+
 /** Removes the expense from every cached month ledger, then refreshes derived views. */
 export async function afterExpenseDeleted(mutate: ScopedMutator, id: string) {
   await mutate(startsWith("/api/expenses?"), withExpenseRemoved(id), { revalidate: false });

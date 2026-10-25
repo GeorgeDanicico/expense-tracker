@@ -1,23 +1,16 @@
 "use client";
 
-import { Flex, Input, NativeSelect, Stack, Textarea } from "@chakra-ui/react";
+import { Flex, Input, Stack, Textarea } from "@chakra-ui/react";
 import { FormEvent, useState } from "react";
 import { useSWRConfig } from "swr";
 
+import { CategoryField, SubtypeField } from "@/components/expenses/expense-category-fields";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import type { ApiForm } from "@/hooks/use-api-form";
 import { apiRequest } from "@/lib/api/client";
 import { afterExpenseCreated } from "@/lib/api/invalidate";
-import {
-  SUBTYPE_LABELS,
-  subtypesForCategory,
-  subtypeForCategory,
-  CATEGORY_LABELS,
-  EXPENSE_CATEGORIES,
-  type ExpenseCategory,
-  type ExpenseSubtype,
-} from "@/lib/expenses/categories";
+import { subtypeForCategory, type ExpenseCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
 import type { Expense } from "@/lib/expenses/types";
 import { getMonthRange } from "@/lib/calendar";
 
@@ -39,7 +32,6 @@ export function ExpenseForm({
   const { mutate } = useSWRConfig();
   const [category, setCategory] = useState<ExpenseCategory>("groceries");
   const [subtype, setSubtype] = useState<ExpenseSubtype | null>(null);
-  const availableSubtypes = subtypesForCategory(category);
   const range = getMonthRange(selectedMonth);
   const endDate = new Date(`${range.endExclusive}T12:00:00`);
   endDate.setDate(endDate.getDate() - 1);
@@ -82,20 +74,15 @@ export function ExpenseForm({
         </FormField>
 
         <Flex gap="3" direction={{ base: "column", sm: "row" }}>
-          <FormField flex="1" label="Category" error={fieldError("category")}>
-            <NativeSelect.Root>
-              <NativeSelect.Field name="category" value={category} onChange={(event) => {
-                const nextCategory = event.target.value as ExpenseCategory;
-                setCategory(nextCategory);
-                setSubtype((current) => subtypeForCategory(nextCategory, current));
-              }}>
-                {EXPENSE_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>
-                ))}
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-          </FormField>
+          <CategoryField
+            flex="1"
+            value={category}
+            error={fieldError("category")}
+            onChange={(nextCategory) => {
+              setCategory(nextCategory);
+              setSubtype((current) => subtypeForCategory(nextCategory, current));
+            }}
+          />
 
           <FormField flex="1" label="Date" error={fieldError("expenseDate")}>
             <Input
@@ -109,17 +96,7 @@ export function ExpenseForm({
           </FormField>
         </Flex>
 
-        {availableSubtypes.length ? (
-          <FormField label="Subtype" optional error={fieldError("subtype")}>
-            <NativeSelect.Root>
-              <NativeSelect.Field name="subtype" value={subtype ?? ""} onChange={(event) => setSubtype(event.target.value ? event.target.value as ExpenseSubtype : null)}>
-                <option value="">No subtype</option>
-                {availableSubtypes.map((option) => <option key={option} value={option}>{SUBTYPE_LABELS[option]}</option>)}
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-          </FormField>
-        ) : null}
+        <SubtypeField category={category} value={subtype} onChange={setSubtype} error={fieldError("subtype")} />
 
         <FormField label="Notes" optional error={fieldError("notes")}>
           <Textarea name="notes" maxLength={500} rows={3} placeholder="Add an optional note" resize="vertical" />

@@ -20,7 +20,8 @@ const TEST_USER_ID = "10000000-0000-4000-8000-000000000001";
  * In-memory `ReminderRepository` acting as `callerId`. Like RLS, every method sees only the
  * caller's reminders (another user's counts as missing), and completions follow their reminder.
  * Like the database, `complete` moves the reminder only while `occurrenceOn` is its open occurrence
- * (409 otherwise), clears the snooze, and keeps one completion per occurrence.
+ * (409 otherwise), clears the snooze, and keeps one completion per occurrence. Deleting an
+ * expense through the fake expenses clears it from completions (`expenseDeleted`), like the foreign key.
  *
  * Seed with `seed({ ... })` (a one-off on 2026-11-01 at 09:00 by default, owned by the caller; pass
  * the dates too, as the fake stores what it's given) or push onto `rows` and `completions`.
@@ -48,6 +49,7 @@ export class FakeReminderRepository implements ReminderRepository {
       nextDueAt: "2026-11-01T07:00:00.000Z",
       snoozedUntil: null,
       nextNotifyAt: null,
+      expenseTemplate: null,
       createdAt: now,
       updatedAt: now,
       ...overrides,
@@ -106,18 +108,28 @@ export class FakeReminderRepository implements ReminderRepository {
     return true;
   }
 
-  async complete(id: string, occurrenceOn: string, next: ReminderNextOccurrence) {
+  async complete(id: string, occurrenceOn: string, next: ReminderNextOccurrence, expenseId: string | null = null) {
     const row = this.find(id);
     if (!row) return null;
     if (row.nextDueOn !== occurrenceOn) throw occurrenceAlreadyDoneError();
 
     Object.assign(row, next, { snoozedUntil: null, updatedAt: new Date().toISOString() });
-    if (!this.completions.some((completion) => completion.reminderId === id && completion.occurrenceOn === occurrenceOn)) {
+    const existing = this.completions.find((completion) => completion.reminderId === id && completion.occurrenceOn === occurrenceOn);
+    if (!existing) {
       this.completions.push({
-        id: randomUUID(), reminderId: id, occurrenceOn, doneAt: new Date().toISOString(), expenseId: null,
+        id: randomUUID(), reminderId: id, occurrenceOn, doneAt: new Date().toISOString(), expenseId,
       });
+    } else if (existing.expenseId === null) {
+      existing.expenseId = expenseId;
     }
     return toReminder(row);
+  }
+
+  /** `reminder_completions.expense_id ... on delete set null`: the fake expenses call it on delete. */
+  expenseDeleted(expenseId: string) {
+    for (const completion of this.completions) {
+      if (completion.expenseId === expenseId) completion.expenseId = null;
+    }
   }
 
   async summary(now: Date) {

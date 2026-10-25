@@ -19,12 +19,19 @@ import type { ReminderInput, SnoozeInput } from "@/lib/validation/reminder";
  */
 export type ReminderFields = ReminderInput;
 
+/**
+ * "Log expense and mark done" (R12): the open occurrence the user confirmed (refused with a 409 when
+ * the reminder has moved on) and the amount, when they changed the template's.
+ */
+export type LogExpenseOptions = { occurrenceOn: string; amount?: number };
+
 /** The reminders page's writes. The page uses the REST API; `/dev/preview` swaps in an in-memory one. */
 export type ReminderApi = {
   create(fields: ReminderFields): Promise<ListedReminder>;
   update(id: string, fields: ReminderFields): Promise<ListedReminder>;
   remove(id: string): Promise<void>;
-  complete(id: string): Promise<ListedReminder>;
+  /** Marks the open occurrence done; with `logExpense`, first logs its expense and links it. */
+  complete(id: string, logExpense?: LogExpenseOptions): Promise<ListedReminder>;
   snooze(id: string, snooze: SnoozeInput): Promise<ListedReminder>;
 };
 
@@ -38,8 +45,9 @@ export const restReminderApi: ReminderApi = {
   async remove(id) {
     await apiRequest<{ success: true }>(reminderApiUrl(id), { method: "DELETE" });
   },
-  async complete(id) {
-    return (await apiRequest<ReminderResponse>(reminderCompleteApiUrl(id), { method: "POST" })).reminder;
+  async complete(id, logExpense) {
+    const body = logExpense ? JSON.stringify({ logExpense: true, ...logExpense }) : undefined;
+    return (await apiRequest<ReminderResponse>(reminderCompleteApiUrl(id), { method: "POST", body })).reminder;
   },
   async snooze(id, snooze) {
     return (await apiRequest<ReminderResponse>(reminderSnoozeApiUrl(id), { method: "POST", body: JSON.stringify(snooze) })).reminder;

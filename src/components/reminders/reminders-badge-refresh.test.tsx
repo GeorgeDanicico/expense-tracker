@@ -25,7 +25,7 @@ const NOW = new Date("2026-10-24T09:00:00Z");
 const REMINDER: ListedReminder = {
   id: "r1", title: "Pay the rent", notes: "", startsOn: "2026-10-24", timeOfDay: "09:00", timezone: "Europe/Bucharest",
   repeatUnit: "month", repeatInterval: 1, leadMinutes: [0], notificationsMuted: false, nextDueOn: "2026-10-24",
-  nextDueAt: "2026-10-24T06:00:00.000Z", snoozedUntil: null, nextNotifyAt: null, createdAt: "", updatedAt: "", state: "overdue",
+  nextDueAt: "2026-10-24T06:00:00.000Z", snoozedUntil: null, nextNotifyAt: null, expenseTemplate: null, createdAt: "", updatedAt: "", state: "overdue",
 };
 
 const api: ReminderApi = {
@@ -61,7 +61,7 @@ function remindersState() {
 
 const FIELDS = {
   title: "Pay the rent", notes: "", startsOn: "2026-10-24", timeOfDay: "09:00", repeatUnit: "month" as const,
-  repeatInterval: 1, leadMinutes: [0], notificationsMuted: false,
+  repeatInterval: 1, leadMinutes: [0], notificationsMuted: false, expenseTemplate: null,
 };
 
 describe("the nav badge after a write on the reminders page", () => {

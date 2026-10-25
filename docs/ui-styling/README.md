@@ -110,3 +110,18 @@ The Next.js dev indicator was removed before each capture.
 | `reminders-phone-overdue-390.jpg` | Overdue on the phone, after switching segments |
 | `reminders-add-sheet-390.jpg` | The add form as a full-height sheet at 390: the footer stays at the bottom, the body scrolls |
 | `reminders-add-dialog-1280.jpg` | The same form at 1280: still the centred dialog |
+
+## Reminders: log as expense (reminders R12)
+
+Captured with headless Chrome (driven over the DevTools protocol) from `/dev/preview/reminders`,
+whose "Pay the rent" and "Electricity bill" fixtures carry an expense template
+(`src/app/dev/preview/reminder-fixtures.ts`): 1280 × 800 at 1× and 390 × 844 at 2×. The Next.js
+dev indicator was removed before each capture.
+
+| Image | Shows |
+|---|---|
+| `reminders-expense-section-1280.jpg` | The edit form scrolled to its optional Expense section: the switch, the amount in the account's currency, and the expense form's category picker; a form taller than the screen now scrolls the whole dialog instead of running under the footer |
+| `reminders-expense-section-390.jpg` | The same section in the full-height sheet at 390: the body scrolls, the footer stays at the bottom |
+| `reminders-log-expense-confirm-1280.jpg` | Mark done on "Pay the rent": the expense pre-filled for the occurrence (description, category, date, editable amount), with "Just mark done" and "Log expense and mark done" |
+| `reminders-log-expense-confirm-390.jpg` | The confirm as a bottom sheet at 390, its two answers stacked with the primary on top |
+| `reminders-done-expense-logged-1280.jpg` | Done after logging: "Expense logged" on the completions with an expense, linking to that month's expenses |

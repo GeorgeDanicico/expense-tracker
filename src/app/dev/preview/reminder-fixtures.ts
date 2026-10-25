@@ -9,7 +9,7 @@ import { utcToZoned } from "@/lib/time-zone";
 
 // The reminders for `/dev/preview/reminders`: samples kept in memory around today, and a fake API
 // that works the dates out with `schedule.ts` the way the service does, so adding, editing, marking
-// done and snoozing work without a session. `?failWrites=1` refuses every mark done and snooze
+// done (logging the expense of a reminder with a template) and snoozing work without a session. `?failWrites=1` refuses every mark done and snooze
 // (to see the rollback); `?noReminders=1` starts empty.
 
 const HOUR = 60 * 60 * 1000;
@@ -46,6 +46,7 @@ function sample(id: string, values: Sample): Reminder {
     leadMinutes: [0],
     notificationsMuted: false,
     snoozedUntil: null,
+    expenseTemplate: null,
     createdAt: now,
     updatedAt: now,
     ...values,
@@ -62,7 +63,7 @@ function seed(): Reminder[] {
   const lastMonth = addDays(today, -30);
 
   completions = [
-    { id: "c-rent", reminderId: "r-rent", occurrenceOn: lastMonth, doneAt: new Date(now.getTime() - 30 * 24 * HOUR + HOUR).toISOString(), expenseId: null },
+    { id: "c-rent", reminderId: "r-rent", occurrenceOn: lastMonth, doneAt: new Date(now.getTime() - 30 * 24 * HOUR + HOUR).toISOString(), expenseId: "e-rent" },
     { id: "c-passport", reminderId: "r-passport", occurrenceOn: addDays(today, -5), doneAt: new Date(now.getTime() - 5 * 24 * HOUR).toISOString(), expenseId: null },
     { id: "c-plants", reminderId: "r-plants", occurrenceOn: addDays(today, -12), doneAt: new Date(now.getTime() - 12 * 24 * HOUR).toISOString(), expenseId: null },
   ];
@@ -71,9 +72,11 @@ function seed(): Reminder[] {
     sample("r-rent", {
       title: "Pay the rent", notes: "Transfer to the landlord's account, reference: flat 12.",
       startsOn: lastMonth, nextDueOn: later.date, timeOfDay: later.time, repeatUnit: "month", leadMinutes: [0, 1440, 4320],
+      expenseTemplate: { amount: 650, currency: "EUR", category: "housing", subtype: null },
     }),
     sample("r-electricity", {
       title: "Electricity bill", nextDueOn: earlier.date, timeOfDay: earlier.time, repeatUnit: "month", leadMinutes: [0, 1440],
+      expenseTemplate: { amount: 84.5, currency: "EUR", category: "utilities", subtype: null },
     }),
     sample("r-bank", {
       title: "Call the bank about the new card", nextDueOn: addDays(today, -2), timeOfDay: "10:00",
@@ -168,13 +171,17 @@ export const previewReminderApi: ReminderApi = {
     store = reminders().filter((reminder) => reminder.id !== id);
     completions = completions.filter((completion) => completion.reminderId !== id);
   },
-  async complete(id) {
+  async complete(id, logExpense) {
     await delay(600);
     refuseIfAsked();
     const current = find(id);
     if (current.nextDueOn === null) throw new ApiError("This reminder is already done.", 409);
+    if (logExpense && logExpense.occurrenceOn !== current.nextDueOn) {
+      throw new ApiError("This reminder was already marked done somewhere else, so no expense was added.", 409);
+    }
+    const expenseId = logExpense && current.expenseTemplate ? `e-new-${++counter}` : null;
     completions = [
-      { id: `c-new-${++counter}`, reminderId: id, occurrenceOn: current.nextDueOn, doneAt: new Date().toISOString(), expenseId: null },
+      { id: `c-new-${++counter}`, reminderId: id, occurrenceOn: current.nextDueOn, doneAt: new Date().toISOString(), expenseId },
       ...completions,
     ];
     const nextDueOn = nextOccurrenceAfter(current, current.nextDueOn);

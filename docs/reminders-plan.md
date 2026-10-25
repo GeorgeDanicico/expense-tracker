@@ -435,6 +435,16 @@ their own reminders.
   date. Confirming adds the expense through the existing expense service and links it on the
   completion (`expense_id`); "Just mark done" skips it.
 
+- `POST /api/reminders/[id]/complete` takes an optional body: `{ logExpense: true, occurrenceOn,
+  amount? }`. Without one it only marks done, as before (and as `complete_reminder` does).
+- Order: check everything first (expenses permission, the reminder, the open occurrence, the
+  template and its currency), then add the expense, then mark done with `expense_id`. A failure to
+  add the expense marks nothing done; a failure to mark done (another tab got there first: 409)
+  deletes the expense again and says no expense was added. Only if that delete fails too does the
+  error say the expense was kept, so it isn't added twice.
+- Expenses have no currency of their own (they're in the account's), so the template stores the
+  account currency it was saved in, and logging refuses it after the account currency changes.
+
 **Done when** ticking "Pay rent" adds the rent expense in one confirm, and deleting that expense
 leaves the completion in place.
 

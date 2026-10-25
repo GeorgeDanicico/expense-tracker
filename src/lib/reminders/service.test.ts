@@ -1,16 +1,23 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FORBIDDEN_MESSAGE } from "@/lib/http/permission";
 import { OCCURRENCE_ALREADY_DONE_MESSAGE } from "@/lib/reminders/repository";
+import { aKid } from "@/test/builders";
 import { reminderSchema } from "@/lib/validation/reminder";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
 import {
+  EXPENSE_KEPT_MESSAGE,
+  EXPENSE_NOT_LOGGED_MESSAGE,
+  NO_EXPENSE_TEMPLATE_MESSAGE,
   REMINDER_DONE_MESSAGE,
   REMINDER_NOT_FOUND_MESSAGE,
   completeReminder,
+  completeReminderWithExpense,
   createReminder,
+  templateCurrencyMessage,
   defaultDoneSince,
   deleteReminder,
   getReminder,
@@ -282,6 +289,189 @@ describe("reminders service", () => {
       await expect(deleteReminder(theirs.id)).rejects.toMatchObject({ status: 404 });
       await deleteReminder(mine.id);
       expect(repositories.reminders.rows.map((row) => row.id)).toEqual([theirs.id]);
+    });
+  });
+
+  describe("completeReminder with occurrenceOn", () => {
+    it("refuses with a 409, changing nothing, when the reminder has moved on", async () => {
+      const reminder = repositories.reminders.seed({ repeatUnit: "month" });
+
+      await expect(completeReminder(reminder.id, new Date(), { occurrenceOn: "2026-10-01" }))
+        .rejects.toMatchObject({ status: 409, message: OCCURRENCE_ALREADY_DONE_MESSAGE });
+      expect(reminder.nextDueOn).toBe("2026-11-01");
+      expect(repositories.reminders.completions).toEqual([]);
+
+      await expect(completeReminder(reminder.id, new Date(), { occurrenceOn: "2026-11-01" }))
+        .resolves.toMatchObject({ nextDueOn: "2026-12-01" });
+    });
+  });
+
+  describe("completeReminderWithExpense", () => {
+    const now = new Date("2026-11-01T10:00:00Z");
+    const rent = { amount: 650, currency: "EUR", category: "housing", subtype: null } as const;
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    function expensesOf(owner = userId) {
+      return repositories.expenses.expenses.get(owner) ?? [];
+    }
+
+    it("adds the template's expense on the occurrence date, then marks it done with the expense linked", async () => {
+      const reminder = repositories.reminders.seed({
+        title: "Fill the tank", repeatUnit: "month",
+        expenseTemplate: { amount: 70, currency: "EUR", category: "car", subtype: "car_fuel" },
+      });
+
+      const { reminder: completed, expense } = await completeReminderWithExpense(userId, reminder.id, { occurrenceOn: "2026-11-01" }, now);
+
+      expect(expense).toMatchObject({
+        description: "Fill the tank", amount: 70, category: "car", subtype: "car_fuel", expenseDate: "2026-11-01", notes: null,
+      });
+      expect(expensesOf()).toEqual([expense]);
+      expect(completed).toMatchObject({ nextDueOn: "2026-12-01", snoozedUntil: null });
+      expect(repositories.reminders.completions).toEqual([
+        expect.objectContaining({ reminderId: reminder.id, occurrenceOn: "2026-11-01", expenseId: expense.id }),
+      ]);
+    });
+
+    it("uses the amount given instead of the template's", async () => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+
+      const { expense } = await completeReminderWithExpense(userId, reminder.id, { amount: 672.4 }, now);
+
+      expect(expense).toMatchObject({ amount: 672.4, category: "housing", subtype: null, expenseDate: "2026-11-01" });
+    });
+
+    it("dates the expense on the open occurrence, not today", async () => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent, nextDueOn: "2026-10-01", startsOn: "2026-10-01", repeatUnit: "month" });
+
+      const { expense } = await completeReminderWithExpense(userId, reminder.id, {}, now);
+
+      expect(expense.expenseDate).toBe("2026-10-01");
+    });
+
+    it("keeps the description within the expense's 120 characters", async () => {
+      const reminder = repositories.reminders.seed({ title: "x".repeat(200), expenseTemplate: rent });
+
+      const { expense } = await completeReminderWithExpense(userId, reminder.id, {}, now);
+
+      expect(expense.description).toHaveLength(120);
+    });
+
+    it("marks nothing done when adding the expense fails", async () => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+      vi.spyOn(repositories.expenses, "create").mockRejectedValueOnce(new Error("The expense could not be saved."));
+
+      await expect(completeReminderWithExpense(userId, reminder.id, {}, now)).rejects.toThrow("The expense could not be saved.");
+      expect(reminder.nextDueOn).toBe("2026-11-01");
+      expect(repositories.reminders.completions).toEqual([]);
+    });
+
+    it("refuses an occurrence that's no longer open before adding anything", async () => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+
+      await expect(completeReminderWithExpense(userId, reminder.id, { occurrenceOn: "2026-10-01" }, now))
+        .rejects.toMatchObject({ status: 409, message: EXPENSE_NOT_LOGGED_MESSAGE });
+      expect(expensesOf()).toEqual([]);
+    });
+
+    it("deletes the expense again when another request marked the occurrence done first", async () => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+      const create = repositories.expenses.create.bind(repositories.expenses);
+      vi.spyOn(repositories.expenses, "create").mockImplementationOnce(async (owner, input) => {
+        // Another tab marks it done while the expense is being added.
+        await completeReminder(reminder.id, now);
+        return create(owner, input);
+      });
+
+      await expect(completeReminderWithExpense(userId, reminder.id, {}, now))
+        .rejects.toMatchObject({ status: 409, message: EXPENSE_NOT_LOGGED_MESSAGE });
+      expect(expensesOf()).toEqual([]);
+      expect(repositories.reminders.completions).toEqual([expect.objectContaining({ expenseId: null })]);
+    });
+
+    it("says the expense was kept when it can't be deleted again", async () => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+      vi.spyOn(repositories.reminders, "complete").mockRejectedValueOnce(new Error("Unable to mark the reminder done."));
+      vi.spyOn(repositories.expenses, "delete").mockRejectedValueOnce(new Error("Unable to delete expense."));
+
+      await expect(completeReminderWithExpense(userId, reminder.id, {}, now))
+        .rejects.toMatchObject({ status: 409, message: EXPENSE_KEPT_MESSAGE });
+      expect(expensesOf()).toHaveLength(1);
+    });
+
+    it("passes another failure on after deleting the expense again", async () => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+      vi.spyOn(repositories.reminders, "complete").mockRejectedValueOnce(new Error("Unable to mark the reminder done."));
+
+      await expect(completeReminderWithExpense(userId, reminder.id, {}, now)).rejects.toThrow("Unable to mark the reminder done.");
+      expect(expensesOf()).toEqual([]);
+    });
+
+    it("refuses a reminder without a template, a done one-off and another user's reminder, adding nothing", async () => {
+      const plain = repositories.reminders.seed();
+      const done = repositories.reminders.seed({ expenseTemplate: rent, nextDueOn: null, nextDueAt: null });
+      const theirs = repositories.reminders.seed({ userId: otherUserId, expenseTemplate: rent });
+
+      await expect(completeReminderWithExpense(userId, plain.id, {}, now)).rejects.toMatchObject({ status: 422, message: NO_EXPENSE_TEMPLATE_MESSAGE });
+      await expect(completeReminderWithExpense(userId, done.id, {}, now)).rejects.toMatchObject({ status: 409, message: REMINDER_DONE_MESSAGE });
+      await expect(completeReminderWithExpense(userId, theirs.id, {}, now)).rejects.toMatchObject({ status: 404 });
+      expect(expensesOf()).toEqual([]);
+      expect(repositories.reminders.completions).toEqual([]);
+    });
+
+    it("refuses a template in another currency than the account's", async () => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+      repositories.account.currencies.set(userId, "RON");
+
+      await expect(completeReminderWithExpense(userId, reminder.id, {}, now))
+        .rejects.toMatchObject({ status: 422, message: templateCurrencyMessage("EUR", "RON") });
+      expect(expensesOf()).toEqual([]);
+      expect(reminder.nextDueOn).toBe("2026-11-01");
+    });
+
+    it("refuses a kid without expenses access, adding nothing", async () => {
+      vi.stubEnv("FAMILY_ENABLED", "true");
+      repositories.family.membership = aKid({ permissions: { ...aKid().permissions, expenses: "off" } });
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+
+      await expect(completeReminderWithExpense(userId, reminder.id, {}, now))
+        .rejects.toMatchObject({ status: 403, message: FORBIDDEN_MESSAGE });
+      expect(expensesOf()).toEqual([]);
+      expect(reminder.nextDueOn).toBe("2026-11-01");
+    });
+
+    it("leaves the completion in place, without its expense, when the expense is deleted later", async () => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+      const { expense } = await completeReminderWithExpense(userId, reminder.id, {}, now);
+
+      expect(await repositories.expenses.delete(userId, expense.id)).toBe(true);
+
+      expect(repositories.reminders.completions).toEqual([
+        expect.objectContaining({ reminderId: reminder.id, occurrenceOn: "2026-11-01", expenseId: null }),
+      ]);
+      expect((await listReminders(defaultDoneSince(now), now)).completions).toHaveLength(1);
+    });
+  });
+
+  describe("expense templates", () => {
+    const rent = { amount: 650, currency: "EUR", category: "housing", subtype: null };
+
+    it("creates and edits reminders with and without a template", async () => {
+      const now = new Date("2026-10-25T08:00:00Z");
+      const plain = await createReminder(userId, input(), now);
+      const withTemplate = await createReminder(userId, input({ expenseTemplate: rent }), now);
+
+      expect(plain.expenseTemplate).toBeNull();
+      expect(withTemplate.expenseTemplate).toEqual(rent);
+
+      const added = await updateReminder(plain.id, input({ expenseTemplate: { ...rent, amount: 700 } }), now);
+      const removed = await updateReminder(withTemplate.id, input(), now);
+
+      expect(added.expenseTemplate).toEqual({ ...rent, amount: 700 });
+      expect(removed.expenseTemplate).toBeNull();
     });
   });
 });
