@@ -85,13 +85,15 @@ describe("tick", () => {
       reminders: { claimed: 0, queued: 0, duplicates: 0, changed: 0 },
       delivery: { claimed: 0, sent: 0, skipped: 0, failed: 0, retried: 0, devicesRemoved: 0 },
       cleaned: 0,
+      // 11:00 in Bucharest: the first tick after 09:00 runs the day's "Due today" to-dos.
+      todosDue: { date: "2026-10-25", found: 0, queued: 0, duplicates: 0, failed: 0 },
     });
     expect(lines.at(-1)).toEqual({
       level: "info",
       event: "tick",
       fields: {
         claimed: 0, sent: 0, skipped: 0, failed: 0, retried: 0, devicesRemoved: 0,
-        remindersClaimed: 0, remindersQueued: 0, remindersDuplicate: 0, remindersChanged: 0, ms: 50,
+        remindersClaimed: 0, remindersQueued: 0, remindersDuplicate: 0, remindersChanged: 0, ms: 75,
       },
     });
   });

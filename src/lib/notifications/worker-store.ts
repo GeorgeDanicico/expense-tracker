@@ -53,6 +53,14 @@ export type NewNotification = {
   dedupeKey: string;
 };
 
+/** An open (not done) to-do card due on a given day, with its assignee's user. */
+export type DueTodo = {
+  id: string;
+  title: string;
+  /** The `user_id` of the card's assignee (`todos.assignee_member_id` → `family_members`). */
+  assigneeUserId: string;
+};
+
 /** A user's switches, as the worker reads them; a user without a row has every switch on. */
 export type RecipientSettings = {
   pushEnabled: boolean;
@@ -121,4 +129,9 @@ export interface WorkerStore {
    * `changed`: an edit, mark done or snooze in between already stored its own `next_notify_at`.
    */
   advanceReminder(reminder: ClaimedReminder, nextNotifyAt: Date | null): Promise<"advanced" | "changed">;
+  /**
+   * Every card in any family whose `due_date` is `date` (`YYYY-MM-DD`), whose status isn't `done`
+   * and which has an assignee, with that assignee's user.
+   */
+  listOpenTodosDueOn(date: string): Promise<DueTodo[]>;
 }

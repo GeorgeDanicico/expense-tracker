@@ -11,8 +11,8 @@ type ReminderRow = Database["public"]["Tables"]["reminders"]["Row"];
 const UNIQUE_VIOLATION = "23505";
 
 /**
- * `WorkerStore` on `worker_heartbeats`, `notifications`, `reminders`, `notification_settings` and
- * `push_subscriptions` with the admin client: the worker acts for every user, and the outbox and
+ * `WorkerStore` on `worker_heartbeats`, `notifications`, `reminders`, `notification_settings`,
+ * `push_subscriptions`, `todos` and `family_members` with the admin client: the worker acts for every user, and the outbox and
  * heartbeats have no policies for signed-in users.
  * Errors carry the database's message (never the key) so the worker's log says what went wrong.
  *
@@ -148,6 +148,35 @@ export function createSupabaseWorkerStore(client: AdminClient = createAdminClien
         .eq("notify_locked_until", reminder.lockedUntil);
       if (released.error) throw new Error(`Unable to release a reminder: ${released.error.message}`);
       return "changed";
+    },
+
+    /**
+     * Two reads, as `todos` has no declared relationship to embed: the open assigned cards due
+     * that day, then their assignees' users. A card whose member row is gone is left out.
+     */
+    async listOpenTodosDueOn(date) {
+      const { data: todos, error } = await client
+        .from("todos")
+        .select("id, title, assignee_member_id")
+        .eq("due_date", date)
+        .neq("status", "done")
+        .not("assignee_member_id", "is", null)
+        .order("created_at", { ascending: true });
+      if (error) throw new Error(`Unable to load the to-dos due today: ${error.message}`);
+      if (todos.length === 0) return [];
+
+      const memberIds = [...new Set(todos.map((todo) => todo.assignee_member_id!))];
+      const { data: members, error: membersError } = await client
+        .from("family_members")
+        .select("id, user_id")
+        .in("id", memberIds);
+      if (membersError) throw new Error(`Unable to load the to-dos' assignees: ${membersError.message}`);
+      const userOf = new Map(members.map((member) => [member.id, member.user_id]));
+
+      return todos.flatMap((todo) => {
+        const assigneeUserId = userOf.get(todo.assignee_member_id!);
+        return assigneeUserId ? [{ id: todo.id, title: todo.title, assigneeUserId }] : [];
+      });
     },
 
     async deleteOldNotifications(before) {

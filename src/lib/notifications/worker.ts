@@ -1,9 +1,13 @@
+import { APPLICATION_TIMEZONE } from "@/lib/calendar";
 import type { PushPayload, PushResult, PushSender } from "@/lib/notifications/push";
 import { planReminderNotification } from "@/lib/reminders/notification";
+import { utcToZoned } from "@/lib/time-zone";
 import type {
   ClaimedNotification,
   DeviceSubscription,
   DueCounts,
+  DueTodo,
+  NewNotification,
   NotificationOutcome,
   RecipientSettings,
   WorkerStore,
@@ -32,6 +36,12 @@ export const NOTIFICATION_RETENTION_MS = 30 * 24 * 60 * 60_000;
 /** How often the clean-up runs: on the first tick, then every 24 hours. */
 export const CLEANUP_INTERVAL_MS = 24 * 60 * 60_000;
 
+/**
+ * The Bucharest wall-clock time from which the day's "Due today" to-do notifications go out: the
+ * first tick at or after it queues them.
+ */
+export const TODO_DUE_TIME = "09:00";
+
 /** What `last_error` says for a recipient without a single registered browser. */
 export const NO_DEVICES = "No devices: notifications aren't enabled on any browser.";
 /** What `last_error` says when every one of the recipient's subscriptions turned out to be gone. */
@@ -50,11 +60,18 @@ export interface WorkerLog {
   error(event: string, fields?: LogFields): void;
 }
 
-/** What the worker remembers between ticks (in memory: a restart runs the clean-up again). */
-export type WorkerState = { lastCleanupAt: Date | null };
+/**
+ * What the worker remembers between ticks (in memory: a restart runs the clean-up again, and
+ * queues the day's due to-dos again, which their dedupe keys turn into no-ops).
+ */
+export type WorkerState = {
+  lastCleanupAt: Date | null;
+  /** The Bucharest date whose "Due today" to-do notifications were all queued. */
+  lastTodoDueOn: string | null;
+};
 
 export function createWorkerState(): WorkerState {
-  return { lastCleanupAt: null };
+  return { lastCleanupAt: null, lastTodoDueOn: null };
 }
 
 export type TickDependencies = {
@@ -90,9 +107,30 @@ export type ReminderCounts = {
   changed: number;
 };
 
+/** What the daily "Due today" run queued, when it ran this tick. */
+export type TodoDueCounts = {
+  /** The Bucharest date it ran for. */
+  date: string;
+  /** Open, assigned cards due that day. */
+  found: number;
+  /** Outbox rows inserted. */
+  queued: number;
+  /** Cards an earlier run (before a restart, or a failed run) had already queued. */
+  duplicates: number;
+  /** Cards whose row couldn't be inserted; the whole day is tried again next tick. */
+  failed: number;
+};
+
 /** What a tick did, or null when it failed (the failure is logged). */
 export type TickResult =
-  | { pushConfigured: true; reminders: ReminderCounts; delivery: DeliveryCounts; cleaned: number | null }
+  | {
+      pushConfigured: true;
+      reminders: ReminderCounts;
+      delivery: DeliveryCounts;
+      cleaned: number | null;
+      /** Null on every tick but the one that ran the day's "Due today" notifications. */
+      todosDue: TodoDueCounts | null;
+    }
   | { pushConfigured: false; due: DueCounts }
   | null;
 
@@ -105,7 +143,14 @@ function truncate(message: string) {
   return message.length > MAX_ERROR_LENGTH ? `${message.slice(0, MAX_ERROR_LENGTH - 1)}…` : message;
 }
 
-/** The row's payload when it has the four strings a push needs, else null. Extra fields are dropped. */
+/**
+ * The row's payload when it has the four strings a push needs, else null. Extra fields are dropped.
+ *
+ * `todo_assigned` rows are sent as the `todos_notify_assignee` trigger wrote them ("Ana assigned
+ * you", the card title, `/todos?card=<id>`, `todo:<id>`), not reformatted here: the payload is
+ * already what the notification shows, and its extra `todoId`, `todoTitle` and `assignerName`
+ * fields are dropped by this function.
+ */
 export function pushPayload(payload: unknown): PushPayload | null {
   if (typeof payload !== "object" || payload === null) return null;
   const { title, body, url, tag } = payload as Record<string, unknown>;
@@ -261,6 +306,53 @@ async function queueDueReminders({ store, clock, log }: TickDependencies): Promi
   return counts;
 }
 
+/** The "Due today" outbox row for an open card due on `date` (a Bucharest date). */
+export function todoDueNotification(todo: DueTodo, date: string): NewNotification {
+  return {
+    userId: todo.assigneeUserId,
+    kind: "todo_due",
+    payload: { title: "Due today", body: todo.title, url: `/todos?card=${todo.id}`, tag: `todo:${todo.id}` },
+    dedupeKey: `todo_due:${todo.id}:${date}`,
+  };
+}
+
+/**
+ * Once a day, on the first tick at or after {@link TODO_DUE_TIME} in Bucharest, queues a
+ * `todo_due` row for each open (not done) card due that day with an assignee. Only today's cards:
+ * a worker that was down all of yesterday never sends yesterday's. A worker that starts later in
+ * the day still sends today's. The day counts as done only when every card was queued (or already
+ * was); otherwise the next tick runs it again, and the dedupe keys keep the queued ones from
+ * repeating. A restart forgets the day and runs it again, which the dedupe keys make a no-op.
+ */
+async function queueDueTodos({ store, clock, log, state }: TickDependencies): Promise<TodoDueCounts | null> {
+  const local = utcToZoned(clock.now(), APPLICATION_TIMEZONE);
+  if (local.time < TODO_DUE_TIME || state.lastTodoDueOn === local.date) return null;
+
+  const counts: TodoDueCounts = { date: local.date, found: 0, queued: 0, duplicates: 0, failed: 0 };
+  let todos: DueTodo[];
+  try {
+    todos = await store.listOpenTodosDueOn(local.date);
+  } catch (error) {
+    log.error("todos_due_failed", { date: local.date, error: errorMessage(error) });
+    return null;
+  }
+  counts.found = todos.length;
+
+  for (const todo of todos) {
+    try {
+      const result = await store.enqueueNotification(todoDueNotification(todo, local.date));
+      if (result === "queued") counts.queued++;
+      else counts.duplicates++;
+    } catch (error) {
+      counts.failed++;
+      log.error("todo_due_failed", { id: todo.id, error: errorMessage(error) });
+    }
+  }
+  if (counts.failed === 0) state.lastTodoDueOn = local.date;
+  log.info("todos_due", counts);
+  return counts;
+}
+
 /** Deletes old `sent` and `skipped` rows on the first tick and then once every 24 hours. */
 async function cleanUp({ store, clock, log, state }: TickDependencies): Promise<number | null> {
   const now = clock.now();
@@ -278,7 +370,8 @@ async function cleanUp({ store, clock, log, state }: TickDependencies): Promise<
 }
 
 /**
- * One pass of the worker: the heartbeat, the daily clean-up, up to {@link REMINDER_BATCH} due
+ * One pass of the worker: the heartbeat, the daily clean-up, the daily "Due today" to-do rows
+ * (from 09:00 Bucharest), up to {@link REMINDER_BATCH} due
  * reminders queued as outbox rows, then up to {@link NOTIFICATION_BATCH} outbox rows sent to every
  * device of their recipient. Without VAPID keys (`push` null) it only logs `push_not_configured`
  * with how many rows are waiting, and leaves them pending; reminders aren't claimed either, and
@@ -302,6 +395,7 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
     }
 
     const cleaned = await cleanUp(deps);
+    const todosDue = await queueDueTodos(deps);
     const reminders = await queueDueReminders(deps);
     const delivery = await deliverDue({ ...deps, push });
     log.info("tick", {
@@ -312,7 +406,7 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
       remindersChanged: reminders.changed,
       ms: clock.now().getTime() - startedAt.getTime(),
     });
-    return { pushConfigured: true, reminders, delivery, cleaned };
+    return { pushConfigured: true, reminders, delivery, cleaned, todosDue };
   } catch (error) {
     log.error("tick_failed", { error: errorMessage(error), ms: clock.now().getTime() - startedAt.getTime() });
     return null;
