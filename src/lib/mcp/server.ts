@@ -7,6 +7,7 @@ import { expenseTabTools } from "@/lib/mcp/tools/expense-tabs";
 import { expenseTools } from "@/lib/mcp/tools/expenses";
 import { investmentTools } from "@/lib/mcp/tools/investments";
 import { netWorthTools } from "@/lib/mcp/tools/net-worth";
+import { reminderTools } from "@/lib/mcp/tools/reminders";
 import { todoTools } from "@/lib/mcp/tools/todos";
 
 const INSTRUCTIONS = [
@@ -19,8 +20,12 @@ const INSTRUCTIONS = [
 export function createMcpServer(ctx: ToolContext): McpServer {
   const server = new McpServer({ name: "expense-tracker", version: "1.0.0" }, { instructions: INSTRUCTIONS });
   // Like the family routes, the to-do tools don't exist while the family flag is off.
+  // Reminders are every user's own and need no family, so their tools are always there.
   const familyTools = isFamilyEnabled() ? todoTools : [];
-  for (const register of [...accountTools, ...expenseTools, ...expenseTabTools, ...investmentTools, ...netWorthTools, ...familyTools]) {
+  const tools = [
+    ...accountTools, ...expenseTools, ...expenseTabTools, ...investmentTools, ...netWorthTools, ...reminderTools, ...familyTools,
+  ];
+  for (const register of tools) {
     register(server, ctx);
   }
   return server;

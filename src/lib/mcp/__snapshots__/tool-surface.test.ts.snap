@@ -833,6 +833,124 @@ exports[`MCP tool surface > lists the same tools, schemas and annotations 1`] = 
       "openWorldHint": false,
       "readOnlyHint": true,
     },
+    "description": "Your own reminders with their state and next due date and time, soonest first. A done one-off has no next date.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "state": {
+          "description": "Omit for every reminder",
+          "enum": [
+            "upcoming",
+            "due",
+            "overdue",
+            "snoozed",
+            "done",
+          ],
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "list_reminders",
+    "title": "List reminders",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Add a private reminder, once or repeating every N weeks, months or years from its first date.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "leadTimes": {
+          "description": "When to notify before each occurrence, at most 3; defaults to ["at_time"]",
+          "items": {
+            "enum": [
+              "at_time",
+              "1_hour",
+              "1_day",
+              "3_days",
+              "1_week",
+            ],
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "notes": {
+          "type": "string",
+        },
+        "notificationsMuted": {
+          "description": "Never notify; it still shows as due and overdue",
+          "type": "boolean",
+        },
+        "repeatInterval": {
+          "description": "Every N weeks, months or years, 1-12; defaults to 1",
+          "type": "number",
+        },
+        "repeatUnit": {
+          "description": "Defaults to none (a one-off)",
+          "enum": [
+            "none",
+            "week",
+            "month",
+            "year",
+          ],
+          "type": "string",
+        },
+        "startsOn": {
+          "description": "The first date, YYYY-MM-DD",
+          "type": "string",
+        },
+        "timeOfDay": {
+          "description": "HH:MM in Europe/Bucharest; defaults to 09:00",
+          "type": "string",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "title",
+        "startsOn",
+      ],
+      "type": "object",
+    },
+    "name": "add_reminder",
+    "title": "Add reminder",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Mark a reminder's open occurrence done. Returns the reminder at its next occurrence; a one-off becomes done.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "complete_reminder",
+    "title": "Complete reminder",
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
     "description": "Cards on the family to-do board, in board order. Done shows the last 30 days unless includeOlderDone.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
