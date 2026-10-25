@@ -7,6 +7,8 @@ import type { ConnectedApp, OAuthApp } from "@/lib/auth/oauth-consent";
 import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
 import { MEMBER_PARAM } from "@/lib/family/viewing";
 import type { McpAccess, McpToken } from "@/lib/mcp/token-repository";
+import type { ReminderCompletion, ReminderSummary } from "@/lib/reminders/repository";
+import type { ListedReminder } from "@/lib/reminders/list";
 import type { Todo } from "@/lib/todos/types";
 
 /**
@@ -255,3 +257,32 @@ export function todoMoveApiUrl(id: string) {
 
 export type TodosResponse = { todos: Todo[] };
 export type TodoResponse = { todo: Todo };
+
+/**
+ * GET → {@link RemindersResponse}: the caller's own reminders with their state, and the occurrences
+ * marked done since `doneSince` (the last 30 days when absent), newest first.
+ * POST the full reminder (`reminderSchema`) → {@link ReminderResponse} (201).
+ */
+export const REMINDERS_API_KEY = "/api/reminders";
+
+/** GET → `ReminderSummary` (`@/lib/reminders/repository`): `{ due, overdue }` for the badge. */
+export const REMINDERS_SUMMARY_API_KEY = `${REMINDERS_API_KEY}/summary`;
+
+/** PATCH the FULL reminder (every field of `reminderSchema`) → {@link ReminderResponse}; DELETE → `{ success: true }`. */
+export function reminderApiUrl(id: string) {
+  return `${REMINDERS_API_KEY}/${encodeURIComponent(id)}`;
+}
+
+/** POST only → {@link ReminderResponse} with the next occurrence; 409 when a one-off is already done. */
+export function reminderCompleteApiUrl(id: string) {
+  return `${reminderApiUrl(id)}/complete`;
+}
+
+/** POST `{ kind: "hour" | "tomorrow" }` or `{ kind: "until", until }` → {@link ReminderResponse}. */
+export function reminderSnoozeApiUrl(id: string) {
+  return `${reminderApiUrl(id)}/snooze`;
+}
+
+export type RemindersResponse = { reminders: ListedReminder[]; completions: ReminderCompletion[] };
+export type ReminderResponse = { reminder: ListedReminder };
+export type RemindersSummaryResponse = ReminderSummary;

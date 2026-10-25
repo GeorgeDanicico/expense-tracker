@@ -7,12 +7,15 @@ import DashboardPage from "@/app/(app)/dashboard/page";
 import ExpensesPage from "@/app/(app)/expenses/page";
 import InvestmentsPage from "@/app/(app)/investments/page";
 import NetWorthPage from "@/app/(app)/net-worth/page";
+import RemindersPage from "@/app/(app)/reminders/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import TodosPage from "@/app/(app)/todos/page";
 import { AppShell } from "@/components/layout/app-shell";
+import { ReminderApiProvider } from "@/components/reminders/reminder-api";
 import { TodoApiProvider } from "@/components/todos/todo-api";
 
 import { fixtureFor } from "../fixtures";
+import { previewReminderApi } from "../reminder-fixtures";
 import { previewTodoApi } from "../todo-fixtures";
 import type { PreviewScreen } from "./screens";
 
@@ -23,6 +26,7 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   "net-worth": NetWorthPage,
   settings: SettingsPage,
   todos: TodosPreview,
+  reminders: RemindersPreview,
 };
 
 /** The board with its writes kept in memory (see `todo-fixtures.ts`). */
@@ -34,6 +38,14 @@ function TodosPreview() {
   );
 }
 
+/** The reminders with their writes kept in memory (see `reminder-fixtures.ts`). */
+function RemindersPreview() {
+  return (
+    <ReminderApiProvider api={previewReminderApi}>
+      <RemindersPage />
+    </ReminderApiProvider>
+  );
+}
 
 /** Replaces every fetcher (including explicit ones) with the fixture resolver. */
 const fixtures: Middleware = (useSWRNext) => (key, _fetcher, config) => {
