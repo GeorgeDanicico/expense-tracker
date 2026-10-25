@@ -70,8 +70,8 @@ describe("MCP server", () => {
     const listTools = async () => (await (await connect()).listTools()).tools;
     const annotationsOf = async (name: string) => (await listTools()).find((tool) => tool.name === name)?.annotations;
 
-    it("lists 20 tools", async () => {
-      expect(await listTools()).toHaveLength(20);
+    it("lists 23 tools", async () => {
+      expect(await listTools()).toHaveLength(23);
     });
 
     it.each(["get_account", "list_expenses", "get_spending_summary", "list_expense_tabs", "get_expense_tab_expenses",
@@ -94,6 +94,21 @@ describe("MCP server", () => {
 
     it("marks add_expense as a non-idempotent, non-destructive write", async () => {
       expect(await annotationsOf("add_expense")).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: false });
+    });
+
+    it("adds the three reminder tools whether or not the family flag is on", async () => {
+      const reminderTools = async () => (await listTools()).map((tool) => tool.name).filter((name) => name.includes("_reminder"));
+      try {
+        for (const flag of ["false", "true"]) {
+          vi.stubEnv("FAMILY_ENABLED", flag);
+          expect(await reminderTools()).toEqual(["list_reminders", "add_reminder", "complete_reminder"]);
+        }
+        expect(await annotationsOf("list_reminders")).toMatchObject({ readOnlyHint: true });
+        expect(await annotationsOf("add_reminder")).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: false });
+        expect(await annotationsOf("complete_reminder")).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: false });
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it("adds the five to-do tools only while the family flag is on", async () => {
@@ -335,6 +350,18 @@ describe("MCP family permissions", () => {
     const result = await call("get_account");
 
     expect(result.isError).toBeFalsy();
+    expect(repositories.family.calls).toEqual([]);
+  });
+
+  it("lets a kid with every module off use their reminders, without reading the membership", async () => {
+    repositories.family.membership = kidWithNothing();
+    repositories.reminders.callerId = "owner";
+
+    const added = await call("add_reminder", { title: "Feed the cat", startsOn: "2026-11-01" });
+    const listed = await call("list_reminders");
+
+    expect(added.isError).toBeFalsy();
+    expect(listed.body.reminders).toEqual([expect.objectContaining({ title: "Feed the cat" })]);
     expect(repositories.family.calls).toEqual([]);
   });
 
