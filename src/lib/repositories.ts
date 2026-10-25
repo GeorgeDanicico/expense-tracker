@@ -9,6 +9,8 @@ import type { FamilyRepository } from "@/lib/family/repository";
 import type { InvestmentRepository } from "@/lib/investments/repository";
 import type { McpTokenRepository } from "@/lib/mcp/token-repository";
 import type { NetWorthRepository } from "@/lib/net-worth/repository";
+import type { NotificationSettingsRepository } from "@/lib/notifications/settings-repository";
+import type { ReminderRepository } from "@/lib/reminders/repository";
 import type { TodoRepository } from "@/lib/todos/repository";
 import { supabaseAccountRepository } from "@/lib/supabase/repositories/account";
 import { supabaseAvatarRepository } from "@/lib/supabase/repositories/avatars";
@@ -19,6 +21,8 @@ import { supabaseInvestmentRepository } from "@/lib/supabase/repositories/invest
 import { supabaseMcpTokenRepository } from "@/lib/supabase/repositories/mcp-tokens";
 import { supabaseNetWorthRepository } from "@/lib/supabase/repositories/net-worth";
 import { supabaseNoticeRepository } from "@/lib/supabase/repositories/notices";
+import { supabaseNotificationSettingsRepository } from "@/lib/supabase/repositories/notification-settings";
+import { supabaseReminderRepository } from "@/lib/supabase/repositories/reminders";
 import { supabaseTodoRepository } from "@/lib/supabase/repositories/todos";
 
 /** Every repository the app uses. Each repository task adds its own key here. */
@@ -32,6 +36,8 @@ export type Repositories = {
   mcpTokens: McpTokenRepository;
   netWorth: NetWorthRepository;
   notices: NoticeRepository;
+  notificationSettings: NotificationSettingsRepository;
+  reminders: ReminderRepository;
   todos: TodoRepository;
 };
 
@@ -52,6 +58,8 @@ export function getRepositories(): Repositories {
     mcpTokens: supabaseMcpTokenRepository,
     netWorth: supabaseNetWorthRepository,
     notices: supabaseNoticeRepository,
+    notificationSettings: supabaseNotificationSettingsRepository,
+    reminders: supabaseReminderRepository,
     todos: supabaseTodoRepository,
   };
 }
