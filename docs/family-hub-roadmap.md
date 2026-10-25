@@ -303,6 +303,8 @@ After 9.9, every later feature step gets a "web + mobile" pair (for example 10.2
 
 ## Phase 14: Production hardening and security
 
+**Status (26 October 2026): planned** in [security-plan.md](security-plan.md) (tasks S1–S12), which supersedes the steps below.
+
 The app is used every day and holds family finance data, so before more features it gets the review a real production app needs. **Starting point (26 October 2026):**
 - RLS on every table, Zod on every route, and Supabase calls through supabase-js and RPCs with parameters, with no raw SQL.
 - An in-memory rate limiter on sign-in, joining a family, password changes and MCP tokens.
