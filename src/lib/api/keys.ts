@@ -274,7 +274,11 @@ export function reminderApiUrl(id: string) {
   return `${REMINDERS_API_KEY}/${encodeURIComponent(id)}`;
 }
 
-/** POST only → {@link ReminderResponse} with the next occurrence; 409 when a one-off is already done. */
+/**
+ * POST → {@link ReminderResponse} with the next occurrence; 409 when a one-off is already done.
+ * The body is optional: `{ logExpense: true, occurrenceOn, amount? }` first logs the reminder's
+ * expense template and also answers `expense` (`completeReminderSchema`).
+ */
 export function reminderCompleteApiUrl(id: string) {
   return `${reminderApiUrl(id)}/complete`;
 }

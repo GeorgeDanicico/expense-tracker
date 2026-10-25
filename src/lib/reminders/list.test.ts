@@ -20,7 +20,7 @@ function reminder(overrides: Partial<ListedReminder> & Pick<ListedReminder, "id"
   const base = {
     title: overrides.id, notes: "", startsOn: "2026-10-24", timeOfDay: "18:00", timezone: "Europe/Bucharest",
     repeatUnit: "none" as const, repeatInterval: 1, leadMinutes: [0], notificationsMuted: false,
-    nextDueOn: "2026-10-24", snoozedUntil: null, nextNotifyAt: null, createdAt: "", updatedAt: "",
+    nextDueOn: "2026-10-24", snoozedUntil: null, nextNotifyAt: null, expenseTemplate: null, createdAt: "", updatedAt: "",
     ...overrides,
   };
   const nextDueAt = base.nextDueOn === null ? null : dueAt(base, base.nextDueOn).toISOString();

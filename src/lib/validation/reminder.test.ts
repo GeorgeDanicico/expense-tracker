@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { reminderSchema, snoozeSchema } from "@/lib/validation/reminder";
+import { completeReminderSchema, expenseTemplateSchema, reminderSchema, snoozeSchema } from "@/lib/validation/reminder";
 
 describe("reminderSchema", () => {
   it("trims text and fills defaults", () => {
@@ -13,6 +13,7 @@ describe("reminderSchema", () => {
       repeatInterval: 1,
       leadMinutes: [0],
       notificationsMuted: false,
+      expenseTemplate: null,
     });
   });
 
@@ -94,5 +95,57 @@ describe("snoozeSchema", () => {
     { kind: "until", until: "2026-11-29T12:00:00Z" },
   ])("rejects %j", (input) => {
     expect(snoozeSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe("expenseTemplateSchema", () => {
+  const rent = { amount: 650, currency: "EUR", category: "housing", subtype: null };
+
+  it("accepts a template, coercing the amount and uppercasing the currency", () => {
+    expect(expenseTemplateSchema.parse({ ...rent, amount: "650.50", currency: "eur" }))
+      .toEqual({ amount: 650.5, currency: "EUR", category: "housing", subtype: null });
+    expect(expenseTemplateSchema.parse({ amount: 40, currency: "RON", category: "car", subtype: "car_fuel" }))
+      .toMatchObject({ category: "car", subtype: "car_fuel" });
+  });
+
+  it("defaults the subtype to none", () => {
+    expect(expenseTemplateSchema.parse({ amount: 1, currency: "EUR", category: "other" }).subtype).toBeNull();
+  });
+
+  it.each([
+    [{ ...rent, amount: 0 }, "amount"],
+    [{ ...rent, amount: -5 }, "amount"],
+    [{ ...rent, amount: 10_000_000_000 }, "amount"],
+    [{ ...rent, currency: "XYZ" }, "currency"],
+    [{ ...rent, category: "rent" }, "category"],
+    [{ ...rent, subtype: "car_fuel" }, "subtype"],
+  ])("rejects %j with the expense schema's rule on %s", (template, field) => {
+    const parsed = expenseTemplateSchema.safeParse(template);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map((issue) => issue.path[0])).toContain(field);
+  });
+
+  it("is optional on a reminder, and validated there", () => {
+    const base = { title: "Pay rent", startsOn: "2026-11-30" };
+    expect(reminderSchema.parse(base).expenseTemplate).toBeNull();
+    expect(reminderSchema.parse({ ...base, expenseTemplate: null }).expenseTemplate).toBeNull();
+    expect(reminderSchema.parse({ ...base, expenseTemplate: rent }).expenseTemplate).toEqual(rent);
+    const invalid = reminderSchema.safeParse({ ...base, expenseTemplate: { ...rent, amount: 0 } });
+    expect(invalid.error?.flatten().fieldErrors).toEqual({ expenseTemplate: ["Amount must be greater than zero."] });
+  });
+});
+
+describe("completeReminderSchema", () => {
+  it("defaults to only marking done", () => {
+    expect(completeReminderSchema.parse({})).toEqual({ logExpense: false });
+  });
+
+  it("takes the occurrence and an amount", () => {
+    expect(completeReminderSchema.parse({ logExpense: true, occurrenceOn: "2026-11-01", amount: "12.5" }))
+      .toEqual({ logExpense: true, occurrenceOn: "2026-11-01", amount: 12.5 });
+  });
+
+  it.each([{ logExpense: "yes" }, { occurrenceOn: "2026-02-30" }, { amount: 0 }])("rejects %j", (body) => {
+    expect(completeReminderSchema.safeParse(body).success).toBe(false);
   });
 });

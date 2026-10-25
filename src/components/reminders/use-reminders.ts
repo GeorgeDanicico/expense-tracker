@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
-import { useReminderApi, type ReminderFields } from "@/components/reminders/reminder-api";
+import { useReminderApi, type LogExpenseOptions, type ReminderFields } from "@/components/reminders/reminder-api";
 import { ApiError } from "@/lib/api/client";
+import { afterExpenseLogged } from "@/lib/api/invalidate";
 import { REMINDERS_API_KEY, REMINDERS_SUMMARY_API_KEY, type RemindersResponse } from "@/lib/api/keys";
 import {
   completeLocally,
@@ -123,6 +124,24 @@ export function useReminders(now: Date) {
     return done;
   }, [api, mutate, optimistic]);
 
+  /**
+   * "Log expense and mark done": not optimistic, as the confirm waits for the answer and shows a
+   * refusal itself (it throws). Either way the list refetches, and on success the expense views too.
+   */
+  const completeWithExpense = useCallback(async (id: string, options: LogExpenseOptions) => {
+    setActionError("");
+    try {
+      const reminder = await api.complete(id, options);
+      await mutate((current = EMPTY) => ({ ...current, reminders: upsertReminder(current.reminders, reminder) }), { revalidate: false });
+      afterExpenseLogged(mutateKey);
+      return reminder;
+    } finally {
+      // The stored completion, with its expense, comes with the refetch.
+      void mutate();
+      refreshSummary();
+    }
+  }, [api, mutate, mutateKey, refreshSummary]);
+
   const snooze = useCallback((id: string, input: SnoozeInput) => {
     const at = new Date();
     return optimistic(
@@ -147,10 +166,11 @@ export function useReminders(now: Date) {
     update,
     remove,
     complete,
+    completeWithExpense,
     snooze,
     actionError,
     dismissActionError: () => setActionError(""),
-  }), [reminders, data, error, isLoading, mutate, add, update, remove, complete, snooze, actionError]);
+  }), [reminders, data, error, isLoading, mutate, add, update, remove, complete, completeWithExpense, snooze, actionError]);
 }
 
 export type RemindersState = ReturnType<typeof useReminders>;

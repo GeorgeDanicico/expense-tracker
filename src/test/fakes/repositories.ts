@@ -56,6 +56,8 @@ export function resetFakeRepositories(): FakeRepositories {
     // Acts as the caller the family fake describes: seed `family.membership` and `family.family` first.
     todos: new FakeTodoRepository(family),
   };
+  const { reminders } = current;
+  current.expenses.onDelete = (id) => reminders.expenseDeleted(id);
   return current;
 }
 

@@ -82,9 +82,10 @@ export interface ReminderRepository {
    * snooze, but only while `occurrenceOn` is still its open occurrence, then records the completion.
    * Returns the moved reminder, or null when the caller has no such reminder. Throws a 409
    * `DomainError` (`occurrenceAlreadyDoneError`) when the open occurrence is no longer
-   * `occurrenceOn`: another request marked it done first.
+   * `occurrenceOn`: another request marked it done first. `expenseId` (R12) links the caller's
+   * expense logged for the occurrence on its completion.
    */
-  complete(id: string, occurrenceOn: string, next: ReminderNextOccurrence): Promise<Reminder | null>;
+  complete(id: string, occurrenceOn: string, next: ReminderNextOccurrence, expenseId?: string | null): Promise<Reminder | null>;
   /** How many of the caller's reminders are due and overdue at `now` (`stateOf`). */
   summary(now: Date): Promise<ReminderSummary>;
 }

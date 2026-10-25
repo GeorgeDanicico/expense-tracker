@@ -8,9 +8,10 @@ import {
   type ReminderRepository,
   type ReminderValues,
 } from "@/lib/reminders/repository";
-import { REPEAT_UNITS, type Reminder, type RepeatUnit } from "@/lib/reminders/types";
+import { REPEAT_UNITS, type ExpenseTemplate, type Reminder, type RepeatUnit } from "@/lib/reminders/types";
 import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
+import { expenseTemplateSchema } from "@/lib/validation/reminder";
 
 const LOAD_ERROR = "Unable to load your reminders.";
 const SAVE_ERROR = "Unable to save the reminder.";
@@ -18,14 +19,14 @@ const DELETE_ERROR = "Unable to delete the reminder.";
 const COMPLETE_ERROR = "Unable to mark the reminder done.";
 
 const REMINDER_COLUMNS =
-  "id, title, notes, starts_on, time_of_day, timezone, repeat_unit, repeat_interval, lead_minutes, notifications_muted, next_due_on, next_due_at, snoozed_until, next_notify_at, created_at, updated_at";
+  "id, title, notes, starts_on, time_of_day, timezone, repeat_unit, repeat_interval, lead_minutes, notifications_muted, next_due_on, next_due_at, snoozed_until, next_notify_at, expense_template, created_at, updated_at";
 const COMPLETION_COLUMNS = "id, reminder_id, occurrence_on, done_at, expense_id";
 
 type ReminderRow = Pick<
   Database["public"]["Tables"]["reminders"]["Row"],
   | "id" | "title" | "notes" | "starts_on" | "time_of_day" | "timezone" | "repeat_unit" | "repeat_interval"
   | "lead_minutes" | "notifications_muted" | "next_due_on" | "next_due_at" | "snoozed_until"
-  | "next_notify_at" | "created_at" | "updated_at"
+  | "next_notify_at" | "expense_template" | "created_at" | "updated_at"
 >;
 type CompletionRow = Database["public"]["Tables"]["reminder_completions"]["Row"];
 type ReminderWrite = Database["public"]["Tables"]["reminders"]["Update"];
@@ -40,6 +41,13 @@ function toIso(value: string): string;
 function toIso(value: string | null): string | null;
 function toIso(value: string | null) {
   return value === null ? null : new Date(value).toISOString();
+}
+
+/** The stored template, or null for none; one that no longer validates (a removed category) counts as none. */
+function toExpenseTemplate(value: ReminderRow["expense_template"]): ExpenseTemplate | null {
+  if (value === null) return null;
+  const parsed = expenseTemplateSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 function toReminder(row: ReminderRow): Reminder {
@@ -59,6 +67,7 @@ function toReminder(row: ReminderRow): Reminder {
     nextDueAt: toIso(row.next_due_at),
     snoozedUntil: toIso(row.snoozed_until),
     nextNotifyAt: toIso(row.next_notify_at),
+    expenseTemplate: toExpenseTemplate(row.expense_template),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
   };
@@ -90,6 +99,7 @@ function columns(values: Partial<ReminderValues>): ReminderWrite {
     ["nextDueAt", "next_due_at"],
     ["snoozedUntil", "snoozed_until"],
     ["nextNotifyAt", "next_notify_at"],
+    ["expenseTemplate", "expense_template"],
   ];
   return Object.fromEntries(
     entries.filter(([field]) => values[field] !== undefined).map(([field, column]) => [column, values[field]]),
@@ -163,10 +173,12 @@ export const supabaseReminderRepository: ReminderRepository = {
   /**
    * Moves the reminder first, guarded on `next_due_on = occurrenceOn`: Postgres re-checks that
    * condition after a racing update commits, so of two concurrent mark-dones only one moves it and
-   * the other gets the 409. The completion is recorded after; one that already exists (the same
-   * date marked done before an edit moved the schedule back) is left as it is.
+   * the other gets the 409. The completion is recorded after, with `expense_id` (the insert policy
+   * accepts only the caller's own expense); one that already exists (the same date marked done
+   * before an edit moved the schedule back) is left as it is, except that it gets `expenseId` when
+   * it has no expense yet.
    */
-  async complete(id, occurrenceOn, next) {
+  async complete(id, occurrenceOn, next, expenseId = null) {
     const supabase = await createClient();
     const { data, error } = await supabase.from("reminders")
       .update(columns({ ...next, snoozedUntil: null }))
@@ -180,9 +192,15 @@ export const supabaseReminderRepository: ReminderRepository = {
     }
 
     const { error: completionError } = await supabase.from("reminder_completions")
-      .insert({ reminder_id: id, occurrence_on: occurrenceOn });
+      .insert({ reminder_id: id, occurrence_on: occurrenceOn, expense_id: expenseId });
     if (completionError && completionError.code !== "23505") {
       throw translateDatabaseError(completionError, COMPLETE_ERROR);
+    }
+    if (completionError && expenseId !== null) {
+      // The completion already existed: link the expense unless one is linked already.
+      const { error: linkError } = await supabase.from("reminder_completions").update({ expense_id: expenseId })
+        .eq("reminder_id", id).eq("occurrence_on", occurrenceOn).is("expense_id", null);
+      if (linkError) throw translateDatabaseError(linkError, COMPLETE_ERROR);
     }
     return toReminder(data);
   },

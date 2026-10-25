@@ -61,6 +61,7 @@ const values: ReminderValues = {
   nextDueAt: "2026-10-31T07:00:00.000Z",
   snoozedUntil: null,
   nextNotifyAt: "2026-10-28T07:00:00.000Z",
+  expenseTemplate: null,
 };
 
 describe("Supabase reminder repository", () => {
@@ -101,6 +102,7 @@ describe("Supabase reminder repository", () => {
         nextDueAt: "2026-10-31T07:00:00.000Z",
         snoozedUntil: null,
         nextNotifyAt: "2026-10-28T07:00:00.000Z",
+        expenseTemplate: null,
         createdAt: "2026-10-20T09:00:00.000Z",
         updatedAt: "2026-10-20T09:00:00.000Z",
       });
@@ -168,8 +170,9 @@ describe("Supabase reminder repository", () => {
         next_due_at: "2026-10-31T07:00:00.000Z",
         snoozed_until: null,
         next_notify_at: "2026-10-28T07:00:00.000Z",
+        expense_template: null,
       });
-      expect(created).toMatchObject({ title: "Pay rent", nextDueOn: "2026-10-31" });
+      expect(created).toMatchObject({ title: "Pay rent", nextDueOn: "2026-10-31", expenseTemplate: null });
     });
 
     it("passes a known database error on as a DomainError", async () => {
@@ -184,6 +187,38 @@ describe("Supabase reminder repository", () => {
       useDatabase({}, { fail: () => true });
 
       await expect(reminders.create(userId, values)).rejects.toThrow("Unable to save the reminder.");
+    });
+  });
+
+  describe("expense template", () => {
+    const template = { amount: 650, currency: "EUR", category: "housing", subtype: null } as const;
+
+    it("stores the template as jsonb and reads it back", async () => {
+      const { queries } = useDatabase({}, {
+        trigger: (row) => ({ created_at: "2026-10-25T08:00:00+00:00", updated_at: "2026-10-25T08:00:00+00:00", ...row }),
+      });
+
+      const created = await reminders.create(userId, { ...values, expenseTemplate: template });
+
+      expect(queries[0].values).toMatchObject({ expense_template: template });
+      expect(created.expenseTemplate).toEqual(template);
+    });
+
+    it("clears it with null on an edit", async () => {
+      const row = aRow({ expense_template: template });
+      const { queries } = useDatabase({ reminders: [row] });
+
+      const updated = await reminders.update(row.id, { expenseTemplate: null });
+
+      expect(queries[0]).toMatchObject({ operation: "update", values: { expense_template: null } });
+      expect(updated?.expenseTemplate).toBeNull();
+    });
+
+    it("reads a stored template that no longer validates as none", async () => {
+      const row = aRow({ expense_template: { amount: 10, currency: "EUR", category: "gone", subtype: null } });
+      useDatabase({ reminders: [row] });
+
+      expect((await reminders.get(row.id))?.expenseTemplate).toBeNull();
     });
   });
 
@@ -258,6 +293,38 @@ describe("Supabase reminder repository", () => {
       useDatabase({});
 
       expect(await reminders.complete("50000000-0000-4000-8000-000000000999", "2026-10-31", next)).toBeNull();
+    });
+
+    it("links the expense on the completion it records", async () => {
+      const row = aRow();
+      const { queries, tables } = useDatabase({ reminders: [row] });
+      const expenseId = "60000000-0000-4000-8000-000000000001";
+
+      await reminders.complete(row.id, "2026-10-31", next, expenseId);
+
+      expect(queries[1]).toMatchObject({
+        table: "reminder_completions", operation: "insert",
+        values: { reminder_id: row.id, occurrence_on: "2026-10-31", expense_id: expenseId },
+      });
+      expect(tables.reminder_completions).toEqual([expect.objectContaining({ expense_id: expenseId })]);
+    });
+
+    it("links the expense on a completion that already exists without one", async () => {
+      const row = aRow();
+      const { queries } = useDatabase({ reminders: [row] }, {
+        fail: (query) => query.table === "reminder_completions" && query.operation === "insert"
+          && { code: "23505", message: "duplicate key value violates unique constraint" },
+      });
+      const expenseId = "60000000-0000-4000-8000-000000000001";
+
+      await reminders.complete(row.id, "2026-10-31", next, expenseId);
+
+      expect(queries[2]).toMatchObject({
+        table: "reminder_completions",
+        operation: "update",
+        values: { expense_id: expenseId },
+        filters: [["eq", "reminder_id", row.id], ["eq", "occurrence_on", "2026-10-31"], ["is", "expense_id", null]],
+      });
     });
 
     it("leaves a completion that already exists for that date", async () => {

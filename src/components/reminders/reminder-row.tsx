@@ -1,13 +1,30 @@
 "use client";
 
-import { Badge, Box, Button, chakra, Flex, Menu, Portal, Text } from "@chakra-ui/react";
-import { AlarmClock, BellOff, BellRing, Check, CircleAlert, CircleCheck, Pencil, Repeat } from "lucide-react";
+import { Badge, Box, Button, chakra, Flex, Link as ChakraLink, Menu, Portal, Text } from "@chakra-ui/react";
+import { AlarmClock, BellOff, BellRing, Check, CircleAlert, CircleCheck, Pencil, Receipt, Repeat } from "lucide-react";
+import NextLink from "next/link";
 import type { ReactNode } from "react";
 
 import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { formatDay, formatDueAt, formatInstant, overdueText, repeatLabel, snoozedText } from "@/lib/reminders/format";
 import type { DoneEntry, ListedReminder } from "@/lib/reminders/list";
+
+/** Where "Expense logged" leads: the expenses page on the occurrence's month. */
+export function loggedExpenseHref(occurrenceOn: string) {
+  return `/expenses?month=${occurrenceOn.slice(0, 7)}`;
+}
+
+/** The Done row's "Expense logged" marker, linking to the month the expense is in. */
+function ExpenseLogged({ occurrenceOn }: { occurrenceOn: string }) {
+  return (
+    <ChakraLink asChild color="fg.accent" fontWeight="medium" display="inline-flex" alignItems="center" gap="1">
+      <NextLink href={loggedExpenseHref(occurrenceOn)}>
+        <Receipt size={12} strokeWidth={ICON_STROKE} aria-hidden="true" /> Expense logged
+      </NextLink>
+    </ChakraLink>
+  );
+}
 
 export type SnoozeChoice = "hour" | "tomorrow" | "until";
 
@@ -220,7 +237,10 @@ export function ReminderRow({
   );
 }
 
-/** One occurrence marked done: the reminder's title, when it was done, and the occurrence's date. */
+/**
+ * One occurrence marked done: the reminder's title, when it was done, the occurrence's date, and
+ * "Expense logged" when an expense was logged with it (and not deleted since).
+ */
 export function DoneRow({
   entry,
   now,
@@ -243,6 +263,12 @@ export function DoneRow({
           <Text as="span">Done {formatInstant(completion.doneAt, reminder.timezone, now)}</Text>
           <Text as="span" aria-hidden="true">·</Text>
           <Text as="span">for {formatDay(completion.occurrenceOn, now)}</Text>
+          {completion.expenseId ? (
+            <>
+              <Text as="span" aria-hidden="true">·</Text>
+              <ExpenseLogged occurrenceOn={completion.occurrenceOn} />
+            </>
+          ) : null}
         </Meta>
       </Flex>
       <Actions>

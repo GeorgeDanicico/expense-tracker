@@ -25,6 +25,8 @@ function sumBy<K>(expenses: Expense[], key: (expense: Expense) => K) {
  */
 export class FakeExpenseRepository implements ExpenseRepository {
   readonly expenses = new Map<string, Expense[]>();
+  /** Runs after a delete, for what the database's foreign keys do (`resetFakeRepositories` wires it). */
+  onDelete: (id: string) => void = () => {};
 
   async listMonth(userId: string, month: string) {
     return this.newestFirst(userId).filter((expense) => inRange(expense, getMonthRange(month)));
@@ -78,6 +80,7 @@ export class FakeExpenseRepository implements ExpenseRepository {
     const owned = this.owned(userId);
     if (!owned.some((expense) => expense.id === id)) return false;
     this.expenses.set(userId, owned.filter((expense) => expense.id !== id));
+    this.onDelete(id);
     return true;
   }
 

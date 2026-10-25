@@ -4,6 +4,7 @@ import { Badge, Box, Button, Stack, Tabs, Text } from "@chakra-ui/react";
 import { BellRing, CircleCheck, PartyPopper, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { LogExpenseDialog } from "@/components/reminders/log-expense-dialog";
 import { ReminderDialog } from "@/components/reminders/reminder-dialog";
 import { DoneRow, ReminderRow, type SnoozeChoice } from "@/components/reminders/reminder-row";
 import { SnoozeDialog } from "@/components/reminders/snooze-dialog";
@@ -16,6 +17,7 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { useAccount } from "@/hooks/use-account";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { doneEntries, groupReminders, tabOf, type ListedReminder, type ReminderTab } from "@/lib/reminders/list";
 import { DONE_WINDOW_DAYS_LABEL } from "@/lib/reminders/format";
@@ -89,6 +91,8 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [snoozingId, setSnoozingId] = useState<string | null>(null);
+  const [loggingId, setLoggingId] = useState<string | null>(null);
+  const { currency } = useAccount();
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
 
   const groups = useMemo(() => groupReminders(reminders.reminders ?? []), [reminders.reminders]);
@@ -117,6 +121,7 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
   const find = (id: string | null) => (id ? reminders.reminders?.find((reminder) => reminder.id === id) : undefined);
   const editing = find(editingId);
   const snoozing = find(snoozingId);
+  const logging = find(loggingId);
 
   /** Runs a mark done or snooze, keeping that row's actions disabled until it settles. */
   const track = useCallback(async (id: string, write: () => Promise<boolean>) => {
@@ -132,7 +137,12 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
     }
   }, []);
 
-  const complete = (reminder: ListedReminder) => void track(reminder.id, () => reminders.complete(reminder.id));
+  const markDone = (reminder: ListedReminder) => void track(reminder.id, () => reminders.complete(reminder.id));
+  // A reminder with an expense template asks first whether to log it (R12).
+  const complete = (reminder: ListedReminder) => {
+    if (reminder.expenseTemplate && reminder.nextDueOn) setLoggingId(reminder.id);
+    else markDone(reminder);
+  };
   const snooze = (reminder: ListedReminder, choice: SnoozeChoice) => {
     if (choice === "until") setSnoozingId(reminder.id);
     else void track(reminder.id, () => reminders.snooze(reminder.id, { kind: choice }));
@@ -275,6 +285,26 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
           onOpenChange={(open) => { if (!open) setEditingId(null); }}
           onSave={(fields) => reminders.update(editing.id, fields)}
           onDelete={reminders.remove}
+        />
+      ) : null}
+      {logging?.expenseTemplate && logging.nextDueOn ? (
+        <LogExpenseDialog
+          key={`${logging.id}-${logging.nextDueOn}`}
+          reminder={logging}
+          template={logging.expenseTemplate}
+          occurrenceOn={logging.nextDueOn}
+          currency={currency}
+          now={now}
+          open
+          onOpenChange={(open) => { if (!open) setLoggingId(null); }}
+          onJustDone={() => markDone(logging)}
+          onLog={(amount) => {
+            const occurrenceOn = logging.nextDueOn ?? "";
+            return track(logging.id, async () => {
+              await reminders.completeWithExpense(logging.id, { occurrenceOn, amount });
+              return true;
+            });
+          }}
         />
       ) : null}
       {snoozing ? (

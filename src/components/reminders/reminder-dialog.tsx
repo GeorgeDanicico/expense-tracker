@@ -4,6 +4,7 @@ import { Button, Flex, Input, NativeSelect, Stack, Switch, Text, Textarea } from
 import { Check, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 
+import { CategoryField, SubtypeField } from "@/components/expenses/expense-category-fields";
 import type { ReminderFields } from "@/components/reminders/reminder-api";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -11,8 +12,11 @@ import { FormActions } from "@/components/ui/form-actions";
 import { FormField, FormRow } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { useAccount } from "@/hooks/use-account";
 import { useApiForm } from "@/hooks/use-api-form";
 import { getBucharestToday } from "@/lib/calendar";
+import { subtypeForCategory, type ExpenseCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
+import { can } from "@/lib/permissions";
 import { formatDueAt, repeatLabel, repeatUnitName } from "@/lib/reminders/format";
 import type { ListedReminder } from "@/lib/reminders/list";
 import {
@@ -25,7 +29,19 @@ import {
   type RepeatUnit,
 } from "@/lib/reminders/types";
 
-/** The form's fields as typed; the interval stays text until it's sent. */
+/** The optional Expense section as typed; the amount stays text until it's sent. */
+export type ExpenseDraft = {
+  /** "Log an expense when marked done" is on. */
+  enabled: boolean;
+  amount: string;
+  category: ExpenseCategory;
+  subtype: ExpenseSubtype | null;
+};
+
+/** The category a new reminder's expense starts on: reminders are mostly bills and rent. */
+export const DEFAULT_TEMPLATE_CATEGORY: ExpenseCategory = "housing";
+
+/** The form's fields as typed; the interval and the amount stay text until they're sent. */
 export type ReminderDraft = {
   title: string;
   notes: string;
@@ -35,6 +51,7 @@ export type ReminderDraft = {
   repeatInterval: string;
   leadMinutes: number[];
   notificationsMuted: boolean;
+  expense: ExpenseDraft;
 };
 
 const REPEAT_OPTIONS: { value: RepeatUnit; label: string }[] = [
@@ -56,8 +73,10 @@ export function draftFor(reminder: ListedReminder | undefined, today: string): R
       repeatInterval: String(MIN_REPEAT_INTERVAL),
       leadMinutes: [...DEFAULT_LEAD_MINUTES],
       notificationsMuted: false,
+      expense: { enabled: false, amount: "", category: DEFAULT_TEMPLATE_CATEGORY, subtype: null },
     };
   }
+  const template = reminder.expenseTemplate;
   return {
     title: reminder.title,
     notes: reminder.notes,
@@ -67,15 +86,20 @@ export function draftFor(reminder: ListedReminder | undefined, today: string): R
     repeatInterval: String(reminder.repeatInterval),
     leadMinutes: [...reminder.leadMinutes],
     notificationsMuted: reminder.notificationsMuted,
+    expense: template
+      ? { enabled: true, amount: String(template.amount), category: template.category, subtype: template.subtype }
+      : { enabled: false, amount: "", category: DEFAULT_TEMPLATE_CATEGORY, subtype: null },
   };
 }
 
 /**
  * Every field of the reminder as POST and PATCH take it. PATCH replaces the whole reminder, so
  * nothing is ever left out. Text is trimmed and the lead times sorted; a one-off's interval is 1.
- * The server validates the rest (an interval outside 1–12 comes back as a field error).
+ * The expense template, when on, is in `currency` (the account's: expenses are kept in it), and
+ * null when off. The server validates the rest (an interval outside 1–12, or an amount that isn't
+ * above zero, comes back as a field error).
  */
-export function draftToFields(draft: ReminderDraft): ReminderFields {
+export function draftToFields(draft: ReminderDraft, currency: string): ReminderFields {
   const interval = Number(draft.repeatInterval.trim());
   return {
     title: draft.title.trim(),
@@ -86,7 +110,95 @@ export function draftToFields(draft: ReminderDraft): ReminderFields {
     repeatInterval: draft.repeatUnit === "none" ? MIN_REPEAT_INTERVAL : interval,
     leadMinutes: [...draft.leadMinutes].sort((a, b) => a - b),
     notificationsMuted: draft.notificationsMuted,
+    expenseTemplate: draft.expense.enabled
+      ? {
+        amount: Number(draft.expense.amount.trim()) || 0,
+        currency,
+        category: draft.expense.category,
+        subtype: subtypeForCategory(draft.expense.category, draft.expense.subtype),
+      }
+      : null,
   };
+}
+
+/**
+ * The optional Expense section: a switch, then the amount in the account's currency and the
+ * expense form's category and subtype pickers. Marking the reminder done then offers to log it.
+ */
+function ExpenseSection({
+  draft,
+  currency,
+  savedCurrency,
+  error,
+  onChange,
+}: {
+  draft: ExpenseDraft;
+  currency: string;
+  /** The currency the stored template is in, when it isn't `currency`. */
+  savedCurrency: string | null;
+  error?: string;
+  onChange: (next: ExpenseDraft) => void;
+}) {
+  return (
+    <Stack gap="3" borderTopWidth="1px" borderColor="border" pt="3" role="group" aria-label="Expense">
+      <Switch.Root
+        checked={draft.enabled}
+        onCheckedChange={(details) => onChange({ ...draft, enabled: details.checked })}
+        colorPalette="brand"
+        display="flex"
+        justifyContent="space-between"
+        gap="4"
+        width="full"
+      >
+        <Stack gap="0">
+          <Switch.Label textStyle="bodySm" fontWeight="medium">
+            Expense{" "}
+            <Text as="span" color="fg.muted" fontWeight="normal">(optional)</Text>
+          </Switch.Label>
+          <Text textStyle="caption">Marking it done offers to log this expense, dated on the day it was due.</Text>
+        </Stack>
+        <Switch.HiddenInput />
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
+      </Switch.Root>
+      {draft.enabled ? (
+        <>
+          <FormField
+            label={`Amount (${currency})`}
+            error={error}
+            hint={savedCurrency ? `Saved in ${savedCurrency}; saving changes it to ${currency}, your expenses' currency.` : undefined}
+          >
+            <Input
+              name="expenseAmount"
+              type="number"
+              inputMode="decimal"
+              min="0.01"
+              max="9999999999.99"
+              step="0.01"
+              placeholder="0.00"
+              required
+              value={draft.amount}
+              onChange={(event) => onChange({ ...draft, amount: event.target.value })}
+            />
+          </FormField>
+          <FormRow>
+            <CategoryField
+              flex="1"
+              value={draft.category}
+              onChange={(category) => onChange({ ...draft, category, subtype: subtypeForCategory(category, draft.subtype) })}
+            />
+            <SubtypeField
+              flex="1"
+              category={draft.category}
+              value={draft.subtype}
+              onChange={(subtype) => onChange({ ...draft, subtype })}
+            />
+          </FormRow>
+        </>
+      ) : null}
+    </Stack>
+  );
 }
 
 /** `selected` with `minutes` toggled; adding is refused (unchanged) once `MAX_LEAD_TIMES` are on. */
@@ -123,7 +235,8 @@ function LeadTimeChips({ selected, onChange }: { selected: number[]; onChange: (
 
 /**
  * Add a reminder, or edit one (with Delete, after a confirmation): title, notes, first date, time,
- * repeat with its interval, up to three lead times, and mute. Always sends every field.
+ * repeat with its interval, up to three lead times, mute, and an optional expense to log when it's
+ * marked done (R12). Always sends every field.
  */
 export function ReminderDialog({
   reminder,
@@ -141,6 +254,7 @@ export function ReminderDialog({
 }) {
   const form = useApiForm();
   const removal = useApiForm();
+  const { account, currency } = useAccount();
   const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState<ReminderDraft>(() => draftFor(reminder, getBucharestToday()));
   const leadLabel = useId();
@@ -148,10 +262,15 @@ export function ReminderDialog({
   const editing = reminder !== undefined;
   const next = reminder ? formatDueAt(reminder) : null;
   const interval = Number(draft.repeatInterval);
+  // Kids without expenses access don't get the section; a template already saved stays visible.
+  const showExpense = can(account?.membership ?? null, "expenses", "edit") || draft.expense.enabled;
+  const savedCurrency = reminder?.expenseTemplate && reminder.expenseTemplate.currency !== currency
+    ? reminder.expenseTemplate.currency
+    : null;
 
   function save() {
     void form.submit(async () => {
-      await onSave(draftToFields(draft));
+      await onSave(draftToFields(draft, currency));
       onOpenChange(false);
     }, { fallback: "The reminder could not be saved." });
   }
@@ -310,6 +429,15 @@ export function ReminderDialog({
                 <Switch.Thumb />
               </Switch.Control>
             </Switch.Root>
+            {showExpense ? (
+              <ExpenseSection
+                draft={draft.expense}
+                currency={currency}
+                savedCurrency={savedCurrency}
+                error={form.fieldError("expenseTemplate")}
+                onChange={(expense) => setDraft({ ...draft, expense })}
+              />
+            ) : null}
             {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
           </Stack>
         </form>
