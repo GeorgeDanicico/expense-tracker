@@ -22,14 +22,21 @@ describe("navigation sections", () => {
   it("drops tab-bar destinations from the More sheet but keeps the section", () => {
     expect(MORE_SECTIONS).toEqual([
       { label: "Finance", items: [NAV_ITEMS.investments, NAV_ITEMS.netWorth] },
-      { label: "Family", items: [NAV_ITEMS.todos] },
+      { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos] },
     ]);
   });
 
-  it("puts To-dos in a Family section of the More sheet, not the tab bar", () => {
-    expect(NAV_SECTIONS.at(-1)).toEqual({ label: "Family", items: [NAV_ITEMS.todos] });
+  it("puts Reminders then To-dos in a Planning section of the More sheet, not the tab bar", () => {
+    expect(NAV_SECTIONS.at(-1)).toEqual({ label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos] });
     expect(TAB_BAR_ITEMS).not.toContain(NAV_ITEMS.todos);
+    expect(TAB_BAR_ITEMS).not.toContain(NAV_ITEMS.reminders);
     expect(NAV_ITEMS.todos).toMatchObject({ href: "/todos", label: "To-dos", requiresFamily: true });
+  });
+
+  it("makes Reminders a badged destination for everyone", () => {
+    expect(NAV_ITEMS.reminders).toMatchObject({ href: "/reminders", label: "Reminders", badge: "reminders" });
+    expect(NAV_ITEMS.reminders).not.toHaveProperty("requiresFamily");
+    expect(NAV_ITEMS.reminders).not.toHaveProperty("module");
   });
 
   it("never lists an empty section", () => {
@@ -45,16 +52,19 @@ const kid = (permissions = DEFAULT_KID_PERMISSIONS): AccountMembership => ({
   permissions,
 });
 
-const FINANCE = NAV_SECTIONS.filter((section) => section.label !== "Family");
-const FINANCE_MORE = MORE_SECTIONS.filter((section) => section.label !== "Family");
+const FINANCE = NAV_SECTIONS.filter((section) => section.label === "Finance");
+const FINANCE_MORE = MORE_SECTIONS.filter((section) => section.label === "Finance");
+const PLANNING_SOLO = { label: "Planning", items: [NAV_ITEMS.reminders] };
+const PLANNING = { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos] };
 
 describe("navigationFor", () => {
-  it("hides the Family section from a user without a family", () => {
+  it("shows a user without a family Reminders but not To-dos", () => {
     const nav = navigationFor(null);
-    expect(nav.sections).toEqual(FINANCE);
+    expect(nav.sections).toEqual([...FINANCE, PLANNING_SOLO]);
     expect(nav.tabBarItems).toEqual(TAB_BAR_ITEMS);
-    expect(nav.moreSections).toEqual(FINANCE_MORE);
+    expect(nav.moreSections).toEqual([...FINANCE_MORE, PLANNING_SOLO]);
     expect(nav.moreItems).toEqual(MORE_ITEMS.filter((item) => item !== NAV_ITEMS.todos));
+    expect(nav.moreItems).toContain(NAV_ITEMS.reminders);
   });
 
   it("shows everything to a parent", () => {
@@ -63,26 +73,26 @@ describe("navigationFor", () => {
     expect(navigationFor(parent).moreItems).toEqual(MORE_ITEMS);
   });
 
-  it("shows the module items but not To-dos while the account is loading", () => {
+  it("shows the module items and Reminders but not To-dos while the account is loading", () => {
     const nav = navigationFor(undefined);
-    expect(nav.sections).toEqual(FINANCE);
+    expect(nav.sections).toEqual([...FINANCE, PLANNING_SOLO]);
     expect(nav.moreItems).not.toContain(NAV_ITEMS.todos);
   });
 
-  it("leaves a kid with only expenses enabled with Home, Expenses, To-dos and Settings", () => {
+  it("leaves a kid with only expenses enabled with Home, Expenses, Reminders, To-dos and Settings", () => {
     const nav = navigationFor(kid());
     expect(nav.sections).toEqual([
       { label: "Finance", items: [NAV_ITEMS.expenses] },
-      { label: "Family", items: [NAV_ITEMS.todos] },
+      PLANNING,
     ]);
     expect(nav.tabBarItems).toEqual(TAB_BAR_ITEMS);
-    expect(nav.moreSections).toEqual([{ label: "Family", items: [NAV_ITEMS.todos] }]);
-    expect(nav.moreItems).toEqual([NAV_ITEMS.todos, NAV_ITEMS.settings]);
+    expect(nav.moreSections).toEqual([PLANNING]);
+    expect(nav.moreItems).toEqual([NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.settings]);
   });
 
-  it("drops the Finance section for a kid with every module off, keeping the board", () => {
+  it("drops the Finance section for a kid with every module off, keeping Planning", () => {
     const nav = navigationFor(kid({ ...DEFAULT_KID_PERMISSIONS, expenses: "off" }));
-    expect(nav.sections).toEqual([{ label: "Family", items: [NAV_ITEMS.todos] }]);
+    expect(nav.sections).toEqual([PLANNING]);
     expect(nav.tabBarItems).toEqual([NAV_ITEMS.home]);
   });
 
@@ -90,7 +100,7 @@ describe("navigationFor", () => {
     const nav = navigationFor(kid({ ...DEFAULT_KID_PERMISSIONS, net_worth: "edit" }));
     expect(nav.moreSections).toEqual([
       { label: "Finance", items: [NAV_ITEMS.netWorth] },
-      { label: "Family", items: [NAV_ITEMS.todos] },
+      PLANNING,
     ]);
   });
 });

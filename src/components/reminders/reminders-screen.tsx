@@ -15,6 +15,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { useIsPhone } from "@/hooks/use-is-phone";
 import { doneEntries, groupReminders, tabOf, type ListedReminder, type ReminderTab } from "@/lib/reminders/list";
 import { DONE_WINDOW_DAYS_LABEL } from "@/lib/reminders/format";
 
@@ -38,6 +40,26 @@ function Empty({ icon, title, description, action }: { icon: ReactNode; title: s
   );
 }
 
+/** The tabs' names, in order. */
+export const REMINDER_TAB_LABELS: Record<ReminderTab, string> = { upcoming: "Upcoming", overdue: "Overdue", done: "Done" };
+
+/**
+ * The phone's tab switcher (below 768 px): Upcoming / Overdue / Done as a full-width
+ * `SegmentedControl`, like the to-do board's columns. Overdue carries its count when there is one.
+ */
+export function ReminderTabSwitcher({ value, overdueCount, onValueChange }: {
+  value: ReminderTab;
+  overdueCount: number;
+  onValueChange: (tab: ReminderTab) => void;
+}) {
+  const items = (Object.keys(REMINDER_TAB_LABELS) as ReminderTab[]).map((tab) => (
+    tab === "overdue" && overdueCount > 0
+      ? { value: tab, label: `Overdue · ${overdueCount}`, ariaLabel: `Overdue, ${overdueCount}` }
+      : { value: tab, label: REMINDER_TAB_LABELS[tab] }
+  ));
+  return <SegmentedControl items={items} value={value} onValueChange={onValueChange} fullWidth aria-label="Reminders" />;
+}
+
 /** How long a reminder opened from a notification stays highlighted. */
 export const FOCUS_HIGHLIGHT_MS = 2500;
 
@@ -58,6 +80,7 @@ function scrollToReminder(id: string) {
  */
 export function RemindersScreen({ focusId = null }: { focusId?: string | null }) {
   const now = useNow();
+  const phone = useIsPhone();
   const reminders = useReminders(now);
   const [tab, setTab] = useState<ReminderTab>("upcoming");
   // The focus id already acted on, so a refetch or a tab change by hand doesn't jump back.
@@ -136,6 +159,61 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
   const rowProps = { now, onComplete: complete, onSnooze: snooze, onEdit: edit };
   const overdueCount = groups.overdue.length;
 
+  const panels: Record<ReminderTab, ReactNode> = {
+    upcoming: groups.upcoming.length > 0 ? (
+      <List>
+        {groups.upcoming.map((reminder) => (
+          <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} focused={reminder.id === highlighted} {...rowProps} />
+        ))}
+      </List>
+    ) : (
+      <Empty
+        icon={<BellRing size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
+        title={reminders.reminders.length === 0 ? "No reminders yet" : "Nothing coming up"}
+        description={reminders.reminders.length === 0
+          ? "Add one for the rent, a renewal or anything that repeats, and pick when it notifies you."
+          : overdueCount > 0 ? "Everything open is overdue; see the Overdue tab." : "Every reminder is done."}
+        action={addButton}
+      />
+    ),
+    overdue: overdueCount > 0 ? (
+      <List>
+        {groups.overdue.map((reminder) => (
+          <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} focused={reminder.id === highlighted} {...rowProps} />
+        ))}
+      </List>
+    ) : (
+      <Empty
+        icon={<PartyPopper size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
+        title="Nothing overdue"
+        description="You're all caught up."
+      />
+    ),
+    done: done.length > 0 ? (
+      <Stack gap="2">
+        <List>
+          {done.map((entry, index) => (
+            <DoneRow
+              key={entry.completion.id}
+              entry={entry}
+              now={now}
+              // Only its latest completion, the first listed, is highlighted.
+              focused={entry.reminder.id === highlighted && done.findIndex((other) => other.reminder.id === highlighted) === index}
+              onEdit={edit}
+            />
+          ))}
+        </List>
+        <Text textStyle="caption" textAlign="center">{DONE_WINDOW_DAYS_LABEL}</Text>
+      </Stack>
+    ) : (
+      <Empty
+        icon={<CircleCheck size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
+        title="Nothing done lately"
+        description={`What you mark done shows here. ${DONE_WINDOW_DAYS_LABEL}`}
+      />
+    ),
+  };
+
   return (
     <Stack gap={{ base: "4", md: "5" }} maxW="4xl">
       {header}
@@ -151,81 +229,37 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
           {reminders.actionError}
         </InlineAlert>
       ) : null}
-      <Tabs.Root value={tab} onValueChange={({ value }) => setTab(value as ReminderTab)} lazyMount>
-        <Tabs.List aria-label="Reminders" mb="4">
-          <Tabs.Trigger value="upcoming">Upcoming</Tabs.Trigger>
-          <Tabs.Trigger value="overdue">
-            Overdue
-            <Badge
-              size="sm"
-              variant={overdueCount > 0 ? "solid" : "subtle"}
-              colorPalette={overdueCount > 0 ? "danger" : "neutral"}
-              aria-label={`${overdueCount} overdue`}
-            >
-              {overdueCount}
-            </Badge>
-          </Tabs.Trigger>
-          <Tabs.Trigger value="done">Done</Tabs.Trigger>
-        </Tabs.List>
-        <Tabs.Content value="upcoming" pt="0">
-          {groups.upcoming.length > 0 ? (
-            <List>
-              {groups.upcoming.map((reminder) => (
-                <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} focused={reminder.id === highlighted} {...rowProps} />
-              ))}
-            </List>
-          ) : (
-            <Empty
-              icon={<BellRing size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
-              title={reminders.reminders.length === 0 ? "No reminders yet" : "Nothing coming up"}
-              description={reminders.reminders.length === 0
-                ? "Add one for the rent, a renewal or anything that repeats, and pick when it notifies you."
-                : overdueCount > 0 ? "Everything open is overdue; see the Overdue tab." : "Every reminder is done."}
-              action={addButton}
-            />
-          )}
-        </Tabs.Content>
-        <Tabs.Content value="overdue" pt="0">
-          {overdueCount > 0 ? (
-            <List>
-              {groups.overdue.map((reminder) => (
-                <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} focused={reminder.id === highlighted} {...rowProps} />
-              ))}
-            </List>
-          ) : (
-            <Empty
-              icon={<PartyPopper size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
-              title="Nothing overdue"
-              description="You're all caught up."
-            />
-          )}
-        </Tabs.Content>
-        <Tabs.Content value="done" pt="0">
-          {done.length > 0 ? (
-            <Stack gap="2">
-              <List>
-                {done.map((entry, index) => (
-                  <DoneRow
-                    key={entry.completion.id}
-                    entry={entry}
-                    now={now}
-                    // Only its latest completion, the first listed, is highlighted.
-                    focused={entry.reminder.id === highlighted && done.findIndex((other) => other.reminder.id === highlighted) === index}
-                    onEdit={edit}
-                  />
-                ))}
-              </List>
-              <Text textStyle="caption" textAlign="center">{DONE_WINDOW_DAYS_LABEL}</Text>
-            </Stack>
-          ) : (
-            <Empty
-              icon={<CircleCheck size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
-              title="Nothing done lately"
-              description={`What you mark done shows here. ${DONE_WINDOW_DAYS_LABEL}`}
-            />
-          )}
-        </Tabs.Content>
-      </Tabs.Root>
+      {phone ? (
+        <Stack gap="3">
+          <ReminderTabSwitcher value={tab} overdueCount={overdueCount} onValueChange={setTab} />
+          <Box role="region" aria-label={REMINDER_TAB_LABELS[tab]}>
+            {panels[tab]}
+          </Box>
+        </Stack>
+      ) : (
+        <Tabs.Root value={tab} onValueChange={({ value }) => setTab(value as ReminderTab)} lazyMount>
+          <Tabs.List aria-label="Reminders" mb="4">
+            <Tabs.Trigger value="upcoming">Upcoming</Tabs.Trigger>
+            <Tabs.Trigger value="overdue">
+              Overdue
+              <Badge
+                size="sm"
+                variant={overdueCount > 0 ? "solid" : "subtle"}
+                colorPalette={overdueCount > 0 ? "danger" : "neutral"}
+                aria-label={`${overdueCount} overdue`}
+              >
+                {overdueCount}
+              </Badge>
+            </Tabs.Trigger>
+            <Tabs.Trigger value="done">Done</Tabs.Trigger>
+          </Tabs.List>
+          {(Object.keys(REMINDER_TAB_LABELS) as ReminderTab[]).map((value) => (
+            <Tabs.Content key={value} value={value} pt="0">
+              {panels[value]}
+            </Tabs.Content>
+          ))}
+        </Tabs.Root>
+      )}
       {adding ? (
         <ReminderDialog
           open

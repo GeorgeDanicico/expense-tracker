@@ -92,3 +92,21 @@ starts empty. The page isn't linked from the navigation yet (R9).
 | `reminders-upcoming-390-light.jpg` | The phone width: the actions wrap under each row; no sideways scroll |
 | `reminders-add-dialog-390.jpg` | The add dialog as a bottom sheet at 390 px |
 | `reminders-overdue-390-dark.jpg` | Overdue at 390 px in dark (forced light), including a reminder just added for 09:00 today |
+
+## Reminders nav, badge and phones (reminders R9)
+
+Captured with headless Chrome (driven over the DevTools protocol) from `/dev/preview`, whose
+reminders are kept in memory around the current time (`src/app/dev/preview/reminder-fixtures.ts`),
+so the badge counts the fixtures' due and overdue reminders: 1280 × 800 at 1× and 390 × 844 at 2×.
+The Next.js dev indicator was removed before each capture.
+
+| Image | Shows |
+|---|---|
+| `reminders-nav-sidebar-badge-1280.jpg` | The sidebar's Planning section (Reminders, then To-dos) with the badge on Reminders, red because something is overdue |
+| `reminders-nav-sidebar-no-family-1280.jpg` | `?noFamily=1`: Planning with Reminders only; no To-dos |
+| `reminders-nav-tab-bar-badge-390.jpg` | The bottom bar: Reminders lives in the More sheet, so More carries the count |
+| `reminders-nav-more-sheet-390.jpg` | The More sheet: Planning with Reminders (badged) and To-dos |
+| `reminders-phone-upcoming-390.jpg` | The reminders page at 390: Upcoming / Overdue · 2 / Done as a segmented control, each row's actions on their own line |
+| `reminders-phone-overdue-390.jpg` | Overdue on the phone, after switching segments |
+| `reminders-add-sheet-390.jpg` | The add form as a full-height sheet at 390: the footer stays at the bottom, the body scrolls |
+| `reminders-add-dialog-1280.jpg` | The same form at 1280: still the centred dialog |

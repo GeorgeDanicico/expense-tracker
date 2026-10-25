@@ -5,12 +5,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useId } from "react";
 
+import { NavBadge, remindersBadgeLabel } from "@/components/layout/nav-badge";
 import { isActivePath, type NavItemConfig, type NavSection } from "@/components/layout/nav-items";
+import { useReminderBadge } from "@/components/reminders/use-reminder-badge";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 
 /**
  * Sidebar / More sheet navigation row. `compact` rows are 32px (sidebar);
- * the More sheet uses 44px touch targets.
+ * the More sheet uses 44px touch targets. An item with a `badge` shows its count at the end,
+ * in the link's accessible name too ("Reminders, 3 due").
  */
 export function NavItem({
   item,
@@ -24,6 +27,7 @@ export function NavItem({
   const pathname = usePathname();
   const active = isActivePath(pathname, item.href);
   const Icon = item.icon;
+  const reminders = useReminderBadge(item.badge === "reminders");
   return (
     <ChakraLink
       asChild
@@ -59,6 +63,9 @@ export function NavItem({
       <Link href={item.href} aria-current={active ? "page" : undefined} onClick={onNavigate}>
         <Icon size={compact ? ICON.sm : ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />
         {item.label}
+        {item.badge === "reminders" ? (
+          <NavBadge count={reminders.count} overdue={reminders.overdue} srLabel={remindersBadgeLabel(reminders.count)} />
+        ) : null}
       </Link>
     </ChakraLink>
   );

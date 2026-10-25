@@ -1,4 +1,5 @@
 import {
+  BellRing,
   CreditCard,
   House,
   Scale,
@@ -16,7 +17,15 @@ import { can, type ModuleKey } from "@/lib/permissions";
  * user without a family (the family features: their pages only mean something inside a family).
  * Items with neither are always shown.
  */
-export type NavItemConfig = { href: string; label: string; icon: LucideIcon; module?: ModuleKey; requiresFamily?: boolean };
+export type NavItemConfig = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  module?: ModuleKey;
+  requiresFamily?: boolean;
+  /** A count shown next to the label (see `NavBadge`): `reminders` is what's due or overdue. */
+  badge?: "reminders";
+};
 export type NavSection = { label: string; items: NavItemConfig[] };
 
 export const NAV_ITEMS = {
@@ -24,17 +33,19 @@ export const NAV_ITEMS = {
   expenses: { href: "/expenses", label: "Expenses", icon: CreditCard, module: "expenses" },
   investments: { href: "/investments", label: "Investments", icon: TrendingUp, module: "investments" },
   netWorth: { href: "/net-worth", label: "Net worth", icon: Scale, module: "net_worth" },
+  reminders: { href: "/reminders", label: "Reminders", icon: BellRing, badge: "reminders" },
   todos: { href: "/todos", label: "To-dos", icon: SquareKanban, requiresFamily: true },
   settings: { href: "/settings", label: "Settings", icon: Settings2 },
 } satisfies Record<string, NavItemConfig>;
 
 /**
- * Grouped destinations between Home and Settings. New modules (Family, Home…) add a section here;
- * a section only appears once it has items.
+ * Grouped destinations between Home and Settings. New modules add a section here; a section only
+ * appears once it has items. Planning holds the personal Reminders, which everyone reaches, then
+ * the family-only To-dos last, so a user without a family keeps the section with Reminders alone.
  */
 export const NAV_SECTIONS: NavSection[] = [
   { label: "Finance", items: [NAV_ITEMS.expenses, NAV_ITEMS.investments, NAV_ITEMS.netWorth] },
-  { label: "Family", items: [NAV_ITEMS.todos] },
+  { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos] },
 ];
 
 /**
@@ -42,20 +53,20 @@ export const NAV_SECTIONS: NavSection[] = [
  * reaches belong here (To-dos needs a family, so it would come and go), and two plus More keeps each
  * tab wide enough for its label at 320 px.
  */
-export const TAB_BAR_ITEMS = [NAV_ITEMS.home, NAV_ITEMS.expenses];
+export const TAB_BAR_ITEMS: NavItemConfig[] = [NAV_ITEMS.home, NAV_ITEMS.expenses];
 
 /** The More sheet's sections: each section minus the destinations the tab bar already shows. */
 export const MORE_SECTIONS: NavSection[] = NAV_SECTIONS
   .map((section) => ({ ...section, items: section.items.filter((item) => !TAB_BAR_ITEMS.includes(item)) }))
   .filter((section) => section.items.length > 0);
 
-export const MORE_ITEMS = [...MORE_SECTIONS.flatMap((section) => section.items), NAV_ITEMS.settings];
+export const MORE_ITEMS: NavItemConfig[] = [...MORE_SECTIONS.flatMap((section) => section.items), NAV_ITEMS.settings];
 
 /**
  * The navigation a user can reach. `membership` is `undefined` while the account is loading: module
  * items show then rather than flash in, since most users reach them. Family-only items wait for the
  * account instead (a user without a family, the common case, would otherwise see them flash in and
- * out), and sit in the last section, so the sections above them never move. The server and the page
+ * out), and sit last in the last section, so nothing above them moves. The server and the page
  * guards enforce access either way. A section with no visible items disappears.
  */
 export function navigationFor(membership: AccountMembership | null | undefined) {
@@ -69,12 +80,8 @@ export function navigationFor(membership: AccountMembership | null | undefined) 
   const moreSections = sections(
     NAV_SECTIONS.map((section) => ({ ...section, items: section.items.filter((item) => !TAB_BAR_ITEMS.includes(item)) })),
   );
-  return {
-    sections: sections(NAV_SECTIONS),
-    tabBarItems,
-    moreSections,
-    moreItems: [...moreSections.flatMap((section) => section.items), NAV_ITEMS.settings],
-  };
+  const moreItems: NavItemConfig[] = [...moreSections.flatMap((section) => section.items), NAV_ITEMS.settings];
+  return { sections: sections(NAV_SECTIONS), tabBarItems, moreSections, moreItems };
 }
 
 export function isActivePath(pathname: string, href: string) {
