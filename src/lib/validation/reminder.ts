@@ -60,3 +60,10 @@ export const snoozeSchema = z.discriminatedUnion("kind", [
 ]);
 
 export type SnoozeInput = z.output<typeof snoozeSchema>;
+
+/** The reminders list's query: `doneSince` (ISO, UTC or with an offset) bounds the completions. */
+export const reminderListQuerySchema = z.object({
+  doneSince: z.iso.datetime({ offset: true, error: "Use an ISO timestamp for doneSince." })
+    .transform((value) => new Date(value).toISOString())
+    .optional(),
+});
