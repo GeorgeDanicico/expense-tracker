@@ -1,6 +1,6 @@
 # Family hub roadmap
 
-Prepared 15 October 2026, updated 23 October 2026. This plan grows Simple Ledger from a single-user expense tracker into a family app: families and roles, profile pictures, safer MCP access, a to-do board, reminders with browser and email notifications, a shared calendar with an ICS feed and two-way Google Calendar sync, statement import, AI features (still open), cars, houses, smart-home devices, and native iOS/Android apps built with Expo. Everything up to and including AI ships on the web before the native apps start (see "Order before the native apps").
+Prepared 15 October 2026, updated 25 October 2026. This plan grows Simple Ledger from a single-user expense tracker into a family app: families and roles, profile pictures, safer MCP access, a to-do board, private reminders with browser notifications, a shared calendar with an ICS feed and two-way Google Calendar sync, statement import, AI features (still open), cars, houses, smart-home devices, and native iOS/Android apps built with Expo. Everything up to and including AI ships on the web before the native apps start (see "Order before the native apps").
 
 Every numbered step below is meant to be **one pull request** that can be reviewed on its own, merged, and deployed without breaking what already works. Unfinished modules stay hidden behind a flag, so `main` is always shippable.
 
@@ -101,7 +101,7 @@ Everything in phases 3–8 ships on the web before the Expo work in phase 9 star
 
 1. **Phase 3, MCP access tokens.** Small, independent, and it stops MCP clients from holding your real password.
 2. **Phase 4, the to-do board.** Already planned, now as a kanban board.
-3. **Phase 5, the worker, notifications and reminders.** The background worker and the notification channels are built once here, then reused by the calendar, to-dos and later the phone.
+3. **Phase 5, the worker, push notifications and reminders.** The background worker and the notification layer are built once here, then reused by the calendar, to-dos and later the phone. Email notifications come in a later step.
 4. **Phase 6, the calendar.** The app's own calendar, an ICS feed for other calendar apps, then two-way Google sync on the worker from phase 5.
 5. **Phase 7, statement import.** CSV first, then PDF.
 6. **Phase 8, AI.** Still an open discussion; nothing is planned in detail yet.
@@ -128,7 +128,7 @@ Before this phase, MCP clients signed in with **Basic auth carrying your real em
 
 To-dos work like a GitHub project board: **three fixed columns, "To do", "In progress" and "Done"**, with cards dragged between and within columns.
 
-**Status (24 October 2026): planned** in [todo-board-plan.md](todo-board-plan.md) (tasks T1–T7). The plan changes the steps below: **one board per family** with member filter chips instead of several boards, **no kid permission or per-card rules** (every member can add, edit, move and delete any card on their family's board), **no feature flag** (the nav item lands last), and **no recurring to-dos**. The steps below are kept as first written; the plan supersedes them.
+**Status (24 October 2026): done** (tasks T1–T7 in [todo-board-plan.md](todo-board-plan.md), merged in #115–#121), apart from the smoke test. The plan changes the steps below: **one board per family** with member filter chips instead of several boards, **no kid permission or per-card rules** (every member can add, edit, move and delete any card on their family's board), **no feature flag** (the nav item lands last), and **no recurring to-dos**. The steps below are kept as first written; the plan supersedes them.
 
 | Step | What | Done when |
 | --- | --- | --- |
@@ -138,37 +138,49 @@ To-dos work like a GitHub project board: **three fixed columns, "To do", "In pro
 | **4.4** | MCP tools `list_todos`, `add_todo` and `move_todo`, with roles and kid permissions enforced. | The tool-surface snapshot is updated. |
 | **4.5** | (Optional) Recurring to-dos (`rrule`), such as "take out the trash every Tuesday". | The next card is created in To do when the current one reaches Done. |
 
-## Phase 5: Background worker, notifications and reminders
+## Phase 5: Background worker, push notifications and reminders
 
-**Reminders** are personal nudges that aren't calendar events: "pay the rent", "pay the taxes", "renew the insurance". Most repeat. The phase also builds what any scheduled notification needs: a background worker and delivery channels. In the browser those channels are **browser notifications (Web Push) and email**; the phone's push notifications join as a third channel in phase 9.
+**Status (25 October 2026): planned** in [reminders-plan.md](reminders-plan.md) (tasks R1–R12). The plan changes a few details below: repeats are stored as structured columns instead of an RRULE, reminders are scheduled through `next_notify_at` on the reminder instead of outbox rows written on save, and the worker locks rows with `FOR UPDATE SKIP LOCKED` instead of a job lock table. The plan supersedes the steps below.
 
-### Who can do what with reminders
+**Reminders** are personal nudges that aren't calendar events: "pay the rent", "pay the taxes", "renew the insurance". Most repeat. The phase also builds what any scheduled notification needs: a background worker and a notification layer. On the web the only channel is **browser notifications (Web Push)**; the phone's push notifications join as a second channel in phase 9. ntfy and other stopgap push apps are left out on purpose, because the native app replaces them.
 
-Every reminder has a **recipient** (`user_id`, who gets the notifications) and a **creator** (`created_by`). Usually they're the same person.
+**Decided 25 October 2026:**
+- **Reminders are strictly personal.** You can only create reminders for yourself, and nobody else ever sees them, parents included. They work for every member, with or without a family, and aren't a kid permission module. To ask someone else to do something, assign them a **to-do** with a due date: the to-do board is for what you ask of others, reminders are for your own nudges.
+- **Reminders notify through browser notifications only, no email.** Email is poor at "now": it lands among everything else, often without an alert. Email notifications are a later step, for family notifications (see "Email notifications, a later step" below).
 
-| | For yourself | Parent → other parent | Parent → kid |
-| --- | --- | --- | --- |
-| **Who can create** | Everyone | Any parent | Any parent |
-| **Who sees it** | Only you | The creator and the recipient | The kid and every parent |
-| **Mark done, snooze** | You | Recipient | Kid |
-| **Turn off its notifications** | You | Recipient | Kid |
-| **Edit, delete** | You | Creator and recipient | Creator only |
+### How notifications reach you
 
-- Kids can't create reminders for anyone else. A kid's own reminders stay private, also from parents.
-- When a kid turns off notifications on a reminder a parent set, the parent sees a muted icon on it. It still shows as overdue when it isn't done, so muting never hides a missed reminder.
-- Reminders aren't a kid permission module: every member has them.
+- **Settings → Notifications** has one **"Browser notifications"** switch for all your devices, an **"Enable on this device"** button and a **"Send a test"** button. Browsers only send notifications after their own permission prompt (Safari only after a click), so each device needs the button pressed once; the device then registers behind the scenes, with no device list to manage.
+- The same code works in Chrome, Edge and Firefox everywhere, in Safari on macOS 13 or later, and in Safari on iOS 16.4 or later once the app is added to the home screen (Apple's rule; a normal Safari tab on iPhone can't receive notifications). On an iPhone the button explains the home-screen step instead.
+- Web Push needs the app on HTTPS. `tailscale serve` on the `*.ts.net` name is enough.
+- **Per reminder**, you can mute one reminder's notifications.
+- With notifications off, or no device enabled, Settings warns "Reminders won't notify you". Reminders still show in the app as due and overdue.
+- The worker checks the switch, the mute and whether the reminder is done or snoozed **when it sends**, so changes take effect at once.
+- **The system notification always shows**, on every browser and device, whether or not the app is open. That keeps the behaviour the same everywhere (Safari also revokes subscriptions that receive pushes without a visible notification). Clicking it focuses an open tab, or opens one, on that reminder.
+- **The Reminders nav item shows a badge** with the number of due and overdue reminders. It refreshes when a notification arrives while the app is open and when the page regains focus, so a reminder is never only in a notification you dismissed.
+
+### How it's built
+
+- **Schedule on save, send when due.** When a reminder is created, edited, marked done or snoozed, the API computes its next occurrence and writes one outbox row per lead time (for example 3 days before and on the day), after cancelling that reminder's unsent rows. The worker only sends outbox rows whose `send_at` has passed. A repeating reminder moves to its next occurrence when marked done.
+- **Recurrence** is stored as an RRULE and computed with the `rrule` package in the reminder's timezone (`Europe/Bucharest` by default). The form offers presets only: once, monthly on day N, yearly, every N weeks. "The 31st" is stored as `BYMONTHDAY=28,29,30,31;BYSETPOS=-1`, so it falls on the last day of shorter months instead of skipping them. Times are kept in local wall-clock time, so "9:00" stays 9:00 across DST.
+- **The worker** is `src/worker/index.ts`, bundled with esbuild into one `dist/worker.js` (Next's standalone output only traces the web app's files), and runs from the same image as a second container. Every 30 seconds it claims due rows through a SQL function using `FOR UPDATE SKIP LOCKED` with a lease, so two workers never send the same row. It retries temporary failures with backoff, writes a heartbeat, and stops cleanly on SIGTERM. It reads the outbox with the Supabase secret key (from phase 1), because it acts for every user.
+- **Web Push** uses the `web-push` package with VAPID keys in server env (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`). "Enable on this device" calls `Notification.requestPermission()` and `pushManager.subscribe()` inside the click handler and posts the subscription to the API, upserted by endpoint. `public/sw.js` gets `push` (always `showNotification`, tagged with the reminder id so a newer one replaces an older one), `notificationclick` and `pushsubscriptionchange` handlers. The service worker is also registered on localhost so this can be tested locally. Signing out removes that device's subscription.
 
 | Step | What | Done when |
 | --- | --- | --- |
-| **5.1** | **Worker process**: add `worker.ts` to the same image as a second container on the VPS, with a job lock table so two workers don't overlap. It only logs at first. | The worker heartbeat appears in `/health` or the logs. |
-| **5.2** | **Notification layer**: a `notifications` outbox `(user_id, kind, payload, send_at, sent_at, attempts, last_error)` that the worker delivers, and `notification_channels (user_id, kind: web_push / email / expo, endpoint, keys, created_at, last_success_at, disabled_at)`. **Web Push** with VAPID keys through the existing PWA's service worker. **Email** through a sending provider (see "Decisions you need to make"). **Settings → Notifications**: turn on browser notifications for this device, email on or off, and a "send a test" button. Web Push needs the app on HTTPS, and on iPhone it only works once the app is added to the home screen. | A test notification arrives in the browser and by email. A dead Web Push subscription (410 from the push service) is disabled automatically. |
-| **5.3** | **Reminders schema**: `reminders (family_id, user_id, created_by, title, notes, due_at, timezone, rrule, lead_times, channels, notifications_muted, snoozed_until, notify_creator_when_overdue, expense_template)` and `reminder_completions (reminder_id, occurrence_at, done_at, done_by, expense_id)`. `lead_times` holds when to notify, for example 3 days before and on the day. RLS follows the table above, and a trigger lets the recipient change only the done, snooze and mute fields of a reminder someone else created. | SQL tests cover every cell of the table above, plus another family's members. |
-| **5.4** | **Reminders API**: create (with a recipient picker for parents), edit, delete, mark done (moves a repeating reminder to its next occurrence), snooze (an hour, until tomorrow, or a custom time) and mute. | Route tests per role for every action in the table. |
-| **5.5** | **Reminders page**: "Upcoming", "Overdue" and "Done". A form with recurrence presets (once, monthly, yearly, custom), lead times and channels. Parents see a "Set by me" view with each reminder's status: done, snoozed, overdue or muted. | Screenshots at 390 and 1280 px. |
-| **5.6** | **Delivery**: the worker turns due lead times into outbox rows in the recipient's timezone. Muted reminders send nothing. With `notify_creator_when_overdue` on (off by default, only for reminders set for someone else), the creator is told when it's overdue: "Ana hasn't marked *homework* done". | A monthly reminder notifies 3 days before and on the day, then moves to the next month when marked done. Tests cover month ends (31st → 30th) and DST in Europe/Bucharest. |
-| **5.7** | (Optional) **Log as expense**: a reminder can carry an expense template (amount, currency, category, subtype). Marking it done offers to add that expense, pre-filled, for the recipient. | Ticking "Pay rent" adds the rent expense in one confirm. |
-| **5.8** | **Notifications from other modules** on the same layer: "a to-do was assigned to you" (phase 4), and the creator alert from 5.6. | Assigning a card to someone notifies them through their channels. |
+| **5.1** | **Worker process**: `src/worker/index.ts`, its esbuild bundle and the second container, with the heartbeat. It only logs at first. | The worker heartbeat appears in `/health` or the logs. |
+| **5.2** | **Notification layer**: `profiles.push_enabled`; `push_subscriptions (user_id, endpoint unique, p256dh, auth, user_agent, created_at, last_success_at)`, one row per enabled device; and a `notifications` outbox `(user_id, kind, source_id, payload, send_at, status: pending / sent / cancelled, attempts, next_attempt_at, last_error, locked_until)` with its claim function. Users manage only their own subscriptions and switch; only the worker reads the outbox. Web Push sending, the service worker handlers and **Settings → Notifications** as described above. | A test notification arrives in Chrome, Safari on macOS and the iPhone home-screen app. Turning the switch off stops it straight away. A dead subscription (404 or 410 from the push service) is deleted automatically. |
+| **5.3** | **Reminders schema**: `reminders (user_id, title, notes, due_at, timezone, rrule, next_due_at, lead_times, notifications_muted, snoozed_until, expense_template)` and `reminder_completions (reminder_id, occurrence_at, done_at, expense_id)`. RLS: only the owner, for every action. | SQL tests show another member of the same family, a parent included, can't read or change someone's reminders. |
+| **5.4** | **Reminders API and scheduling**: create, edit, delete, mark done (moves a repeating reminder to its next occurrence), snooze (an hour, until tomorrow, or a custom time) and mute, each rewriting that reminder's pending outbox rows. | Route tests for every action, plus the outbox rows each one leaves. Recurrence tests cover month ends (31st → 30th), leap years and DST in Europe/Bucharest. |
+| **5.5** | **Reminders page**: "Upcoming", "Overdue" and "Done". A form with recurrence presets (once, monthly, yearly, every N weeks) and lead times, with a link to Settings → Notifications. The nav badge and the nav item land last. | Screenshots at 390 and 1280 px. |
+| **5.6** | **Delivery**: the worker sends due outbox rows as Web Push. Muted, done or snoozed reminders send nothing. | A monthly reminder notifies 3 days before and on the day, then moves to the next month when marked done. |
+| **5.7** | (Optional) **Log as expense**: a reminder can carry an expense template (amount, currency, category, subtype). Marking it done offers to add that expense, pre-filled. | Ticking "Pay rent" adds the rent expense in one confirm. |
+| **5.8** | **To-do notifications** on the same layer: "a to-do was assigned to you" (not when you assign yourself), and "a to-do assigned to you is due today" at 9:00. Settings → Notifications gets a switch per kind (reminders, to-dos), on by default. | Assigning a card to someone notifies them, and nothing arrives when they've switched to-do notifications off. |
 | **5.9** | MCP tools `list_reminders`, `add_reminder` and `complete_reminder`, on the caller's own reminders only. | The tool-surface snapshot is updated. |
+
+### Email notifications, a later step
+
+Email isn't part of this phase; it's a later step, after phase 5. When it comes, it's for family notifications (for example a parent assigning a kid a to-do), most likely as a daily or weekly summary rather than one email per event. It would be another channel on the same outbox. Without a domain, the plan is Gmail SMTP from George's existing Gmail account with an app password, behind an `EmailSender` interface so a provider like Resend can replace it if a domain is ever bought.
 
 ## Phase 6: Family calendar, calendar feeds and two-way Google sync
 
@@ -277,13 +289,13 @@ Each PR should include:
 | --- | --- | --- |
 | **New product name** | Your call, needed by step 0.3 | It sets the app ID and bundle ID for the stores. Those are hard to change after TestFlight. |
 | **Public HTTPS or Tailscale only** | Stay on Tailscale through phase 8. Decide before 3.5, 6.9 or the store releases. | Phones need the Tailscale app to reach the API. claude.ai MCP connectors (3.5), Google subscribing to the ICS feed (6.4), Google push webhooks (6.9) and some OAuth redirects need a public URL (Tailscale Funnel or a Cloudflare Tunnel both work). Web Push needs HTTPS but not a public URL. |
-| **Email provider** | Your call before 5.2: a transactional provider such as Resend or Amazon SES, or the SMTP account Supabase Auth already sends from | Reminder emails need a sender, a verified domain (SPF and DKIM) and a way to unsubscribe. |
+| **Email provider** | Decided (25 October 2026): Gmail SMTP from George's existing Gmail account with an app password, behind an `EmailSender` interface. Resend if a domain is ever bought | No domain, so providers that need SPF and DKIM on your own domain are out. Supabase Auth's email is only for sign-in emails. |
 | **One to-do board or several** | Decided: one board per family, filtered by member; no private cards. See [todo-board-plan.md](todo-board-plan.md) | Simpler for a family, and member chips cover "show me Ana's to-dos". |
 | **Banks and formats for statement import** | Open, needed before 7.2: which banks, and whether each gives CSV, PDF or both | Every bank needs its own parser and fixtures. |
 | **How MCP clients sign in** | Decided: OAuth through Supabase Auth's OAuth 2.1 server, behind our own interfaces so leaving Supabase stays cheap, plus personal access tokens (1, 3 or 6 months, or never with a warning) for headless machines. Kids: OAuth only, with a parent's permission and a confirmed real email. See [mcp-access-plan.md](mcp-access-plan.md) | Using the secret key to read data would bypass RLS for every MCP call; a home-made OAuth server would still need Supabase to act as the user. |
 | **AI provider, cost and privacy** | Open, discuss when phase 8 starts | Sending financial data to a third party needs opt-in and masking. |
 | **Mac calendar** | Decided: an ICS feed out (6.4) and two-way Google sync; no CalDAV | A Mac calendar synced with Google gets the app's events through Google. |
-| **Reminder rules** | Decided: see the table in phase 5 | |
+| **Reminder rules** | Decided: reminders are strictly personal; to ask someone else, assign them a to-do (phase 5) | |
 | **Google OAuth consent screen** | Publish the OAuth app "In production" (unverified is fine for family use, under 100 users) | In "Testing" status, Google refresh tokens for sensitive scopes like Calendar **expire after 7 days**, so the sync would keep breaking. |
 | **Home Assistant** | Use it if you already run HA, or are willing to. It's a Docker container on the VPS or a Raspberry Pi at home. | The alternative is reverse-engineered vendor clouds (python-roborock, miio), which are fragile and may break the vendors' terms. |
 | **Finance visibility** | Decided: parents see every member's finance read-only, kids only with Family finance on (decision 3, step 1.7) | It widens the read policies on every finance table, so every finance read needs an explicit owner filter first. |
