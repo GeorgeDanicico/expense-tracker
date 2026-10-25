@@ -1,7 +1,10 @@
 name: Notify VPS deployments
 
+# Runs once the image for a main commit is in GHCR, so the VPS deploy can pull it straight away.
 on:
-  push:
+  workflow_run:
+    workflows: [Build image]
+    types: [completed]
     branches: [main]
 
 permissions:
@@ -9,6 +12,7 @@ permissions:
 
 jobs:
   notify:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Wake the central deployment workflow

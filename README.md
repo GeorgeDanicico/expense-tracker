@@ -217,6 +217,23 @@ user can read it and use Docker. To use a different environment-file path, add a
 repository variable named `DEPLOY_ENV_FILE`. The workflow publishes the container
 on `127.0.0.1:3000` by default, matching the Docker command above.
 
+### Prebuilt images (GHCR)
+
+`next build` needs more memory than a small VPS has, so production doesn't build there.
+`.github/workflows/image.yml` builds the image on GitHub's runners for every push to `main`
+and pushes it to `ghcr.io/georgedanicico/expense-tracker`, tagged with the full commit SHA and
+`latest`. Once it succeeds, `notify-vps.yml` wakes the central deployment, which runs
+`scripts/deploy.sh` with `IMAGE_SOURCE=pull`, `IMAGE_NAME=ghcr.io/georgedanicico/expense-tracker`
+and `IMAGE_TAG=<commit SHA>`: the script pulls that image (retrying for up to
+`PULL_ATTEMPTS` × `PULL_INTERVAL_SECONDS`, 10 minutes by default) instead of building, then
+deploys the web app and the worker exactly as above. `IMAGE_SOURCE` defaults to `build`, so a
+manual run without it still builds locally.
+
+The VPS needs to be able to pull the image: make the `expense-tracker` package public in its
+GitHub package settings (the image holds no secrets; they come from the environment file at
+runtime), or run `docker login ghcr.io` once on the VPS with a token that has only
+`read:packages`.
+
 When building on a different architecture, use Docker Buildx with the VPS platform
 (for example, `--platform linux/amd64 --load` for an x86 VPS). Refresh the base-image
 digest periodically and rebuild to receive security fixes.
