@@ -202,6 +202,56 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["net_worth_valuations"]["Insert"]>;
         Relationships: [];
       };
+      notification_settings: {
+        Row: {
+          push_enabled: boolean;
+          reminders_enabled: boolean;
+          todos_enabled: boolean;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          push_enabled?: boolean;
+          reminders_enabled?: boolean;
+          todos_enabled?: boolean;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notification_settings"]["Insert"]>;
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          attempts: number;
+          created_at: string;
+          dedupe_key: string | null;
+          id: string;
+          kind: string;
+          last_error: string | null;
+          locked_until: string | null;
+          payload: Json;
+          send_at: string;
+          sent_at: string | null;
+          status: string;
+          user_id: string;
+        };
+        Insert: {
+          attempts?: number;
+          created_at?: string;
+          dedupe_key?: string | null;
+          id?: string;
+          kind: string;
+          last_error?: string | null;
+          locked_until?: string | null;
+          payload: Json;
+          send_at?: string;
+          sent_at?: string | null;
+          status?: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
+        Relationships: [];
+      };
       investment_accounts: {
         Row: {
           broker_id: string;
@@ -328,6 +378,94 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
         Relationships: [];
       };
+      push_subscriptions: {
+        Row: {
+          auth: string;
+          created_at: string;
+          endpoint: string;
+          id: string;
+          last_success_at: string | null;
+          p256dh: string;
+          user_agent: string;
+          user_id: string;
+        };
+        Insert: {
+          auth: string;
+          created_at?: string;
+          endpoint: string;
+          id?: string;
+          last_success_at?: string | null;
+          p256dh: string;
+          user_agent?: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["push_subscriptions"]["Insert"]>;
+        Relationships: [];
+      };
+      reminder_completions: {
+        Row: {
+          done_at: string;
+          expense_id: string | null;
+          id: string;
+          occurrence_on: string;
+          reminder_id: string;
+        };
+        Insert: {
+          done_at?: string;
+          expense_id?: string | null;
+          id?: string;
+          occurrence_on: string;
+          reminder_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["reminder_completions"]["Insert"]>;
+        Relationships: [];
+      };
+      reminders: {
+        Row: {
+          created_at: string;
+          expense_template: Json | null;
+          id: string;
+          lead_minutes: number[];
+          next_due_at: string | null;
+          next_due_on: string | null;
+          next_notify_at: string | null;
+          notes: string;
+          notifications_muted: boolean;
+          notify_locked_until: string | null;
+          repeat_interval: number;
+          repeat_unit: string;
+          snoozed_until: string | null;
+          starts_on: string;
+          time_of_day: string;
+          timezone: string;
+          title: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          expense_template?: Json | null;
+          id?: string;
+          lead_minutes?: number[];
+          next_due_at?: string | null;
+          next_due_on?: string | null;
+          next_notify_at?: string | null;
+          notes?: string;
+          notifications_muted?: boolean;
+          notify_locked_until?: string | null;
+          repeat_interval?: number;
+          repeat_unit?: string;
+          snoozed_until?: string | null;
+          starts_on: string;
+          time_of_day?: string;
+          timezone?: string;
+          title: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["reminders"]["Insert"]>;
+        Relationships: [];
+      };
       todos: {
         Row: {
           assignee_member_id: string | null;
@@ -362,6 +500,20 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["todos"]["Insert"]>;
         Relationships: [];
       };
+      worker_heartbeats: {
+        Row: {
+          beat_at: string;
+          name: string;
+          version: string;
+        };
+        Insert: {
+          beat_at: string;
+          name: string;
+          version: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["worker_heartbeats"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -380,6 +532,14 @@ export type Database = {
           token_id: string | null;
           user_id: string | null;
         }[];
+      };
+      claim_due_reminders: {
+        Args: { p_batch: number };
+        Returns: Database["public"]["Tables"]["reminders"]["Row"][];
+      };
+      claim_notifications: {
+        Args: { p_batch: number };
+        Returns: Database["public"]["Tables"]["notifications"]["Row"][];
       };
       complete_password_change: {
         Args: never;
@@ -523,6 +683,15 @@ export type Database = {
           user_id: string;
         }[];
       };
+      register_push_subscription: {
+        Args: {
+          p_auth: string;
+          p_endpoint: string;
+          p_p256dh: string;
+          p_user_agent?: string;
+        };
+        Returns: Database["public"]["Tables"]["push_subscriptions"]["Row"];
+      };
       remove_family_member: {
         Args: { p_member_id: string };
         Returns: undefined;
@@ -537,6 +706,10 @@ export type Database = {
       };
       revoke_mcp_token: {
         Args: { p_id: string };
+        Returns: boolean;
+      };
+      send_test_notification: {
+        Args: never;
         Returns: boolean;
       };
       set_member_color: {
