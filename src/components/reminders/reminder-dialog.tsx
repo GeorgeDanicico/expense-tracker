@@ -173,6 +173,7 @@ export function ReminderDialog({
           if (!form.pending) onOpenChange(value);
         }}
         title={editing ? "Edit reminder" : "Add reminder"}
+        fullHeightOnPhone
         description={editing
           ? (next ? `Next: ${next}. Only you can see it.` : "Done. Move the first date on to use it again.")
           : "Only you can see your reminders. Times are Bucharest time."}

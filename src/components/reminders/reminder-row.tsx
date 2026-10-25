@@ -97,12 +97,32 @@ function RowFrame({
   );
 }
 
+/** The row's actions: their own line under the text on a phone, at the end of the row from `md`. */
+function Actions({ children }: { children: ReactNode }) {
+  return (
+    <Flex
+      data-row-actions=""
+      align="center"
+      gap={{ base: "2", md: "1" }}
+      flexBasis={{ base: "100%", md: "auto" }}
+      ps={{ base: "11", md: "0" }}
+      ms={{ base: "0", md: "auto" }}
+      flexShrink="0"
+    >
+      {children}
+    </Flex>
+  );
+}
+
+/** Taller touch targets on a phone, the compact size from `md`. */
+const ACTION_SIZE = { base: "sm", md: "xs" } as const;
+
 /** "Snooze" with its three choices: an hour, until tomorrow 09:00, or a chosen time. */
 function SnoozeMenu({ title, disabled, onChoose }: { title: string; disabled: boolean; onChoose: (choice: SnoozeChoice) => void }) {
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }} onSelect={({ value }) => onChoose(value as SnoozeChoice)}>
       <Menu.Trigger asChild>
-        <Button size="xs" variant="ghost" disabled={disabled} aria-label={`Snooze ${title}`}>
+        <Button size={ACTION_SIZE} variant="ghost" disabled={disabled} aria-label={`Snooze ${title}`}>
           <AlarmClock size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Snooze
         </Button>
       </Menu.Trigger>
@@ -125,7 +145,8 @@ function SnoozeMenu({ title, disabled, onChoose }: { title: string; disabled: bo
 /**
  * One open reminder: title (opens the dialog), next due date and time, how it repeats, a muted
  * icon, how late it is or until when it's snoozed, and Mark done / Snooze / Edit. A reminder due
- * today is highlighted. The actions wrap under the text on a narrow screen.
+ * today is highlighted. On a phone (below 768 px) the actions sit on their own line under the
+ * text, lined up with it, with taller touch targets; from 768 px they share the row.
  */
 export function ReminderRow({
   reminder,
@@ -184,15 +205,17 @@ export function ReminderRow({
           </Meta>
         ) : null}
       </Flex>
-      <Flex align="center" gap="1" ms="auto" flexShrink="0">
-        <Button size="xs" variant="outline" disabled={busy} onClick={() => onComplete(reminder)} aria-label={`Mark ${reminder.title} done`}>
+      <Actions>
+        <Button size={ACTION_SIZE} variant="outline" disabled={busy} onClick={() => onComplete(reminder)} aria-label={`Mark ${reminder.title} done`}>
           <Check size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Mark done
         </Button>
         <SnoozeMenu title={reminder.title} disabled={busy} onChoose={(choice) => onSnooze(reminder, choice)} />
-        <IconButton aria-label={`Edit ${reminder.title}`} size="xs" tooltip onClick={() => onEdit(reminder)}>
-          <Pencil size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
-        </IconButton>
-      </Flex>
+        <Box ms={{ base: "auto", md: "0" }}>
+          <IconButton aria-label={`Edit ${reminder.title}`} size="xs" tooltip onClick={() => onEdit(reminder)}>
+            <Pencil size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
+          </IconButton>
+        </Box>
+      </Actions>
     </RowFrame>
   );
 }
@@ -222,11 +245,11 @@ export function DoneRow({
           <Text as="span">for {formatDay(completion.occurrenceOn, now)}</Text>
         </Meta>
       </Flex>
-      <Flex align="center" gap="1" ms="auto" flexShrink="0">
+      <Actions>
         <Text textStyle="caption" color="fg.muted">
           {reminder.nextDueOn === null ? "Finished" : `Next ${formatDay(reminder.nextDueOn, now)}`}
         </Text>
-      </Flex>
+      </Actions>
     </RowFrame>
   );
 }

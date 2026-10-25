@@ -7,11 +7,14 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { MoreSheet } from "@/components/layout/more-sheet";
+import { NavBadge, remindersBadgeLabel } from "@/components/layout/nav-badge";
 import { isActivePath } from "@/components/layout/nav-items";
 import { useNavigation } from "@/components/layout/use-navigation";
+import { useReminderBadge } from "@/components/reminders/use-reminder-badge";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 
 const itemStyles = (active: boolean): SystemStyleObject => ({
+  position: "relative",
   flex: "1",
   minW: "0",
   minH: "3.25rem",
@@ -35,12 +38,18 @@ function TabLabel({ children }: { children: string }) {
   );
 }
 
-/** Fixed bottom navigation on mobile: Home, Expenses and the More sheet. */
+/**
+ * Fixed bottom navigation on mobile: Home, Expenses and the More sheet. A tab-bar item with a
+ * badge shows it on its icon; More carries the count of the badged items it holds (Reminders), so
+ * what's due is visible without opening the sheet.
+ */
 export function MobileTabBar({ email, avatarUrl = null }: { email: string; avatarUrl?: string | null }) {
   const pathname = usePathname();
   const { tabBarItems, moreItems } = useNavigation();
   const [open, setOpen] = useState(false);
   const moreActive = moreItems.some(({ href }) => isActivePath(pathname, href));
+  const reminders = useReminderBadge();
+  const remindersInMore = moreItems.some((item) => item.badge === "reminders");
   return (
     <Flex
       as="nav"
@@ -56,13 +65,16 @@ export function MobileTabBar({ email, avatarUrl = null }: { email: string; avata
       px="2"
       pb="env(safe-area-inset-bottom)"
     >
-      {tabBarItems.map(({ href, label, icon: Icon }) => {
+      {tabBarItems.map(({ href, label, icon: Icon, badge }) => {
         const active = pathname === href;
         return (
           <ChakraLink key={href} asChild css={itemStyles(active)}>
             <Link href={href} aria-current={active ? "page" : undefined}>
               <Icon size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />
               <TabLabel>{label}</TabLabel>
+              {badge === "reminders" ? (
+                <NavBadge dot count={reminders.count} overdue={reminders.overdue} srLabel={remindersBadgeLabel(reminders.count)} />
+              ) : null}
             </Link>
           </ChakraLink>
         );
@@ -76,6 +88,14 @@ export function MobileTabBar({ email, avatarUrl = null }: { email: string; avata
           <Box as="button" css={itemStyles(moreActive)} aria-current={moreActive ? "page" : undefined}>
             <MoreHorizontal size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />
             <TabLabel>More</TabLabel>
+            {remindersInMore ? (
+              <NavBadge
+                dot
+                count={reminders.count}
+                overdue={reminders.overdue}
+                srLabel={reminders.count > 0 ? `, ${reminders.count} ${reminders.count === 1 ? "reminder" : "reminders"} due` : ""}
+              />
+            ) : null}
           </Box>
         }
       />
