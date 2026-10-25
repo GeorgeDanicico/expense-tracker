@@ -103,6 +103,7 @@ const workerBoundary = {
     "src/worker/**",
     "src/lib/notifications/worker.ts",
     "src/lib/notifications/worker-store.ts",
+    "src/lib/notifications/push.ts",
     "src/lib/supabase/worker-store.ts",
   ],
   rules: {

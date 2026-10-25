@@ -370,6 +370,14 @@ function previewsNoFamily() {
   return typeof window !== "undefined" && new URLSearchParams(window.location.search).has("noFamily");
 }
 
+/** Whether the page was opened with `?devices=0`. */
+function previewsNoDevices() {
+  return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("devices") === "0";
+}
+
+// 65 bytes (an uncompressed P-256 point's length), base64url; not a real key.
+const PREVIEW_PUSH_KEY = `B${"A".repeat(86)}`;
+
 /** Resolves an SWR key to fixture data, mirroring the API routes' shapes. */
 export function fixtureFor(key: string): unknown {
   const [path, query = ""] = key.split("?");
@@ -392,5 +400,11 @@ export function fixtureFor(key: string): unknown {
   if (path === "/api/todos") return previewTodos();
   if (path === "/api/reminders") return previewReminders();
   if (path === "/api/reminders/summary") return previewReminderSummary();
+  // `?devices=0` previews the "Reminders won't notify you" warning.
+  if (path === "/api/notifications/settings") {
+    return { pushEnabled: true, remindersEnabled: true, todosEnabled: true, deviceCount: previewsNoDevices() ? 0 : 2 };
+  }
+  // A well-formed but made-up key: the preview never subscribes for real.
+  if (path === "/api/notifications/push-key") return { publicKey: PREVIEW_PUSH_KEY };
   throw new Error(`No preview fixture for ${key}`);
 }

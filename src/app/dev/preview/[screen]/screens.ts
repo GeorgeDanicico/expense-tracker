@@ -1,4 +1,4 @@
-export const PREVIEW_SCREENS = ["dashboard", "expenses", "investments", "net-worth", "settings", "todos", "reminders"] as const;
+export const PREVIEW_SCREENS = ["dashboard", "expenses", "investments", "net-worth", "settings", "todos", "reminders", "notifications"] as const;
 export type PreviewScreen = (typeof PREVIEW_SCREENS)[number];
 
 export function isPreviewScreen(value: string): value is PreviewScreen {

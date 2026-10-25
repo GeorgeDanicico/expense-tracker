@@ -10,10 +10,14 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
 import { useApiForm } from "@/hooks/use-api-form";
+import { forgetThisDeviceBeforeSignOut } from "@/hooks/use-notification-settings";
 import { apiRequest } from "@/lib/api/client";
 import { afterSignOut } from "@/lib/api/invalidate";
 
-/** The sign-out flow: the button opens a confirmation, and only "Yes, log me out" signs out. */
+/**
+ * The sign-out flow: the button opens a confirmation, and only "Yes, log me out" signs out. It first
+ * turns off this device's notifications (best effort, never blocking the sign-out).
+ */
 function useSignOut() {
   const router = useRouter();
   const { mutate } = useSWRConfig();
@@ -22,6 +26,7 @@ function useSignOut() {
 
   function signOut() {
     void form.submit(async () => {
+      await forgetThisDeviceBeforeSignOut();
       await apiRequest<{ success: true }>("/api/auth", { method: "DELETE" });
       await afterSignOut(mutate);
       router.replace("/login");
