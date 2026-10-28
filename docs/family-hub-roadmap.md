@@ -1,6 +1,6 @@
 # Family hub roadmap
 
-Prepared 15 October 2026, updated 26 October 2026. This plan grows Simple Ledger from a single-user expense tracker into a family app: families and roles, profile pictures, safer MCP access, a to-do board, private reminders with browser notifications, a shared calendar with an ICS feed and two-way Google Calendar sync, statement import, AI assistance with a hard cost limit, production hardening, logging, performance and a simpler UI, cars, houses, smart-home devices, and native iOS/Android apps built with Expo. Everything up to and including AI ships on the web before the native apps start (see "Order before the native apps").
+Prepared 15 October 2026, updated 28 October 2026. This plan grows Simple Ledger from a single-user expense tracker into a family app: families and roles, profile pictures, safer MCP access, a to-do board, private reminders with browser notifications, a shared calendar with a calendar feed for other calendar apps, statement import, AI assistance with a hard cost limit, production hardening, logging, performance and a simpler UI, cars, houses, smart-home devices, and native iOS/Android apps built with Expo. Everything up to and including AI ships on the web before the native apps start (see "Order before the native apps").
 
 Every numbered step below is meant to be **one pull request** that can be reviewed on its own, merged, and deployed without breaking what already works. Unfinished modules stay hidden behind a flag, so `main` is always shippable.
 
@@ -13,7 +13,7 @@ These facts shape the plan:
 - **The browser never talks to Supabase directly.** Next.js route handlers in `src/app/api/**` use `withUser` (`src/lib/http/route.ts`), which reads the user from **cookies**. The Supabase keys are server-only. A native app can't use cookies the same way, so the API has to accept a bearer token as well (step 1.2).
 - **The domain logic is already separate from the UI.** Zod schemas (`src/lib/validation`), types and calculations (`src/lib/expenses`, `src/lib/net-worth`, `src/lib/investments`) don't depend on Chakra, so the Expo app can reuse them.
 - **MCP connects through OAuth or personal access tokens** (phase 3, [mcp-access-plan.md](mcp-access-plan.md)), and each user turns it on in Settings → AI assistants. MCP clients used to send the user's real email and password (Basic auth); that was removed in M10.
-- **The production VPS is reachable only over Tailscale.** This matters for phones, which need Tailscale, and for Google Calendar push webhooks, which need a public HTTPS URL (see "Decisions you need to make").
+- **The production VPS is reachable only over Tailscale.** This matters for phones, which need Tailscale, and for calendar apps that fetch feeds from their own servers (Google Calendar, Outlook.com), which need a public HTTPS URL (see "Decisions you need to make").
 - **Tests:** Vitest for units and routes, plus SQL RLS tests in `supabase/tests` run by `npm run test:db`. The only workflows are deploy and VPS notification. Nothing runs checks on pull requests yet.
 
 ## Architecture decisions (recommended)
@@ -23,7 +23,7 @@ These facts shape the plan:
 3. **Parents see the whole family's finance, read-only.** Parents see every member's expenses, investments and net worth, including each other's. They can't change data that isn't theirs: only the read policies widen, and insert, update and delete stay owner-only. Kids see only their own finance, plus the rest of the family's if a parent turns on the "Family finance" permission for them. MCP keeps working on the caller's own data only.
 4. **Two roles, `parent` and `kid`, plus a creator flag.** The member who created the family is its creator, and only the creator can remove members or delete the family. Parents have every permission. Each kid has their own permission set, chosen by a parent and changeable at any time, so two kids in one family can see different things. Kids can't leave the family on their own, and they're never promoted to parent. Grandparents and other relatives are out of scope for now (step 13.1).
 5. **Smart devices go through Home Assistant, not each vendor.** Roborock has no official public API, and air purifiers each use a different cloud. Home Assistant already supports Roborock, Xiaomi, Philips, Dyson and most others. The app stores one Home Assistant URL and token per family, reads entity states, and calls services.
-6. **Scheduled and background work runs in a worker, not in a request handler.** It's a small Node process in the same Docker image (`node dist/worker.js`), built in phase 5. It delivers reminders and notifications, and runs Google Calendar sync with Google's incremental `syncToken`, polling every couple of minutes at first; push webhooks come later if the app becomes publicly reachable.
+6. **Scheduled and background work runs in a worker, not in a request handler.** It's a small Node process in the same Docker image (`node dist/worker.js`), built in phase 5. It delivers reminders, to-do and calendar notifications.
 7. **Feature flags.** An env flag hides each unfinished module's navigation and API until it's ready. This is separate from kid permissions, which decide what a finished module shows to each kid.
 8. **Supabase sits behind interfaces.** Routes, MCP tools and use cases talk to storage through repository interfaces (`ExpenseRepository`, `FamilyRepository`, …) and to auth through `AuthService` / `AuthAdmin`. Supabase is one implementation, chosen in two composition roots, and a lint rule stops Supabase imports from leaking elsewhere. New SQL identifies the caller through `app_private.current_user_id()` instead of `auth.uid()`. Moving to another Postgres host or auth provider then means writing new implementations, not touching the app. The frontend already only talks to `/api`.
 9. **Notifications go through channels.** Anything that notifies (reminders, to-do assignments, events) writes to one outbox, and the worker delivers it to each of the user's channels: Web Push and email on the web, Expo push once the phone app exists. A new channel needs no change to the features that notify.
@@ -102,7 +102,7 @@ Everything in phases 3–8 ships on the web before the Expo work in phase 9 star
 1. **Phase 3, MCP access tokens.** Small, independent, and it stops MCP clients from holding your real password.
 2. **Phase 4, the to-do board.** Already planned, now as a kanban board.
 3. **Phase 5, the worker, push notifications and reminders.** The background worker and the notification layer are built once here, then reused by the calendar, to-dos and later the phone. Email notifications come in a later step.
-4. **Phase 6, the calendar.** The app's own calendar, an ICS feed for other calendar apps, then two-way Google sync on the worker from phase 5.
+4. **Phase 6, the calendar.** The app's own family calendar, event notifications on the phase 5 worker, and a private feed per member for other calendar apps. Google sync is dropped.
 5. **Phase 7, statement import.** CSV first, then PDF.
 6. **Phase 8, AI assistance**, with the cost gate and kill switch.
 
@@ -191,7 +191,9 @@ To-dos work like a GitHub project board: **three fixed columns, "To do", "In pro
 
 Email isn't part of this phase; it's a later step, after phase 5. When it comes, it's for family notifications (for example a parent assigning a kid a to-do), most likely as a daily or weekly summary rather than one email per event. It would be another channel on the same outbox. Without a domain, the plan is Gmail SMTP from George's existing Gmail account with an app password, behind an `EmailSender` interface so a provider like Resend can replace it if a domain is ever bought.
 
-## Phase 6: Family calendar, calendar feeds and two-way Google sync
+## Phase 6: Family calendar and calendar feeds
+
+**Status (28 October 2026): planned** (tasks C1–C9 in [calendar-plan.md](calendar-plan.md)). The plan changes the steps below: **one calendar per family** with no calendars table, **no kid permission** (every member edits every event), **short repeats only** (daily up to 10 days, weekly up to 10 weeks, stored as one row per occurrence instead of an RRULE), fixed notifications (30 minutes before, 07:30 for all-day events) instead of per-event lead times, and **no Google Calendar sync** (6.5–6.7 and 6.9 are dropped). Each member's feed holds **only the events they attend**, not everything they can see. The steps below are kept as first written; the plan supersedes them.
 
 The app gets its own family calendar. Other calendars connect in two ways:
 - **An ICS feed out**: a private `webcal://` link per user that Apple Calendar, Outlook or any other calendar app subscribes to. It's read-only and works for the Mac calendar without any Apple API.
@@ -284,7 +286,7 @@ After 9.9, every later feature step gets a "web + mobile" pair (for example 10.2
 
 | Step | What | Done when |
 | --- | --- | --- |
-| **11.1** | **Connection**: a family setting (parents only) for the Home Assistant base URL plus a long-lived access token (encrypted like the Google tokens). A server-side client for the HA REST API. "Test connection" button. | Status shows as connected, and the token is never sent to the client. |
+| **11.1** | **Connection**: a family setting (parents only) for the Home Assistant base URL plus a long-lived access token (encrypted with AES-GCM and a server key in env). A server-side client for the HA REST API. "Test connection" button. | Status shows as connected, and the token is never sent to the client. |
 | **11.2** | **Device registry**: pick which HA entities appear in the app (vacuum, air purifier, sensors). Each one gets a friendly name, a room, and whether kids with Devices at edit may control it. | Only chosen devices are listed. |
 | **11.3** | **Read-only dashboard**: vacuum state and battery, air-quality readings, purifier mode. | Live state on web and mobile. |
 | **11.4** | **Controls**: start, stop or dock the vacuum, clean a room (Roborock segment cleaning through HA), set the purifier mode or fan speed. Every action is checked against the role and kid permissions, and written to an audit log. | A kid with Devices at view can't control anything; at edit, only the devices marked for kids. |
@@ -398,7 +400,7 @@ Each PR should include:
 | Decision | Recommendation | Why it matters |
 | --- | --- | --- |
 | **New product name** | Your call, needed by step 0.3 | It sets the app ID and bundle ID for the stores. Those are hard to change after TestFlight. |
-| **Public HTTPS or Tailscale only** | Stay on Tailscale through phase 8. Decide before 3.5, 6.9 or the store releases. | Phones need the Tailscale app to reach the API. claude.ai MCP connectors (3.5), Google subscribing to the ICS feed (6.4), Google push webhooks (6.9) and some OAuth redirects need a public URL (Tailscale Funnel or a Cloudflare Tunnel both work). Web Push needs HTTPS but not a public URL. |
+| **Public HTTPS or Tailscale only** | Stay on Tailscale through phase 8. Decide before 3.5 or the store releases. | Phones need the Tailscale app to reach the API. claude.ai MCP connectors (3.5), Google Calendar, new Outlook and Outlook.com subscribing to the calendar feed (C8 in calendar-plan.md) and some OAuth redirects need a public URL (Tailscale Funnel or a Cloudflare Tunnel both work). Web Push needs HTTPS but not a public URL. |
 | **Email provider** | Decided (25 October 2026): Gmail SMTP from George's existing Gmail account with an app password, behind an `EmailSender` interface. Resend if a domain is ever bought | No domain, so providers that need SPF and DKIM on your own domain are out. Supabase Auth's email is only for sign-in emails. |
 | **One to-do board or several** | Decided: one board per family, filtered by member; no private cards. See [todo-board-plan.md](todo-board-plan.md) | Simpler for a family, and member chips cover "show me Ana's to-dos". |
 | **Banks and formats for statement import** | Open, needed before 7.2: which banks, and whether each gives CSV, PDF or both | Every bank needs its own parser and fixtures. |
@@ -407,9 +409,8 @@ Each PR should include:
 | **Log retention** | 5 days through journald, capped at 300 MB. Your call on the number of days. | Longer means more disk; the cap keeps it bounded either way. |
 | **Who is an admin** | Your own account, by user id in env (`APP_ADMIN_USER_IDS`) | The AI usage page and the kill switch need an owner who isn't tied to a family role. |
 | **UI direction** | Sign off the 17.2 mockups before any screen is rebuilt | Rebuilding screens without an agreed direction would mean doing it twice. |
-| **Mac calendar** | Decided: an ICS feed out (6.4) and two-way Google sync; no CalDAV | A Mac calendar synced with Google gets the app's events through Google. |
+| **Mac calendar** | Decided (28 October 2026): a read-only feed per member with only the events they attend; no Google sync, no CalDAV. See [calendar-plan.md](calendar-plan.md) | Apple Calendar on a Mac or iPhone with Tailscale subscribes now; Google and Outlook.com subscribe once the app has a public URL. |
 | **Reminder rules** | Decided: reminders are strictly personal; to ask someone else, assign them a to-do (phase 5) | |
-| **Google OAuth consent screen** | Publish the OAuth app "In production" (unverified is fine for family use, under 100 users) | In "Testing" status, Google refresh tokens for sensitive scopes like Calendar **expire after 7 days**, so the sync would keep breaking. |
 | **Home Assistant** | Use it if you already run HA, or are willing to. It's a Docker container on the VPS or a Raspberry Pi at home. | The alternative is reverse-engineered vendor clouds (python-roborock, miio), which are fragile and may break the vendors' terms. |
 | **Finance visibility** | Decided: parents see every member's finance read-only, kids only with Family finance on (decision 3, step 1.7) | It widens the read policies on every finance table, so every finance read needs an explicit owner filter first. |
 | **Kids' sign-in** | Decided: a username account created by a parent (or a kid code or link). A real email can be added later (step 1.5) | Creating accounts on the server needs the Supabase secret key, which the app doesn't have yet. |
