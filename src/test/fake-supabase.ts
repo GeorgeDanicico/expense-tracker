@@ -8,7 +8,7 @@
  * `!inner`, a filter drops a row whose list no longer has any rows.
  */
 type Row = Record<string, unknown>;
-type Filter = [operator: "eq" | "is" | "not.is" | "in" | "gte" | "lt" | "lte" | "or", column: string, value: unknown];
+type Filter = [operator: "eq" | "is" | "not.is" | "in" | "gt" | "gte" | "lt" | "lte" | "or", column: string, value: unknown];
 type Result = { data: Row[] | null; error: unknown; count: number | null };
 
 export type RecordedQuery = {
@@ -92,6 +92,8 @@ function matches(row: Row, [operator, column, value]: Filter) {
   if (operator === "eq" || operator === "is") return read(row, column) === value;
   if (operator === "not.is") return read(row, column) !== value;
   if (operator === "in") return (value as unknown[]).includes(read(row, column));
+  // Like SQL, a null never matches a comparison.
+  if (operator === "gt") return read(row, column) != null && String(read(row, column)) > String(value);
   if (operator === "gte") return String(read(row, column)) >= String(value);
   if (operator === "lt") return String(read(row, column)) < String(value);
   // Like SQL, a null never matches a comparison.
@@ -131,6 +133,7 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
     /** Only `not(column, "is", null)`. */
     not(column: string, operator: "is", value: null) { return this.filter(`not.${operator}`, column, value); }
     in(column: string, values: unknown[]) { return this.filter("in", column, values); }
+    gt(column: string, value: string) { return this.filter("gt", column, value); }
     gte(column: string, value: string) { return this.filter("gte", column, value); }
     lt(column: string, value: string) { return this.filter("lt", column, value); }
     lte(column: string, value: string) { return this.filter("lte", column, value); }
