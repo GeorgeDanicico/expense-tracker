@@ -1,0 +1,2 @@
+# iCalendar feed snapshots hold CRLF line endings, which is part of what they check.
+*.ics -text

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Flex, Heading, Stack } from "@chakra-ui/react";
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarDays, CalendarSync, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -14,6 +14,7 @@ import { EventDialog, type EventDialogMode } from "@/components/family-calendar/
 import { MemberChips } from "@/components/family-calendar/member-chips";
 import { MonthDots, SelectedDay } from "@/components/family-calendar/month-dots";
 import { MonthView } from "@/components/family-calendar/month-view";
+import { SubscribeDialog } from "@/components/family-calendar/subscribe-dialog";
 import { useCalendarRange, useCalendarWrites, usePrefetchRanges } from "@/components/family-calendar/use-calendar-events";
 import { WeekView } from "@/components/family-calendar/week-view";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
@@ -125,6 +126,7 @@ export function CalendarScreen() {
   usePrefetchRanges(neighbours, { enabled: hasFamily, member: filteredMemberId });
   const writes = useCalendarWrites(members);
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [subscribing, setSubscribing] = useState(false);
 
   // `?event=<id>` (where an event notification leads) opens that event: fetch it, move the view to
   // its day and open its form, then drop the parameter so a reload or the next notification starts
@@ -166,14 +168,19 @@ export function CalendarScreen() {
       title="Calendar"
       description={account?.membership?.familyName ? `Shared by everyone in ${account.membership.familyName}` : undefined}
       actions={hasFamily ? (
-        <Button
-          size="sm"
-          variant="solid"
-          colorPalette="brand"
-          onClick={() => openCreate(range.start <= today && today < range.endExclusive ? today : date)}
-        >
-          <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add event
-        </Button>
+        <>
+          <Button size="sm" variant="outline" onClick={() => setSubscribing(true)}>
+            <CalendarSync size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Subscribe
+          </Button>
+          <Button
+            size="sm"
+            variant="solid"
+            colorPalette="brand"
+            onClick={() => openCreate(range.start <= today && today < range.endExclusive ? today : date)}
+          >
+            <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add event
+          </Button>
+        </>
       ) : undefined}
     />
   );
@@ -297,6 +304,7 @@ export function CalendarScreen() {
           onRemove={writes.remove}
         />
       ) : null}
+      {subscribing ? <SubscribeDialog onClose={() => setSubscribing(false)} /> : null}
       {dialog?.kind === "day" ? (
         <DayDialog
           date={dialog.date}
