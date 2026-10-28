@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { SWRConfig, type Middleware } from "swr";
 
+import CalendarPage from "@/app/(app)/calendar/page";
 import DashboardPage from "@/app/(app)/dashboard/page";
 import ExpensesPage from "@/app/(app)/expenses/page";
 import InvestmentsPage from "@/app/(app)/investments/page";
@@ -12,10 +13,12 @@ import SettingsLayout from "@/app/(app)/settings/layout";
 import NotificationsSettingsPage from "@/app/(app)/settings/notifications/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import TodosPage from "@/app/(app)/todos/page";
+import { CalendarApiProvider } from "@/components/family-calendar/calendar-api";
 import { AppShell } from "@/components/layout/app-shell";
 import { ReminderApiProvider } from "@/components/reminders/reminder-api";
 import { TodoApiProvider } from "@/components/todos/todo-api";
 
+import { previewCalendarApi } from "../calendar-fixtures";
 import { fixtureFor } from "../fixtures";
 import { previewReminderApi } from "../reminder-fixtures";
 import { previewTodoApi } from "../todo-fixtures";
@@ -29,6 +32,7 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   settings: SettingsPage,
   todos: TodosPreview,
   reminders: RemindersPreview,
+  calendar: CalendarPreview,
   notifications: NotificationsPreview,
 };
 
@@ -47,6 +51,15 @@ function TodosPreview() {
     <TodoApiProvider api={previewTodoApi}>
       <TodosPage />
     </TodoApiProvider>
+  );
+}
+
+/** The calendar with its events and writes kept in memory (see `calendar-fixtures.ts`). */
+function CalendarPreview() {
+  return (
+    <CalendarApiProvider api={previewCalendarApi}>
+      <CalendarPage />
+    </CalendarApiProvider>
   );
 }
 

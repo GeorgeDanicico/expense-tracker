@@ -125,3 +125,29 @@ dev indicator was removed before each capture.
 | `reminders-log-expense-confirm-1280.jpg` | Mark done on "Pay the rent": the expense pre-filled for the occurrence (description, category, date, editable amount), with "Just mark done" and "Log expense and mark done" |
 | `reminders-log-expense-confirm-390.jpg` | The confirm as a bottom sheet at 390, its two answers stacked with the primary on top |
 | `reminders-done-expense-logged-1280.jpg` | Done after logging: "Expense logged" on the completions with an expense, linking to that month's expenses |
+
+## Calendar page (family C5)
+
+Captured with the in-app browser from `/dev/preview/calendar`, whose events and writes are kept in
+memory around today (`src/app/dev/preview/calendar-fixtures.ts`, which runs the same `seriesRows`
+and `editedRows` as the service): 1280 × 800 (saved at 800 × 500, the first at 800 × 563) and
+390 × 844 (saved at 468 × 1012). `?failWrites=1` refuses every write after 500 ms, so the optimistic
+change and its rollback can be seen; `?noFamily=1` previews an account without a family. The page
+isn't linked from the navigation yet (C6). The dark capture has `prefers-color-scheme: dark`
+emulated; the app forces its light theme, so it matches the light one.
+
+| Image | Shows |
+|---|---|
+| `calendar-month-1280-light.jpg` | Month: six weeks from Monday, today filled, chips in the attendee's colour, a neutral chip with colour dots for several attendees, "+3 more", a 4-day all-day bar crossing two week rows |
+| `calendar-month-1280-dark.jpg` | The same with dark colour scheme emulated (the app stays light) |
+| `calendar-agenda-1280.jpg` | Agenda: the next 60 days by day, "from 20:00" / "until 10:00" for an event across midnight, "3 of 8" on a series, avatars |
+| `calendar-add-dialog-1280.jpg` | The add form with a weekly repeat: who's going (Just me by default), "for N weeks" and where the repeat ends |
+| `calendar-series-6-weeks-1280.jpg` | A 6-week series created from the form: Wed 4 Nov to Wed 9 Dec (the last two are below the grid) |
+| `calendar-edit-scope-1280.jpg` | Save on the 3rd of 6: "This event / This and following events / All events", each with how many it reaches |
+| `calendar-moved-one-1280.jpg` | "This event": only the 3rd occurrence moved, from Wed 18 to Thu 19 Nov |
+| `calendar-following-time-1280.jpg` | "This and following": the 4th and later occurrences now at 10:00; the earlier ones, and the moved one, stay at 09:00 |
+| `calendar-delete-scope-1280.jpg` | Delete on the 5th of 6 asks the same question, with the danger tone |
+| `calendar-deleted-all-1280.jpg` | After "All events": all six occurrences gone, the moved one included |
+| `calendar-day-dialog-1280.jpg` | "+3 more" opened: the day's six events in full, with Add event |
+| `calendar-rolled-back-1280.jpg` | `?failWrites=1`: the refused delete's error in its dialog (the event went back to the grid) |
+| `calendar-month-390.jpg` | The phone width: the grid fits with no sideways scroll; the phone layout proper is C6 |
