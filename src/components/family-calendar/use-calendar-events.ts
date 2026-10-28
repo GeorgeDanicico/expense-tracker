@@ -7,6 +7,7 @@ import { useCalendarApi } from "@/components/family-calendar/calendar-api";
 import { ApiError } from "@/lib/api/client";
 import { calendarEventsApiKey, isCalendarEventsKey, type CalendarEventsResponse } from "@/lib/api/keys";
 import type { FamilyMember } from "@/lib/family/repository";
+import { eventsAttendedBy, memberOfKey } from "@/lib/family-calendar/filters";
 import { withEditedEvent, withoutEvents, withPendingEvents } from "@/lib/family-calendar/optimistic";
 import type { CalendarAttendee, CalendarEvent, EditScope } from "@/lib/family-calendar/types";
 import { rangeInstants, type DateRange } from "@/lib/family-calendar/view";
@@ -76,7 +77,8 @@ export function useCalendarWrites(members: readonly FamilyMember[]) {
     const before = new Map(keys.map((key) => [key, cache.get(key)?.data as CalendarEventsResponse | undefined]));
     await Promise.all(keys.map((key) => mutate(
       key,
-      (current?: CalendarEventsResponse) => (current ? { events: optimistic(current.events) } : current),
+      // A range filtered to a member only holds that member's events, so a guess keeps to that too.
+      (current?: CalendarEventsResponse) => (current ? { events: eventsAttendedBy(optimistic(current.events), memberOfKey(key)) } : current),
       { revalidate: false },
     )));
     try {

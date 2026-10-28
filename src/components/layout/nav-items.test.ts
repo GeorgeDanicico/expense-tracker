@@ -22,15 +22,17 @@ describe("navigation sections", () => {
   it("drops tab-bar destinations from the More sheet but keeps the section", () => {
     expect(MORE_SECTIONS).toEqual([
       { label: "Finance", items: [NAV_ITEMS.investments, NAV_ITEMS.netWorth] },
-      { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos] },
+      { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] },
     ]);
   });
 
-  it("puts Reminders then To-dos in a Planning section of the More sheet, not the tab bar", () => {
-    expect(NAV_SECTIONS.at(-1)).toEqual({ label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos] });
+  it("puts Reminders, To-dos then Calendar in a Planning section of the More sheet, not the tab bar", () => {
+    expect(NAV_SECTIONS.at(-1)).toEqual({ label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] });
     expect(TAB_BAR_ITEMS).not.toContain(NAV_ITEMS.todos);
+    expect(TAB_BAR_ITEMS).not.toContain(NAV_ITEMS.calendar);
     expect(TAB_BAR_ITEMS).not.toContain(NAV_ITEMS.reminders);
     expect(NAV_ITEMS.todos).toMatchObject({ href: "/todos", label: "To-dos", requiresFamily: true });
+    expect(NAV_ITEMS.calendar).toMatchObject({ href: "/calendar", label: "Calendar", requiresFamily: true });
   });
 
   it("makes Reminders a badged destination for everyone", () => {
@@ -55,15 +57,17 @@ const kid = (permissions = DEFAULT_KID_PERMISSIONS): AccountMembership => ({
 const FINANCE = NAV_SECTIONS.filter((section) => section.label === "Finance");
 const FINANCE_MORE = MORE_SECTIONS.filter((section) => section.label === "Finance");
 const PLANNING_SOLO = { label: "Planning", items: [NAV_ITEMS.reminders] };
-const PLANNING = { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos] };
+const PLANNING = { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] };
 
 describe("navigationFor", () => {
-  it("shows a user without a family Reminders but not To-dos", () => {
+  it("shows a user without a family Reminders but not To-dos or Calendar", () => {
     const nav = navigationFor(null);
     expect(nav.sections).toEqual([...FINANCE, PLANNING_SOLO]);
     expect(nav.tabBarItems).toEqual(TAB_BAR_ITEMS);
     expect(nav.moreSections).toEqual([...FINANCE_MORE, PLANNING_SOLO]);
-    expect(nav.moreItems).toEqual(MORE_ITEMS.filter((item) => item !== NAV_ITEMS.todos));
+    expect(nav.moreItems).toEqual(MORE_ITEMS.filter((item) => item !== NAV_ITEMS.todos && item !== NAV_ITEMS.calendar));
+    expect(nav.moreItems).not.toContain(NAV_ITEMS.calendar);
+    expect(nav.sections.flatMap((section) => section.items)).not.toContain(NAV_ITEMS.calendar);
     expect(nav.moreItems).toContain(NAV_ITEMS.reminders);
   });
 
@@ -73,13 +77,14 @@ describe("navigationFor", () => {
     expect(navigationFor(parent).moreItems).toEqual(MORE_ITEMS);
   });
 
-  it("shows the module items and Reminders but not To-dos while the account is loading", () => {
+  it("shows the module items and Reminders but not To-dos or Calendar while the account is loading", () => {
     const nav = navigationFor(undefined);
     expect(nav.sections).toEqual([...FINANCE, PLANNING_SOLO]);
     expect(nav.moreItems).not.toContain(NAV_ITEMS.todos);
+    expect(nav.moreItems).not.toContain(NAV_ITEMS.calendar);
   });
 
-  it("leaves a kid with only expenses enabled with Home, Expenses, Reminders, To-dos and Settings", () => {
+  it("leaves a kid with only expenses enabled with Home, Expenses, Reminders, To-dos, Calendar and Settings", () => {
     const nav = navigationFor(kid());
     expect(nav.sections).toEqual([
       { label: "Finance", items: [NAV_ITEMS.expenses] },
@@ -87,7 +92,7 @@ describe("navigationFor", () => {
     ]);
     expect(nav.tabBarItems).toEqual(TAB_BAR_ITEMS);
     expect(nav.moreSections).toEqual([PLANNING]);
-    expect(nav.moreItems).toEqual([NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.settings]);
+    expect(nav.moreItems).toEqual([NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar, NAV_ITEMS.settings]);
   });
 
   it("drops the Finance section for a kid with every module off, keeping Planning", () => {

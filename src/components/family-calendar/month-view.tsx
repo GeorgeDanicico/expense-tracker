@@ -21,15 +21,21 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const ROWS = `1.75rem repeat(${MONTH_MAX_LANES}, 1.375rem) 1.25rem`;
 const COLUMNS = "repeat(7, minmax(0, 1fr))";
 
-/** One event's stretch of a week: a chip that keeps the same row on every day it covers. */
-function Chip({
+/**
+ * One event's stretch of a week: a chip that keeps the same row on every day it covers. The Week
+ * view's all-day row draws the same chips; `firstRow` is the grid row of lane 0 (2 under the month
+ * grid's day numbers, 1 in the all-day row).
+ */
+export function EventChip({
   segment,
   colorOf,
   onOpen,
+  firstRow = 2,
 }: {
   segment: WeekSegment;
   colorOf: ColorOf;
   onOpen: (event: CalendarEvent) => void;
+  firstRow?: number;
 }) {
   const { event, startsBeforeWeek, endsAfterWeek } = segment;
   const appearance = eventAppearance(event, colorOf);
@@ -57,7 +63,7 @@ function Chip({
       aria-label={eventLabel(event)}
       onClick={() => onOpen(event)}
       gridColumn={`${segment.column + 1} / span ${segment.span}`}
-      gridRow={segment.lane + 2}
+      gridRow={segment.lane + firstRow}
       ms={startsBeforeWeek ? "0" : "0.5"}
       me={endsAfterWeek ? "0" : "0.5"}
       pointerEvents="auto"
@@ -150,7 +156,7 @@ const Week = memo(function Week({
           );
         })}
         {layout.segments.map((segment) => (
-          <Chip key={`${segment.event.id}-${segment.column}`} segment={segment} colorOf={colorOf} onOpen={onOpenEvent} />
+          <EventChip key={`${segment.event.id}-${segment.column}`} segment={segment} colorOf={colorOf} onOpen={onOpenEvent} />
         ))}
         {layout.moreByDay.map((more, column) => more > 0 ? (
           <Box

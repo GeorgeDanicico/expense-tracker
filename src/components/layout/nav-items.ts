@@ -1,5 +1,6 @@
 import {
   BellRing,
+  CalendarDays,
   CreditCard,
   House,
   Scale,
@@ -35,22 +36,24 @@ export const NAV_ITEMS = {
   netWorth: { href: "/net-worth", label: "Net worth", icon: Scale, module: "net_worth" },
   reminders: { href: "/reminders", label: "Reminders", icon: BellRing, badge: "reminders" },
   todos: { href: "/todos", label: "To-dos", icon: SquareKanban, requiresFamily: true },
+  calendar: { href: "/calendar", label: "Calendar", icon: CalendarDays, requiresFamily: true },
   settings: { href: "/settings", label: "Settings", icon: Settings2 },
 } satisfies Record<string, NavItemConfig>;
 
 /**
  * Grouped destinations between Home and Settings. New modules add a section here; a section only
  * appears once it has items. Planning holds the personal Reminders, which everyone reaches, then
- * the family-only To-dos last, so a user without a family keeps the section with Reminders alone.
+ * the family-only To-dos and Calendar last, so a user without a family keeps the section with
+ * Reminders alone.
  */
 export const NAV_SECTIONS: NavSection[] = [
   { label: "Finance", items: [NAV_ITEMS.expenses, NAV_ITEMS.investments, NAV_ITEMS.netWorth] },
-  { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos] },
+  { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] },
 ];
 
 /**
  * Shown in the mobile tab bar; everything else lives in the More sheet. Only destinations every user
- * reaches belong here (To-dos needs a family, so it would come and go), and two plus More keeps each
+ * reaches belong here (To-dos and Calendar need a family, so they would come and go), and two plus More keeps each
  * tab wide enough for its label at 320 px.
  */
 export const TAB_BAR_ITEMS: NavItemConfig[] = [NAV_ITEMS.home, NAV_ITEMS.expenses];

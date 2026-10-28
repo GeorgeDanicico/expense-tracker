@@ -5,9 +5,13 @@ import { describe, expect, it } from "vitest";
 import { eventAppearance, eventLabel, attendeeNames } from "@/components/family-calendar/event-appearance";
 import { goingSummary, repeatEndsOn } from "@/components/family-calendar/event-dialog";
 import { EventRow, seriesLabel } from "@/components/family-calendar/event-row";
-import { NoFamilyCalendar, WeekPlaceholder } from "@/components/family-calendar/calendar-screen";
+import { NoFamilyCalendar } from "@/components/family-calendar/calendar-screen";
+import { MemberChips } from "@/components/family-calendar/member-chips";
+import { dayDots, MonthDots, SelectedDay } from "@/components/family-calendar/month-dots";
 import { MonthView } from "@/components/family-calendar/month-view";
 import { scopeChoices } from "@/components/family-calendar/scope-dialog";
+import { WeekView } from "@/components/family-calendar/week-view";
+import { weekViewDays } from "@/lib/family-calendar/view";
 import { ledgerSystem } from "@/components/ui/theme";
 import { ANA, calendarEvent, calendarEvents, colorOf, DAN, LUCA } from "@/test/calendar-events";
 
@@ -157,11 +161,178 @@ describe("the empty states", () => {
     expect(html).toContain("The calendar belongs to a family");
     expect(html).toContain('href="/settings/family"');
   });
+});
 
-  it("holds the Week view's place", () => {
-    const html = render(<WeekPlaceholder onShow={noop} />);
-    expect(html).toContain("The week view is coming soon");
-    expect(html).toContain("Show the month");
-    expect(html).toContain("Show the agenda");
+describe("WeekView", () => {
+  const WEEK = weekViewDays("2026-10-28");
+  const view = (events: ReturnType<typeof calendarEvents>, days: readonly string[] = WEEK, today = "2026-10-28") => render(
+    <WeekView days={days} today={today} events={events} colorOf={colorOf} onOpenEvent={noop} onAddAt={noop} onOpenDay={noop} />,
+  );
+
+  it("shows the seven days from Monday, today marked, with a column to click on each", () => {
+    const html = view([]);
+    expect(html.indexOf("Mon")).toBeLessThan(html.indexOf("Sun"));
+    expect(html).toContain("Show Wednesday 28 October 2026 (today)");
+    expect(html.match(/aria-current="date"/g)).toHaveLength(1);
+    expect(html.match(/aria-label="Add an event on /g)).toHaveLength(7);
+    expect(html.match(/aria-label="Add an all-day event on /g)).toHaveLength(7);
+    expect(html).toContain("All day");
+  });
+
+  it("labels the hours of the whole day, so the grid can scroll to 00:00 and 23:00", () => {
+    const html = view([]);
+    for (const hour of ["01:00", "07:00", "12:00", "22:00", "23:00"]) expect(html).toContain(`>${hour}<`);
+  });
+
+  it("places a timed event by its time: 09:30 to 11:00 sits 9.5 hours down and 1.5 hours tall", () => {
+    const html = view(calendarEvents({ title: "Dentist", start: "2026-10-28 09:30", end: "2026-10-28 11:00" }));
+    expect(html).toContain('aria-label="Dentist, 09:30 – 11:00, Ana"');
+    // 48 px an hour, plus the 1 px inset; two pixels shorter than 1.5 hours so neighbours show a gap.
+    expect(html).toContain("top:457px");
+    expect(html).toContain("height:70px");
+  });
+
+  it("draws overlapping events side by side, each half the width", () => {
+    const html = view([
+      ...calendarEvents({ id: "a", title: "Concert", start: "2026-10-28 09:00", end: "2026-10-28 11:00" }),
+      ...calendarEvents({ id: "b", title: "Plumber", start: "2026-10-28 10:00", end: "2026-10-28 12:00", attendees: [DAN] }),
+    ]);
+    expect(html).toContain("left:calc(0% + 1px);width:calc(50% - 2px)");
+    expect(html).toContain("left:calc(50% + 1px);width:calc(50% - 2px)");
+  });
+
+  it("colours a block like the month does: the member's colour for one attendee, neutral for several", () => {
+    /** The CSS rule of the block's own class. */
+    const blockCss = (html: string) => {
+      const className = html.match(/aria-label="Swimming[^"]*" class="(css-\w+)"/)?.[1];
+      return html.match(new RegExp(`\\.${className}\\{[^}]*\\}`))?.[0] ?? "";
+    };
+    const one = blockCss(view(calendarEvents({ start: "2026-10-28 09:00", attendees: [ANA] })));
+    expect(one).toContain("var(--chakra-colors-member-2)");
+    const several = blockCss(view(calendarEvents({ start: "2026-10-28 09:00", attendees: [ANA, DAN] })));
+    expect(several).not.toContain("member-2");
+    expect(several).toContain("var(--chakra-colors-bg-emphasized)");
+  });
+
+  it("puts all-day and multi-day events in the all-day row, not on the grid", () => {
+    const html = view([
+      ...calendarEvents({ id: "bd", title: "Birthday", start: "2026-10-29" }),
+      ...calendarEvents({ id: "trip", title: "Trip", start: "2026-10-30", end: "2026-11-01" }),
+      ...calendarEvents({ id: "sl", title: "Sleepover", start: "2026-10-30 20:00", end: "2026-10-31 10:00" }),
+    ]);
+    expect(html).toContain('aria-label="Birthday, All day, Ana"');
+    expect(html).toContain('aria-label="Trip, All day, Ana"');
+    expect(html).toContain("Sleepover");
+    // Each is one chip in the row; none is a positioned block (those carry a pixel `top`).
+    expect(html).not.toMatch(/aria-label="(Birthday|Trip|Sleepover)[^"]*"[^>]*style="top:/);
+    expect(html.match(/aria-label="Trip, /g)).toHaveLength(1);
+  });
+
+  it("says how many events don't fit in the all-day row", () => {
+    const many = ["a", "b", "c", "d", "e"].flatMap((id) => calendarEvents({ id, title: `Day ${id}`, start: "2026-10-29" }));
+    const html = view(many);
+    expect(html).toContain("+2 more");
+    expect(html).toContain("Show 2 more events on Thursday 29 October 2026");
+  });
+
+  it("shows only three days on a phone", () => {
+    const html = view([], weekViewDays("2026-10-28", 3));
+    expect(html.match(/aria-label="Add an event on /g)).toHaveLength(3);
+    expect(html).toContain("Add an event on Wednesday 28 October 2026");
+    expect(html).toContain("Add an event on Friday 30 October 2026");
+    expect(html).not.toContain("Add an event on Saturday 31 October 2026");
+  });
+
+  it("draws no 'now' line on the server: it appears once the browser knows the time", () => {
+    expect(view([])).not.toContain("now-line");
+  });
+
+  it("marks an unconfirmed event so it can be told from a saved one", () => {
+    const [pending] = calendarEvents({ id: "pending-1", start: "2026-10-28 09:00" });
+    expect(view([pending])).toContain("opacity:0.6");
+  });
+});
+
+describe("MonthDots", () => {
+  const view = (events: ReturnType<typeof calendarEvents>, selected = "2026-10-28") => render(
+    <MonthDots selected={selected} today="2026-10-28" events={events} colorOf={colorOf} onSelectDay={noop} />,
+  );
+
+  it("shows a button per day of the six-week grid, with today and the chosen day marked", () => {
+    const html = view([], "2026-10-30");
+    expect(html.match(/aria-pressed=/g)).toHaveLength(42);
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(html).toContain('aria-label="Friday 30 October 2026, no events"');
+    expect(html).toContain("Wednesday 28 October 2026 (today), no events");
+  });
+
+  it("counts a day's events in its label, and draws dots rather than chips", () => {
+    const html = view(calendarEvents({ id: "a", title: "Swimming", start: "2026-10-29 18:00" }));
+    expect(html).toContain("Thursday 29 October 2026, 1 event");
+    expect(html).not.toContain("Swimming");
+  });
+
+  it("draws one dot per event in the member's colour, grey for several people, at most three", () => {
+    const events = [
+      ...calendarEvents({ id: "a", start: "2026-10-29 08:00", attendees: [ANA] }),
+      ...calendarEvents({ id: "b", start: "2026-10-29 09:00", attendees: [ANA, DAN] }),
+      ...calendarEvents({ id: "c", start: "2026-10-29 10:00", attendees: [DAN] }),
+      ...calendarEvents({ id: "d", start: "2026-10-29 11:00", attendees: [DAN] }),
+    ];
+    expect(dayDots(events.slice(0, 3), colorOf)).toEqual({ colors: ["member.2", "fg.subtle", "member.1"], more: 0 });
+    expect(dayDots(events, colorOf)).toEqual({ colors: ["member.2", "fg.subtle", "member.1"], more: 1 });
+    expect(dayDots([], colorOf)).toEqual({ colors: [], more: 0 });
+  });
+
+  it("dots a multi-day event on every day it covers", () => {
+    const html = view(calendarEvents({ id: "trip", title: "Trip", start: "2026-10-29", end: "2026-10-31" }));
+    for (const day of ["Thursday 29 October", "Friday 30 October", "Saturday 31 October"]) expect(html).toContain(`${day} 2026, 1 event`);
+  });
+});
+
+describe("SelectedDay", () => {
+  it("lists the chosen day's events under the grid, with a way to add one", () => {
+    const events = calendarEvents({ id: "sw", title: "Swimming", start: "2026-10-29 18:00", end: "2026-10-29 19:00" });
+    const html = render(<SelectedDay date="2026-10-29" events={events} colorOf={colorOf} onOpenEvent={noop} onAdd={noop} />);
+    expect(html).toContain("Thursday 29 October 2026");
+    expect(html).toContain("1 event");
+    expect(html).toContain("Swimming");
+    expect(html).toContain("18:00 – 19:00");
+    expect(html).toContain("Add");
+  });
+
+  it("says when nothing is planned", () => {
+    const html = render(<SelectedDay date="2026-10-29" events={[]} colorOf={colorOf} onOpenEvent={noop} onAdd={noop} />);
+    expect(html).toContain("Nothing planned.");
+  });
+});
+
+describe("MemberChips", () => {
+  const members = [
+    { memberId: "m-dan", displayName: "Dan", username: "dan", avatarUrl: null, color: null },
+    { memberId: "m-ana", displayName: "Ana", username: "ana", avatarUrl: null, color: null },
+  ] as unknown as Parameters<typeof MemberChips>[0]["members"];
+  const chips = (filter: Parameters<typeof MemberChips>[0]["filter"]) => render(
+    <MemberChips filter={filter} members={members} myMemberId="m-dan" colorOf={colorOf} onChange={noop} />,
+  );
+  /** The text of each pressed chip. */
+  const pressed = (html: string) => html.split("<button").filter((chip) => chip.includes('aria-pressed="true"'))
+    .map((chip) => chip.slice(chip.indexOf(">") + 1).split("</button>")[0].replace(/<[^>]*>/g, ""));
+
+  it("offers Everyone, Me and each other member, leaving the caller out of the member chips", () => {
+    const html = chips("all");
+    expect(html.indexOf("Everyone")).toBeLessThan(html.indexOf("Me<"));
+    expect(html.indexOf("Me<")).toBeLessThan(html.indexOf("Ana"));
+    expect(html.match(/aria-pressed=/g)).toHaveLength(3);
+    expect(html).not.toContain("Dan");
+  });
+
+  it("presses the chip of the filter", () => {
+    expect(chips("all").match(/aria-pressed="true"/g)).toHaveLength(1);
+    for (const [filter, label] of [["all", /Everyone$/], ["me", /Me$/], ["m-dan", /Me$/], ["m-ana", /Ana$/]] as const) {
+      const on = pressed(chips(filter));
+      expect(on).toHaveLength(1);
+      expect(on[0]).toMatch(label);
+    }
   });
 });

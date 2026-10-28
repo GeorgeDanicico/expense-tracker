@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Flex, Heading, Stack } from "@chakra-ui/react";
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -10,9 +10,11 @@ import useSWR from "swr";
 import { AgendaView } from "@/components/family-calendar/agenda-view";
 import { DayDialog } from "@/components/family-calendar/day-dialog";
 import { EventDialog, type EventDialogMode } from "@/components/family-calendar/event-dialog";
+import { MemberChips } from "@/components/family-calendar/member-chips";
+import { MonthDots, SelectedDay } from "@/components/family-calendar/month-dots";
 import { MonthView } from "@/components/family-calendar/month-view";
 import { useCalendarRange, useCalendarWrites, usePrefetchRanges } from "@/components/family-calendar/use-calendar-events";
-import { Card } from "@/components/ui/card";
+import { WeekView } from "@/components/family-calendar/week-view";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
@@ -20,21 +22,33 @@ import { IconButton } from "@/components/ui/icon-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useAccount } from "@/hooks/use-account";
+import { useIsPhone } from "@/hooks/use-is-phone";
 import { useMemberColors } from "@/hooks/use-member-colors";
 import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 import { getBucharestToday } from "@/lib/calendar";
 import { eventsOnDay } from "@/lib/family-calendar/days";
+import {
+  attendeesForNewEvent,
+  memberFilterHref,
+  memberIdFor,
+  parseMemberFilter,
+  type CalendarMemberFilter,
+} from "@/lib/family-calendar/filters";
 import { isPendingEvent } from "@/lib/family-calendar/optimistic";
 import type { CalendarEvent } from "@/lib/family-calendar/types";
 import {
+  AGENDA_DAYS,
   CALENDAR_VIEW_LABELS,
   CALENDAR_VIEWS,
   calendarHref,
+  defaultViewFor,
   neighbourRanges,
   parseCalendarParams,
   periodTitle,
   shiftCalendarDate,
   viewRange,
+  weekLengthFor,
+  weekViewDays,
   type CalendarState,
   type CalendarView,
 } from "@/lib/family-calendar/view";
@@ -56,86 +70,86 @@ export function NoFamilyCalendar() {
   );
 }
 
-/** The Week view's place until it is built (family C6). */
-export function WeekPlaceholder({ onShow }: { onShow: (view: CalendarView) => void }) {
-  return (
-    <Card>
-      <Card.Body>
-        <EmptyState
-          size="sm"
-          titleAs="h2"
-          icon={<CalendarRange size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
-          title="The week view is coming soon"
-          description="Until then, the month and the agenda show every event."
-          action={(
-            <Flex gap="2" wrap="wrap" justify="center">
-              <Button size="sm" variant="outline" onClick={() => onShow("month")}>Show the month</Button>
-              <Button size="sm" variant="outline" onClick={() => onShow("agenda")}>Show the agenda</Button>
-            </Flex>
-          )}
-        />
-      </Card.Body>
-    </Card>
-  );
-}
-
 /** What is open on top of the calendar. */
 type Dialog =
   | { kind: "event"; mode: EventDialogMode; id: string }
   | { kind: "day"; date: string }
   | null;
 
-const PERIOD_NAMES: Record<CalendarView, string> = { month: "month", week: "week", agenda: "60 days" };
+/** What Previous and Next move by, for their labels. */
+function periodName(view: CalendarView, phone: boolean) {
+  return view === "week" ? (phone ? "3 days" : "week") : view === "month" ? "month" : `${AGENDA_DAYS} days`;
+}
 
 /**
- * The family calendar page: header (Today, previous and next, the period's title, the view
- * switcher; its state is in the URL as `?view=` and `?date=`), the chosen view, and the event
- * dialogs. Needs a Suspense boundary above it for `useSearchParams`.
+ * The family calendar page: the member chips, the header (Today, previous and next, the period's
+ * title, the view switcher), the chosen view, and the event dialogs. Its state is in the URL:
+ * `?view=` and `?date=`, and `?member=` for the chips (Everyone leaves it out; `me` and a member
+ * id are passed to the API as `member`, for the views and the prefetches alike). Needs a Suspense
+ * boundary above it for `useSearchParams`.
  *
- * Month and Agenda are drawn here; Week is a placeholder until C6, which also adds the member
- * filter chips above the view (their `?member=` value goes to `useCalendarRange`/`rangeKey`).
+ * Phones (below 768 px) open on the Agenda when the URL has no `?view=`; Month there shows dots
+ * and lists the chosen day (`?date=`) below the grid, and Week shows three days from `?date=`.
  */
 export function CalendarScreen() {
   const { account } = useAccount();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const colorOf = useMemberColors();
+  const phone = useIsPhone();
   const today = getBucharestToday();
-  const { view, date } = parseCalendarParams(searchParams, today);
+  const defaultView = defaultViewFor(phone);
+  const weekLength = weekLengthFor(phone);
+  const { view, date } = parseCalendarParams(searchParams, today, defaultView);
   const hasFamily = Boolean(account?.membership);
   const myMemberId = account?.membership?.memberId ?? null;
   const { data: family } = useSWR<FamilyResponse>(hasFamily ? FAMILY_API_KEY : null);
   const members = useMemo(() => family?.family?.members ?? [], [family]);
+  const memberIds = family ? members.map((member) => member.memberId) : undefined;
+  // A `?member=` naming nobody in the family is Everyone once the family has loaded.
+  const filter = parseMemberFilter(searchParams, memberIds);
+  const filteredMemberId = memberIdFor(filter, myMemberId);
 
-  const range = useMemo(() => viewRange(view, date), [view, date]);
-  const neighbours = useMemo(() => neighbourRanges(view, date), [view, date]);
-  const current = useCalendarRange(range, { enabled: hasFamily });
-  usePrefetchRanges(neighbours, { enabled: hasFamily });
+  const range = useMemo(() => viewRange(view, date, undefined, weekLength), [view, date, weekLength]);
+  const neighbours = useMemo(() => neighbourRanges(view, date, weekLength), [view, date, weekLength]);
+  const current = useCalendarRange(range, { enabled: hasFamily, member: filteredMemberId });
+  usePrefetchRanges(neighbours, { enabled: hasFamily, member: filteredMemberId });
   const writes = useCalendarWrites(members);
   const [dialog, setDialog] = useState<Dialog>(null);
 
-  // The native History API syncs `useSearchParams` without a server round trip, and pushing
-  // (unlike the to-do filters) keeps each month in the back button's history.
-  const go = (next: Partial<CalendarState>) => {
-    const href = calendarHref(pathname, searchParams, { view, date, ...next }, today);
-    window.history.pushState(null, "", href);
+  // The native History API syncs `useSearchParams` without a server round trip. Pushing (unlike the
+  // to-do filters) keeps each month in the back button's history; picking a day on a phone, or a
+  // chip, replaces instead.
+  const go = (next: Partial<CalendarState>, { replace = false }: { replace?: boolean } = {}) => {
+    const href = calendarHref(pathname, searchParams, { view, date, ...next }, today, defaultView);
+    if (replace) window.history.replaceState(null, "", href);
+    else window.history.pushState(null, "", href);
   };
-  const step = (direction: -1 | 1) => go({ date: shiftCalendarDate(view, date, direction) });
+  const step = (direction: -1 | 1) => go({ date: shiftCalendarDate(view, date, direction, weekLength) });
+  const setFilter = (next: CalendarMemberFilter) => window.history.replaceState(null, "", memberFilterHref(pathname, searchParams, next));
 
+  const visibleDays = view === "week" ? weekViewDays(date, weekLength) : null;
   const header = (
     <PageHeader
       title="Calendar"
       description={account?.membership?.familyName ? `Shared by everyone in ${account.membership.familyName}` : undefined}
       actions={hasFamily ? (
-        <Button size="sm" variant="solid" colorPalette="brand" onClick={() => openCreate(range.start <= today && today < range.endExclusive ? today : date)}>
+        <Button
+          size="sm"
+          variant="solid"
+          colorPalette="brand"
+          onClick={() => openCreate(range.start <= today && today < range.endExclusive ? today : date)}
+        >
           <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add event
         </Button>
       ) : undefined}
     />
   );
 
-  function openCreate(onDate: string) {
-    setDialog({ kind: "event", mode: { kind: "create", date: onDate }, id: `new-${onDate}-${Date.now()}` });
+  /** Opens the form for a new event; under a member's chip it starts with that member going. */
+  function openCreate(onDate: string, slot: { startTime?: string; allDay?: boolean } = {}) {
+    const mode: EventDialogMode = { kind: "create", date: onDate, ...slot, attendeeMemberIds: attendeesForNewEvent(filter, myMemberId) };
+    setDialog({ kind: "event", mode, id: `new-${onDate}-${slot.startTime ?? (slot.allDay ? "all-day" : "")}-${Date.now()}` });
   }
   function openEvent(event: CalendarEvent) {
     // A guess the server hasn't confirmed has no id to edit yet.
@@ -166,18 +180,26 @@ export function CalendarScreen() {
   return (
     <Stack gap={{ base: "4", md: "5" }}>
       {header}
+      <MemberChips
+        filter={filter}
+        members={members}
+        myMemberId={myMemberId}
+        myAvatarUrl={account.avatarUrl}
+        colorOf={colorOf}
+        onChange={setFilter}
+      />
       <Flex align="center" justify="space-between" gap="3" wrap="wrap">
         <Flex align="center" gap="2" wrap="wrap" minW="0">
           <Button variant="outline" size="sm" onClick={() => go({ date: today })}>Today</Button>
           <Flex gap="1">
-            <IconButton aria-label={`Previous ${PERIOD_NAMES[view]}`} variant="outline" onClick={() => step(-1)}>
+            <IconButton aria-label={`Previous ${periodName(view, phone)}`} variant="outline" onClick={() => step(-1)}>
               <ChevronLeft size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
             </IconButton>
-            <IconButton aria-label={`Next ${PERIOD_NAMES[view]}`} variant="outline" onClick={() => step(1)}>
+            <IconButton aria-label={`Next ${periodName(view, phone)}`} variant="outline" onClick={() => step(1)}>
               <ChevronRight size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
             </IconButton>
           </Flex>
-          <Heading as="h2" size="lg" aria-live="polite" minW="0">{periodTitle(view, date, today)}</Heading>
+          <Heading as="h2" size="lg" aria-live="polite" minW="0">{periodTitle(view, date, today, undefined, weekLength)}</Heading>
         </Flex>
         <SegmentedControl
           aria-label="Calendar view"
@@ -192,6 +214,11 @@ export function CalendarScreen() {
 
       {failed ? (
         <DataError message="The calendar could not be loaded." retry={current.refresh} />
+      ) : view === "month" && phone ? (
+        <>
+          <MonthDots selected={date} today={today} events={events} colorOf={colorOf} onSelectDay={(day) => go({ date: day }, { replace: true })} />
+          <SelectedDay date={date} events={eventsOnDay(events, date)} colorOf={colorOf} onOpenEvent={openEvent} onAdd={(day) => openCreate(day)} />
+        </>
       ) : view === "month" ? (
         <MonthView
           date={date}
@@ -199,13 +226,21 @@ export function CalendarScreen() {
           events={events}
           colorOf={colorOf}
           onOpenEvent={openEvent}
-          onAddOnDay={openCreate}
+          onAddOnDay={(day) => openCreate(day)}
           onOpenDay={(day) => setDialog({ kind: "day", date: day })}
         />
-      ) : view === "week" ? (
-        <WeekPlaceholder onShow={(next) => go({ view: next })} />
+      ) : visibleDays ? (
+        <WeekView
+          days={visibleDays}
+          today={today}
+          events={events}
+          colorOf={colorOf}
+          onOpenEvent={openEvent}
+          onAddAt={(day, startTime) => openCreate(day, startTime ? { startTime } : { allDay: true })}
+          onOpenDay={(day) => setDialog({ kind: "day", date: day })}
+        />
       ) : (
-        <AgendaView start={date} today={today} colorOf={colorOf} onOpenEvent={openEvent} onAddOnDay={openCreate} />
+        <AgendaView start={date} today={today} colorOf={colorOf} member={filteredMemberId} onOpenEvent={openEvent} onAddOnDay={(day) => openCreate(day)} />
       )}
 
       {dialog?.kind === "event" ? (
@@ -230,7 +265,7 @@ export function CalendarScreen() {
           open
           onOpenChange={(open) => { if (!open) setDialog(null); }}
           onOpenEvent={openEvent}
-          onAdd={openCreate}
+          onAdd={(day) => openCreate(day)}
         />
       ) : null}
     </Stack>

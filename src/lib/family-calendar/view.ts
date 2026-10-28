@@ -13,11 +13,27 @@ export type CalendarView = (typeof CALENDAR_VIEWS)[number];
 
 export const CALENDAR_VIEW_LABELS: Record<CalendarView, string> = { month: "Month", week: "Week", agenda: "Agenda" };
 
+/** The view a URL without `?view=` opens: Month on a computer, Agenda on a phone (below 768 px). */
 export const DEFAULT_CALENDAR_VIEW: CalendarView = "month";
+export const PHONE_CALENDAR_VIEW: CalendarView = "agenda";
+
+/** The default view for the screen's width. */
+export function defaultViewFor(phone: boolean): CalendarView {
+  return phone ? PHONE_CALENDAR_VIEW : DEFAULT_CALENDAR_VIEW;
+}
 
 /** The query parameters the page keeps its state in: `?view=` and `?date=`. */
 export const CALENDAR_VIEW_PARAM = "view";
 export const CALENDAR_DATE_PARAM = "date";
+
+/** The Week view shows the seven days of a week from Monday, or on a phone this many days from the chosen date. */
+export const WEEK_DAYS = 7;
+export const PHONE_WEEK_DAYS = 3;
+
+/** How many days the Week view shows: seven, or three on a phone. */
+export function weekLengthFor(phone: boolean) {
+  return phone ? PHONE_WEEK_DAYS : WEEK_DAYS;
+}
 
 /** The month grid always shows six weeks, so its height doesn't jump from month to month. */
 export const MONTH_GRID_WEEKS = 6;
@@ -36,20 +52,36 @@ export function isCalendarView(value: string | null | undefined): value is Calen
   return (CALENDAR_VIEWS as readonly string[]).includes(value ?? "");
 }
 
-/** The view and date in a page URL; a missing or invalid view is Month and a missing or invalid date is `today`. */
-export function parseCalendarParams(params: { get(name: string): string | null }, today: string): CalendarState {
+/**
+ * The view and date in a page URL; a missing or invalid view is `defaultView` (Month, or Agenda on
+ * a phone: see `defaultViewFor`) and a missing or invalid date is `today`.
+ */
+export function parseCalendarParams(
+  params: { get(name: string): string | null },
+  today: string,
+  defaultView: CalendarView = DEFAULT_CALENDAR_VIEW,
+): CalendarState {
   const view = params.get(CALENDAR_VIEW_PARAM);
   const date = params.get(CALENDAR_DATE_PARAM)?.trim() ?? "";
   return {
-    view: isCalendarView(view) ? view : DEFAULT_CALENDAR_VIEW,
+    view: isCalendarView(view) ? view : defaultView,
     date: isValidDate(date) ? date : today,
   };
 }
 
-/** The page URL for `state`, keeping other query parameters; the defaults (Month, today) leave the URL clean. */
-export function calendarHref(pathname: string, current: { toString(): string }, state: CalendarState, today: string) {
+/**
+ * The page URL for `state`, keeping other query parameters (the member filter among them); the
+ * defaults (`defaultView`, today) leave the URL clean.
+ */
+export function calendarHref(
+  pathname: string,
+  current: { toString(): string },
+  state: CalendarState,
+  today: string,
+  defaultView: CalendarView = DEFAULT_CALENDAR_VIEW,
+) {
   const params = new URLSearchParams(current.toString());
-  if (state.view === DEFAULT_CALENDAR_VIEW) params.delete(CALENDAR_VIEW_PARAM);
+  if (state.view === defaultView) params.delete(CALENDAR_VIEW_PARAM);
   else params.set(CALENDAR_VIEW_PARAM, state.view);
   if (state.date === today) params.delete(CALENDAR_DATE_PARAM);
   else params.set(CALENDAR_DATE_PARAM, state.date);
@@ -70,7 +102,15 @@ export function startOfWeek(date: string) {
 /** The seven dates of the week `date` falls in, Monday first. */
 export function weekDays(date: string) {
   const start = startOfWeek(date);
-  return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+  return Array.from({ length: WEEK_DAYS }, (_, index) => addDays(start, index));
+}
+
+/**
+ * The dates the Week view shows for `date`: the week it falls in (`length` 7), or on a phone
+ * `length` days starting on `date`.
+ */
+export function weekViewDays(date: string, length = WEEK_DAYS) {
+  return length === WEEK_DAYS ? weekDays(date) : Array.from({ length }, (_, index) => addDays(date, index));
 }
 
 /** The first day of the month grid for `date`'s month: the Monday on or before the 1st. */
@@ -90,15 +130,18 @@ export function monthGridWeeks(date: string) {
   return Array.from({ length: MONTH_GRID_WEEKS }, (_, index) => days.slice(index * 7, index * 7 + 7));
 }
 
-/** The days a view needs events for: the month grid, the week, or the Agenda's first `agendaDays` days. */
-export function viewRange(view: CalendarView, date: string, agendaDays = AGENDA_DAYS): DateRange {
+/**
+ * The days a view needs events for: the month grid, the week (`weekLength` days, see
+ * `weekViewDays`), or the Agenda's first `agendaDays` days.
+ */
+export function viewRange(view: CalendarView, date: string, agendaDays = AGENDA_DAYS, weekLength = WEEK_DAYS): DateRange {
   if (view === "month") {
     const start = monthGridStart(date);
     return { start, endExclusive: addDays(start, MONTH_GRID_DAYS) };
   }
   if (view === "week") {
-    const start = startOfWeek(date);
-    return { start, endExclusive: addDays(start, 7) };
+    const start = weekLength === WEEK_DAYS ? startOfWeek(date) : date;
+    return { start, endExclusive: addDays(start, weekLength) };
   }
   return { start: date, endExclusive: addDays(date, agendaDays) };
 }
@@ -111,17 +154,23 @@ export function rangeInstants(range: DateRange, timeZone = DEFAULT_EVENT_TIMEZON
   };
 }
 
-/** The date Previous (-1) or Next (1) moves to: a month, a week, or an Agenda window. A month keeps the day where it can. */
-export function shiftCalendarDate(view: CalendarView, date: string, direction: -1 | 1) {
-  if (view === "week") return addDays(date, 7 * direction);
+/**
+ * The date Previous (-1) or Next (1) moves to: a month, a week (or `weekLength` days on a phone), or
+ * an Agenda window. A month keeps the day where it can.
+ */
+export function shiftCalendarDate(view: CalendarView, date: string, direction: -1 | 1, weekLength = WEEK_DAYS) {
+  if (view === "week") return addDays(date, weekLength * direction);
   if (view === "agenda") return addDays(date, AGENDA_DAYS * direction);
   const month = addMonths(date.slice(0, 7), direction);
   return toIsoDate(Number(month.slice(0, 4)), Number(month.slice(5)), Math.min(Number(date.slice(8)), daysInMonth(month)));
 }
 
 /** The ranges Previous and Next lead to, which the page fetches ahead of time. */
-export function neighbourRanges(view: CalendarView, date: string): [DateRange, DateRange] {
-  return [viewRange(view, shiftCalendarDate(view, date, -1)), viewRange(view, shiftCalendarDate(view, date, 1))];
+export function neighbourRanges(view: CalendarView, date: string, weekLength = WEEK_DAYS): [DateRange, DateRange] {
+  return [
+    viewRange(view, shiftCalendarDate(view, date, -1, weekLength), AGENDA_DAYS, weekLength),
+    viewRange(view, shiftCalendarDate(view, date, 1, weekLength), AGENDA_DAYS, weekLength),
+  ];
 }
 
 function shortDate(date: string, withYear: boolean) {
@@ -141,15 +190,19 @@ function spanTitle(first: string, last: string) {
 }
 
 /**
- * The header's title: "October 2026" for a month, "Oct 26 – Nov 1, 2026" for a week, and for the
+ * The header's title: "October 2026" for a month, "Oct 26 – Nov 1, 2026" for a week (or its three
+ * days on a phone), and for the
  * Agenda "Next 60 days" from `today` or the window's dates from any other day.
  */
-export function periodTitle(view: CalendarView, date: string, today: string, agendaDays = AGENDA_DAYS) {
+export function periodTitle(view: CalendarView, date: string, today: string, agendaDays = AGENDA_DAYS, weekLength = WEEK_DAYS) {
   if (view === "month") {
     return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
       .format(new Date(`${date.slice(0, 7)}-01T12:00:00Z`));
   }
-  if (view === "week") return spanTitle(startOfWeek(date), addDays(startOfWeek(date), 6));
+  if (view === "week") {
+    const first = weekLength === WEEK_DAYS ? startOfWeek(date) : date;
+    return spanTitle(first, addDays(first, weekLength - 1));
+  }
   return date === today ? `Next ${agendaDays} days` : spanTitle(date, addDays(date, agendaDays - 1));
 }
 

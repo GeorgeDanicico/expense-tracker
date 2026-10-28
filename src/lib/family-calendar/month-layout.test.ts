@@ -111,3 +111,20 @@ describe("layoutMonthWeek", () => {
     expect(layout.moreByDay[2]).toBe(1);
   });
 });
+
+describe("layoutMonthWeek over fewer days", () => {
+  it("lays out a three-day row from any date, with a bar clipped at its edges", () => {
+    const layout = layoutMonthWeek([
+      calendarEvent({ id: "trip", start: "2026-10-27", end: "2026-10-30" }),
+      calendarEvent({ id: "out", start: "2026-11-02" }),
+    ], "2026-10-29", 3, 3);
+    expect(layout.moreByDay).toEqual([0, 0, 0]);
+    expect(layout.segments).toHaveLength(1);
+    expect(layout.segments[0]).toMatchObject({ column: 0, span: 2, startsBeforeWeek: true, endsAfterWeek: false });
+  });
+
+  it("counts the events behind '+N more' per day of the shorter row", () => {
+    const events = ["a", "b", "c"].map((id) => calendarEvent({ id, start: "2026-10-30" }));
+    expect(layoutMonthWeek(events, "2026-10-29", 2, 3).moreByDay).toEqual([0, 1, 0]);
+  });
+});

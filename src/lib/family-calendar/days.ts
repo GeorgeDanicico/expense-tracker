@@ -23,6 +23,14 @@ export function eventLengthInDays(event: Pick<CalendarEvent, "startsAt" | "endsA
   return Math.round((Date.parse(`${last}T00:00:00Z`) - Date.parse(`${first}T00:00:00Z`)) / (24 * 60 * MINUTE)) + 1;
 }
 
+/**
+ * Whether the Week view puts the event in its all-day row rather than on the hourly grid: an
+ * all-day event, or a timed one that runs across more than one day.
+ */
+export function isAllDayRowEvent(event: Pick<CalendarEvent, "allDay" | "startsAt" | "endsAt" | "timezone">) {
+  return event.allDay || eventLengthInDays(event) > 1;
+}
+
 /** Whether the event covers the local day `date`. */
 export function coversDay(event: Pick<CalendarEvent, "startsAt" | "endsAt" | "timezone">, date: string) {
   const { first, last } = eventDays(event);
