@@ -106,13 +106,14 @@ Everything in phases 3–8 ships on the web before the Expo work in phase 9 star
 5. **Phase 7, statement import.** CSV first, then PDF.
 6. **Phase 8, AI assistance**, with the cost gate and kill switch.
 
-Phases 14–17 come **before phase 6**, in this order, because the app is in daily use and should be safe, observable, fast and simple before it grows:
+**Features first, improvements after (decided 26 October 2026).** All the planned functionality ships before the improvement phases. That means phases 6–8 here, then the native apps (9), cars and houses (10), smart home (11), polish (12) and the later items (13). After that come the improvements, in this order:
 - **Phase 14, production hardening and security.**
 - **Phase 15, logging and tracing,** which also measures phase 16.
 - **Phase 16, performance and loading.**
 - **Phase 17, the simpler UI, mobile first.** This includes swipe-to-delete on phones.
+- **Phase 18, clean-up and fewer tests** (optional).
 
-Phase 18 (clean-up and fewer tests) is optional and can run whenever there's a lull. So the full order is 14 → 15 → 16 → 17 → 6 → 7 → 8.
+So the full order is 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18. Phase 14 already has a task breakdown, `docs/security-plan.md`, in [#137](https://github.com/GeorgeDanicico/expense-tracker/pull/137). It's kept unmerged until its turn comes.
 
 Display-name editing (the rest of 2.1) is small and can slot in anywhere.
 
