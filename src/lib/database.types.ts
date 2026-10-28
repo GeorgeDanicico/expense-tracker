@@ -30,6 +30,82 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["account_notices"]["Insert"]>;
         Relationships: [];
       };
+      calendar_event_attendees: {
+        Row: {
+          event_id: string;
+          member_id: string;
+        };
+        Insert: {
+          event_id: string;
+          member_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["calendar_event_attendees"]["Insert"]>;
+        Relationships: [];
+      };
+      calendar_events: {
+        Row: {
+          all_day: boolean;
+          created_at: string;
+          created_by: string | null;
+          ends_at: string;
+          family_id: string;
+          id: string;
+          location: string;
+          notes: string;
+          notified_at: string | null;
+          notify_at: string | null;
+          notify_locked_until: string | null;
+          series_id: string;
+          series_index: number;
+          series_repeat: string;
+          starts_at: string;
+          timezone: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          all_day?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          ends_at: string;
+          family_id: string;
+          id?: string;
+          location?: string;
+          notes?: string;
+          notified_at?: string | null;
+          notify_at?: string | null;
+          notify_locked_until?: string | null;
+          series_id?: string;
+          series_index?: number;
+          series_repeat?: string;
+          starts_at: string;
+          timezone?: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["calendar_events"]["Insert"]>;
+        Relationships: [];
+      };
+      calendar_feeds: {
+        Row: {
+          created_at: string;
+          id: string;
+          last_fetched_at: string | null;
+          revoked_at: string | null;
+          token_hash: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          last_fetched_at?: string | null;
+          revoked_at?: string | null;
+          token_hash: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["calendar_feeds"]["Insert"]>;
+        Relationships: [];
+      };
       expense_tabs: {
         Row: {
           id: string;
@@ -204,6 +280,7 @@ export type Database = {
       };
       notification_settings: {
         Row: {
+          calendar_enabled: boolean;
           push_enabled: boolean;
           reminders_enabled: boolean;
           todos_enabled: boolean;
@@ -211,6 +288,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          calendar_enabled?: boolean;
           push_enabled?: boolean;
           reminders_enabled?: boolean;
           todos_enabled?: boolean;
@@ -533,6 +611,26 @@ export type Database = {
           user_id: string | null;
         }[];
       };
+      calendar_feed: {
+        Args: { p_token_hash: string };
+        Returns: Json | null;
+      };
+      claim_due_calendar_events: {
+        Args: { p_batch: number };
+        Returns: {
+          all_day: boolean;
+          attendee_user_ids: string[];
+          ends_at: string;
+          family_id: string;
+          id: string;
+          location: string;
+          notify_at: string;
+          series_id: string;
+          starts_at: string;
+          timezone: string;
+          title: string;
+        }[];
+      };
       claim_due_reminders: {
         Args: { p_batch: number };
         Returns: Database["public"]["Tables"]["reminders"]["Row"][];
@@ -544,6 +642,20 @@ export type Database = {
       complete_password_change: {
         Args: never;
         Returns: undefined;
+      };
+      create_calendar_events: {
+        Args: { p_member_ids: string[]; p_rows: Json };
+        Returns: Database["public"]["Tables"]["calendar_events"]["Row"][];
+      };
+      create_calendar_feed: {
+        Args: { p_token_hash: string };
+        Returns: {
+          created_at: string;
+          id: string;
+          last_fetched_at: string | null;
+          revoked_at: string | null;
+          user_id: string;
+        }[];
       };
       create_family: {
         Args: {
@@ -700,6 +812,10 @@ export type Database = {
         Args: { p_member_id: string };
         Returns: string;
       };
+      revoke_calendar_feed: {
+        Args: never;
+        Returns: boolean;
+      };
       revoke_family_invite: {
         Args: { p_invite_id: string };
         Returns: undefined;
@@ -729,6 +845,10 @@ export type Database = {
       touch_last_active: {
         Args: never;
         Returns: undefined;
+      };
+      update_calendar_events: {
+        Args: { p_member_ids: string[] | null; p_rows: Json };
+        Returns: Database["public"]["Tables"]["calendar_events"]["Row"][];
       };
     };
     Enums: { Role: "USER" | "ADMIN" };
