@@ -101,3 +101,23 @@ export const calendarEventEditSchema = z.object({
 });
 
 export type CalendarEventEdit = z.output<typeof calendarEventEditSchema>;
+
+const instant = (field: string) => z.iso
+  .datetime({ offset: true, error: `Use an ISO timestamp for ${field}.` })
+  .transform((value) => new Date(value));
+
+/**
+ * `GET /api/calendar/events` query: the range `from` (included) to `to` (excluded) as ISO timestamps
+ * (UTC or with an offset), and optionally the family member whose events to list. The range's length
+ * is the service's to check.
+ */
+export const calendarRangeQuerySchema = z.object({
+  from: instant("from"),
+  to: instant("to"),
+  member: idSchema("Choose a member of your family.").optional(),
+});
+
+/** `DELETE /api/calendar/events/[id]` query: which occurrences to delete, `this` when absent. */
+export const calendarScopeQuerySchema = z.object({
+  scope: z.enum(EDIT_SCOPES, "Choose this event, this and following events, or all events.").default("this"),
+});

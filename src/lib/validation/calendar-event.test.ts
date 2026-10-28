@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { calendarEventEditSchema, calendarEventSchema } from "@/lib/validation/calendar-event";
+import {
+  calendarEventEditSchema,
+  calendarEventSchema,
+  calendarRangeQuerySchema,
+  calendarScopeQuerySchema,
+} from "@/lib/validation/calendar-event";
 
 const MEMBER = "6f1c3a52-9c1e-4a52-8a53-3d3f5b9e3a01";
 const OTHER = "0b9d7a34-6c4a-4f43-a1d4-52f0a7d5c102";
@@ -122,5 +127,38 @@ describe("calendarEventEditSchema", () => {
     ["a repeat", { title: "Swim", repeat: { kind: "daily", count: 3 } }],
   ])("rejects %s", (_name, input) => {
     expect(calendarEventEditSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe("calendarRangeQuerySchema", () => {
+  it("reads the range as instants, normalising offsets, with an optional member", () => {
+    const parsed = calendarRangeQuerySchema.parse({ from: "2026-11-01T02:00:00+02:00", to: "2026-12-01T00:00:00Z", member: MEMBER });
+
+    expect(parsed.from.toISOString()).toBe("2026-11-01T00:00:00.000Z");
+    expect(parsed.to.toISOString()).toBe("2026-12-01T00:00:00.000Z");
+    expect(parsed.member).toBe(MEMBER);
+    expect(calendarRangeQuerySchema.parse({ from: "2026-11-01T00:00:00Z", to: "2026-12-01T00:00:00Z" }).member).toBeUndefined();
+  });
+
+  it.each([
+    ["no range", {}],
+    ["no end", { from: "2026-11-01T00:00:00Z" }],
+    ["dates without times", { from: "2026-11-01", to: "2026-12-01" }],
+    ["a member that isn't a UUID", { from: "2026-11-01T00:00:00Z", to: "2026-12-01T00:00:00Z", member: "all" }],
+  ])("rejects %s", (_name, input) => {
+    expect(calendarRangeQuerySchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe("calendarScopeQuerySchema", () => {
+  it("defaults to this event and accepts each scope", () => {
+    expect(calendarScopeQuerySchema.parse({})).toEqual({ scope: "this" });
+    expect(calendarScopeQuerySchema.parse({ scope: "following" })).toEqual({ scope: "following" });
+    expect(calendarScopeQuerySchema.parse({ scope: "all" })).toEqual({ scope: "all" });
+  });
+
+  it("rejects any other scope", () => {
+    expect(calendarScopeQuerySchema.safeParse({ scope: "future" }).success).toBe(false);
+    expect(calendarScopeQuerySchema.safeParse({ scope: "" }).success).toBe(false);
   });
 });
