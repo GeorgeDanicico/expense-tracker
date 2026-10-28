@@ -1152,5 +1152,230 @@ exports[`MCP tool surface > lists the same tools, schemas and annotations 1`] = 
     "name": "delete_todo",
     "title": "Delete to-do",
   },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Events on the family calendar from one day to another (at most 92 days), in time order, with who is attending. Daily and weekly repeats are listed one event per occurrence.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "from": {
+          "description": "YYYY-MM-DD",
+          "type": "string",
+        },
+        "member": {
+          "description": "Only the events this family member attends: a name or "me"",
+          "minLength": 1,
+          "type": "string",
+        },
+        "to": {
+          "description": "The last day to include; defaults to from",
+          "type": "string",
+        },
+      },
+      "required": [
+        "from",
+      ],
+      "type": "object",
+    },
+    "name": "list_events",
+    "title": "List calendar events",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Add an event to the family calendar, for the caller unless attendees say otherwise. A daily or weekly repeat adds every occurrence (2 to 10). Members of the family are notified, 30 minutes before a timed event and at 07:30 for an all-day one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "allDay": {
+          "default": false,
+          "type": "boolean",
+        },
+        "attendees": {
+          "description": "Member names, "me" or "everyone"; defaults to just the caller",
+          "items": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "endDate": {
+          "description": "The last day; defaults to startDate",
+          "type": "string",
+        },
+        "endTime": {
+          "description": "Required unless allDay",
+          "type": "string",
+        },
+        "location": {
+          "type": "string",
+        },
+        "notes": {
+          "type": "string",
+        },
+        "repeat": {
+          "description": "Weekly repeats on the same weekday; needs repeatCount",
+          "enum": [
+            "daily",
+            "weekly",
+          ],
+          "type": "string",
+        },
+        "repeatCount": {
+          "description": "How many occurrences in all, 2 to 10, the first included",
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        "startDate": {
+          "description": "YYYY-MM-DD",
+          "type": "string",
+        },
+        "startTime": {
+          "description": "Required unless allDay",
+          "type": "string",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "title",
+        "startDate",
+      ],
+      "type": "object",
+    },
+    "name": "add_event",
+    "title": "Add calendar event",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Change an event's title, times, attendees, location or notes. In a repeating series, scope picks which occurrences change. A repeat itself can't be changed: delete the following events or add a new series.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "allDay": {
+          "type": "boolean",
+        },
+        "attendees": {
+          "description": "Replaces the attendees: member names, "me" or "everyone"",
+          "items": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "endDate": {
+          "description": "YYYY-MM-DD",
+          "type": "string",
+        },
+        "endTime": {
+          "anyOf": [
+            {
+              "description": "HH:MM, 24-hour",
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "location": {
+          "type": "string",
+        },
+        "notes": {
+          "type": "string",
+        },
+        "scope": {
+          "default": "this",
+          "description": "For an event in a repeating series: this (just this event), following (this and the later ones) or all (the whole series)",
+          "enum": [
+            "this",
+            "following",
+            "all",
+          ],
+          "type": "string",
+        },
+        "startDate": {
+          "description": "Moves every event in the scope by the same number of days",
+          "type": "string",
+        },
+        "startTime": {
+          "anyOf": [
+            {
+              "description": "HH:MM, 24-hour",
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "update_event",
+    "title": "Update calendar event",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Permanently delete an event from the family calendar. In a repeating series, scope picks which occurrences go.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "scope": {
+          "default": "this",
+          "description": "For an event in a repeating series: this (just this event), following (this and the later ones) or all (the whole series)",
+          "enum": [
+            "this",
+            "following",
+            "all",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "delete_event",
+    "title": "Delete calendar event",
+  },
 ]
 `;

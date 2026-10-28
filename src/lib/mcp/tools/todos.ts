@@ -1,9 +1,7 @@
 import { z } from "zod";
 
-import { DomainError } from "@/lib/errors";
-import { getCurrentMember } from "@/lib/family/current-member";
-import type { CurrentMember, FamilyMember } from "@/lib/family/repository";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
+import { requireMember, resolveMember } from "@/lib/mcp/tools/members";
 import { getRepositories } from "@/lib/repositories";
 import { filterTodos, type TodoAssigneeFilter } from "@/lib/todos/filters";
 import { NO_FAMILY_MESSAGE } from "@/lib/todos/repository";
@@ -29,40 +27,6 @@ function toolTodo(todo: Todo) {
     dueDate: todo.dueDate,
     notes: todo.notes,
   };
-}
-
-/**
- * The caller's membership, or a refusal for a caller without a family. While the family flag is off
- * `getCurrentMember()` is null too (the tools aren't registered then, so that's only a safety net).
- */
-async function requireMember(): Promise<CurrentMember> {
-  const member = await getCurrentMember();
-  if (!member) throw new DomainError(NO_FAMILY_MESSAGE, 404);
-  return member;
-}
-
-function memberNames(members: readonly FamilyMember[]) {
-  return members.map((member) => member.displayName ?? member.username).filter((name) => name !== null);
-}
-
-/**
- * The member id for `name`: "me" is the caller, otherwise a member whose display name or username
- * matches case-insensitively. Unknown or ambiguous names are a field error listing the valid names.
- */
-async function resolveAssignee(me: CurrentMember, name: string, field = "assignee"): Promise<string> {
-  const wanted = name.trim().toLowerCase();
-  if (wanted === "me") return me.memberId;
-
-  const members = (await getRepositories().family.getFamily())?.members ?? [];
-  const matches = members.filter((member) =>
-    [member.displayName, member.username].some((candidate) => candidate?.trim().toLowerCase() === wanted));
-  if (matches.length === 1) return matches[0].memberId;
-
-  const valid = [...memberNames(members).map((member) => `"${member}"`), "\"me\""].join(", ");
-  const message = matches.length === 0
-    ? `No family member is called "${name}". Use one of: ${valid}.`
-    : `More than one family member is called "${name}". Use one of: ${valid}.`;
-  throw new DomainError(message, 422, { [field]: [message] });
 }
 
 const listSchema = z.object({
@@ -105,11 +69,11 @@ export const todoTools = [
     schema: listSchema,
     annotations: READ,
     run: async ({ status, assignee, due, includeOlderDone }) => {
-      const me = await requireMember();
+      const me = await requireMember(NO_FAMILY_MESSAGE);
       let assigneeFilter: TodoAssigneeFilter = "all";
       if (assignee !== undefined) {
         const lower = assignee.toLowerCase();
-        assigneeFilter = lower === "me" || lower === "unassigned" ? lower : await resolveAssignee(me, assignee);
+        assigneeFilter = lower === "me" || lower === "unassigned" ? lower : await resolveMember(me, assignee, "assignee");
       }
       const todos = filterTodos(
         await listTodos(includeOlderDone ? ALL_TIME : undefined),
@@ -126,8 +90,8 @@ export const todoTools = [
     schema: addSchema,
     annotations: CREATE,
     run: async ({ assignee, ...fields }, { userId }) => {
-      const me = await requireMember();
-      const assigneeMemberId = assignee === undefined ? null : await resolveAssignee(me, assignee);
+      const me = await requireMember(NO_FAMILY_MESSAGE);
+      const assigneeMemberId = assignee === undefined ? null : await resolveMember(me, assignee, "assignee");
       const todo = await createTodo(userId, todoSchema.parse({ ...fields, assigneeMemberId }));
       return { todo: toolTodo(todo) };
     },
@@ -139,7 +103,7 @@ export const todoTools = [
     schema: moveSchema,
     annotations: UPDATE,
     run: async ({ id, status, where }) => {
-      await requireMember();
+      await requireMember(NO_FAMILY_MESSAGE);
       let beforeId: string | null = null;
       if (where === "bottom") {
         // Every card of the column, old Done cards included, so "bottom" really is the bottom.
@@ -157,12 +121,12 @@ export const todoTools = [
     annotations: UPDATE,
     notFound: TODO_NOT_FOUND_MESSAGE,
     run: async ({ id, assignee, ...fields }) => {
-      const me = await requireMember();
+      const me = await requireMember(NO_FAMILY_MESSAGE);
       const patch: Record<string, unknown> = Object.fromEntries(
         Object.entries(fields).filter(([, value]) => value !== undefined),
       );
       if (assignee !== undefined) {
-        patch.assigneeMemberId = assignee === null ? null : await resolveAssignee(me, assignee);
+        patch.assigneeMemberId = assignee === null ? null : await resolveMember(me, assignee, "assignee");
       }
       const todo = await getRepositories().todos.update(id, todoPatchSchema.parse(patch));
       return todo && { todo: toolTodo(todo) };
@@ -176,7 +140,7 @@ export const todoTools = [
     annotations: DELETE,
     notFound: TODO_NOT_FOUND_MESSAGE,
     run: async ({ id }) => {
-      await requireMember();
+      await requireMember(NO_FAMILY_MESSAGE);
       return (await getRepositories().todos.delete(id)) && { deleted: true, id };
     },
   }),
