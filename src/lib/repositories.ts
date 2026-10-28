@@ -3,6 +3,8 @@ import "server-only";
 import type { AccountRepository } from "@/lib/account/repository";
 import type { NoticeRepository } from "@/lib/account/notice-repository";
 import type { AvatarRepository } from "@/lib/avatars/repository";
+import type { CalendarFeedRepository } from "@/lib/family-calendar/feed-repository";
+import type { CalendarRepository } from "@/lib/family-calendar/repository";
 import type { ExpenseRepository } from "@/lib/expenses/repository";
 import type { ExpenseTabRepository } from "@/lib/expenses/tab-repository";
 import type { FamilyRepository } from "@/lib/family/repository";
@@ -14,6 +16,8 @@ import type { ReminderRepository } from "@/lib/reminders/repository";
 import type { TodoRepository } from "@/lib/todos/repository";
 import { supabaseAccountRepository } from "@/lib/supabase/repositories/account";
 import { supabaseAvatarRepository } from "@/lib/supabase/repositories/avatars";
+import { supabaseCalendarFeedRepository } from "@/lib/supabase/repositories/calendar-feeds";
+import { supabaseCalendarRepository } from "@/lib/supabase/repositories/calendar";
 import { supabaseExpenseTabRepository } from "@/lib/supabase/repositories/expense-tabs";
 import { supabaseExpenseRepository } from "@/lib/supabase/repositories/expenses";
 import { supabaseFamilyRepository } from "@/lib/supabase/repositories/family";
@@ -29,6 +33,8 @@ import { supabaseTodoRepository } from "@/lib/supabase/repositories/todos";
 export type Repositories = {
   account: AccountRepository;
   avatars: AvatarRepository;
+  calendar: CalendarRepository;
+  calendarFeeds: CalendarFeedRepository;
   expenseTabs: ExpenseTabRepository;
   family: FamilyRepository;
   investments: InvestmentRepository;
@@ -51,6 +57,8 @@ export function getRepositories(): Repositories {
   return {
     account: supabaseAccountRepository,
     avatars: supabaseAvatarRepository,
+    calendar: supabaseCalendarRepository,
+    calendarFeeds: supabaseCalendarFeedRepository,
     expenseTabs: supabaseExpenseTabRepository,
     family: supabaseFamilyRepository,
     investments: supabaseInvestmentRepository,

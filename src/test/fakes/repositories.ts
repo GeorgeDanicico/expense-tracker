@@ -2,6 +2,7 @@ import type { Repositories } from "@/lib/repositories";
 
 import { FakeAccountRepository } from "./account";
 import { FakeAvatarRepository } from "./avatars";
+import { FakeCalendarFeedRepository, FakeCalendarRepository } from "./calendar";
 import { FakeExpenseTabRepository } from "./expense-tabs";
 import { FakeFamilyRepository } from "./family";
 import { FakeInvestmentRepository } from "./investments";
@@ -25,6 +26,8 @@ import { FakeTodoRepository } from "./todos";
 export type FakeRepositories = {
   account: FakeAccountRepository;
   avatars: FakeAvatarRepository;
+  calendar: FakeCalendarRepository;
+  calendarFeeds: FakeCalendarFeedRepository;
   expenseTabs: FakeExpenseTabRepository;
   family: FakeFamilyRepository;
   investments: FakeInvestmentRepository;
@@ -44,6 +47,9 @@ export function resetFakeRepositories(): FakeRepositories {
   current = {
     account: new FakeAccountRepository(),
     avatars: new FakeAvatarRepository(),
+    // Acts as the caller the family fake describes: seed `family.membership` and `family.family` first.
+    calendar: new FakeCalendarRepository(family),
+    calendarFeeds: new FakeCalendarFeedRepository(),
     expenseTabs: new FakeExpenseTabRepository(),
     family,
     investments: new FakeInvestmentRepository(),

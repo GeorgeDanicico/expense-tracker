@@ -24,6 +24,9 @@ export type EditScope = (typeof EDIT_SCOPES)[number];
  */
 export const MAX_EVENT_DAYS = 30;
 
+/** The widest range of days a list of events may cover, as the API and the service both check. */
+export const MAX_RANGE_DAYS = 92;
+
 /** The only time zone offered for now; stored per event so others can come later. */
 export const DEFAULT_EVENT_TIMEZONE = APPLICATION_TIMEZONE;
 
