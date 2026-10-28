@@ -1,6 +1,7 @@
 import type { CalendarApi } from "@/components/family-calendar/calendar-api";
 import { ApiError } from "@/lib/api/client";
 import { addDays, getBucharestToday } from "@/lib/calendar";
+import type { CalendarFeed } from "@/lib/family-calendar/feed-repository";
 import { editedRows, seriesRows, type StoredRow } from "@/lib/family-calendar/series";
 import {
   DEFAULT_EVENT_TIMEZONE,
@@ -16,7 +17,9 @@ import type { CalendarEventEdit, CalendarEventInput } from "@/lib/validation/cal
 // fake API that changes them the way the real routes do (the same `seriesRows` and `editedRows` the
 // service uses, so a repeat, a moved occurrence and "this and following" land on the right days),
 // so adding, editing and deleting work without a session. Open `/dev/preview/calendar?failWrites=1`
-// to have every write refused, which shows the rollback.
+// to have every write refused, which shows the rollback. The feed link (the Subscribe dialog) is
+// kept in memory too: `?feedLink=1` starts with a link made last Tuesday and used this morning, and
+// a made link carries a random stand-in for the secret (nothing here ever fetches it).
 
 const MEMBERS: Record<string, CalendarAttendee> = {
   "m-george": { memberId: "m-george", name: "George", color: null, avatarUrl: null },
@@ -168,7 +171,39 @@ function inScope(anchor: CalendarEvent, scope: EditScope) {
     .sort((a, b) => a.seriesIndex - b.seriesIndex);
 }
 
+/** A made-up secret in the real token's shape; the preview's link is never fetched. */
+function previewToken() {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  return `sl_cal_${Array.from({ length: 43 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("")}`;
+}
+
+let feed: CalendarFeed | null | undefined;
+
+function currentFeed(): CalendarFeed | null {
+  if (feed === undefined) {
+    const startsWithLink = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("feedLink");
+    const now = Date.now();
+    feed = startsWithLink
+      ? { id: "feed-1", createdAt: new Date(now - 8 * 86_400_000).toISOString(), lastFetchedAt: new Date(now - 3 * 3_600_000).toISOString() }
+      : null;
+  }
+  return feed;
+}
+
 export const previewCalendarApi: CalendarApi = {
+  async feedLink() {
+    await delay(300);
+    return currentFeed();
+  },
+  async createFeedLink() {
+    await begin();
+    feed = { id: `feed-${++counter}`, createdAt: new Date().toISOString(), lastFetchedAt: null };
+    return { feed, token: previewToken() };
+  },
+  async deleteFeedLink() {
+    await begin();
+    feed = null;
+  },
   async get(id: string) {
     await delay(200);
     return find(id);

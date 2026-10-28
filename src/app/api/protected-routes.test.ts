@@ -5,16 +5,23 @@ import { fileURLToPath } from "node:url";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ getAuthenticatedUser: vi.fn(), createClient: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  getAuthenticatedUser: vi.fn(),
+  createClient: vi.fn(),
+  cookies: vi.fn(),
+  readFeed: vi.fn(),
+}));
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
+vi.mock("next/headers", () => ({ cookies: mocks.cookies, headers: mocks.cookies }));
+vi.mock("@/lib/repositories", () => ({ getRepositories: () => ({ calendarFeeds: { read: mocks.readFeed } }) }));
 
 const API_DIR = fileURLToPath(new URL(".", import.meta.url));
 const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
 const HTTP_METHODS = ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"];
 
 // Routes that authenticate in their own way and are covered by their own tests.
-const PUBLIC_ROUTES = ["auth", "auth/google", "mcp"];
+const PUBLIC_ROUTES = ["auth", "auth/google", "calendar/feed/[token]", "mcp"];
 
 // Every other route handler must reject anonymous requests. Adding a route
 // under src/app/api means adding it here, so a route without auth fails below.
@@ -34,6 +41,7 @@ const PROTECTED_ROUTES: Record<string, string[]> = {
   "avatars/[userId]/[file]": ["GET"],
   "calendar/events": ["GET", "POST"],
   "calendar/events/[id]": ["DELETE", "GET", "PATCH"],
+  "calendar/feed-link": ["DELETE", "GET", "POST"],
   dashboard: ["GET"],
   "expense-tabs": ["GET", "POST"],
   "expense-tabs/[id]": ["DELETE", "PATCH"],
@@ -120,5 +128,48 @@ describe("protected REST routes", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
     expect(mocks.getAuthenticatedUser).toHaveBeenCalledOnce();
     expect(mocks.createClient).not.toHaveBeenCalled();
+  });
+
+  // The calendar feed is read by a calendar app with no session: its secret in the path is the only
+  // credential, so it must answer without touching cookies, the signed-in user or the caller's client.
+  describe("the public calendar feed", () => {
+    const TOKEN = `sl_cal_${"A".repeat(43)}`;
+    let GET_FEED: (request: NextRequest, context: { params: Promise<{ token: string }> }) => Promise<Response>;
+
+    function fetchFeed(token: string) {
+      const request = new NextRequest(`http://localhost/api/calendar/feed/${token}.ics`, {
+        headers: { cookie: "sb-access-token=session" },
+      });
+      const cookiesRead = vi.fn();
+      Object.defineProperty(request, "cookies", { get: cookiesRead });
+      return { cookiesRead, response: GET_FEED(request, { params: Promise.resolve({ token: `${token}.ics` }) }) };
+    }
+    beforeEach(async () => {
+      GET_FEED = (await import("@/app/api/calendar/feed/[token]/route")).GET;
+    });
+
+    it.each([
+      ["a feed", async () => ({ familyName: "The Danicicos", events: [] }), 200],
+      ["an unknown token", async () => null, 404],
+    ])("answers %s without reading cookies or a session", async (_name, read, status) => {
+      mocks.readFeed.mockImplementation(read);
+      const { cookiesRead, response } = fetchFeed(TOKEN);
+
+      expect((await response).status).toBe(status);
+      expect(mocks.readFeed).toHaveBeenCalledOnce();
+      expect(cookiesRead).not.toHaveBeenCalled();
+      expect(mocks.cookies).not.toHaveBeenCalled();
+      expect(mocks.getAuthenticatedUser).not.toHaveBeenCalled();
+      expect(mocks.createClient).not.toHaveBeenCalled();
+    });
+
+    it("answers a malformed token with 404 before reaching the database", async () => {
+      const { cookiesRead, response } = fetchFeed("not-a-token");
+
+      expect((await response).status).toBe(404);
+      expect(mocks.readFeed).not.toHaveBeenCalled();
+      expect(cookiesRead).not.toHaveBeenCalled();
+      expect(mocks.getAuthenticatedUser).not.toHaveBeenCalled();
+    });
   });
 });

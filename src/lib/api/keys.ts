@@ -10,6 +10,7 @@ import type { McpAccess, McpToken } from "@/lib/mcp/token-repository";
 import type { NotificationSettings } from "@/lib/notifications/settings-repository";
 import type { ReminderCompletion, ReminderSummary } from "@/lib/reminders/repository";
 import type { ListedReminder } from "@/lib/reminders/list";
+import type { CalendarFeed } from "@/lib/family-calendar/feed-repository";
 import type { CalendarEvent } from "@/lib/family-calendar/types";
 import type { Todo } from "@/lib/todos/types";
 
@@ -347,3 +348,13 @@ export type CalendarEventsResponse = { events: CalendarEvent[] };
 /** GET {@link calendarEventApiUrl} → the one event (404 when the caller's family has none). */
 export type CalendarEventResponse = { event: CalendarEvent };
 export type CalendarDeletedResponse = { deletedIds: string[] };
+
+/**
+ * GET → {@link CalendarFeedLinkResponse}: whether the caller has a live feed link. POST (no body) →
+ * {@link CreatedCalendarFeedLink} (201), the only time the secret is sent: keep it in component
+ * state for the show-once dialog, never the SWR cache, storage or the URL; a second POST replaces the
+ * link. DELETE → 204, turning it off.
+ */
+export const CALENDAR_FEED_LINK_API_KEY = "/api/calendar/feed-link";
+export type CalendarFeedLinkResponse = { feed: CalendarFeed | null };
+export type CreatedCalendarFeedLink = { feed: CalendarFeed; token: string };

@@ -6,10 +6,14 @@ import { apiFetcher, apiRequest } from "@/lib/api/client";
 import {
   calendarEventApiUrl,
   CALENDAR_EVENTS_API_KEY,
+  CALENDAR_FEED_LINK_API_KEY,
   type CalendarDeletedResponse,
   type CalendarEventResponse,
   type CalendarEventsResponse,
+  type CalendarFeedLinkResponse,
+  type CreatedCalendarFeedLink,
 } from "@/lib/api/keys";
+import type { CalendarFeed } from "@/lib/family-calendar/feed-repository";
 import type { CalendarEvent, EditScope } from "@/lib/family-calendar/types";
 import type { CalendarEventEdit, CalendarEventInput } from "@/lib/validation/calendar-event";
 
@@ -23,6 +27,12 @@ export type CalendarApi = {
   create(input: CalendarEventInput): Promise<CalendarEvent[]>;
   update(id: string, edit: CalendarEventEdit): Promise<CalendarEvent[]>;
   remove(id: string, scope: EditScope): Promise<string[]>;
+  /** The caller's live feed link (never its secret), or null when they have none. */
+  feedLink(): Promise<CalendarFeed | null>;
+  /** Makes the feed link, replacing any live one; the answer holds the only copy of its secret. */
+  createFeedLink(): Promise<CreatedCalendarFeedLink>;
+  /** Turns the feed link off. */
+  deleteFeedLink(): Promise<void>;
 };
 
 export const restCalendarApi: CalendarApi = {
@@ -37,6 +47,15 @@ export const restCalendarApi: CalendarApi = {
   },
   async remove(id, scope) {
     return (await apiRequest<CalendarDeletedResponse>(calendarEventApiUrl(id, scope), { method: "DELETE" })).deletedIds;
+  },
+  async feedLink() {
+    return (await apiFetcher<CalendarFeedLinkResponse>(CALENDAR_FEED_LINK_API_KEY)).feed;
+  },
+  createFeedLink() {
+    return apiRequest<CreatedCalendarFeedLink>(CALENDAR_FEED_LINK_API_KEY, { method: "POST" });
+  },
+  async deleteFeedLink() {
+    await apiRequest<void>(CALENDAR_FEED_LINK_API_KEY, { method: "DELETE" });
   },
 };
 
