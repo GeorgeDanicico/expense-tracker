@@ -1,11 +1,13 @@
 begin;
 create extension if not exists pgtap;
-select plan(51);
+select plan(82);
 
 -- R1 (docs/reminders-plan.md): notification settings, push subscriptions, the
 -- outbox, the worker heartbeat and the worker's claim functions.
 --
--- Users (prefix d8200000): 01 and 02, no family needed.
+-- Users (prefix d8200000): 01 and 02, no family needed; 03 (parent), 04 (kid)
+-- and 05 (parent) are the family of the calendar tests at the end (C1,
+-- docs/calendar-plan.md).
 -- Outbox ids: ...0000000b00NN. Reminder ids: ...0000000a00NN.
 --
 -- Fixture outbox rows (all for user 02):
@@ -49,7 +51,7 @@ $$;
 insert into auth.users (id, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 select pg_temp.uid(n), 'r1-notify-' || n || '@example.test', 'not-used', now(), '{}', '{}', now(), now()
-from generate_series(1, 2) as n
+from generate_series(1, 5) as n
 on conflict (id) do nothing;
 
 insert into public.notifications (id, user_id, kind, payload, send_at, status, locked_until) values
@@ -382,6 +384,304 @@ select is(
    where r.id in (pg_temp.rid(1), pg_temp.rid(6))),
   array[true, true],
   'claimed reminders are leased for 2 minutes'
+);
+
+-- ---------------------------------------------------------------------------
+-- Calendar (docs/calendar-plan.md, C1): the Calendar switch, the new kinds,
+-- claim_due_calendar_events and the "added you" trigger
+-- ---------------------------------------------------------------------------
+--
+-- Family 'Family C' (...00fc): 03 creator parent, 04 kid, 05 parent. Member id
+-- of user NN: ...0000000f00NN. Event ids: ...0000000e00NN.
+--
+-- Fixture events (inserted as the table owner):
+--   01 due (notify_at 10 minutes ago, starts in 20 minutes), for members 03, 04
+--   02 due but already over (the worker was down), for member 03
+--   03 not due yet (notify_at in an hour)
+--   04 due but already notified
+--   05 due but leased by another worker
+--   06 with no notify_at
+--   07 due, notify_at 20 minutes ago (older than 01), for member 05
+
+create function pg_temp.mid(n integer)
+returns uuid
+language sql
+immutable
+as $$
+  select ('d8200000-0000-4000-8000-0000000f00' || lpad(n::text, 2, '0'))::uuid
+$$;
+
+create function pg_temp.eid(n integer)
+returns uuid
+language sql
+immutable
+as $$
+  select ('d8200000-0000-4000-8000-0000000e00' || lpad(n::text, 2, '0'))::uuid
+$$;
+
+insert into public.families (id, name, creator_id) values
+  ('d8200000-0000-4000-8000-0000000000fc', 'Family C', pg_temp.uid(3));
+insert into public.family_members (id, family_id, user_id, role) values
+  (pg_temp.mid(3), 'd8200000-0000-4000-8000-0000000000fc', pg_temp.uid(3), 'parent'),
+  (pg_temp.mid(4), 'd8200000-0000-4000-8000-0000000000fc', pg_temp.uid(4), 'kid'),
+  (pg_temp.mid(5), 'd8200000-0000-4000-8000-0000000000fc', pg_temp.uid(5), 'parent');
+
+insert into public.calendar_events (id, family_id, title, starts_at, ends_at, notify_at, notified_at,
+  notify_locked_until, created_by) values
+  (pg_temp.eid(1), 'd8200000-0000-4000-8000-0000000000fc', 'Due', now() + interval '20 minutes',
+    now() + interval '80 minutes', now() - interval '10 minutes', null, null, pg_temp.uid(3)),
+  (pg_temp.eid(2), 'd8200000-0000-4000-8000-0000000000fc', 'Over', now() - interval '90 minutes',
+    now() - interval '30 minutes', now() - interval '2 hours', null, null, pg_temp.uid(3)),
+  (pg_temp.eid(3), 'd8200000-0000-4000-8000-0000000000fc', 'Later', now() + interval '90 minutes',
+    now() + interval '150 minutes', now() + interval '1 hour', null, null, pg_temp.uid(3)),
+  (pg_temp.eid(4), 'd8200000-0000-4000-8000-0000000000fc', 'Done', now() + interval '20 minutes',
+    now() + interval '80 minutes', now() - interval '10 minutes', now() - interval '5 minutes', null, pg_temp.uid(3)),
+  (pg_temp.eid(5), 'd8200000-0000-4000-8000-0000000000fc', 'Leased', now() + interval '20 minutes',
+    now() + interval '80 minutes', now() - interval '10 minutes', null, now() + interval '1 minute', pg_temp.uid(3)),
+  (pg_temp.eid(6), 'd8200000-0000-4000-8000-0000000000fc', 'No time', now() + interval '20 minutes',
+    now() + interval '80 minutes', null, null, null, pg_temp.uid(3)),
+  (pg_temp.eid(7), 'd8200000-0000-4000-8000-0000000000fc', 'Oldest due', now() + interval '10 minutes',
+    now() + interval '70 minutes', now() - interval '20 minutes', null, null, pg_temp.uid(3));
+
+insert into public.calendar_event_attendees (event_id, member_id) values
+  (pg_temp.eid(1), pg_temp.mid(3)),
+  (pg_temp.eid(1), pg_temp.mid(4)),
+  (pg_temp.eid(2), pg_temp.mid(3)),
+  (pg_temp.eid(7), pg_temp.mid(5));
+
+-- The fixture attendees above were added by nobody, which queues "added you"
+-- rows for them. Clear those, so the counts below are the tests' own.
+delete from public.notifications where kind = 'event_added';
+
+select is(
+  (select c.column_default from information_schema.columns c
+   where c.table_schema = 'public' and c.table_name = 'notification_settings' and c.column_name = 'calendar_enabled'),
+  'true',
+  'notification_settings has a calendar_enabled switch, on by default'
+);
+select is(
+  (select c.is_nullable from information_schema.columns c
+   where c.table_schema = 'public' and c.table_name = 'notification_settings' and c.column_name = 'calendar_enabled'),
+  'NO',
+  'and it is never null'
+);
+select is(
+  pg_temp.attempt(format($q$insert into public.notifications (user_id, kind, payload) values (%L, 'event', '{}')$q$, pg_temp.uid(3))),
+  'rows:1',
+  'the outbox accepts the event kind'
+);
+select is(
+  pg_temp.attempt(format($q$insert into public.notifications (user_id, kind, payload) values (%L, 'event_added', '{}')$q$, pg_temp.uid(3))),
+  'rows:1',
+  'and the event_added kind'
+);
+select is(
+  pg_temp.attempt(format($q$insert into public.notifications (user_id, kind, payload) values (%L, 'calendar', '{}')$q$, pg_temp.uid(3))),
+  'error:23514',
+  'but no other kind'
+);
+select is(
+  pg_temp.attempt(format($q$insert into public.notifications (user_id, kind, payload) values (%L, 'todo_due', '{}')$q$, pg_temp.uid(3))),
+  'rows:1',
+  'and the earlier kinds still work'
+);
+delete from public.notifications where user_id in (pg_temp.uid(3), pg_temp.uid(4), pg_temp.uid(5));
+
+-- The claim function is the worker's alone.
+select ok(
+  has_function_privilege('service_role', 'public.claim_due_calendar_events(integer)', 'execute')
+  and not has_function_privilege('authenticated', 'public.claim_due_calendar_events(integer)', 'execute')
+  and not has_function_privilege('anon', 'public.claim_due_calendar_events(integer)', 'execute'),
+  'claim_due_calendar_events is granted to service_role only'
+);
+select ok(
+  (select p.proconfig @> array['search_path=""'] from pg_catalog.pg_proc p
+   where p.oid = 'public.claim_due_calendar_events(integer)'::regprocedure),
+  'and sets an empty search_path'
+);
+
+set local role authenticated;
+select pg_temp.act_as(3);
+select is(pg_temp.attempt('select * from public.claim_due_calendar_events(10)'), 'error:42501',
+  'a user can''t claim due events');
+reset role;
+set local role anon;
+select is(pg_temp.attempt('select * from public.claim_due_calendar_events(10)'), 'error:42501',
+  'anon can''t claim due events');
+reset role;
+
+set local role service_role;
+
+select is(
+  (select array_agg(right(c.id::text, 2)::integer order by c.notify_at) from public.claim_due_calendar_events(1) c),
+  array[7],
+  'claim_due_calendar_events returns at most the batch, the oldest notify_at first'
+);
+select is(
+  (select array_agg(right(c.id::text, 2)::integer order by c.notify_at) from public.claim_due_calendar_events(10) c),
+  array[1],
+  'it skips events that are not due, over, notified, leased, without a time or already claimed'
+);
+select is(pg_temp.attempt('select * from public.claim_due_calendar_events(10)'), 'rows:0',
+  'claimed events are leased, so a second claim gets none');
+reset role;
+
+select is(
+  (select array_agg(c.id order by c.notify_at)
+   from public.calendar_events c where c.id in (pg_temp.eid(1), pg_temp.eid(7)) and c.notify_locked_until = now() + interval '2 minutes'),
+  array[pg_temp.eid(7), pg_temp.eid(1)],
+  'a claimed event is leased for 2 minutes'
+);
+select is(
+  (select row(c.notified_at is not null, c.notify_locked_until is null)::text from public.calendar_events c where c.id = pg_temp.eid(2)),
+  row(true, true)::text,
+  'an event that was already over is marked notified without being returned or leased'
+);
+select is(
+  (select c.notified_at is null from public.calendar_events c where c.id = pg_temp.eid(3)),
+  true,
+  'an event that isn''t due is untouched'
+);
+
+-- What the worker gets: the event and its attendees' users.
+update public.calendar_events set notify_locked_until = null where id = pg_temp.eid(1);
+set local role service_role;
+select is(
+  (select row(c.title, c.all_day, c.timezone, c.attendee_user_ids)::text from public.claim_due_calendar_events(10) c),
+  row('Due'::text, false, 'Europe/Bucharest'::text, array[pg_temp.uid(3), pg_temp.uid(4)])::text,
+  'the claim returns the event with its attendees'' user ids'
+);
+reset role;
+
+-- An attendee-less event is returned with an empty list (it's claimed all the same).
+update public.calendar_events set notify_locked_until = null where id = pg_temp.eid(1);
+delete from public.calendar_event_attendees where event_id = pg_temp.eid(1);
+set local role service_role;
+select is(
+  (select c.attendee_user_ids from public.claim_due_calendar_events(10) c),
+  '{}'::uuid[],
+  'an event with no attendees comes back with an empty list'
+);
+reset role;
+
+-- "X added you": once per series and user, never for yourself.
+delete from public.notifications where kind = 'event_added';
+
+set local role authenticated;
+select pg_temp.act_as(3);
+
+select is(
+  (select count(*)::integer from public.create_calendar_events(
+    (select jsonb_agg(jsonb_build_object(
+      'series_id', 'd8200000-0000-4000-8000-0000000000a1',
+      'series_index', k, 'series_repeat', 'daily', 'title', 'School trip',
+      'starts_at', to_char('2027-03-01 07:00+00'::timestamptz + (k - 1) * interval '1 day', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'ends_at', to_char('2027-03-01 08:00+00'::timestamptz + (k - 1) * interval '1 day', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) order by k)
+     from generate_series(1, 5) as k),
+    array[pg_temp.mid(3), pg_temp.mid(4)])),
+  5,
+  'a parent creates a 5-day series for themselves and the kid'
+);
+reset role;
+
+select is(
+  (select array_agg(n.user_id::text) from public.notifications n where n.kind = 'event_added'),
+  array[pg_temp.uid(4)::text],
+  'the kid gets one "added you" row for the whole series, and the parent none for themselves'
+);
+select is(
+  (select n.payload - 'eventId' from public.notifications n where n.kind = 'event_added'),
+  jsonb_build_object(
+    'title', 'r1-notify-3 added you',
+    'body', 'School trip',
+    'url', '/calendar?event=' || (select e.id from public.calendar_events e
+      where e.series_id = 'd8200000-0000-4000-8000-0000000000a1' and e.series_index = 1),
+    'tag', 'event_added:d8200000-0000-4000-8000-0000000000a1',
+    'eventTitle', 'School trip',
+    'startsAt', '2027-03-01T07:00:00Z',
+    'allDay', false,
+    'timezone', 'Europe/Bucharest',
+    'seriesRepeat', 'daily',
+    'seriesLength', 5,
+    'adderName', 'r1-notify-3'
+  ),
+  'it names the adder, the event, its start and the series'
+);
+select is(
+  (select n.payload ->> 'eventId' from public.notifications n where n.kind = 'event_added'),
+  (select e.id::text from public.calendar_events e
+   where e.series_id = 'd8200000-0000-4000-8000-0000000000a1' and e.series_index = 1),
+  'and points at the first event of the series'
+);
+select is(
+  (select n.dedupe_key from public.notifications n where n.kind = 'event_added'),
+  'event_added:d8200000-0000-4000-8000-0000000000a1:' || pg_temp.uid(4),
+  'the row is keyed by series and user'
+);
+
+set local role authenticated;
+select pg_temp.act_as(3);
+
+-- Saving the same attendees again, or adding the kid to one more event of the
+-- series, queues nothing; adding the other parent queues one row for them.
+select is(
+  (select count(*)::integer from public.update_calendar_events(
+    (select jsonb_agg(jsonb_build_object('id', e.id, 'location', 'Zoo'))
+     from public.calendar_events e where e.series_id = 'd8200000-0000-4000-8000-0000000000a1'),
+    array[pg_temp.mid(3), pg_temp.mid(4)])),
+  5,
+  'the parent saves the series again with the same attendees'
+);
+select is(
+  (select count(*)::integer from public.update_calendar_events(
+    (select jsonb_agg(jsonb_build_object('id', e.id))
+     from public.calendar_events e where e.series_id = 'd8200000-0000-4000-8000-0000000000a1'),
+    array[pg_temp.mid(3), pg_temp.mid(4), pg_temp.mid(5)])),
+  5,
+  'and adds the other parent to all five events'
+);
+reset role;
+
+select is(
+  (select array_agg(n.user_id::text order by n.user_id) from public.notifications n where n.kind = 'event_added'),
+  array[pg_temp.uid(4)::text, pg_temp.uid(5)::text],
+  'adding another member to a 5-day series queues one row for them, and none for the kid again'
+);
+
+-- Adding yourself queues nothing, adding someone else does.
+set local role authenticated;
+select pg_temp.act_as(4);
+select is(
+  (select count(*)::integer from public.create_calendar_events(
+    '[{"title": "Football", "starts_at": "2027-03-10T07:00:00Z", "ends_at": "2027-03-10T08:00:00Z"}]',
+    array[pg_temp.mid(4)])),
+  1,
+  'the kid creates an event for themselves'
+);
+select is(
+  pg_temp.attempt(format('insert into public.calendar_event_attendees (event_id, member_id)
+    select e.id, %L from public.calendar_events e where e.title = %L', pg_temp.mid(3), 'Football')),
+  'rows:1',
+  'the kid adds the parent to it'
+);
+reset role;
+
+select is(
+  (select array_agg(n.user_id::text order by n.user_id) from public.notifications n where n.kind = 'event_added'),
+  array[pg_temp.uid(3)::text, pg_temp.uid(4)::text, pg_temp.uid(5)::text],
+  'adding another member to a one-off queues a row for them'
+);
+select is(
+  (select n.payload ->> 'seriesLength' from public.notifications n
+   where n.kind = 'event_added' and n.user_id = pg_temp.uid(3)),
+  '1',
+  'a one-off''s series length is 1'
+);
+select is(
+  (select count(*)::integer from public.notifications n
+   where n.kind = 'event_added' and n.user_id = pg_temp.uid(4)),
+  1,
+  'and the kid, who added themselves, has only the school trip row'
 );
 
 select * from finish();
