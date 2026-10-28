@@ -193,6 +193,8 @@ Email isn't part of this phase; it's a later step, after phase 5. When it comes,
 
 ## Phase 6: Family calendar, calendar feeds and two-way Google sync
 
+**Status (28 October 2026): planned** in [calendar-plan.md](calendar-plan.md) (tasks C1–C12), which supersedes the steps below.
+
 The app gets its own family calendar. Other calendars connect in two ways:
 - **An ICS feed out**: a private `webcal://` link per user that Apple Calendar, Outlook or any other calendar app subscribes to. It's read-only and works for the Mac calendar without any Apple API.
 - **Two-way Google Calendar sync**, run by the worker from phase 5.
