@@ -67,6 +67,14 @@ describe("MCP server", () => {
   });
 
   describe("tool list", () => {
+    // The family tools only exist while the flag is on: count the tools without them, whatever the environment says.
+    beforeEach(() => {
+      vi.stubEnv("FAMILY_ENABLED", "false");
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     const listTools = async () => (await (await connect()).listTools()).tools;
     const annotationsOf = async (name: string) => (await listTools()).find((tool) => tool.name === name)?.annotations;
 

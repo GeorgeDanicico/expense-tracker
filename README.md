@@ -88,6 +88,7 @@ Tools (the destructive ones carry the MCP `destructiveHint` annotation):
 - **Net worth:** `get_net_worth`, `add_net_worth_item`, `update_net_worth_item`, `add_net_worth_valuation`, `update_net_worth_valuation`
 - **Investments:** `get_investments`, `list_investment_transactions`, `add_investment_transaction`, `delete_investment_transaction` (destructive)
 - **Family to-do board** (only while `FAMILY_ENABLED` is on; a caller without a family is refused): `list_todos`, `add_todo`, `move_todo`, `update_todo`, `delete_todo` (destructive). Assignees are given by member name or `me`.
+- **Family calendar** (only while `FAMILY_ENABLED` is on; a caller without a family is refused): `list_events` (a range of at most 92 days, optionally one member's), `add_event` (with an optional daily or weekly repeat of 2 to 10), `update_event`, `delete_event` (destructive). Dates are `YYYY-MM-DD` and times `HH:MM` in Europe/Bucharest; attendees are given by member name, `me` or `everyone`; in a repeating series `scope` picks `this` (the default), `following` or `all` occurrences.
 
 ### Connecting through OAuth
 

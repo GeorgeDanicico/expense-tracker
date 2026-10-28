@@ -115,8 +115,8 @@ export function seriesRows(
   }));
 }
 
-/** A stored row's timing read back on the wall clock of `timeZone`. */
-function timingOf(row: StoredRow, timeZone: string): EventTiming {
+/** A stored row's timing read back on the wall clock of `timeZone`; an all-day event's `endDate` is its last day, included. */
+export function timingOf(row: StoredRow, timeZone: string): EventTiming {
   const start = utcToZoned(new Date(row.startsAt), timeZone);
   const end = utcToZoned(new Date(row.endsAt), timeZone);
   return row.allDay
