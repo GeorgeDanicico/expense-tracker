@@ -1,3 +1,4 @@
+import type { NotifiableEvent } from "@/lib/family-calendar/notification";
 import type { NotifiableReminder } from "@/lib/reminders/notification";
 
 /** How many rows are due at a moment: what the next claims would pick up, leases aside. */
@@ -16,7 +17,7 @@ export type Heartbeat = {
 };
 
 /** The kinds of outbox row (`notifications.kind`). */
-export const NOTIFICATION_KINDS = ["reminder", "todo_assigned", "todo_due", "test"] as const;
+export const NOTIFICATION_KINDS = ["reminder", "todo_assigned", "todo_due", "event", "event_added", "test"] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** An outbox row the worker has claimed (leased) for sending. */
@@ -45,7 +46,20 @@ export type ClaimedReminder = NotifiableReminder & {
   lockedUntil: string;
 };
 
-/** A notification the worker queues itself (a reminder's), deduplicated by `dedupeKey`. */
+/**
+ * An event the worker has claimed (`claim_due_calendar_events`) because its notify time has passed:
+ * what the notification says and who gets it. Events that already ended aren't returned.
+ */
+export type ClaimedEvent = NotifiableEvent & {
+  /** The stored `notify_at` the claim found due; part of the dedupe key. */
+  notifyAt: Date;
+  /** `notify_at` exactly as the claim returned it, for the update that checks it hasn't moved. */
+  notifyAtStored: string;
+  /** The `user_id` of each attendee. */
+  attendeeUserIds: string[];
+};
+
+/** A notification the worker queues itself (a reminder's or an event's), deduplicated by `dedupeKey`. */
 export type NewNotification = {
   userId: string;
   kind: NotificationKind;
@@ -66,6 +80,7 @@ export type RecipientSettings = {
   pushEnabled: boolean;
   remindersEnabled: boolean;
   todosEnabled: boolean;
+  calendarEnabled: boolean;
 };
 
 /** One of a user's browsers. */
@@ -134,4 +149,17 @@ export interface WorkerStore {
    * and which has an assignee, with that assignee's user.
    */
   listOpenTodosDueOn(date: string): Promise<DueTodo[]>;
+  /**
+   * Leases up to `batch` events whose `notify_at` has passed and that haven't been notified for 2
+   * minutes (`claim_due_calendar_events`) and returns them with their attendees' users. Events that
+   * ended already are marked notified by the claim and not returned.
+   */
+  claimDueCalendarEvents(batch: number): Promise<ClaimedEvent[]>;
+  /**
+   * Sets `notified_at` on a claimed event and releases its lease, only while its `notify_at` is
+   * still the claim's and it hasn't been notified: an edit in between moved the notify time and
+   * cleared `notified_at` for the new one, which must still go out. Otherwise it changes nothing
+   * and answers `changed`.
+   */
+  markEventNotified(event: ClaimedEvent, at: Date): Promise<"notified" | "changed">;
 }

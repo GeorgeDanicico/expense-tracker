@@ -29,15 +29,15 @@ describe("Supabase notification settings repository", () => {
     it("returns the defaults without a row, and the device count", async () => {
       useDatabase({ push_subscriptions: [{ id: "s1", user_id: userId }, { id: "s2", user_id: userId }] });
 
-      expect(await settings.get()).toEqual({ pushEnabled: true, remindersEnabled: true, todosEnabled: true, deviceCount: 2 });
+      expect(await settings.get()).toEqual({ pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: true, deviceCount: 2 });
     });
 
     it("returns the caller's switches", async () => {
       useDatabase({
-        notification_settings: [{ user_id: userId, push_enabled: true, reminders_enabled: false, todos_enabled: true }],
+        notification_settings: [{ user_id: userId, push_enabled: true, reminders_enabled: false, todos_enabled: true, calendar_enabled: false }],
       });
 
-      expect(await settings.get()).toEqual({ pushEnabled: true, remindersEnabled: false, todosEnabled: true, deviceCount: 0 });
+      expect(await settings.get()).toEqual({ pushEnabled: true, remindersEnabled: false, todosEnabled: true, calendarEnabled: false, deviceCount: 0 });
     });
 
     it("keeps database failures private", async () => {
@@ -62,6 +62,14 @@ describe("Supabase notification settings repository", () => {
       expect(tables.notification_settings).toHaveLength(1);
       // The fake has no column defaults; the database fills in the others.
       expect(updated).toMatchObject({ remindersEnabled: false, deviceCount: 0 });
+    });
+
+    it("writes calendarEnabled to calendar_enabled", async () => {
+      const { queries } = useDatabase({});
+
+      await settings.update(userId, { calendarEnabled: false });
+
+      expect(queries[0]).toMatchObject({ operation: "upsert", values: { user_id: userId, calendar_enabled: false } });
     });
 
     it("writes nothing for an empty patch", async () => {

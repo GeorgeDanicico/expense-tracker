@@ -295,7 +295,7 @@ export type RemindersSummaryResponse = ReminderSummary;
 
 /**
  * GET → {@link NotificationSettingsResponse}: the caller's switches and device count. PATCH any of
- * `{ pushEnabled, remindersEnabled, todosEnabled }` → the same shape.
+ * `{ pushEnabled, remindersEnabled, todosEnabled, calendarEnabled }` → the same shape.
  */
 export const NOTIFICATION_SETTINGS_API_KEY = "/api/notifications/settings";
 /**
@@ -344,4 +344,6 @@ export function calendarEventApiUrl(id: string, scope?: string) {
 }
 
 export type CalendarEventsResponse = { events: CalendarEvent[] };
+/** GET {@link calendarEventApiUrl} → the one event (404 when the caller's family has none). */
+export type CalendarEventResponse = { event: CalendarEvent };
 export type CalendarDeletedResponse = { deletedIds: string[] };

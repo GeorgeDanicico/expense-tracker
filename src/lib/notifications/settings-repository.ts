@@ -4,18 +4,20 @@ export type NotificationSettings = {
   pushEnabled: boolean;
   remindersEnabled: boolean;
   todosEnabled: boolean;
+  calendarEnabled: boolean;
   /** The caller's registered push subscriptions (devices). */
   deviceCount: number;
 };
 
 /** A change to the switches: any subset of them. */
-export type NotificationSettingsPatch = Partial<Pick<NotificationSettings, "pushEnabled" | "remindersEnabled" | "todosEnabled">>;
+export type NotificationSettingsPatch = Partial<Pick<NotificationSettings, "pushEnabled" | "remindersEnabled" | "todosEnabled" | "calendarEnabled">>;
 
 /** Everything on: what a user without a `notification_settings` row has. */
 export const DEFAULT_NOTIFICATION_SETTINGS = {
   pushEnabled: true,
   remindersEnabled: true,
   todosEnabled: true,
+  calendarEnabled: true,
 } as const satisfies Required<NotificationSettingsPatch>;
 
 /** A browser's Web Push subscription, as `PushSubscription.toJSON()` gives it, plus its user agent. */

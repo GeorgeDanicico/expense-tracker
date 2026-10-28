@@ -19,7 +19,7 @@ const ENDPOINT = "https://fcm.googleapis.com/fcm/send/abc123";
 const P256DH = "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM";
 const AUTH = "tBHItJI5svbpez7KI4CCXg";
 const subscription = (endpoint = ENDPOINT) => ({ endpoint, expirationTime: null, keys: { p256dh: P256DH, auth: AUTH } });
-const DEFAULTS = { pushEnabled: true, remindersEnabled: true, todosEnabled: true, deviceCount: 0 };
+const DEFAULTS = { pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: true, deviceCount: 0 };
 
 let repositories: FakeRepositories;
 
@@ -82,14 +82,15 @@ describe("GET /api/notifications/settings", () => {
 describe("PATCH /api/notifications/settings", () => {
   it("changes only the switches it is sent and answers the settings", async () => {
     expect(await patch({ remindersEnabled: false })).toMatchObject({ status: 200, body: { ...DEFAULTS, remindersEnabled: false } });
-    expect(await patch({ pushEnabled: false, todosEnabled: false })).toMatchObject({
+    expect(await patch({ pushEnabled: false, todosEnabled: false, calendarEnabled: false })).toMatchObject({
       status: 200,
-      body: { pushEnabled: false, remindersEnabled: false, todosEnabled: false, deviceCount: 0 },
+      body: { pushEnabled: false, remindersEnabled: false, todosEnabled: false, calendarEnabled: false, deviceCount: 0 },
     });
     expect(repositories.notificationSettings.settings.get(testUser.id)).toEqual({
       pushEnabled: false,
       remindersEnabled: false,
       todosEnabled: false,
+      calendarEnabled: false,
     });
   });
 

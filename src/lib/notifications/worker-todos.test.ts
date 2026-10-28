@@ -20,7 +20,7 @@ const TODAY = "2026-11-10";
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const TICK = 30_000;
-const ON = { pushEnabled: true, remindersEnabled: true, todosEnabled: true };
+const ON = { pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: true };
 
 class FakePush implements PushSender {
   sends: { endpoint: string; payload: PushPayload }[] = [];

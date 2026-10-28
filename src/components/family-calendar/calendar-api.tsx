@@ -2,11 +2,12 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import { apiRequest } from "@/lib/api/client";
+import { apiFetcher, apiRequest } from "@/lib/api/client";
 import {
   calendarEventApiUrl,
   CALENDAR_EVENTS_API_KEY,
   type CalendarDeletedResponse,
+  type CalendarEventResponse,
   type CalendarEventsResponse,
 } from "@/lib/api/keys";
 import type { CalendarEvent, EditScope } from "@/lib/family-calendar/types";
@@ -17,12 +18,17 @@ import type { CalendarEventEdit, CalendarEventInput } from "@/lib/validation/cal
  * `create` and `update` answer with the rows they added or changed, `remove` with the ids deleted.
  */
 export type CalendarApi = {
+  /** The event, for `/calendar?event=<id>`; rejects when it doesn't exist in the caller's family. */
+  get(id: string): Promise<CalendarEvent>;
   create(input: CalendarEventInput): Promise<CalendarEvent[]>;
   update(id: string, edit: CalendarEventEdit): Promise<CalendarEvent[]>;
   remove(id: string, scope: EditScope): Promise<string[]>;
 };
 
 export const restCalendarApi: CalendarApi = {
+  async get(id) {
+    return (await apiFetcher<CalendarEventResponse>(calendarEventApiUrl(id))).event;
+  },
   async create(input) {
     return (await apiRequest<CalendarEventsResponse>(CALENDAR_EVENTS_API_KEY, { method: "POST", body: JSON.stringify(input) })).events;
   },

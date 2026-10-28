@@ -20,6 +20,7 @@ function patchValues(patch: NotificationSettingsPatch) {
     ...(patch.pushEnabled !== undefined ? { push_enabled: patch.pushEnabled } : {}),
     ...(patch.remindersEnabled !== undefined ? { reminders_enabled: patch.remindersEnabled } : {}),
     ...(patch.todosEnabled !== undefined ? { todos_enabled: patch.todosEnabled } : {}),
+    ...(patch.calendarEnabled !== undefined ? { calendar_enabled: patch.calendarEnabled } : {}),
   };
 }
 
@@ -33,7 +34,7 @@ export const supabaseNotificationSettingsRepository: NotificationSettingsReposit
   async get() {
     const supabase = await createClient();
     const [settings, devices] = await Promise.all([
-      supabase.from("notification_settings").select("push_enabled, reminders_enabled, todos_enabled").maybeSingle(),
+      supabase.from("notification_settings").select("push_enabled, reminders_enabled, todos_enabled, calendar_enabled").maybeSingle(),
       supabase.from("push_subscriptions").select("id", { count: "exact", head: true }),
     ]);
     if (settings.error || devices.error) throw new Error(LOAD_ERROR);
@@ -43,6 +44,7 @@ export const supabaseNotificationSettingsRepository: NotificationSettingsReposit
             pushEnabled: settings.data.push_enabled,
             remindersEnabled: settings.data.reminders_enabled,
             todosEnabled: settings.data.todos_enabled,
+            calendarEnabled: settings.data.calendar_enabled,
           }
         : DEFAULT_NOTIFICATION_SETTINGS),
       deviceCount: devices.count ?? 0,

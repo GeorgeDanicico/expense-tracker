@@ -404,7 +404,7 @@ export function fixtureFor(key: string): unknown {
   if (path === "/api/reminders/summary") return previewReminderSummary();
   // `?devices=0` previews the "Reminders won't notify you" warning.
   if (path === "/api/notifications/settings") {
-    return { pushEnabled: true, remindersEnabled: true, todosEnabled: true, deviceCount: previewsNoDevices() ? 0 : 2 };
+    return { pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: true, deviceCount: previewsNoDevices() ? 0 : 2 };
   }
   // A well-formed but made-up key: the preview never subscribes for real.
   if (path === "/api/notifications/push-key") return { publicKey: PREVIEW_PUSH_KEY };

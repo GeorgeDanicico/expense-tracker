@@ -29,7 +29,7 @@ import {
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }), usePathname: () => "/settings/notifications" }));
 
-const ON: NotificationSettings = { pushEnabled: true, remindersEnabled: true, todosEnabled: true, deviceCount: 1 };
+const ON: NotificationSettings = { pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: true, deviceCount: 1 };
 
 function render(node: React.ReactNode) {
   return renderToStaticMarkup(<ChakraProvider value={ledgerSystem}>{node}</ChakraProvider>);
@@ -126,11 +126,13 @@ describe("ThisDeviceCard", () => {
 });
 
 describe("NotificationKindsCard", () => {
-  it("shows the Reminders and To-dos switches", () => {
-    const html = render(<NotificationKindsCard settings={{ remindersEnabled: true, todosEnabled: false }} onChange={noop} />);
+  it("shows the Reminders, To-dos and Calendar switches", () => {
+    const html = render(<NotificationKindsCard settings={{ remindersEnabled: true, todosEnabled: false, calendarEnabled: true }} onChange={noop} />);
     expect(html).toContain("Reminders");
     expect(html).toContain("To-dos");
-    expect(switchesChecked(html)).toEqual([true, false]);
+    expect(html).toContain("Calendar");
+    expect(html).toContain("30 minutes before your events, and at 07:30 on the day of all-day events.");
+    expect(switchesChecked(html)).toEqual([true, false, true]);
   });
 });
 

@@ -1,5 +1,6 @@
 import { APPLICATION_TIMEZONE } from "@/lib/calendar";
 import type { PushPayload, PushResult, PushSender } from "@/lib/notifications/push";
+import { eventAddedPayload, eventDedupeKey, eventPayload } from "@/lib/family-calendar/notification";
 import { planReminderNotification } from "@/lib/reminders/notification";
 import { utcToZoned } from "@/lib/time-zone";
 import type {
@@ -25,6 +26,9 @@ export const NOTIFICATION_BATCH = 50;
 /** The most due reminders one tick claims. */
 export const REMINDER_BATCH = 50;
 
+/** The most due calendar events one tick claims. */
+export const EVENT_BATCH = 50;
+
 /**
  * When a row whose push the push service throttled (429) or failed (5xx, no answer) is tried again,
  * after its first, second and third send: 1, 5 and 30 minutes. A fourth failure marks it `failed`.
@@ -47,7 +51,7 @@ export const NO_DEVICES = "No devices: notifications aren't enabled on any brows
 /** What `last_error` says when every one of the recipient's subscriptions turned out to be gone. */
 export const ALL_DEVICES_GONE = "No devices: every subscription had expired and was deleted.";
 
-const DEFAULT_SETTINGS: RecipientSettings = { pushEnabled: true, remindersEnabled: true, todosEnabled: true };
+const DEFAULT_SETTINGS: RecipientSettings = { pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: true };
 const MAX_ERROR_LENGTH = 500;
 
 export type Clock = { now(): Date };
@@ -107,6 +111,17 @@ export type ReminderCounts = {
   changed: number;
 };
 
+/** How the claimed calendar events of one tick ended. */
+export type EventCounts = {
+  claimed: number;
+  /** Outbox rows inserted, one per attendee. */
+  queued: number;
+  /** Rows an earlier run had already queued (same dedupe key). */
+  duplicates: number;
+  /** Events edited since the claim (a new notify time); left for their new time. */
+  changed: number;
+};
+
 /** What the daily "Due today" run queued, when it ran this tick. */
 export type TodoDueCounts = {
   /** The Bucharest date it ran for. */
@@ -126,6 +141,7 @@ export type TickResult =
   | {
       pushConfigured: true;
       reminders: ReminderCounts;
+      events: EventCounts;
       delivery: DeliveryCounts;
       cleaned: number | null;
       /** Null on every tick but the one that ran the day's "Due today" notifications. */
@@ -149,13 +165,25 @@ function truncate(message: string) {
  * `todo_assigned` rows are sent as the `todos_notify_assignee` trigger wrote them ("Ana assigned
  * you", the card title, `/todos?card=<id>`, `todo:<id>`), not reformatted here: the payload is
  * already what the notification shows, and its extra `todoId`, `todoTitle` and `assignerName`
- * fields are dropped by this function.
+ * fields are dropped by this function. `event_added` rows are the exception: {@link payloadFor}
+ * words their body from those extra fields.
  */
 export function pushPayload(payload: unknown): PushPayload | null {
   if (typeof payload !== "object" || payload === null) return null;
   const { title, body, url, tag } = payload as Record<string, unknown>;
   if ([title, body, url, tag].some((value) => typeof value !== "string") || !title) return null;
   return { title, body, url, tag } as PushPayload;
+}
+
+/**
+ * What to send for a row: {@link pushPayload}, except that an `event_added` row's body (the
+ * trigger stores just the event's title) is reworded as "Visit my parents, Sat 1 Nov" or
+ * "Swimming, Tue 3 Nov, every week for 6 weeks" from the payload's extra fields, as of `now`.
+ */
+export function payloadFor(kind: string, payload: unknown, now: Date): PushPayload | null {
+  const plain = pushPayload(payload);
+  if (!plain || kind !== "event_added") return plain;
+  return eventAddedPayload(payload, now) ?? plain;
 }
 
 /**
@@ -172,6 +200,9 @@ export function kindAllowed(kind: string, settings: RecipientSettings): boolean 
     case "todo_assigned":
     case "todo_due":
       return settings.todosEnabled;
+    case "event":
+    case "event_added":
+      return settings.calendarEnabled;
     default:
       return null;
   }
@@ -180,7 +211,9 @@ export function kindAllowed(kind: string, settings: RecipientSettings): boolean 
 /** Why a switch turned the row into `skipped`. */
 function skippedBecause(kind: string, settings: RecipientSettings) {
   if (!settings.pushEnabled) return "Skipped: Browser notifications are off.";
-  return kind === "reminder" ? "Skipped: reminder notifications are off." : "Skipped: to-do notifications are off.";
+  if (kind === "reminder") return "Skipped: reminder notifications are off.";
+  if (kind === "event" || kind === "event_added") return "Skipped: calendar notifications are off.";
+  return "Skipped: to-do notifications are off.";
 }
 
 /**
@@ -211,7 +244,7 @@ async function deliver(row: ClaimedNotification, { settings, devices }: Deliveri
   const { store, push, clock, log } = deps;
   const recipient = settings.get(row.userId) ?? DEFAULT_SETTINGS;
   const allowed = kindAllowed(row.kind, recipient);
-  const payload = pushPayload(row.payload);
+  const payload = payloadFor(row.kind, row.payload, clock.now());
 
   let outcome: NotificationOutcome;
   if (allowed === null) {
@@ -306,6 +339,41 @@ async function queueDueReminders({ store, clock, log }: TickDependencies): Promi
   return counts;
 }
 
+/**
+ * Claims due calendar events and, for each, queues one `event` outbox row per attendee, then marks
+ * it notified. Claim, queue, mark: a crash after queueing leaves `notified_at` empty, and the
+ * re-run after the lease queues the same dedupe keys (`event:<id>:<notify_at>:<user>`), which are
+ * no-ops, so nobody is notified twice. The mark only applies while the event's `notify_at` is the
+ * claim's: an edit in between has stored a new time and cleared `notified_at` for it. An event that
+ * already ended is never returned by the claim (the claim marks it notified), and a failure on one
+ * event (some row not queued) is logged and leaves it unmarked for the re-claim.
+ */
+async function queueDueEvents({ store, clock, log }: TickDependencies): Promise<EventCounts> {
+  const counts: EventCounts = { claimed: 0, queued: 0, duplicates: 0, changed: 0 };
+  const events = await store.claimDueCalendarEvents(EVENT_BATCH);
+  counts.claimed = events.length;
+
+  for (const event of events) {
+    try {
+      const payload = eventPayload(event, clock.now());
+      for (const userId of event.attendeeUserIds) {
+        const result = await store.enqueueNotification({
+          userId,
+          kind: "event",
+          payload,
+          dedupeKey: eventDedupeKey(event.id, event.notifyAt, userId),
+        });
+        if (result === "queued") counts.queued++;
+        else counts.duplicates++;
+      }
+      if ((await store.markEventNotified(event, clock.now())) === "changed") counts.changed++;
+    } catch (error) {
+      log.error("event_failed", { id: event.id, error: errorMessage(error) });
+    }
+  }
+  return counts;
+}
+
 /** The "Due today" outbox row for an open card due on `date` (a Bucharest date). */
 export function todoDueNotification(todo: DueTodo, date: string): NewNotification {
   return {
@@ -372,10 +440,12 @@ async function cleanUp({ store, clock, log, state }: TickDependencies): Promise<
 /**
  * One pass of the worker: the heartbeat, the daily clean-up, the daily "Due today" to-do rows
  * (from 09:00 Bucharest), up to {@link REMINDER_BATCH} due
- * reminders queued as outbox rows, then up to {@link NOTIFICATION_BATCH} outbox rows sent to every
+ * reminders queued as outbox rows, up to {@link EVENT_BATCH} due calendar events queued as one
+ * outbox row per attendee, then up to {@link NOTIFICATION_BATCH} outbox rows sent to every
  * device of their recipient. Without VAPID keys (`push` null) it only logs `push_not_configured`
- * with how many rows are waiting, and leaves them pending; reminders aren't claimed either, and
- * once the keys are set each sends only its latest missed notify time.
+ * with how many rows are waiting, and leaves them pending; reminders and events aren't claimed
+ * either, and once the keys are set each reminder sends only its latest missed notify time (an
+ * event whose end passed meanwhile sends nothing).
  * It never throws: a failure is logged as one `tick_failed` line and the next tick tries again.
  */
 export async function tick(deps: TickDependencies): Promise<TickResult> {
@@ -397,6 +467,7 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
     const cleaned = await cleanUp(deps);
     const todosDue = await queueDueTodos(deps);
     const reminders = await queueDueReminders(deps);
+    const events = await queueDueEvents(deps);
     const delivery = await deliverDue({ ...deps, push });
     log.info("tick", {
       ...delivery,
@@ -404,9 +475,13 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
       remindersQueued: reminders.queued,
       remindersDuplicate: reminders.duplicates,
       remindersChanged: reminders.changed,
+      eventsClaimed: events.claimed,
+      eventsQueued: events.queued,
+      eventsDuplicate: events.duplicates,
+      eventsChanged: events.changed,
       ms: clock.now().getTime() - startedAt.getTime(),
     });
-    return { pushConfigured: true, reminders, delivery, cleaned, todosDue };
+    return { pushConfigured: true, reminders, events, delivery, cleaned, todosDue };
   } catch (error) {
     log.error("tick_failed", { error: errorMessage(error), ms: clock.now().getTime() - startedAt.getTime() });
     return null;

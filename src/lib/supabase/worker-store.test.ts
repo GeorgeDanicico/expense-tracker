@@ -123,8 +123,8 @@ describe("Supabase worker store", () => {
   describe("getRecipientSettings and listDevices", () => {
     const tables = {
       notification_settings: [
-        { user_id: "u1", push_enabled: false, reminders_enabled: true, todos_enabled: false },
-        { user_id: "u3", push_enabled: true, reminders_enabled: true, todos_enabled: true },
+        { user_id: "u1", push_enabled: false, reminders_enabled: true, todos_enabled: false, calendar_enabled: true },
+        { user_id: "u3", push_enabled: true, reminders_enabled: true, todos_enabled: true, calendar_enabled: false },
       ],
       push_subscriptions: [
         { id: "d1", user_id: "u1", endpoint: "https://push.example.test/1", p256dh: "k1", auth: "a1", user_agent: "", last_success_at: null },
@@ -138,7 +138,7 @@ describe("Supabase worker store", () => {
       const store = createSupabaseWorkerStore();
 
       expect(await store.getRecipientSettings(["u1", "u2"])).toEqual(
-        new Map([["u1", { pushEnabled: false, remindersEnabled: true, todosEnabled: false }]]),
+        new Map([["u1", { pushEnabled: false, remindersEnabled: true, todosEnabled: false, calendarEnabled: true }]]),
       );
       expect(await store.listDevices(["u1", "u2"])).toEqual([
         { id: "d1", userId: "u1", endpoint: "https://push.example.test/1", p256dh: "k1", auth: "a1" },
@@ -322,6 +322,59 @@ describe("Supabase worker store", () => {
 
       expect(await createSupabaseWorkerStore().advanceReminder(claimed, null)).toBe("changed");
       expect(tables.reminders[0]).toEqual(taken);
+    });
+  });
+
+  describe("calendar events", () => {
+    const stored = {
+      id: "e1", notify_at: "2026-11-03T06:30:00+00:00", notified_at: null, notify_locked_until: "2026-11-03T06:32:00+00:00",
+    };
+    const claimed = {
+      id: "e1", title: "Swimming", allDay: false, startsAt: new Date("2026-11-03T07:00:00Z"), timezone: "Europe/Bucharest",
+      notifyAt: new Date("2026-11-03T06:30:00Z"), notifyAtStored: stored.notify_at, attendeeUserIds: ["u1", "u2"],
+    };
+
+    it("claims through claim_due_calendar_events and reads its rows", async () => {
+      const { rpcs } = useDatabase({}, {
+        rpc: () => ({
+          data: [{
+            id: "e1", series_id: "s1", family_id: "f1", title: "Swimming", location: "", all_day: false,
+            starts_at: "2026-11-03T07:00:00+00:00", ends_at: "2026-11-03T08:00:00+00:00", timezone: "Europe/Bucharest",
+            notify_at: stored.notify_at, attendee_user_ids: ["u1", "u2"],
+          }],
+          error: null,
+        }),
+      });
+
+      expect(await createSupabaseWorkerStore().claimDueCalendarEvents(50)).toEqual([claimed]);
+      expect(rpcs).toEqual([{ fn: "claim_due_calendar_events", args: { p_batch: 50 } }]);
+    });
+
+    it("throws with the database's message when the claim fails", async () => {
+      useDatabase({}, { rpc: () => ({ data: null, error: { message: "permission denied" } }) });
+      await expect(createSupabaseWorkerStore().claimDueCalendarEvents(50)).rejects.toThrow("Unable to claim due calendar events: permission denied");
+    });
+
+    it("sets notified_at and releases the lease while the notify time is the claim's", async () => {
+      const at = new Date("2026-11-03T06:30:10Z");
+      const { queries, tables } = useDatabase({ calendar_events: [stored] });
+
+      expect(await createSupabaseWorkerStore().markEventNotified(claimed, at)).toBe("notified");
+      expect(queries).toEqual([expect.objectContaining({
+        table: "calendar_events",
+        operation: "update",
+        values: { notified_at: "2026-11-03T06:30:10.000Z", notify_locked_until: null },
+        filters: [["eq", "id", "e1"], ["eq", "notify_at", stored.notify_at], ["is", "notified_at", null]],
+      })]);
+      expect(tables.calendar_events[0]).toMatchObject({ notified_at: "2026-11-03T06:30:10.000Z", notify_locked_until: null });
+    });
+
+    it("leaves an event moved since the claim alone, so its new time still notifies", async () => {
+      const moved = { ...stored, notify_at: "2026-11-03T07:30:00+00:00" };
+      const { tables } = useDatabase({ calendar_events: [moved] });
+
+      expect(await createSupabaseWorkerStore().markEventNotified(claimed, new Date("2026-11-03T06:30:10Z"))).toBe("changed");
+      expect(tables.calendar_events[0]).toEqual(moved);
     });
   });
 });
