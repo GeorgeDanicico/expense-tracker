@@ -32,6 +32,8 @@ const PROTECTED_ROUTES: Record<string, string[]> = {
   "account/notices/[id]/dismiss": ["POST"],
   "account/password": ["POST"],
   "avatars/[userId]/[file]": ["GET"],
+  "calendar/events": ["GET", "POST"],
+  "calendar/events/[id]": ["DELETE", "GET", "PATCH"],
   dashboard: ["GET"],
   "expense-tabs": ["GET", "POST"],
   "expense-tabs/[id]": ["DELETE", "PATCH"],
