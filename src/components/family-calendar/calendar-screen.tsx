@@ -4,10 +4,11 @@ import { Button, Flex, Heading, Stack } from "@chakra-ui/react";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 
 import { AgendaView } from "@/components/family-calendar/agenda-view";
+import { useCalendarApi } from "@/components/family-calendar/calendar-api";
 import { DayDialog } from "@/components/family-calendar/day-dialog";
 import { EventDialog, type EventDialogMode } from "@/components/family-calendar/event-dialog";
 import { MemberChips } from "@/components/family-calendar/member-chips";
@@ -19,6 +20,7 @@ import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state"
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useAccount } from "@/hooks/use-account";
@@ -34,6 +36,13 @@ import {
   parseMemberFilter,
   type CalendarMemberFilter,
 } from "@/lib/family-calendar/filters";
+import {
+  CALENDAR_EVENT_PARAM,
+  LINKED_EVENT_MISSING_MESSAGE,
+  linkedEventHref,
+  loadLinkedEvent,
+  withoutEventHref,
+} from "@/lib/family-calendar/linked-event";
 import { isPendingEvent } from "@/lib/family-calendar/optimistic";
 import type { CalendarEvent } from "@/lib/family-calendar/types";
 import {
@@ -117,6 +126,29 @@ export function CalendarScreen() {
   const writes = useCalendarWrites(members);
   const [dialog, setDialog] = useState<Dialog>(null);
 
+  // `?event=<id>` (where an event notification leads) opens that event: fetch it, move the view to
+  // its day and open its form, then drop the parameter so a reload or the next notification starts
+  // afresh. An event that can't be had (deleted, not the family's) says so instead. Each id is acted
+  // on once, whatever refetches or re-renders follow.
+  const api = useCalendarApi();
+  const eventParam = searchParams.get(CALENDAR_EVENT_PARAM)?.trim() || null;
+  const handledEvent = useRef<string | null>(null);
+  const [linkNotice, setLinkNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!eventParam || !hasFamily || handledEvent.current === eventParam) return;
+    handledEvent.current = eventParam;
+    void loadLinkedEvent(eventParam, (id) => api.get(id)).then((event) => {
+      if (!event) {
+        window.history.replaceState(null, "", withoutEventHref(pathname, window.location.search));
+        setLinkNotice(LINKED_EVENT_MISSING_MESSAGE);
+        return;
+      }
+      window.history.replaceState(null, "", linkedEventHref(pathname, window.location.search, event, getBucharestToday(), defaultView));
+      setLinkNotice(null);
+      setDialog({ kind: "event", mode: { kind: "edit", event }, id: event.id });
+    });
+  }, [eventParam, hasFamily, api, pathname, defaultView]);
+
   // The native History API syncs `useSearchParams` without a server round trip. Pushing (unlike the
   // to-do filters) keeps each month in the back button's history; picking a day on a phone, or a
   // chip, replaces instead.
@@ -180,6 +212,14 @@ export function CalendarScreen() {
   return (
     <Stack gap={{ base: "4", md: "5" }}>
       {header}
+      {linkNotice ? (
+        <InlineAlert
+          title="Event not found"
+          action={<Button size="xs" variant="ghost" onClick={() => setLinkNotice(null)}>Dismiss</Button>}
+        >
+          {linkNotice}
+        </InlineAlert>
+      ) : null}
       <MemberChips
         filter={filter}
         members={members}

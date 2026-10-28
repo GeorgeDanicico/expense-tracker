@@ -8,13 +8,14 @@ const MAX_ENDPOINT_LENGTH = 2048;
 const MAX_USER_AGENT_LENGTH = 500;
 const BASE64URL = /^[A-Za-z0-9_-]+=*$/;
 
-/** The body of `PATCH /api/notifications/settings`: one or more of the three switches. */
+/** The body of `PATCH /api/notifications/settings`: one or more of the four switches. */
 export const notificationSettingsPatchSchema = z
   .strictObject({
     pushEnabled: z.boolean(SWITCH_MESSAGE).optional(),
     remindersEnabled: z.boolean(SWITCH_MESSAGE).optional(),
     todosEnabled: z.boolean(SWITCH_MESSAGE).optional(),
-  }, "Send only pushEnabled, remindersEnabled or todosEnabled.")
+    calendarEnabled: z.boolean(SWITCH_MESSAGE).optional(),
+  }, "Send only pushEnabled, remindersEnabled, todosEnabled or calendarEnabled.")
   .refine((patch) => Object.values(patch).some((value) => value !== undefined), "Change at least one switch.");
 
 const endpoint = z

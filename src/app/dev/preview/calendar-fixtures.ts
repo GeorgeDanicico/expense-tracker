@@ -169,6 +169,10 @@ function inScope(anchor: CalendarEvent, scope: EditScope) {
 }
 
 export const previewCalendarApi: CalendarApi = {
+  async get(id: string) {
+    await delay(200);
+    return find(id);
+  },
   async create(input: CalendarEventInput) {
     await begin();
     const created = eventsFor({ ...input, endDate: input.endDate }, new Date().toISOString());

@@ -6,7 +6,7 @@ describe("FakeNotificationSettingsRepository", () => {
   it("starts on the defaults and keeps each user's switches apart", async () => {
     const settings = new FakeNotificationSettingsRepository();
 
-    expect(await settings.get()).toEqual({ pushEnabled: true, remindersEnabled: true, todosEnabled: true, deviceCount: 0 });
+    expect(await settings.get()).toEqual({ pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: true, deviceCount: 0 });
     expect(await settings.update(settings.callerId, { todosEnabled: false })).toMatchObject({ todosEnabled: false, pushEnabled: true });
 
     settings.callerId = "someone-else";

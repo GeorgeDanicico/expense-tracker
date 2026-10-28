@@ -83,6 +83,7 @@ describe("tick", () => {
     expect(result).toEqual({
       pushConfigured: true,
       reminders: { claimed: 0, queued: 0, duplicates: 0, changed: 0 },
+      events: { claimed: 0, queued: 0, duplicates: 0, changed: 0 },
       delivery: { claimed: 0, sent: 0, skipped: 0, failed: 0, retried: 0, devicesRemoved: 0 },
       cleaned: 0,
       // 11:00 in Bucharest: the first tick after 09:00 runs the day's "Due today" to-dos.
@@ -93,7 +94,8 @@ describe("tick", () => {
       event: "tick",
       fields: {
         claimed: 0, sent: 0, skipped: 0, failed: 0, retried: 0, devicesRemoved: 0,
-        remindersClaimed: 0, remindersQueued: 0, remindersDuplicate: 0, remindersChanged: 0, ms: 75,
+        remindersClaimed: 0, remindersQueued: 0, remindersDuplicate: 0, remindersChanged: 0,
+        eventsClaimed: 0, eventsQueued: 0, eventsDuplicate: 0, eventsChanged: 0, ms: 75,
       },
     });
   });
@@ -200,11 +202,13 @@ describe("tick", () => {
     });
 
     it.each([
-      ["Browser notifications off", { pushEnabled: false, remindersEnabled: true, todosEnabled: true }, "test", "Skipped: Browser notifications are off."],
-      ["Browser notifications off", { pushEnabled: false, remindersEnabled: true, todosEnabled: true }, "reminder", "Skipped: Browser notifications are off."],
-      ["Reminders off", { pushEnabled: true, remindersEnabled: false, todosEnabled: true }, "reminder", "Skipped: reminder notifications are off."],
-      ["To-dos off", { pushEnabled: true, remindersEnabled: true, todosEnabled: false }, "todo_assigned", "Skipped: to-do notifications are off."],
-      ["To-dos off", { pushEnabled: true, remindersEnabled: true, todosEnabled: false }, "todo_due", "Skipped: to-do notifications are off."],
+      ["Browser notifications off", { pushEnabled: false, remindersEnabled: true, todosEnabled: true, calendarEnabled: true }, "test", "Skipped: Browser notifications are off."],
+      ["Browser notifications off", { pushEnabled: false, remindersEnabled: true, todosEnabled: true, calendarEnabled: true }, "reminder", "Skipped: Browser notifications are off."],
+      ["Reminders off", { pushEnabled: true, remindersEnabled: false, todosEnabled: true, calendarEnabled: true }, "reminder", "Skipped: reminder notifications are off."],
+      ["To-dos off", { pushEnabled: true, remindersEnabled: true, todosEnabled: false, calendarEnabled: true }, "todo_assigned", "Skipped: to-do notifications are off."],
+      ["To-dos off", { pushEnabled: true, remindersEnabled: true, todosEnabled: false, calendarEnabled: true }, "todo_due", "Skipped: to-do notifications are off."],
+      ["Calendar off", { pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: false }, "event", "Skipped: calendar notifications are off."],
+      ["Calendar off", { pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: false }, "event_added", "Skipped: calendar notifications are off."],
     ])("skips without sending when %s (%s)", async (_label, settings, kind, reason) => {
       const { store, push, run } = setup();
       store.settings.set(ANA, settings);
@@ -218,8 +222,8 @@ describe("tick", () => {
 
     it("sends a test with the kind switches off, and other kinds whose switch is on", async () => {
       const { store, push, run } = setup();
-      store.settings.set(ANA, { pushEnabled: true, remindersEnabled: false, todosEnabled: false });
-      store.settings.set(BOGDAN, { pushEnabled: true, remindersEnabled: false, todosEnabled: true });
+      store.settings.set(ANA, { pushEnabled: true, remindersEnabled: false, todosEnabled: false, calendarEnabled: true });
+      store.settings.set(BOGDAN, { pushEnabled: true, remindersEnabled: false, todosEnabled: true, calendarEnabled: true });
       store.addDevice(ANA);
       store.addDevice(BOGDAN);
       const test = store.queue({ userId: ANA, kind: "test" });
@@ -433,10 +437,21 @@ describe("outcomeOf", () => {
 });
 
 describe("kindAllowed", () => {
-  const on = { pushEnabled: true, remindersEnabled: true, todosEnabled: true };
+  const on = { pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: true };
 
   it("answers null for a kind it doesn't know", () => {
     expect(kindAllowed("sms", on)).toBeNull();
+  });
+
+  it("maps both calendar kinds to the Calendar switch, behind Browser notifications", () => {
+    for (const kind of ["event", "event_added"]) {
+      expect(kindAllowed(kind, on)).toBe(true);
+      expect(kindAllowed(kind, { ...on, calendarEnabled: false })).toBe(false);
+      expect(kindAllowed(kind, { ...on, remindersEnabled: false, todosEnabled: false })).toBe(true);
+      expect(kindAllowed(kind, { ...on, pushEnabled: false })).toBe(false);
+    }
+    expect(kindAllowed("reminder", { ...on, calendarEnabled: false })).toBe(true);
+    expect(kindAllowed("todo_due", { ...on, calendarEnabled: false })).toBe(true);
   });
 });
 

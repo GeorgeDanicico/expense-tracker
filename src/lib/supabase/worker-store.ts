@@ -12,7 +12,7 @@ const UNIQUE_VIOLATION = "23505";
 
 /**
  * `WorkerStore` on `worker_heartbeats`, `notifications`, `reminders`, `notification_settings`,
- * `push_subscriptions`, `todos` and `family_members` with the admin client: the worker acts for every user, and the outbox and
+ * `push_subscriptions`, `todos`, `calendar_events` and `family_members` with the admin client: the worker acts for every user, and the outbox and
  * heartbeats have no policies for signed-in users.
  * Errors carry the database's message (never the key) so the worker's log says what went wrong.
  *
@@ -64,7 +64,7 @@ export function createSupabaseWorkerStore(client: AdminClient = createAdminClien
       if (userIds.length === 0) return settings;
       const { data, error } = await client
         .from("notification_settings")
-        .select("user_id, push_enabled, reminders_enabled, todos_enabled")
+        .select("user_id, push_enabled, reminders_enabled, todos_enabled, calendar_enabled")
         .in("user_id", [...userIds]);
       if (error) throw new Error(`Unable to load notification settings: ${error.message}`);
       for (const row of data) {
@@ -72,6 +72,7 @@ export function createSupabaseWorkerStore(client: AdminClient = createAdminClien
           pushEnabled: row.push_enabled,
           remindersEnabled: row.reminders_enabled,
           todosEnabled: row.todos_enabled,
+          calendarEnabled: row.calendar_enabled,
         });
       }
       return settings;
@@ -177,6 +178,38 @@ export function createSupabaseWorkerStore(client: AdminClient = createAdminClien
         const assigneeUserId = userOf.get(todo.assignee_member_id!);
         return assigneeUserId ? [{ id: todo.id, title: todo.title, assigneeUserId }] : [];
       });
+    },
+
+    async claimDueCalendarEvents(batch) {
+      const { data, error } = await client.rpc("claim_due_calendar_events", { p_batch: batch });
+      if (error) throw new Error(`Unable to claim due calendar events: ${error.message}`);
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        title: row.title,
+        allDay: row.all_day,
+        startsAt: new Date(row.starts_at),
+        timezone: row.timezone,
+        notifyAt: new Date(row.notify_at),
+        notifyAtStored: row.notify_at,
+        attendeeUserIds: row.attendee_user_ids,
+      }));
+    },
+
+    /**
+     * One conditional update: it matches only while `notify_at` is the claim's and `notified_at` is
+     * still empty (an edit that moves the time sets a new `notify_at` and clears `notified_at`).
+     * The lease is released with it. `calendar_events_guard` leaves `updated_at` alone for this.
+     */
+    async markEventNotified(event, at) {
+      const { data, error } = await client
+        .from("calendar_events")
+        .update({ notified_at: at.toISOString(), notify_locked_until: null })
+        .eq("id", event.id)
+        .eq("notify_at", event.notifyAtStored)
+        .is("notified_at", null)
+        .select("id");
+      if (error) throw new Error(`Unable to mark an event notified: ${error.message}`);
+      return data.length > 0 ? "notified" : "changed";
     },
 
     async deleteOldNotifications(before) {

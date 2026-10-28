@@ -231,17 +231,17 @@ export function ThisDeviceCard({ support, subscribed, serverNotReady = false, pe
   );
 }
 
-/** The Reminders and To-dos switches. */
+/** The Reminders, To-dos and Calendar switches. */
 export function NotificationKindsCard({
   settings,
   pending = false,
   error,
   onChange,
 }: {
-  settings: Pick<NotificationSettings, "remindersEnabled" | "todosEnabled">;
+  settings: Pick<NotificationSettings, "remindersEnabled" | "todosEnabled" | "calendarEnabled">;
   pending?: boolean;
   error?: string;
-  onChange: (patch: { remindersEnabled?: boolean; todosEnabled?: boolean }) => void;
+  onChange: (patch: { remindersEnabled?: boolean; todosEnabled?: boolean; calendarEnabled?: boolean }) => void;
 }) {
   return (
     <Card>
@@ -261,6 +261,13 @@ export function NotificationKindsCard({
             checked={settings.todosEnabled}
             disabled={pending}
             onChange={(todosEnabled) => onChange({ todosEnabled })}
+          />
+          <SwitchRow
+            label="Calendar"
+            description="30 minutes before your events, and at 07:30 on the day of all-day events."
+            checked={settings.calendarEnabled}
+            disabled={pending}
+            onChange={(calendarEnabled) => onChange({ calendarEnabled })}
           />
           {error ? <InlineAlert status="error">{error}</InlineAlert> : null}
         </Stack>
