@@ -4,6 +4,7 @@ import { eventAddedPayload, eventDedupeKey, eventPayload } from "@/lib/family-ca
 import { planReminderNotification } from "@/lib/reminders/notification";
 import { utcToZoned } from "@/lib/time-zone";
 import type {
+  ClaimedEvent,
   ClaimedNotification,
   DeviceSubscription,
   DueCounts,
@@ -346,11 +347,21 @@ async function queueDueReminders({ store, clock, log }: TickDependencies): Promi
  * no-ops, so nobody is notified twice. The mark only applies while the event's `notify_at` is the
  * claim's: an edit in between has stored a new time and cleared `notified_at` for it. An event that
  * already ended is never returned by the claim (the claim marks it notified), and a failure on one
- * event (some row not queued) is logged and leaves it unmarked for the re-claim.
+ * event (some row not queued) is logged and leaves it unmarked for the re-claim. A claim that fails
+ * as a whole is logged as `event_claim_failed` and counts as no events, so the rest of the tick
+ * (reminders, to-dos, delivery) still runs.
  */
 async function queueDueEvents({ store, clock, log }: TickDependencies): Promise<EventCounts> {
   const counts: EventCounts = { claimed: 0, queued: 0, duplicates: 0, changed: 0 };
-  const events = await store.claimDueCalendarEvents(EVENT_BATCH);
+  let events: ClaimedEvent[];
+  try {
+    events = await store.claimDueCalendarEvents(EVENT_BATCH);
+  } catch (error) {
+    // The calendar must not stop reminders, to-dos and delivery: the claim function is missing
+    // until the calendar migration is applied, and a database error may be momentary.
+    log.error("event_claim_failed", { error: errorMessage(error) });
+    return counts;
+  }
   counts.claimed = events.length;
 
   for (const event of events) {

@@ -342,6 +342,49 @@ describe("tick, for calendar events", () => {
     expect(repositories.calendar.rows[0].notifiedAt).not.toBeNull();
   });
 
+  it("still queues reminders and delivers the outbox when the event claim fails", async () => {
+    const worker = setup("2026-11-03T06:00:00Z");
+    worker.store.failEventClaimWith = new Error(
+      "Unable to claim due calendar events: Could not find the function public.claim_due_calendar_events(p_batch) in the schema cache",
+    );
+    const waiting = worker.store.queue({ userId: ME, kind: "todo_assigned", payload: { title: "Ana assigned you", body: "Buy milk", url: "/todos?card=t1", tag: "todo:t1" } });
+    // A one-off reminder due at 09:00 Bucharest time on 3 November (07:00 UTC), due by the time of the tick.
+    const reminder = worker.store.addReminder({ userId: ME, startsOn: "2026-11-03", timeOfDay: "09:00" });
+    worker.jumpTo("2026-11-03T07:00:30Z");
+
+    const result = await worker.tick();
+
+    expect(result).toMatchObject({
+      pushConfigured: true,
+      events: { claimed: 0, queued: 0, duplicates: 0, changed: 0 },
+      reminders: { claimed: 1, queued: 1 },
+      delivery: { claimed: 2, sent: 2 },
+    });
+    expect(waiting.status).toBe("sent");
+    expect(worker.store.reminderNotifications()).toHaveLength(1);
+    expect(reminder.nextNotifyAt).toBeNull();
+    expect(worker.lines.filter((line) => line.event === "event_claim_failed")).toEqual([
+      expect.objectContaining({ level: "error", fields: { error: expect.stringContaining("claim_due_calendar_events") } }),
+    ]);
+    expect(worker.lines.some((line) => line.event === "tick_failed")).toBe(false);
+    expect(worker.lines.at(-1)).toMatchObject({ event: "tick", fields: { eventsClaimed: 0, sent: 2 } });
+  });
+
+  it("picks the events up again once the claim works", async () => {
+    const worker = setup("2026-11-02T09:00:00Z");
+    await createEvent(newEvent(), new Date("2026-11-02T09:00:00Z"));
+    worker.store.failEventClaimWith = new Error("claim_due_calendar_events doesn't exist");
+
+    worker.jumpTo("2026-11-03T06:30:30Z");
+    await worker.tick();
+    expect(worker.sent()).toEqual([]);
+
+    worker.store.failEventClaimWith = null;
+    worker.jumpTo("2026-11-03T06:31:00Z");
+    await worker.tick();
+    expect(worker.sent()).toHaveLength(2);
+  });
+
   it("doesn't claim events without a push sender", async () => {
     const worker = setup("2026-11-02T09:00:00Z");
     await createEvent(newEvent(), new Date("2026-11-02T09:00:00Z"));

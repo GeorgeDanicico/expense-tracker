@@ -88,6 +88,8 @@ export class FakeWorkerStore implements WorkerStore {
   /** Leases of claimed events by id. */
   eventLeases = new Map<string, Date>();
   failWith: Error | null = null;
+  /** Makes only `claimDueCalendarEvents` reject (the claim function missing, or a database error). */
+  failEventClaimWith: Error | null = null;
   beforeAdvance: ((reminder: ClaimedReminder) => void) | null = null;
   /** Runs inside `markEventNotified` before it checks the event (an edit racing the worker). */
   beforeMarkEvent: ((event: ClaimedEvent) => void) | null = null;
@@ -377,6 +379,7 @@ export class FakeWorkerStore implements WorkerStore {
    */
   async claimDueCalendarEvents(batch: number): Promise<ClaimedEvent[]> {
     this.check();
+    if (this.failEventClaimWith) throw this.failEventClaimWith;
     if (!this.calendar) return [];
     const { repository, userOf } = this.calendar;
     const now = this.now();
