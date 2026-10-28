@@ -2,12 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/filters";
 
 import {
+  calendarEventApiUrl,
+  calendarEventsApiKey,
   dashboardApiKey,
   expenseTabExpensesApiKey,
   expenseTabsApiKey,
   expensesApiKey,
   investmentsApiKey,
   investmentTransactionsApiKey,
+  isCalendarEventsKey,
   mainExpensesApiKey,
   mainExpensesExportUrl,
   netWorthApiKey,
@@ -64,5 +67,27 @@ describe("keys for another member's data", () => {
   it("gives different members different keys", () => {
     expect(netWorthApiKey(member)).not.toBe(netWorthApiKey("60000000-0000-4000-8000-000000000003"));
     expect(netWorthApiKey(member)).not.toBe(netWorthApiKey());
+  });
+});
+
+describe("calendar keys", () => {
+  it("builds a range's key from its two instants, with an optional member", () => {
+    expect(calendarEventsApiKey("2026-09-27T21:00:00.000Z", "2026-11-08T22:00:00.000Z")).toBe(
+      "/api/calendar/events?from=2026-09-27T21%3A00%3A00.000Z&to=2026-11-08T22%3A00%3A00.000Z",
+    );
+    expect(calendarEventsApiKey("2026-09-27T21:00:00.000Z", "2026-11-08T22:00:00.000Z", "m-1")).toContain("&member=m-1");
+  });
+
+  it("recognises the keys of every cached range, and no other", () => {
+    expect(isCalendarEventsKey(calendarEventsApiKey("2026-09-27T21:00:00.000Z", "2026-11-08T22:00:00.000Z"))).toBe(true);
+    expect(isCalendarEventsKey("/api/calendar/events")).toBe(true);
+    expect(isCalendarEventsKey("/api/calendar/events-other")).toBe(false);
+    expect(isCalendarEventsKey("/api/todos")).toBe(false);
+    expect(isCalendarEventsKey(["/api/calendar/events"])).toBe(false);
+  });
+
+  it("builds an event's URL, with the scope of a delete", () => {
+    expect(calendarEventApiUrl("abc")).toBe("/api/calendar/events/abc");
+    expect(calendarEventApiUrl("abc", "following")).toBe("/api/calendar/events/abc?scope=following");
   });
 });

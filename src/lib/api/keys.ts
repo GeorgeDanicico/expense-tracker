@@ -10,6 +10,7 @@ import type { McpAccess, McpToken } from "@/lib/mcp/token-repository";
 import type { NotificationSettings } from "@/lib/notifications/settings-repository";
 import type { ReminderCompletion, ReminderSummary } from "@/lib/reminders/repository";
 import type { ListedReminder } from "@/lib/reminders/list";
+import type { CalendarEvent } from "@/lib/family-calendar/types";
 import type { Todo } from "@/lib/todos/types";
 
 /**
@@ -313,3 +314,34 @@ export type TestNotificationResponse = { queued: true } | { queued: false; messa
 
 /** What the test route says when a test was already queued within the minute. */
 export const TEST_ALREADY_SENT = "A test was sent less than a minute ago. Wait a minute to send another.";
+
+/**
+ * GET → {@link CalendarEventsResponse}: the family's events overlapping `from` (included) to `to`
+ * (excluded), at most 92 days (+1 h) apart. 404 for a caller without a family.
+ * POST the new event (`calendarEventSchema`) → {@link CalendarEventsResponse} with its occurrences (201).
+ */
+export const CALENDAR_EVENTS_API_KEY = "/api/calendar/events";
+
+/** {@link CALENDAR_EVENTS_API_KEY} for the range `from`–`to` (ISO timestamps), optionally one member's events. */
+export function calendarEventsApiKey(from: string, to: string, member?: string | null) {
+  const params = new URLSearchParams({ from, to });
+  if (member) params.set("member", member);
+  return `${CALENDAR_EVENTS_API_KEY}?${params}`;
+}
+
+/** Whether `key` is a calendar range's SWR key, to mutate every cached range at once. */
+export function isCalendarEventsKey(key: unknown): key is string {
+  return typeof key === "string" && (key === CALENDAR_EVENTS_API_KEY || key.startsWith(`${CALENDAR_EVENTS_API_KEY}?`));
+}
+
+/**
+ * PATCH (any of the event's fields, plus `scope`: this, following or all) → {@link CalendarEventsResponse}
+ * with the changed events; DELETE `?scope=` → `{ deletedIds }`.
+ */
+export function calendarEventApiUrl(id: string, scope?: string) {
+  const url = `${CALENDAR_EVENTS_API_KEY}/${encodeURIComponent(id)}`;
+  return scope ? `${url}?scope=${encodeURIComponent(scope)}` : url;
+}
+
+export type CalendarEventsResponse = { events: CalendarEvent[] };
+export type CalendarDeletedResponse = { deletedIds: string[] };

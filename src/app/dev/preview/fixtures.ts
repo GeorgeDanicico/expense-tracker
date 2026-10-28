@@ -21,6 +21,7 @@ import { ALL_MEMBERS, type Viewing } from "@/lib/family/viewing";
 import type { FamilyInvestmentsOverview } from "@/lib/investments/types";
 import type { FamilyNetWorthOverview } from "@/lib/net-worth/types";
 
+import { previewCalendarEvents } from "./calendar-fixtures";
 import { previewReminders, previewReminderSummary } from "./reminder-fixtures";
 import { previewTodos } from "./todo-fixtures";
 
@@ -398,6 +399,7 @@ export function fixtureFor(key: string): unknown {
   if (path === "/api/investment-transactions") return transactions(key);
   if (path === "/api/net-worth") return family ? familyNetWorth() : NET_WORTH;
   if (path === "/api/todos") return previewTodos();
+  if (path === "/api/calendar/events") return previewCalendarEvents(params);
   if (path === "/api/reminders") return previewReminders();
   if (path === "/api/reminders/summary") return previewReminderSummary();
   // `?devices=0` previews the "Reminders won't notify you" warning.
