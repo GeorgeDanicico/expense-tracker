@@ -25,6 +25,18 @@ const draft = (overrides: Partial<EventDraft> = {}): EventDraft => ({
 });
 
 describe("newDraft", () => {
+  it("opens an all-day draft from the Week view's all-day row, on one day", () => {
+    expect(newDraft({ date: "2026-11-04", allDay: true, attendeeMemberIds: ["m-ana"], now: NOW })).toMatchObject({
+      allDay: true, startDate: "2026-11-04", endDate: "2026-11-04",
+    });
+  });
+
+  it("ends a slot in the day's last hour just after midnight, on the next day", () => {
+    expect(newDraft({ date: "2026-11-04", startTime: "23:00", attendeeMemberIds: [], now: NOW })).toMatchObject({
+      startDate: "2026-11-04", startTime: "23:00", endDate: "2026-11-05", endTime: "00:00",
+    });
+  });
+
   it("starts at 09:00 on another day, for an hour, for just the caller", () => {
     expect(newDraft({ date: "2026-11-04", attendeeMemberIds: ["m-ana"], now: NOW })).toMatchObject({
       title: "", allDay: false, startDate: "2026-11-04", startTime: "09:00", endDate: "2026-11-04", endTime: "10:00",

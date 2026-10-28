@@ -21,7 +21,7 @@ export function seriesLabel(event: Pick<CalendarEvent, "seriesIndex" | "seriesLe
 
 /**
  * One event as a row for the Agenda and the day list: a stripe in the event's colour, its time on
- * `date`, title, place, "3 of 6" for a series, and who's going as avatars. Opens the event.
+ * `date` (beside the title, or above it on a phone), title, place, "3 of 6" for a series, and who's going as avatars. Opens the event.
  */
 export function EventRow({
   event,
@@ -59,10 +59,12 @@ export function EventRow({
       _focusVisible={{ outline: "2px solid", outlineColor: "fg.accent", outlineOffset: "2px" }}
     >
       <Box alignSelf="stretch" w="1.5" flexShrink="0" bg={appearance.neutral ? "fg.subtle" : appearance.bg} aria-hidden="true" />
-      <Text textStyle="label" color="fg.muted" w={{ base: "5.5rem", sm: "8rem" }} flexShrink="0" py="2" aria-hidden="true">
+      <Text textStyle="label" color="fg.muted" w="8rem" flexShrink="0" py="2" display={{ base: "none", sm: "block" }} aria-hidden="true">
         {dayTimeLabel(event, date)}
       </Text>
       <Box flex="1" minW="0" py="2">
+        {/* On a phone the time sits above the title, so the title gets the row's width. */}
+        <Text textStyle="label" color="fg.muted" display={{ base: "block", sm: "none" }} aria-hidden="true">{dayTimeLabel(event, date)}</Text>
         <Text textStyle="bodySm" fontWeight="medium" truncate>{event.title}</Text>
         {event.location || series ? (
           <Flex gap="3" textStyle="caption" wrap="wrap">

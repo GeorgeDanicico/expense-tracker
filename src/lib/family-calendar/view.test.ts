@@ -4,6 +4,7 @@ import { MAX_RANGE_DAYS } from "@/lib/family-calendar/types";
 import {
   calendarHref,
   dayHeading,
+  defaultViewFor,
   longDate,
   monthGridDays,
   monthGridStart,
@@ -16,6 +17,8 @@ import {
   startOfWeek,
   viewRange,
   weekdayIndex,
+  weekLengthFor,
+  weekViewDays,
 } from "@/lib/family-calendar/view";
 
 const TODAY = "2026-10-28";
@@ -162,5 +165,59 @@ describe("day names", () => {
   it("writes a short heading and a long date", () => {
     expect(dayHeading("2026-11-04")).toBe("Wed 4 Nov");
     expect(longDate("2026-11-04")).toBe("Wednesday 4 November 2026");
+  });
+});
+
+describe("the phone layout", () => {
+  it("opens on the Agenda for a phone and on the Month otherwise", () => {
+    expect(defaultViewFor(true)).toBe("agenda");
+    expect(defaultViewFor(false)).toBe("month");
+  });
+
+  it("makes the phone's default view the one a URL without ?view= means", () => {
+    expect(parseCalendarParams(params(""), TODAY, defaultViewFor(true))).toEqual({ view: "agenda", date: TODAY });
+    expect(parseCalendarParams(params("view=month"), TODAY, defaultViewFor(true))).toEqual({ view: "month", date: TODAY });
+    expect(parseCalendarParams(params("view=year"), TODAY, defaultViewFor(true))).toEqual({ view: "agenda", date: TODAY });
+  });
+
+  it("leaves the URL clean for the Agenda on a phone, and writes ?view=month there", () => {
+    const agenda = defaultViewFor(true);
+    expect(calendarHref("/calendar", "", { view: "agenda", date: TODAY }, TODAY, agenda)).toBe("/calendar");
+    expect(calendarHref("/calendar", "", { view: "month", date: TODAY }, TODAY, agenda)).toBe("/calendar?view=month");
+    // ...and the other way round on a computer.
+    expect(calendarHref("/calendar", "", { view: "agenda", date: TODAY }, TODAY)).toBe("/calendar?view=agenda");
+  });
+
+  it("shows three days on a phone and a week otherwise", () => {
+    expect(weekLengthFor(true)).toBe(3);
+    expect(weekLengthFor(false)).toBe(7);
+  });
+
+  it("starts the three days on the chosen date, not on a Monday", () => {
+    expect(weekViewDays("2026-10-29", 3)).toEqual(["2026-10-29", "2026-10-30", "2026-10-31"]);
+    expect(weekViewDays("2026-10-29")).toEqual(["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"]);
+  });
+
+  it("fetches just those three days", () => {
+    expect(viewRange("week", "2026-10-29", undefined, 3)).toEqual({ start: "2026-10-29", endExclusive: "2026-11-01" });
+    expect(viewRange("week", "2026-10-29")).toEqual({ start: "2026-10-26", endExclusive: "2026-11-02" });
+  });
+
+  it("steps three days at a time on a phone, across a month end", () => {
+    expect(shiftCalendarDate("week", "2026-10-29", 1, 3)).toBe("2026-11-01");
+    expect(shiftCalendarDate("week", "2026-10-29", -1, 3)).toBe("2026-10-26");
+    expect(shiftCalendarDate("week", "2026-10-29", 1)).toBe("2026-11-05");
+  });
+
+  it("prefetches the three days before and after", () => {
+    expect(neighbourRanges("week", "2026-10-29", 3)).toEqual([
+      { start: "2026-10-26", endExclusive: "2026-10-29" },
+      { start: "2026-11-01", endExclusive: "2026-11-04" },
+    ]);
+  });
+
+  it("titles the three days by their dates", () => {
+    expect(periodTitle("week", "2026-10-29", TODAY, undefined, 3)).toBe("Oct 29 – Oct 31, 2026");
+    expect(periodTitle("week", "2026-10-30", TODAY, undefined, 3)).toBe("Oct 30 – Nov 1, 2026");
   });
 });

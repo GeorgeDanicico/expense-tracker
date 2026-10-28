@@ -133,7 +133,7 @@ memory around today (`src/app/dev/preview/calendar-fixtures.ts`, which runs the 
 and `editedRows` as the service): 1280 × 800 (saved at 800 × 500, the first at 800 × 563) and
 390 × 844 (saved at 468 × 1012). `?failWrites=1` refuses every write after 500 ms, so the optimistic
 change and its rollback can be seen; `?noFamily=1` previews an account without a family. The page
-isn't linked from the navigation yet (C6). The dark capture has `prefers-color-scheme: dark`
+wasn't linked from the navigation until C6 (below). The dark capture has `prefers-color-scheme: dark`
 emulated; the app forces its light theme, so it matches the light one.
 
 | Image | Shows |
@@ -150,4 +150,26 @@ emulated; the app forces its light theme, so it matches the light one.
 | `calendar-deleted-all-1280.jpg` | After "All events": all six occurrences gone, the moved one included |
 | `calendar-day-dialog-1280.jpg` | "+3 more" opened: the day's six events in full, with Add event |
 | `calendar-rolled-back-1280.jpg` | `?failWrites=1`: the refused delete's error in its dialog (the event went back to the grid) |
-| `calendar-month-390.jpg` | The phone width: the grid fits with no sideways scroll; the phone layout proper is C6 |
+| `calendar-month-390.jpg` | The phone width: the grid fits with no sideways scroll; the phone layout proper is C6 (see below) |
+
+## Calendar: week view, member chips, phones and the nav item (family C6)
+
+Captured with the in-app browser from `/dev/preview/calendar` (fake data around today; Thursday is
+crowded on purpose to show overlapping events, plus all-day, multi-day and a 3-attendee event), at
+1280 × 800 (saved at 800 × 500) and 390 × 844 (saved at 468 × 1012). The preview's "me" is George.
+`?noFamily=1` previews an account without a family. The clock in these captures was about 21:20,
+which is where the red "now" line is.
+
+| Image | Shows |
+|---|---|
+| `calendar-week-1280.jpg` | Week: seven columns from Monday, an all-day row (all-day and multi-day events as bars, one of them a timed sleepover across midnight), the hourly grid scrolled to 07:00, overlapping events side by side on Thursday, today's column tinted and the red "now" line at the bottom |
+| `calendar-week-add-slot-1280.jpg` | Clicking Friday at 14:00: the add form opens with 30/10 and 14:00 to 15:00 filled in |
+| `calendar-member-filter-1280.jpg` | The Luca chip pressed (`?view=week&member=m-luca`): only his events, and the events that include him (the ski weekend, the family lunch) |
+| `calendar-me-agenda-1280.jpg` | The Me chip on the Agenda (`?member=me`, which the preview maps to George): only the events he attends |
+| `calendar-no-family-nav-1280.jpg` | `?noFamily=1`: no Calendar (or To-dos) in the sidebar, and the page points to Settings → Family |
+| `calendar-agenda-390.jpg` | A phone with no `?view=`: the Agenda is the default, the time sits above each title so titles aren't cut short, the chips scroll sideways inside their own row |
+| `calendar-month-dots-390.jpg` | Phone Month: colour dots under each day (grey for several people, at most three, "+" for more) and the chosen day ringed |
+| `calendar-month-day-list-390.jpg` | Below the grid: the chosen day's events in full, with Add |
+| `calendar-week-390.jpg` | Phone Week: three days from the chosen date (`?view=week&date=2026-10-29`), the same all-day row and grid |
+| `calendar-add-sheet-390.jpg` | The event form as a full-height sheet on a phone |
+| `calendar-more-sheet-390.jpg` | The More sheet for a family user: Calendar after To-dos in Planning |

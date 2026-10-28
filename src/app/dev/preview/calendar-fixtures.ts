@@ -49,7 +49,15 @@ const SAMPLES: Sample[] = [
   { title: "Dentist", day: 1, time: "10:00", endTime: "11:00", going: ["m-maria"], location: "Dr. Ionescu", notes: "Bring the insurance card." },
   { title: "Parent-teacher meeting", day: 2, time: "17:30", endTime: "18:30", going: ["m-george", "m-maria"], location: "Ana's school" },
   { title: "School concert", day: 3, time: "09:00", endTime: "10:30", going: ["m-ana"] },
+  // Thursday is crowded on purpose, to show the Week view's side-by-side layout: the concert, the
+  // check-up and the rehearsal overlap three ways, and the call overlaps the plumber and groceries.
+  { title: "Doctor check-up", day: 3, time: "09:30", endTime: "10:30", going: ["m-maria"], location: "Clinic" },
+  { title: "Piano recital rehearsal", day: 3, time: "10:00", endTime: "11:15", going: ["m-luca"] },
   { title: "Call the plumber", day: 3, time: "11:00", endTime: "11:30", going: ["m-george"] },
+  { title: "Team call", day: 3, time: "11:15", endTime: "12:15", going: ["m-george"] },
+  { title: "Bin day", day: 3, going: ["m-george"] },
+  { title: "Library books due", day: 3, going: ["m-ana"] },
+  { title: "Ski weekend", day: 5, endDay: 6, going: ["m-george", "m-luca"], location: "Poiana Brasov" },
   { title: "Groceries", day: 3, time: "12:00", endTime: "13:00", going: ["m-george"] },
   { title: "Football", day: 3, time: "15:00", endTime: "16:30", going: ["m-luca"] },
   { title: "Book club", day: 3, time: "19:00", endTime: "21:00", going: ["m-maria"] },

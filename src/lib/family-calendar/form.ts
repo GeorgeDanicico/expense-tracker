@@ -50,6 +50,7 @@ const HOUR = 60;
 export function newDraft({
   date,
   startTime,
+  allDay = false,
   attendeeMemberIds,
   now = new Date(),
   timeZone = DEFAULT_EVENT_TIMEZONE,
@@ -57,6 +58,8 @@ export function newDraft({
   date: string;
   /** A start time to use instead (from a slot clicked in the Week view). */
   startTime?: string;
+  /** An all-day event (from the Week view's all-day row), which keeps the usual start time for when the switch is turned off. */
+  allDay?: boolean;
   attendeeMemberIds: string[];
   now?: Date;
   timeZone?: string;
@@ -66,15 +69,17 @@ export function newDraft({
     ?? (local.date === date
       ? `${String(Math.min(Number(local.time.slice(0, 2)) + 1, 22)).padStart(2, "0")}:00`
       : DEFAULT_START_TIME);
+  // An event starting in the day's last hour ends after midnight, on the next day.
+  const end = addMinutes(date, start, HOUR);
   return {
     title: "",
     notes: "",
     location: "",
-    allDay: false,
+    allDay,
     startDate: date,
     startTime: start,
-    endDate: date,
-    endTime: addMinutes(date, start, HOUR).time,
+    endDate: allDay ? date : end.date,
+    endTime: end.time,
     attendeeMemberIds,
     repeatKind: "none",
     repeatCount: DEFAULT_REPEAT_COUNT,

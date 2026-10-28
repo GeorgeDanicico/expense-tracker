@@ -35,7 +35,16 @@ import { dayHeading } from "@/lib/family-calendar/view";
 import type { CalendarEventEdit, CalendarEventInput } from "@/lib/validation/calendar-event";
 
 export type EventDialogMode =
-  | { kind: "create"; date: string; startTime?: string }
+  | {
+    kind: "create";
+    date: string;
+    /** A start time to open with, from the Week view's hourly grid. */
+    startTime?: string;
+    /** Open as an all-day event, from the Week view's all-day row. */
+    allDay?: boolean;
+    /** Who's going to start with, when the calendar is filtered to someone; just the caller otherwise. */
+    attendeeMemberIds?: string[];
+  }
   | { kind: "edit"; event: CalendarEvent };
 
 type Person = { memberId: string; name: string; avatarUrl: string | null };
@@ -116,7 +125,12 @@ export function EventDialog({
   const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState<EventDraft>(() => mode.kind === "edit"
     ? draftFromEvent(mode.event)
-    : newDraft({ date: mode.date, startTime: mode.startTime, attendeeMemberIds: myMemberId ? [myMemberId] : [] }));
+    : newDraft({
+      date: mode.date,
+      startTime: mode.startTime,
+      allDay: mode.allDay,
+      attendeeMemberIds: mode.attendeeMemberIds ?? (myMemberId ? [myMemberId] : []),
+    }));
   const goingLabel = useId();
   const formId = `event-${event?.id ?? "new"}`;
   const inSeries = (event?.seriesLength ?? 1) > 1;

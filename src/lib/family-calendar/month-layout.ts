@@ -10,7 +10,7 @@ export type WeekSegment = {
   event: CalendarEvent;
   /** The first day's column in the week, 0 for Monday. */
   column: number;
-  /** How many columns it spans, 1 to 7. */
+  /** How many columns it spans, 1 to 7 (the row's length). */
   span: number;
   /** The row it sits in, counted from 0 at the top of the week's chips. */
   lane: number;
@@ -23,14 +23,15 @@ export type WeekSegment = {
 export type MonthWeekLayout = {
   /** The segments that fit in the lanes, in drawing order. */
   segments: WeekSegment[];
-  /** For each of the week's seven days, how many events didn't fit and are behind "+N more". */
+  /** For each of the row's days (seven in a week), how many events didn't fit and are behind "+N more". */
   moreByDay: number[];
   /** How many lanes the visible segments use, 0 to `maxLanes`. */
   laneCount: number;
 };
 
 /**
- * Lays the events that touch the week starting on `weekStart` (a Monday) into lanes. Each event
+ * Lays the events that touch the week starting on `weekStart` (a Monday) into lanes. `dayCount`
+ * (7 by default) shortens the row for the Week view on a phone, which shows three days from any date. Each event
  * becomes one segment spanning the days it covers within the week; a segment takes the first lane
  * that is free on all its days, so a multi-day event keeps one row across the week. Segments that
  * would need a lane at or past `maxLanes` aren't drawn: each of their days counts them in
@@ -41,8 +42,9 @@ export function layoutMonthWeek(
   events: readonly CalendarEvent[],
   weekStart: string,
   maxLanes = MONTH_MAX_LANES,
+  dayCount = 7,
 ): MonthWeekLayout {
-  const weekEnd = addDays(weekStart, 6);
+  const weekEnd = addDays(weekStart, dayCount - 1);
   const columnOf = (date: string) => Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${weekStart}T00:00:00Z`)) / 86_400_000);
 
   const candidates = events.flatMap((event) => {
@@ -62,7 +64,7 @@ export function layoutMonthWeek(
   // `busy[lane]` holds the columns each lane is already using.
   const busy: boolean[][] = [];
   const segments: WeekSegment[] = [];
-  const moreByDay = Array.from({ length: 7 }, () => 0);
+  const moreByDay = Array.from({ length: dayCount }, () => 0);
 
   for (const candidate of candidates) {
     const columns = Array.from({ length: candidate.span }, (_, index) => candidate.column + index);

@@ -31,6 +31,12 @@ export function eventAppearance(event: Pick<CalendarEvent, "attendees">, colorOf
     : { bg: "bg.emphasized", color: "fg", neutral: true };
 }
 
+/** The colour of an event's dot in the phone's month: the member's, or a neutral grey for an event with several people. */
+export function eventDotColor(event: Pick<CalendarEvent, "attendees">, colorOf: ColorOf) {
+  const appearance = eventAppearance(event, colorOf);
+  return appearance.neutral ? "fg.subtle" : appearance.bg;
+}
+
 export function attendeeName(attendee: Pick<CalendarAttendee, "name">) {
   return attendee.name ?? "A family member";
 }
