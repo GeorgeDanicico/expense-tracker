@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getAuthenticatedUser, type AuthenticatedUser } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
 import { touchLastActiveInBackground } from "@/lib/family/last-active";
+import { ImportError } from "@/lib/imports/types";
 import { idSchema } from "@/lib/validation/primitives";
 
 /** Every API response is per-user data and must never be cached by browsers or proxies. */
@@ -78,13 +79,16 @@ export type RouteHandler<Req, Ctx> = {
   (request: Req, context: Ctx): Promise<Response>;
 };
 
-function errorResponse(error: HttpError | DomainError) {
+function errorResponse(error: HttpError | DomainError | ImportError) {
+  // A refused statement carries the `code` the import screen tells refusals apart by, and no field errors.
+  if (error instanceof ImportError) return json({ error: error.message, code: error.code }, error.status);
   return json({ error: error.message, fieldErrors: error.fieldErrors }, error.status);
 }
 
 /**
  * Wraps a route handler with authentication and error mapping:
- * no user → 401, `HttpError`/`DomainError` → their status, anything else → 500 with `failure`.
+ * no user → 401, `HttpError`/`DomainError` → their status, `ImportError` → its status with `{ error, code }`,
+ * anything else → 500 with `failure`.
  * Without `failure`, unexpected errors propagate to Next's default error response.
  * While the family flag is on, it also records the user's last activity in the background
  * (`touchLastActiveInBackground`), which never delays or changes the response.
@@ -101,7 +105,7 @@ export function withUser<Req extends Request = Request, Ctx = unknown>(
     try {
       return await handler(request as Req, user, context as Ctx);
     } catch (error) {
-      if (error instanceof HttpError || error instanceof DomainError) return errorResponse(error);
+      if (error instanceof HttpError || error instanceof DomainError || error instanceof ImportError) return errorResponse(error);
       if (options.failure === undefined) throw error;
       return json({ error: options.failure }, 500);
     }

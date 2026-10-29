@@ -17,6 +17,7 @@ vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClie
 vi.mock("@/lib/supabase/config", () => ({ getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "pk" }) }));
 
 import { DomainError } from "@/lib/errors";
+import { ImportError } from "@/lib/imports/types";
 import { HttpError, json, noContent, notFound, parseBody, parseId, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { fakeSupabase } from "@/test/fake-supabase";
@@ -122,6 +123,17 @@ describe("withUser", () => {
     expect(await respond(() => { throw new DomainError("Not enough shares.", 409, { quantity: ["Too many."] }); })).toEqual({
       status: 409,
       body: { error: "Not enough shares.", fieldErrors: { quantity: ["Too many."] } },
+    });
+  });
+
+  it("maps an ImportError to its status, message and code, without field errors", async () => {
+    expect(await respond(() => { throw new ImportError("already_imported", "You imported this statement."); })).toEqual({
+      status: 409,
+      body: { error: "You imported this statement.", code: "already_imported" },
+    });
+    expect(await respond(() => { throw new ImportError("file_too_large", "Choose a statement under 2 MB."); })).toEqual({
+      status: 413,
+      body: { error: "Choose a statement under 2 MB.", code: "file_too_large" },
     });
   });
 
