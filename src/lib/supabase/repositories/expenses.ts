@@ -125,6 +125,10 @@ export const supabaseExpenseRepository: ExpenseRepository = {
     return queryExpensesForUser(userId, getMonthRange(month));
   },
 
+  async listRange(userId, { start, endExclusive }) {
+    return queryExpensesForUser(userId, { start, endExclusive });
+  },
+
   async listForTab(userId, tab, filters) {
     return queryExpensesForUser(userId, { tab, filters, ...expenseTabDateBounds(filters) });
   },

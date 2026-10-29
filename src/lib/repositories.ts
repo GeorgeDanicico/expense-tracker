@@ -8,6 +8,7 @@ import type { CalendarRepository } from "@/lib/family-calendar/repository";
 import type { ExpenseRepository } from "@/lib/expenses/repository";
 import type { ExpenseTabRepository } from "@/lib/expenses/tab-repository";
 import type { FamilyRepository } from "@/lib/family/repository";
+import type { ImportRepository } from "@/lib/imports/repository";
 import type { InvestmentRepository } from "@/lib/investments/repository";
 import type { McpTokenRepository } from "@/lib/mcp/token-repository";
 import type { NetWorthRepository } from "@/lib/net-worth/repository";
@@ -21,6 +22,7 @@ import { supabaseCalendarRepository } from "@/lib/supabase/repositories/calendar
 import { supabaseExpenseTabRepository } from "@/lib/supabase/repositories/expense-tabs";
 import { supabaseExpenseRepository } from "@/lib/supabase/repositories/expenses";
 import { supabaseFamilyRepository } from "@/lib/supabase/repositories/family";
+import { supabaseImportRepository } from "@/lib/supabase/repositories/imports";
 import { supabaseInvestmentRepository } from "@/lib/supabase/repositories/investments";
 import { supabaseMcpTokenRepository } from "@/lib/supabase/repositories/mcp-tokens";
 import { supabaseNetWorthRepository } from "@/lib/supabase/repositories/net-worth";
@@ -37,6 +39,7 @@ export type Repositories = {
   calendarFeeds: CalendarFeedRepository;
   expenseTabs: ExpenseTabRepository;
   family: FamilyRepository;
+  imports: ImportRepository;
   investments: InvestmentRepository;
   expenses: ExpenseRepository;
   mcpTokens: McpTokenRepository;
@@ -61,6 +64,7 @@ export function getRepositories(): Repositories {
     calendarFeeds: supabaseCalendarFeedRepository,
     expenseTabs: supabaseExpenseTabRepository,
     family: supabaseFamilyRepository,
+    imports: supabaseImportRepository,
     investments: supabaseInvestmentRepository,
     expenses: supabaseExpenseRepository,
     mcpTokens: supabaseMcpTokenRepository,

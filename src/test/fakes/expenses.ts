@@ -32,6 +32,10 @@ export class FakeExpenseRepository implements ExpenseRepository {
     return this.newestFirst(userId).filter((expense) => inRange(expense, getMonthRange(month)));
   }
 
+  async listRange(userId: string, range: DateRange) {
+    return this.newestFirst(userId).filter((expense) => inRange(expense, range));
+  }
+
   async listForTab(userId: string, tab: ExpenseTab, filters: ExpenseTabFilters) {
     const search = filters.search.toLowerCase();
     return this.newestFirst(userId).filter((expense) =>

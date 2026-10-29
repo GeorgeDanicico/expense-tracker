@@ -23,6 +23,8 @@ export type ExpenseDashboardSnapshot = {
 export interface ExpenseRepository {
   /** The user's expenses dated in `month` (`YYYY-MM`; an invalid month means the current one). */
   listMonth(userId: string, month: string): Promise<Expense[]>;
+  /** The user's expenses dated from `range.start` up to, not including, `range.endExclusive`. */
+  listRange(userId: string, range: DateRange): Promise<Expense[]>;
   /**
    * The user's expenses in the tab's categories or subtypes, narrowed by the filters.
    * The caller resolves the tab with the user's ownership first. A tab with no selections lists nothing.
