@@ -7,13 +7,14 @@ import { useState } from "react";
 import { useSWRConfig } from "swr";
 
 import { useImportApi } from "@/components/expenses/import/import-api";
+import { UndoImportDialog } from "@/components/expenses/import/undo-dialog";
 import { Card } from "@/components/ui/card";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
-import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
 import { afterImportChange } from "@/lib/api/invalidate";
 import type { ImportConfirmResponse } from "@/lib/api/keys";
 import { formatMonth } from "@/lib/calendar";
+import { formatInstantDay } from "@/lib/imports/recent";
 import { monthsOf, pluralize } from "@/lib/imports/review";
 import { formatCurrency } from "@/lib/utils/currency";
 
@@ -47,6 +48,7 @@ export function ResultView({
   const { mutate } = useSWRConfig();
   const form = useApiForm();
   const [removed, setRemoved] = useState<number | null>(null);
+  const [undoing, setUndoing] = useState(false);
   const { created, batch } = result;
   const total = created.reduce((sum, expense) => sum + Math.round(expense.amount * 100), 0) / 100;
   const months = monthsOf(created);
@@ -58,6 +60,8 @@ export function ResultView({
       setRemoved(undone.removed);
     }, { fallback: "The import could not be undone.", action: "undo" });
   }
+
+  const now = new Date();
 
   if (removed !== null) {
     return (
@@ -91,14 +95,21 @@ export function ResultView({
               <Text textStyle="caption">Changed your mind? Undo removes exactly these expenses.</Text>
             </Stack>
           </Flex>
-          {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
           <Flex gap="2" wrap="wrap">
             {months.slice(0, MAX_MONTH_LINKS).map((month) => (
               <Button key={month} asChild variant="solid" colorPalette="brand" size="sm">
                 <Link href={`/expenses?month=${month}`}>View {formatMonth(month)}</Link>
               </Button>
             ))}
-            <Button variant="outline" size="sm" loading={form.pending} onClick={undo}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={form.pending}
+              onClick={() => {
+                form.reset();
+                setUndoing(true);
+              }}
+            >
               <Undo2 size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Undo
             </Button>
             <Button variant="ghost" size="sm" disabled={form.pending} onClick={onUploadAnother}>
@@ -106,6 +117,18 @@ export function ResultView({
             </Button>
           </Flex>
         </Stack>
+        <UndoImportDialog
+          open={undoing}
+          onOpenChange={(next) => {
+            if (!form.pending) setUndoing(next);
+          }}
+          // Just imported: the expenses are the ones it created, none of them edited yet.
+          counts={{ expenseCount: created.length, changedCount: 0 }}
+          importedOn={formatInstantDay(batch.confirmedAt ?? now.toISOString(), { now, long: true })}
+          pending={form.pendingAction === "undo"}
+          error={form.error}
+          onConfirm={undo}
+        />
       </Card.Body>
     </Card>
   );

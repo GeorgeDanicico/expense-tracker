@@ -78,6 +78,7 @@ export function UploadStep({
   pending,
   error,
   notice,
+  noticeTone = "info",
 }: {
   onFile: (file: File) => void;
   pending: boolean;
@@ -85,6 +86,8 @@ export function UploadStep({
   error?: string;
   /** Something to say before the picker (an import was just discarded, say). */
   notice?: string;
+  /** `warning` for a draft that is gone (expired, or confirmed elsewhere); `info` for a plain note. */
+  noticeTone?: "info" | "warning";
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -114,7 +117,7 @@ export function UploadStep({
 
   return (
     <Stack gap="3">
-      {notice ? <InlineAlert status="info">{notice}</InlineAlert> : null}
+      {notice ? <InlineAlert status={noticeTone}>{notice}</InlineAlert> : null}
       {shownError ? <InlineAlert status="error">{shownError}</InlineAlert> : null}
       <Card>
         <Card.Body>
@@ -126,8 +129,8 @@ export function UploadStep({
             borderColor={dragging ? "fg.accent" : "border.strong"}
             borderRadius="card"
             bg={dragging ? "bg.selected" : "bg.subtle"}
-            px="4"
-            py={{ base: "8", md: "10" }}
+            px={{ base: "3", sm: "4" }}
+            py={{ base: "6", md: "10" }}
             onDragOver={(event) => {
               event.preventDefault();
               if (!pending) setDragging(true);
@@ -157,6 +160,7 @@ export function UploadStep({
               <Button
                 variant="solid"
                 colorPalette="brand"
+                width={{ base: "full", sm: "auto" }}
                 loading={pending}
                 loadingText="Reading the statement…"
                 onClick={() => {

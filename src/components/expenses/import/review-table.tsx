@@ -26,14 +26,20 @@ import { IMPORT_DESCRIPTION_MAX_LENGTH } from "@/lib/imports/types";
 /** The merchant rule's note under a car row whose category the database sets. */
 export const RULE_NOTE = "Set by a merchant rule";
 
-function CategorySelects({
+/**
+ * A row's category (and subtype) selects, or its fixed car category when a merchant rule set it.
+ * They stack in the table's narrow column and sit side by side in a phone card.
+ */
+export function CategorySelects({
   item,
   disabled,
   dispatch,
+  layout = "stacked",
 }: {
   item: ReviewRow;
   disabled: boolean;
   dispatch: Dispatch<ReviewAction>;
+  layout?: "stacked" | "inline";
 }) {
   const { row, category, subtype } = item;
   if (row.ruleMatched) {
@@ -46,7 +52,7 @@ function CategorySelects({
   }
   const subtypes = subtypesForCategory(category);
   return (
-    <Stack gap="1">
+    <Flex direction={layout === "inline" ? "row" : "column"} gap={layout === "inline" ? "2" : "1"}>
       <NativeSelect.Root size="sm" disabled={disabled}>
         <NativeSelect.Field
           aria-label={`Category for ${row.description}`}
@@ -76,7 +82,7 @@ function CategorySelects({
           <NativeSelect.Indicator />
         </NativeSelect.Root>
       ) : null}
-    </Stack>
+    </Flex>
   );
 }
 
