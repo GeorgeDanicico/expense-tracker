@@ -77,6 +77,14 @@ export function afterImportChange(mutate: ScopedMutator) {
   void mutate(IMPORTS_API_KEY);
 }
 
+/**
+ * After a draft is uploaded or discarded, which changes the list of recent imports and no expense:
+ * refetches that list only.
+ */
+export function afterImportDraftChange(mutate: ScopedMutator) {
+  void mutate(IMPORTS_API_KEY);
+}
+
 /** Removes the expense from every cached month ledger, then refreshes derived views. */
 export async function afterExpenseDeleted(mutate: ScopedMutator, id: string) {
   await mutate(startsWith("/api/expenses?"), withExpenseRemoved(id), { revalidate: false });

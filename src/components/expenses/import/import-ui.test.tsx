@@ -2,8 +2,13 @@ import { ChakraProvider } from "@chakra-ui/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { SWRConfig } from "swr";
+
 import { restImportApi } from "@/components/expenses/import/import-api";
+import { RecentImports, RecentImportsList } from "@/components/expenses/import/recent-imports";
+import { ReviewCards } from "@/components/expenses/import/review-cards";
 import { addedHeading, ResultView, undoneDescription } from "@/components/expenses/import/result-view";
+import { undoDescription } from "@/components/expenses/import/undo-dialog";
 import { ReviewStep, REOPENED_NOTE, REVIEW_NOTE } from "@/components/expenses/import/review-step";
 import { ReviewTable, RULE_NOTE } from "@/components/expenses/import/review-table";
 import {
@@ -20,6 +25,9 @@ import {
 import { ledgerSystem } from "@/components/ui/theme";
 import { ApiError } from "@/lib/api/client";
 import { importApiUrl, importConfirmApiUrl, importUndoApiUrl, IMPORTS_API_KEY } from "@/lib/api/keys";
+import type { ImportsResponse } from "@/lib/api/keys";
+import type { RecentImport } from "@/lib/imports/repository";
+import { IMPORT_EXPIRED_NOTICE } from "@/lib/imports/recent";
 import { initialReview } from "@/lib/imports/review";
 import type { DraftRow, ImportBatch, ImportDraft } from "@/lib/imports/types";
 import { anExpense } from "@/test/builders";
@@ -158,6 +166,18 @@ describe("restImportApi", () => {
     expect(fetchMock.mock.calls[2][1]?.method).toBe("POST");
   });
 
+  it("treats a draft that was confirmed or undone meanwhile as a 409, since the route answers with the batch alone", async () => {
+    stubFetch(new Response(JSON.stringify({ batch: { ...batch, status: "confirmed" } })));
+    const caught = await restImportApi.getDraft("b1").catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(ApiError);
+    expect(caught).toMatchObject({ status: 409, message: "That import was already confirmed or undone." });
+  });
+
+  it("passes an expired draft's 404 on with the server's message", async () => {
+    stubFetch(new Response(JSON.stringify({ error: "That import wasn't found or has expired." }), { status: 404 }));
+    await expect(restImportApi.getDraft("b1")).rejects.toMatchObject({ status: 404 });
+  });
+
   it("carries a confirm's field errors on the ApiError", async () => {
     stubFetch(new Response(JSON.stringify({ error: "Check the rows and try again.", fieldErrors: { "rows.1.amount": ["Too small."] } }), { status: 422 }));
     const caught = await restImportApi.confirm("b1", []).catch((error: unknown) => error);
@@ -271,6 +291,131 @@ describe("ReviewStep", () => {
   it("disables Add while nothing is ticked", () => {
     const none = { ...draft, rows: draft.rows.map((row) => ({ ...row, importable: false })) };
     expect(render(<ReviewStep {...props} draft={none} />)).toMatch(/<button[^>]*disabled[^>]*>Add expenses<\/button>/);
+  });
+});
+
+describe("UploadStep notices", () => {
+  it("shows an expired draft's notice above the picker, whatever its tone", () => {
+    for (const noticeTone of ["warning", "info"] as const) {
+      const html = render(<UploadStep onFile={noop} pending={false} notice={IMPORT_EXPIRED_NOTICE} noticeTone={noticeTone} />);
+      expect(html.indexOf(IMPORT_EXPIRED_NOTICE)).toBeGreaterThan(-1);
+      expect(html.indexOf(IMPORT_EXPIRED_NOTICE)).toBeLessThan(html.indexOf("Drop a statement here"));
+    }
+    expect(IMPORT_EXPIRED_NOTICE).toBe("This import has expired. Upload the statement again.");
+  });
+});
+
+describe("ReviewCards", () => {
+  const items = initialReview(draft.rows);
+  const html = render(<ReviewCards items={items} accountCurrency="EUR" rowErrors={{}} dispatch={noop} />);
+
+  it("is one card per row, not a table", () => {
+    expect(html).not.toContain("<table");
+    expect(html.match(/<li /g)).toHaveLength(4);
+    expect(html).toContain("Transactions found in the statement");
+  });
+
+  it("has the tick box, the merchant, the amount, the date and the category in each card", () => {
+    expect(html).toContain('aria-label="Add Cafe"');
+    expect(html).toMatch(/<input[^>]*aria-label="Description of Cafe"[^>]*value="Cafe"/);
+    expect(html).toContain("4.50");
+    expect(html).toContain("Oct 12, 2026");
+    expect(html).toContain('aria-label="Category for Cafe"');
+  });
+
+  it("ticks, flags and explains rows the way the table does", () => {
+    const boxes = [...html.matchAll(/<input[^>]*type="checkbox"[^>]*aria-label="Add ([^"]+)"[^>]*>/g)];
+    expect(boxes.map((box) => [box[1], box[0].includes("checked=\"\""), box[0].includes("disabled")])).toEqual([
+      ["Cafe", true, false],
+      ["Lidl Cluj", false, false],
+      ["Foreign shop", false, true],
+      ["OMV 1642", true, false],
+    ]);
+    expect(html).toContain("Possible duplicate");
+    expect(html).toMatch(/Looks like [\s\S]*?<em[^>]*>Lidl, 12 Oct, 45\.20<\/em>/);
+    expect(html).toContain("In RON. Your account is in EUR, so this can&#x27;t be imported.");
+    expect(html).toContain(RULE_NOTE);
+    expect(html).not.toContain('aria-label="Category for OMV 1642"');
+  });
+
+  it("shows a server message under its row, and a blank description on a ticked row", () => {
+    const shown = render(<ReviewCards items={items} accountCurrency="EUR" rowErrors={{ a: "Amount must be greater than zero." }} dispatch={noop} />);
+    expect(shown).toContain("Amount must be greater than zero.");
+    const blank = initialReview([aRow({ id: "x", description: "" })]);
+    expect(render(<ReviewCards items={blank} accountCurrency="EUR" rowErrors={{}} dispatch={noop} />)).toContain("Enter a description.");
+  });
+});
+
+describe("RecentImportsList", () => {
+  const now = new Date("2026-10-29T12:00:00Z");
+  const confirmedBatch: ImportBatch = {
+    ...batch, id: "b2", status: "confirmed", expiresAt: null, confirmedAt: "2026-10-03T09:00:00Z", confirmedCount: 37,
+    createdAt: "2026-10-03T08:00:00Z", rowCount: 37,
+  };
+  const undoneBatch: ImportBatch = { ...confirmedBatch, id: "b3", status: "undone", undoneAt: "2026-10-05T09:00:00Z" };
+  const imports: RecentImport[] = [
+    { batch: { ...batch, rowCount: 37, createdAt: "2026-10-28T17:00:00Z", expiresAt: "2026-10-29T17:00:00Z" }, expenseCount: 0, changedCount: 0 },
+    { batch: confirmedBatch, expenseCount: 37, changedCount: 2 },
+    { batch: undoneBatch, expenseCount: 0, changedCount: 0 },
+  ];
+  const html = render(<RecentImportsList imports={imports} now={now} onResume={noop} onDiscard={noop} onUndo={noop} />);
+  const rows = html.split("<li ").slice(1);
+
+  it("lists a draft with its rows and time left, and Resume and Discard", () => {
+    expect(rows[0]).toContain("Statement of 1 Oct to 31 Oct 2026");
+    expect(rows[0]).toContain("37 rows · uploaded 28 Oct · expires in 5 h");
+    expect(rows[0]).toContain(">Draft<");
+    expect(rows[0]).toMatch(/<button[^>]*aria-label="Resume Statement of 1 Oct to 31 Oct 2026"/);
+    expect(rows[0]).toMatch(/<button[^>]*aria-label="Discard Statement of 1 Oct to 31 Oct 2026"/);
+    expect(rows[0]).not.toContain("Undo");
+  });
+
+  it("lists a confirmed import with its expenses, the day, and Undo", () => {
+    expect(rows[1]).toContain("37 expenses · imported 3 Oct");
+    expect(rows[1]).toContain(">Imported<");
+    expect(rows[1]).toMatch(/<button[^>]*aria-label="Undo Statement of 1 Oct to 31 Oct 2026"/);
+    expect(rows[1]).not.toContain("Resume");
+  });
+
+  it("shows an undone import as such, without a button", () => {
+    expect(rows[2]).toContain("37 expenses · undone 5 Oct");
+    expect(rows[2]).toContain(">Undone<");
+    expect(rows[2]).not.toContain("<button");
+  });
+
+  it("disables the buttons while a request is in flight", () => {
+    const busy = render(<RecentImportsList imports={imports} now={now} disabled onResume={noop} onDiscard={noop} onUndo={noop} />);
+    expect([...busy.matchAll(/<button[^>]*>/g)].every((button) => button[0].includes("disabled"))).toBe(true);
+  });
+});
+
+describe("RecentImports", () => {
+  const confirmedBatch: ImportBatch = {
+    ...batch, id: "b2", status: "confirmed", expiresAt: null, confirmedAt: "2026-10-03T09:00:00Z", confirmedCount: 37,
+  };
+  const withData = (response: ImportsResponse) => render(
+    <SWRConfig value={{ fallback: { [IMPORTS_API_KEY]: response }, revalidateOnMount: false }}>
+      <RecentImports onResume={noop} />
+    </SWRConfig>,
+  );
+
+  it("shows the section with its title when there are imports", () => {
+    const html = withData({ imports: [{ batch: confirmedBatch, expenseCount: 37, changedCount: 2 }] });
+    expect(html).toContain("Recent imports");
+    expect(html).toContain("Your last 20. A draft is kept for 24 hours.");
+    expect(html).toContain("37 expenses");
+  });
+
+  it("shows nothing when there are no imports", () => {
+    expect(withData({ imports: [] })).not.toContain("Recent imports");
+  });
+});
+
+describe("undo dialog wording", () => {
+  it("says the counts and what stays", () => {
+    expect(undoDescription({ expenseCount: 37, changedCount: 2 }, "3 October")).toBe(
+      "This removes 37 expenses you imported on 3 October, 2 of them changed since. Expenses you added yourself stay. The statement can be imported again afterwards.",
+    );
   });
 });
 

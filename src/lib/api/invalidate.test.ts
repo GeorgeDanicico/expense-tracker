@@ -5,6 +5,7 @@ import {
   afterExpenseCreated,
   afterExpenseDeleted,
   afterImportChange,
+  afterImportDraftChange,
   afterFamilyDeleted,
   afterFamilyJoined,
   afterMemberRemoved,
@@ -81,6 +82,13 @@ describe("cache invalidation after mutations", () => {
       [["/api/dashboard?period=1m&granularity=day&date=2026-10-14"], undefined],
       [["/api/imports"], undefined],
     ]);
+  });
+
+  it("afterImportDraftChange refetches only the list of imports", () => {
+    const { mutate, calls } = recorder();
+    afterImportDraftChange(mutate);
+
+    expect(calls.map((call) => [call.keys, call.options])).toEqual([[["/api/imports"], undefined]]);
   });
 
   it("afterExpenseDeleted removes the expense from every month ledger, then refreshes derived views", async () => {

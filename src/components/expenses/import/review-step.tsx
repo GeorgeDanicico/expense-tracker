@@ -5,15 +5,18 @@ import { useReducer, useState } from "react";
 import { useSWRConfig } from "swr";
 
 import { useImportApi } from "@/components/expenses/import/import-api";
+import { ReviewCards } from "@/components/expenses/import/review-cards";
 import { ReviewTable } from "@/components/expenses/import/review-table";
 import { Amount } from "@/components/ui/amount";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Toolbar } from "@/components/ui/toolbar";
 import { useApiForm } from "@/hooks/use-api-form";
+import { useIsPhone } from "@/hooks/use-is-phone";
 import { ApiError } from "@/lib/api/client";
 import { afterImportChange } from "@/lib/api/invalidate";
 import type { ImportConfirmResponse } from "@/lib/api/keys";
+import { discardDescription } from "@/lib/imports/recent";
 import { formatCurrency } from "@/lib/utils/currency";
 import {
   addLabel,
@@ -66,6 +69,8 @@ export function ReviewStep({
   const api = useImportApi();
   const { mutate } = useSWRConfig();
   const form = useApiForm();
+  // Below 768 px each row is a card; the table only scrolled sideways there.
+  const phone = useIsPhone();
   const { batch, rows } = draft;
   const [items, dispatchReview] = useReducer(reviewReducer, rows, initialReview);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
@@ -146,7 +151,11 @@ export function ReviewStep({
         ) : null}
       </Toolbar>
 
-      <ReviewTable items={items} accountCurrency={accountCurrency} rowErrors={rowErrors} dispatch={edit} />
+      {phone ? (
+        <ReviewCards items={items} accountCurrency={accountCurrency} rowErrors={rowErrors} dispatch={edit} />
+      ) : (
+        <ReviewTable items={items} accountCurrency={accountCurrency} rowErrors={rowErrors} dispatch={edit} />
+      )}
 
       <Stack
         gap="3"
@@ -229,7 +238,7 @@ export function ReviewStep({
           if (!form.pending) setDiscarding(next);
         }}
         title="Discard this import?"
-        description={`The ${pluralize(rows.length, "row")} read from the statement are deleted. Nothing is added to your expenses.`}
+        description={discardDescription(rows.length)}
         confirmLabel="Discard"
         onConfirm={discard}
         pending={form.pendingAction === "discard"}

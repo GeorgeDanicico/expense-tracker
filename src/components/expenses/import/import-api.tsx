@@ -2,17 +2,19 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import { apiFetcher, apiRequest } from "@/lib/api/client";
+import { ApiError, apiFetcher, apiRequest } from "@/lib/api/client";
 import {
   IMPORTS_API_KEY,
   importApiUrl,
   importConfirmApiUrl,
   importUndoApiUrl,
   type ImportConfirmResponse,
+  type ImportDetailResponse,
   type ImportUndoResponse,
   type ImportUploadResponse,
 } from "@/lib/api/keys";
 import type { confirmRows } from "@/lib/imports/review";
+import { IMPORT_ALREADY_DONE_NOTICE } from "@/lib/imports/recent";
 import type { ImportDraft } from "@/lib/imports/types";
 
 /** The rows the confirm route takes: the ticked rows with their final values. */
@@ -26,7 +28,11 @@ export type ConfirmRows = ReturnType<typeof confirmRows>;
 export type ImportApi = {
   /** Sends the statement as the raw body with the given `Content-Type` (never multipart). */
   upload(file: File, contentType: string): Promise<ImportUploadResponse>;
-  /** A draft with its rows, duplicate flags and `importable`. */
+  /**
+   * A draft with its rows, duplicate flags and `importable`. Rejects with a 404 `ApiError` for a
+   * draft that is missing or has expired, and a 409 one for an import that was confirmed or undone
+   * (the route answers those with the batch alone).
+   */
   getDraft(id: string): Promise<ImportDraft>;
   confirm(id: string, rows: ConfirmRows): Promise<ImportConfirmResponse>;
   /** Discards a draft. */
@@ -44,8 +50,10 @@ export const restImportApi: ImportApi = {
       headers: { "Content-Type": contentType },
     });
   },
-  getDraft(id) {
-    return apiFetcher<ImportDraft>(importApiUrl(id));
+  async getDraft(id) {
+    const detail = await apiFetcher<ImportDetailResponse>(importApiUrl(id));
+    if (!detail.rows) throw new ApiError(IMPORT_ALREADY_DONE_NOTICE, 409);
+    return { batch: detail.batch, rows: detail.rows };
   },
   confirm(id, rows) {
     return apiRequest<ImportConfirmResponse>(importConfirmApiUrl(id), {

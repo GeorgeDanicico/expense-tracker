@@ -190,3 +190,23 @@ and undo.
 | `import-review-1280-light.jpg`, `import-review-1280-dark.jpg` | The review: the summary line (parser, period, 12 rows, 3 possible duplicates, 1 in another currency, 5 incoming payments skipped), three unticked "Possible duplicate" rows with "Looks like Lidl, 28 Oct, 45.20", the OMV row's Car / Car Fuel shown as fixed ("Set by a merchant rule"), the RON row unticked, disabled and explained, and the sticky footer with the count, the total, Discard and "Add 8 expenses" |
 | `import-confirm-dialog-1280.jpg` | After unticking Netflix and changing Bolt ride to Transport and Cinema City to Entertainment: "Add 7 expenses?" with the count and the total |
 | `import-result-1280-light.jpg`, `import-result-1280-dark.jpg` | The result: "Added 7 expenses", the total, "View October 2026", Undo and "Import another statement" |
+
+## Statement import: recent imports, undo, expiry and phones (import I8)
+
+Captured with headless Chrome (driven over the DevTools protocol) from `/dev/preview/import`: 1280 × 900
+at 1× and 390 × 844 or 390 × 1000 at 2× (the phone captures emulate a touch device). The preview starts
+with a few made-up imports (`src/app/dev/preview/import-fixtures.ts`): a draft with 19 hours left, two
+confirmed imports (the first has 37 expenses, 2 of them "changed since") and an undone one. The Next.js
+dev indicator was removed before each capture. `?draft=<id>` opens a draft directly; the preview
+doesn't know `expired-draft`, so it answers 404, which is what a draft past its 24 hours does. The app
+forces its light theme, so there are no dark captures.
+
+| Image | Shows |
+|---|---|
+| `import-recent-1280.jpg`, `import-recent-390.jpg` | The upload step with **Recent imports** below it: the draft with Resume and Discard ("7 rows · uploaded 29 Oct · expires in 19 h"), two confirmed imports with Undo, and the undone one with no button. At 390 the buttons sit under each row, the upload button is full width, and the page doesn't scroll sideways |
+| `import-undo-dialog-1280.jpg`, `import-undo-dialog-390.jpg` | Undo from the list: "This removes 37 expenses you imported on 3 October, 2 of them changed since." |
+| `import-result-undo-dialog-1280.jpg` | Undo from the result view now asks too, with the count of the expenses just added |
+| `import-expired-1280.jpg`, `import-expired-390.jpg` | A draft opened after its 24 hours (`?draft=expired-draft`): "This import has expired. Upload the statement again." above the upload step, and the list |
+| `import-review-390.jpg` | Resume at 390: one card per row (tick box, merchant, amount and date, then the category), a rule-matched row with its fixed car category, and the sticky footer above the tab bar |
+| `import-review-bottom-390.jpg` | The end of that review: a ticked row, a row in another currency (unticked, disabled, explained) and the footer |
+| `import-review-sample-390.jpg` | The sample statement's review at 390: unticked possible duplicates with "Looks like …", and a rule-matched row |

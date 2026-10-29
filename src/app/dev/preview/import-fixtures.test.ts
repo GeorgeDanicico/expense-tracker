@@ -107,4 +107,78 @@ describe("the import preview API", () => {
   it("exports an API for the page", () => {
     expect(Object.keys(previewImportApi).toSorted()).toEqual(["confirm", "discard", "getDraft", "undo", "upload"]);
   });
+
+  describe("the list of recent imports", () => {
+    async function fresh() {
+      return import("./import-fixtures");
+    }
+
+    it("starts with a draft that expires in 19 hours, two confirmed imports and an undone one", async () => {
+      const { previewRecentImports } = await fresh();
+      const { imports } = previewRecentImports();
+      expect(imports.map((item) => item.batch.status)).toEqual(["draft", "confirmed", "confirmed", "undone"]);
+      // The fake clock keeps running, so allow a few seconds around 18 h 59 min from now.
+      const left = new Date(imports[0].batch.expiresAt!).getTime() - Date.now();
+      expect(Math.abs(left - (18 * 60 + 59) * 60_000)).toBeLessThan(5_000);
+      expect(imports[1]).toMatchObject({ expenseCount: 37, changedCount: 2 });
+      expect(imports[2]).toMatchObject({ expenseCount: 24, changedCount: 0 });
+      expect(imports[3]).toMatchObject({ expenseCount: 0, changedCount: 0 });
+    });
+
+    it("leaves out a draft once its 24 hours are over", async () => {
+      const { previewRecentImports } = await fresh();
+      const later = Date.now() + 20 * 3_600_000;
+      expect(previewRecentImports(later).imports.map((item) => item.batch.status)).toEqual(["confirmed", "confirmed", "undone"]);
+    });
+
+    it("resumes the made-up draft, with its duplicate, rule row and foreign row", async () => {
+      const { previewImportApi: api, PREVIEW_DRAFT_ID } = await fresh();
+      const draft = await api.getDraft(PREVIEW_DRAFT_ID);
+      expect(draft.batch).toMatchObject({ status: "draft", rowCount: 7, skippedCredits: 1 });
+      expect(draft.rows.filter((row) => row.duplicateOf).map((row) => row.description)).toEqual(["Rent"]);
+      expect(draft.rows.find((row) => row.description === "Petrom Floresti")).toMatchObject({ category: "car", ruleMatched: true });
+      expect(draft.rows.find((row) => row.description === "Hotel Zagreb")).toMatchObject({ importable: false });
+    });
+
+    it("discards a listed draft, which then leaves the list and can't be opened", async () => {
+      const { previewImportApi: api, previewRecentImports, PREVIEW_DRAFT_ID } = await fresh();
+      await api.discard(PREVIEW_DRAFT_ID);
+      expect(previewRecentImports().imports.map((item) => item.batch.id)).not.toContain(PREVIEW_DRAFT_ID);
+      await expect(api.getDraft(PREVIEW_DRAFT_ID)).rejects.toMatchObject({ status: 404 });
+    });
+
+    it("answers 404 for an id it doesn't know, which is what an expired draft is, and 409 for an import that is done", async () => {
+      const { previewImportApi: api } = await fresh();
+      await expect(api.getDraft("expired-draft")).rejects.toMatchObject({ status: 404, message: "That import wasn't found or has expired." });
+      await expect(api.getDraft("preview-confirmed-1")).rejects.toMatchObject({ status: 409 });
+    });
+
+    it("undoes a listed import with its count, and shows it as undone without a count", async () => {
+      const { previewImportApi: api, previewRecentImports } = await fresh();
+      await expect(api.undo("preview-confirmed-1")).resolves.toMatchObject({ removed: 37, batch: { status: "undone" } });
+      const undone = previewRecentImports().imports.find((item) => item.batch.id === "preview-confirmed-1")!;
+      expect(undone).toMatchObject({ expenseCount: 0, batch: { status: "undone" } });
+      await expect(api.undo("preview-confirmed-1")).rejects.toMatchObject({ status: 409 });
+      await expect(api.undo("preview-undone")).rejects.toMatchObject({ status: 409 });
+    });
+
+    it("lists a new draft first, then the confirmed import with its count, and undo leaves the expenses as they were", async () => {
+      const { previewImportApi: api, previewRecentImports, previewExpenses } = await fresh();
+      const before = previewExpenses().map((expense) => expense.id);
+
+      const { batch } = await api.upload(sample(), "text/csv");
+      expect(previewRecentImports().imports[0].batch.id).toBe(batch.id);
+
+      const draft = await api.getDraft(batch.id);
+      await api.confirm(batch.id, confirmRows(initialReview(draft.rows)));
+      expect(previewExpenses()).toHaveLength(before.length + 8);
+      expect(previewRecentImports().imports.find((item) => item.batch.id === batch.id))
+        .toMatchObject({ expenseCount: 8, changedCount: 0, batch: { status: "confirmed" } });
+
+      await expect(api.undo(batch.id)).resolves.toMatchObject({ removed: 8 });
+      expect(previewExpenses().map((expense) => expense.id)).toEqual(before);
+      expect(previewRecentImports().imports.find((item) => item.batch.id === batch.id))
+        .toMatchObject({ expenseCount: 0, batch: { status: "undone" } });
+    });
+  });
 });

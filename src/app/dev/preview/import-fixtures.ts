@@ -3,10 +3,12 @@ import { ApiError } from "@/lib/api/client";
 import { addDays, getBucharestToday } from "@/lib/calendar";
 import { subtypeForCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
 import type { Expense } from "@/lib/expenses/types";
+import type { ImportsResponse } from "@/lib/api/keys";
 import { decodeStatementText } from "@/lib/imports/decode";
 import { flagDuplicates } from "@/lib/imports/duplicates";
 import { parseStatement } from "@/lib/imports/parser";
 import { maskAccountNumbers } from "@/lib/imports/redact";
+import type { RecentImport } from "@/lib/imports/repository";
 import {
   ImportError,
   type DraftRow,
@@ -26,6 +28,12 @@ import { confirmImportSchema } from "@/lib/validation/import";
 // matches the sample expenses (three of its rows are possible duplicates), has a row in RON
 // (the preview account is in EUR), a fuel station the merchant rule knows, and four incoming
 // payments; the preview page offers it as a download.
+//
+// The list of recent imports starts with a few made-up ones (a draft with 19 hours left that can be
+// resumed, two confirmed imports, one of which has 2 expenses "edited since", and an undone one), so
+// resume, discard and undo can be tried without uploading anything first. Their expenses aren't in
+// the sample expenses below: undoing one reports its count and changes nothing. `?draft=<id>` opens
+// a draft directly; an id the preview doesn't know is a 404, which is what an expired draft is.
 
 /** The preview account's currency (see `fixtures.ts`). */
 const ACCOUNT_CURRENCY = "EUR";
@@ -80,10 +88,107 @@ function merchantRule(description: string): ExpenseSubtype | null {
 }
 
 type StoredRow = Omit<DraftRow, "duplicateOf" | "importable">;
-type StoredImport = { batch: ImportBatch; rows: StoredRow[]; hash: string; created: string[] };
+type StoredImport = {
+  batch: ImportBatch;
+  rows: StoredRow[];
+  hash: string;
+  created: string[];
+  /** A made-up import from the start: its expenses aren't in `expenses()`, only counted. */
+  seeded?: { expenseCount: number; changedCount: number };
+};
 
-const imports = new Map<string, StoredImport>();
+let store: Map<string, StoredImport> | null = null;
 let saved: Expense[] | null = null;
+
+/** The id of the draft the list starts with. */
+export const PREVIEW_DRAFT_ID = "preview-draft";
+
+const SEED_DRAFT_ROWS: SampleRow[] = [
+  [22, "Mega Image Brasov 0412", -32.15, ACCOUNT_CURRENCY],
+  [21, "Petrom Floresti", -58, ACCOUNT_CURRENCY],
+  [20, "Rent", -950, ACCOUNT_CURRENCY],
+  [19, "Spotify", -9.99, ACCOUNT_CURRENCY],
+  [18, "Decathlon Cluj", -129.9, ACCOUNT_CURRENCY],
+  [17, "Hotel Zagreb", -420, "RON"],
+  [16, "Salary", 2500, ACCOUNT_CURRENCY],
+  [15, "Pharmacy Catena", -23.4, ACCOUNT_CURRENCY],
+];
+
+const DAY = 86_400_000;
+
+function seededBatch(overrides: Partial<ImportBatch> & Pick<ImportBatch, "id" | "status" | "createdAt">): ImportBatch {
+  return {
+    sourceKind: "csv",
+    parserId: "generic-csv",
+    currency: ACCOUNT_CURRENCY,
+    periodStart: null,
+    periodEnd: null,
+    rowCount: 1,
+    skippedCredits: 0,
+    expiresAt: null,
+    confirmedAt: null,
+    confirmedCount: null,
+    undoneAt: null,
+    ...overrides,
+  };
+}
+
+/** The made-up recent imports, dated back from now so they always look recent. */
+function seedImports(now = Date.now(), today = getBucharestToday()): Map<string, StoredImport> {
+  const map = new Map<string, StoredImport>();
+
+  const text = SEED_DRAFT_ROWS.map(([daysAgo, description, amount, currency]) =>
+    `${addDays(today, -daysAgo)},${description},${amount.toFixed(2)},${currency}`);
+  const draft = previewDraft(new TextEncoder().encode(["Date,Description,Amount,Currency", ...text].join("\n")));
+  // A minute over five hours, so the list reads "expires in 19 h" however soon it is looked at.
+  const created = now - (5 * 60 + 1) * 60_000;
+  map.set(PREVIEW_DRAFT_ID, {
+    batch: seededBatch({
+      id: PREVIEW_DRAFT_ID,
+      status: "draft",
+      createdAt: new Date(created).toISOString(),
+      expiresAt: new Date(created + 24 * 3_600_000).toISOString(),
+      periodStart: draft.periodStart,
+      periodEnd: draft.periodEnd,
+      rowCount: draft.rows.length,
+      skippedCredits: draft.skippedCredits,
+    }),
+    rows: draftRows(draft.rows),
+    hash: draft.hash,
+    created: [],
+  });
+
+  const month = (id: string, daysAgo: number, count: number, changed: number, status: "confirmed" | "undone") => {
+    const at = new Date(now - daysAgo * DAY).toISOString();
+    map.set(id, {
+      batch: seededBatch({
+        id,
+        status,
+        createdAt: at,
+        confirmedAt: at,
+        confirmedCount: count,
+        rowCount: count,
+        periodStart: addDays(today, -daysAgo - 31),
+        periodEnd: addDays(today, -daysAgo - 1),
+        undoneAt: status === "undone" ? new Date(now - (daysAgo - 2) * DAY).toISOString() : null,
+      }),
+      rows: [],
+      hash: id,
+      created: [],
+      seeded: status === "confirmed" ? { expenseCount: count, changedCount: changed } : undefined,
+    });
+  };
+  month("preview-confirmed-1", 26, 37, 2, "confirmed");
+  month("preview-confirmed-2", 58, 24, 0, "confirmed");
+  month("preview-undone", 85, 19, 0, "undone");
+  return map;
+}
+
+/** The imports, made up on first use. */
+function imports(): Map<string, StoredImport> {
+  store ??= seedImports();
+  return store;
+}
 
 function expenses(): Expense[] {
   saved ??= seedExpenses();
@@ -126,12 +231,31 @@ function previewDraft(bytes: Uint8Array) {
   };
 }
 
+/** The stored rows of a draft: the merchant rule's suggestion on each, as `create_import_batch` sets it. */
+function draftRows(rows: ReturnType<typeof previewDraft>["rows"]): StoredRow[] {
+  return rows.map((row, index) => {
+    const subtype = merchantRule(row.description);
+    return {
+      id: crypto.randomUUID(),
+      position: index + 1,
+      expenseDate: row.expense_date,
+      description: row.description,
+      amount: row.amount,
+      currency: row.currency,
+      category: subtype ? "car" : "other",
+      subtype,
+      ruleMatched: subtype !== null,
+      notes: row.notes ?? null,
+    };
+  });
+}
+
 function importDay(iso: string) {
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long" }).format(new Date(iso));
 }
 
 function liveDraft(id: string): StoredImport {
-  const stored = imports.get(id);
+  const stored = imports().get(id);
   if (!stored) throw notFound();
   if (stored.batch.status !== "draft") throw new ApiError("That import was already confirmed or undone.", 409);
   return stored;
@@ -179,7 +303,7 @@ export const previewImportApi: ImportApi = {
       throw caught;
     }
 
-    const same = [...imports.values()].find(
+    const same = [...imports().values()].find(
       (stored) => stored.hash === draft.hash && stored.batch.status !== "undone",
     );
     if (same?.batch.status === "draft") return { batch: same.batch, reopened: true, warnings: [] };
@@ -208,22 +332,8 @@ export const previewImportApi: ImportApi = {
       confirmedCount: null,
       undoneAt: null,
     };
-    const rows = draft.rows.map((row, index): StoredRow => {
-      const subtype = merchantRule(row.description);
-      return {
-        id: crypto.randomUUID(),
-        position: index + 1,
-        expenseDate: row.expense_date,
-        description: row.description,
-        amount: row.amount,
-        currency: row.currency,
-        category: subtype ? "car" : "other",
-        subtype,
-        ruleMatched: subtype !== null,
-        notes: row.notes ?? null,
-      };
-    });
-    imports.set(id, { batch, rows, hash: draft.hash, created: [] });
+    const rows = draftRows(draft.rows);
+    imports().set(id, { batch, rows, hash: draft.hash, created: [] });
     return { batch, reopened: false, warnings: draft.warnings };
   },
 
@@ -260,25 +370,50 @@ export const previewImportApi: ImportApi = {
       confirmedAt: new Date().toISOString(),
       confirmedCount: created.length,
     };
-    imports.set(id, { ...stored, batch, created: created.map((expense) => expense.id) });
+    imports().set(id, { ...stored, batch, created: created.map((expense) => expense.id) });
     return { batch, created };
   },
 
   async discard(id) {
     await refuseWrites();
     liveDraft(id);
-    imports.delete(id);
+    imports().delete(id);
   },
 
   async undo(id) {
     await refuseWrites();
-    const stored = imports.get(id);
+    const stored = imports().get(id);
     if (!stored) throw notFound();
     if (stored.batch.status !== "confirmed") throw new ApiError("Only a confirmed import can be undone.", 409);
-    const removed = stored.created.length;
+    const removed = stored.seeded?.expenseCount ?? stored.created.length;
     saved = expenses().filter((expense) => !stored.created.includes(expense.id));
     const batch: ImportBatch = { ...stored.batch, status: "undone", undoneAt: new Date().toISOString() };
-    imports.set(id, { ...stored, batch, created: [] });
+    imports().set(id, { ...stored, batch, created: [], seeded: undefined });
     return { batch, removed };
   },
 };
+
+/**
+ * What `GET /api/imports` answers in the preview: live drafts first, then the confirmed and undone
+ * imports, newest first, at most 20, each with how many of its expenses still exist.
+ */
+export function previewRecentImports(now = Date.now()): ImportsResponse {
+  const list = [...imports().values()]
+    .filter((item) => item.batch.status !== "draft" || new Date(item.batch.expiresAt ?? 0).getTime() > now)
+    .map((item): RecentImport => ({
+      batch: item.batch,
+      expenseCount: item.batch.status === "confirmed" ? item.seeded?.expenseCount ?? item.created.length : 0,
+      changedCount: item.batch.status === "confirmed" ? item.seeded?.changedCount ?? 0 : 0,
+    }));
+  const rank = (item: RecentImport) => (item.batch.status === "draft" ? 0 : 1);
+  return {
+    imports: list
+      .toSorted((a, b) => rank(a) - rank(b) || b.batch.createdAt.localeCompare(a.batch.createdAt))
+      .slice(0, 20),
+  };
+}
+
+/** The expenses the preview has saved (the sample ones plus what imports created), for the tests. */
+export function previewExpenses(): readonly Expense[] {
+  return expenses();
+}
