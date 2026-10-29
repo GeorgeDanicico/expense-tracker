@@ -196,6 +196,88 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["family_members"]["Insert"]>;
         Relationships: [];
       };
+      import_batches: {
+        Row: {
+          confirmed_at: string | null;
+          confirmed_count: number | null;
+          content_hash: string;
+          created_at: string;
+          currency: string | null;
+          expires_at: string | null;
+          id: string;
+          parser_id: string;
+          period_end: string | null;
+          period_start: string | null;
+          row_count: number;
+          skipped_credits: number;
+          source_kind: string;
+          status: string;
+          undone_at: string | null;
+          user_id: string;
+        };
+        Insert: {
+          confirmed_at?: string | null;
+          confirmed_count?: number | null;
+          content_hash: string;
+          created_at?: string;
+          currency?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          parser_id: string;
+          period_end?: string | null;
+          period_start?: string | null;
+          row_count: number;
+          skipped_credits?: number;
+          source_kind: string;
+          status?: string;
+          undone_at?: string | null;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["import_batches"]["Insert"]>;
+        Relationships: [];
+      };
+      import_expenses: {
+        Row: {
+          batch_id: string;
+          expense_id: string;
+        };
+        Insert: {
+          batch_id: string;
+          expense_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["import_expenses"]["Insert"]>;
+        Relationships: [];
+      };
+      import_rows: {
+        Row: {
+          amount: number;
+          batch_id: string;
+          category: string;
+          currency: string;
+          description: string;
+          expense_date: string;
+          id: string;
+          notes: string | null;
+          position: number;
+          rule_matched: boolean;
+          subtype: string | null;
+        };
+        Insert: {
+          amount: number;
+          batch_id: string;
+          category?: string;
+          currency: string;
+          description: string;
+          expense_date: string;
+          id?: string;
+          notes?: string | null;
+          position: number;
+          rule_matched?: boolean;
+          subtype?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["import_rows"]["Insert"]>;
+        Relationships: [];
+      };
       member_permissions: {
         Row: {
           level: string;
@@ -643,6 +725,18 @@ export type Database = {
         Args: never;
         Returns: undefined;
       };
+      confirm_import_batch: {
+        Args: { p_batch_id: string; p_rows: Json };
+        Returns: {
+          amount: number;
+          category: string;
+          description: string;
+          expense_date: string;
+          id: string;
+          notes: string | null;
+          subtype: string | null;
+        }[];
+      };
       create_calendar_events: {
         Args: { p_member_ids: string[]; p_rows: Json };
         Returns: Database["public"]["Tables"]["calendar_events"]["Row"][];
@@ -673,6 +767,10 @@ export type Database = {
           expires_at: string;
           invite_id: string;
         }[];
+      };
+      create_import_batch: {
+        Args: { p_batch: Json; p_rows: Json };
+        Returns: string;
       };
       create_mcp_token: {
         Args: {
@@ -772,6 +870,10 @@ export type Database = {
           role: string;
         }[];
       };
+      purge_expired_import_batches: {
+        Args: never;
+        Returns: number;
+      };
       redeem_family_invite: {
         Args: { p_code_hash: string };
         Returns: string;
@@ -845,6 +947,10 @@ export type Database = {
       touch_last_active: {
         Args: never;
         Returns: undefined;
+      };
+      undo_import_batch: {
+        Args: { p_batch_id: string };
+        Returns: number;
       };
       update_calendar_events: {
         Args: { p_member_ids: string[] | null; p_rows: Json };
