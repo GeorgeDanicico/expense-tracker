@@ -1,0 +1,10 @@
+{
+  "parserId": "generic-csv",
+  "currency": "RON",
+  "periodStart": "2026-09-08",
+  "periodEnd": "2026-09-09",
+  "rows": [
+    { "expenseDate": "2026-09-08", "description": "Transfer to RO00 FAKE 0000 0000 0000 0001 rent", "amount": 500, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-09", "description": "Ref 000000000000 insurance", "amount": 75, "currency": "RON", "direction": "debit" }
+  ]
+}

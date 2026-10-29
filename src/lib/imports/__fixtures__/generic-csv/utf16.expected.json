@@ -1,0 +1,10 @@
+{
+  "parserId": "generic-csv",
+  "currency": "EUR",
+  "periodStart": "2026-09-12",
+  "periodEnd": "2026-09-13",
+  "rows": [
+    { "expenseDate": "2026-09-12", "description": "Café Müller", "amount": 14.8, "currency": "EUR", "direction": "debit" },
+    { "expenseDate": "2026-09-13", "description": "Bäckerei Süd", "amount": 3.4, "currency": "EUR", "direction": "debit" }
+  ]
+}

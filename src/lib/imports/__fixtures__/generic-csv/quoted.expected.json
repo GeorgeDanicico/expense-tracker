@@ -1,0 +1,11 @@
+{
+  "parserId": "generic-csv",
+  "currency": "EUR",
+  "periodStart": "2026-09-04",
+  "periodEnd": "2026-09-06",
+  "rows": [
+    { "expenseDate": "2026-09-04", "description": "Shop, with a comma", "amount": 10, "currency": "EUR", "direction": "debit" },
+    { "expenseDate": "2026-09-05", "description": "He said \"hello\"", "amount": 5.5, "currency": "EUR", "direction": "debit" },
+    { "expenseDate": "2026-09-06", "description": "Two lines second line", "amount": 7, "currency": "EUR", "direction": "debit" }
+  ]
+}

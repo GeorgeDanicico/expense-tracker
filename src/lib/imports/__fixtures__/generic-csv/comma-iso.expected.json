@@ -1,0 +1,13 @@
+{
+  "parserId": "generic-csv",
+  "currency": "RON",
+  "periodStart": "2026-09-01",
+  "periodEnd": "2026-09-30",
+  "rows": [
+    { "expenseDate": "2026-09-01", "description": "Corner Cafe", "amount": 4.5, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-02", "description": "Fresh Market", "amount": 123.4, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-03", "description": "Salary September", "amount": 2500, "currency": "RON", "direction": "credit" },
+    { "expenseDate": "2026-09-05", "description": "Fuel Station 12", "amount": 210, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-30", "description": "Pharmacy Green", "amount": 37.25, "currency": "RON", "direction": "debit" }
+  ]
+}
