@@ -223,6 +223,28 @@ describe("Supabase worker store", () => {
       expect(tables.notifications.map((row) => row.id)).toEqual(["old-failed", "old-pending", "new-sent"]);
     });
   });
+  describe("purgeExpiredImportBatches", () => {
+    it("calls purge_expired_import_batches with no arguments and returns the count", async () => {
+      const { rpcs } = useDatabase({}, { rpc: () => ({ data: 5, error: null }) });
+
+      expect(await createSupabaseWorkerStore().purgeExpiredImportBatches()).toBe(5);
+      expect(rpcs).toEqual([{ fn: "purge_expired_import_batches", args: {} }]);
+    });
+
+    it("counts none when the function answers nothing", async () => {
+      useDatabase({}, { rpc: () => ({ data: null, error: null }) });
+
+      expect(await createSupabaseWorkerStore().purgeExpiredImportBatches()).toBe(0);
+    });
+
+    it("throws with the database's message", async () => {
+      useDatabase({}, { rpc: () => ({ data: null, error: { message: "permission denied for function purge_expired_import_batches" } }) });
+
+      await expect(createSupabaseWorkerStore().purgeExpiredImportBatches())
+        .rejects.toThrow("Unable to purge expired import drafts: permission denied for function purge_expired_import_batches");
+    });
+  });
+
   describe("claimDueReminders", () => {
     const row = {
       id: "r1", user_id: "u1", title: "Pay rent", notes: "", starts_on: "2026-10-31", time_of_day: "09:00:00",

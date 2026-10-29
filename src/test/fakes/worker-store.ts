@@ -66,7 +66,7 @@ const LEASE_MS = 2 * 60_000;
  * `useCalendar` shares a `FakeCalendarRepository`'s events with the worker, so the calendar service
  * writes them (`notify_at`, `notified_at`) and `claimDueCalendarEvents` leases them like
  * `claim_due_calendar_events`; `eventAdded` queues the row the attendee trigger inserts.
- * `failWith` makes every call reject with that error; `beforeAdvance` runs inside
+ * `expiredImportDrafts` is what the import-draft purge deletes and returns. `failWith` makes every call reject with that error; `beforeAdvance` runs inside
  * `advanceReminder` before it checks the reminder (an edit racing the worker, or a crash), and
  * `beforeMarkEvent` does the same in `markEventNotified`.
  */
@@ -79,6 +79,12 @@ export class FakeWorkerStore implements WorkerStore {
   devices: FakeDevice[] = [];
   /** Cut-offs `deleteOldNotifications` was called with. */
   cleanups: Date[] = [];
+  /** How many expired import drafts the database holds; `purgeExpiredImportBatches` returns it and empties it. */
+  expiredImportDrafts = 0;
+  /** How many times `purgeExpiredImportBatches` was called. */
+  importPurges = 0;
+  /** Makes only `purgeExpiredImportBatches` reject (the function missing, or a database error). */
+  failPurgeWith: Error | null = null;
   reminders: FakeReminder[] = [];
   todos: FakeTodo[] = [];
   /** Dates `listOpenTodosDueOn` was called with. */
@@ -426,5 +432,14 @@ export class FakeWorkerStore implements WorkerStore {
     const deleted = this.notifications.length - kept.length;
     this.notifications = kept;
     return deleted;
+  }
+
+  async purgeExpiredImportBatches() {
+    this.check();
+    this.importPurges++;
+    if (this.failPurgeWith) throw this.failPurgeWith;
+    const purged = this.expiredImportDrafts;
+    this.expiredImportDrafts = 0;
+    return purged;
   }
 }

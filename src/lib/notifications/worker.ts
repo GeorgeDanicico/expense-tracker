@@ -38,7 +38,11 @@ export const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000] as const;
 
 /** `sent` and `skipped` rows older than this are deleted, once a day. */
 export const NOTIFICATION_RETENTION_MS = 30 * 24 * 60 * 60_000;
-/** How often the clean-up runs: on the first tick, then every 24 hours. */
+/**
+ * How often each clean-up step runs: on the first tick, then every 24 hours. The purge of expired
+ * statement-import drafts keeps its own clock, so a failing step is retried next tick without
+ * repeating the other.
+ */
 export const CLEANUP_INTERVAL_MS = 24 * 60 * 60_000;
 
 /**
@@ -71,12 +75,14 @@ export interface WorkerLog {
  */
 export type WorkerState = {
   lastCleanupAt: Date | null;
+  /** When the expired import drafts were last purged. */
+  lastImportPurgeAt: Date | null;
   /** The Bucharest date whose "Due today" to-do notifications were all queued. */
   lastTodoDueOn: string | null;
 };
 
 export function createWorkerState(): WorkerState {
-  return { lastCleanupAt: null, lastTodoDueOn: null };
+  return { lastCleanupAt: null, lastImportPurgeAt: null, lastTodoDueOn: null };
 }
 
 export type TickDependencies = {
@@ -145,6 +151,8 @@ export type TickResult =
       events: EventCounts;
       delivery: DeliveryCounts;
       cleaned: number | null;
+      /** Expired import drafts deleted, or null on a tick that didn't purge or whose purge failed. */
+      importsPurged: number | null;
       /** Null on every tick but the one that ran the day's "Due today" notifications. */
       todosDue: TodoDueCounts | null;
     }
@@ -433,7 +441,7 @@ async function queueDueTodos({ store, clock, log, state }: TickDependencies): Pr
 }
 
 /** Deletes old `sent` and `skipped` rows on the first tick and then once every 24 hours. */
-async function cleanUp({ store, clock, log, state }: TickDependencies): Promise<number | null> {
+async function cleanUpNotifications({ store, clock, log, state }: TickDependencies): Promise<number | null> {
   const now = clock.now();
   if (state.lastCleanupAt && now.getTime() - state.lastCleanupAt.getTime() < CLEANUP_INTERVAL_MS) return null;
   try {
@@ -449,7 +457,30 @@ async function cleanUp({ store, clock, log, state }: TickDependencies): Promise<
 }
 
 /**
- * One pass of the worker: the heartbeat, the daily clean-up, the daily "Due today" to-do rows
+ * Deletes the expired statement-import drafts of every user (`purge_expired_import_batches`) on
+ * the first tick and then once every 24 hours. Drafts expire after 24 hours and every read already
+ * treats an expired one as missing, so this only frees the rows. A failure (the function is missing
+ * until the import migration is applied, or the database errors) is logged and tried again next
+ * tick; it never stops the rest of the tick. The log carries the count of drafts and nothing from
+ * them, and an error's message is the database's, never a row.
+ */
+async function purgeImportDrafts({ store, clock, log, state }: TickDependencies): Promise<number | null> {
+  const now = clock.now();
+  if (state.lastImportPurgeAt && now.getTime() - state.lastImportPurgeAt.getTime() < CLEANUP_INTERVAL_MS) return null;
+  try {
+    const purged = await store.purgeExpiredImportBatches();
+    state.lastImportPurgeAt = now;
+    log.info("import_drafts_purged", { purged });
+    return purged;
+  } catch (error) {
+    log.error("import_drafts_purge_failed", { error: errorMessage(error) });
+    return null;
+  }
+}
+
+/**
+ * One pass of the worker: the heartbeat, the daily clean-up (old outbox rows, expired import
+ * drafts), the daily "Due today" to-do rows
  * (from 09:00 Bucharest), up to {@link REMINDER_BATCH} due
  * reminders queued as outbox rows, up to {@link EVENT_BATCH} due calendar events queued as one
  * outbox row per attendee, then up to {@link NOTIFICATION_BATCH} outbox rows sent to every
@@ -475,7 +506,8 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
       return { pushConfigured: false, due };
     }
 
-    const cleaned = await cleanUp(deps);
+    const cleaned = await cleanUpNotifications(deps);
+    const importsPurged = await purgeImportDrafts(deps);
     const todosDue = await queueDueTodos(deps);
     const reminders = await queueDueReminders(deps);
     const events = await queueDueEvents(deps);
@@ -492,7 +524,7 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
       eventsChanged: events.changed,
       ms: clock.now().getTime() - startedAt.getTime(),
     });
-    return { pushConfigured: true, reminders, events, delivery, cleaned, todosDue };
+    return { pushConfigured: true, reminders, events, delivery, cleaned, importsPurged, todosDue };
   } catch (error) {
     log.error("tick_failed", { error: errorMessage(error), ms: clock.now().getTime() - startedAt.getTime() });
     return null;
