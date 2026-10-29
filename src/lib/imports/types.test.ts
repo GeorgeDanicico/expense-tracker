@@ -51,7 +51,8 @@ describe("import errors", () => {
 
   it("map the refusals to their HTTP statuses", () => {
     expect(new ImportError("unsupported_type").status).toBe(415);
-    expect(new ImportError("pdf_not_supported").status).toBe(415);
+    expect(new ImportError("encrypted_pdf").status).toBe(422);
+    expect(new ImportError("no_text").status).toBe(422);
     expect(new ImportError("file_too_large").status).toBe(413);
     expect(new ImportError("already_imported").status).toBe(409);
     expect(new ImportError("rate_limited").status).toBe(429);

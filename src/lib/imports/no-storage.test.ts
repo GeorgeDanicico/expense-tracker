@@ -38,6 +38,7 @@ describe("the import code never writes a statement anywhere", () => {
     expect(files.some((file) => file.endsWith("pipeline.ts"))).toBe(true);
     expect(files.some((file) => file.endsWith("upload.ts"))).toBe(true);
     expect(files.some((file) => file.endsWith("generic-csv.ts"))).toBe(true);
+    expect(files.some((file) => file.endsWith("pdf-text.ts"))).toBe(true);
     expect(files.some((file) => file.endsWith(".test.ts"))).toBe(false);
   });
 

@@ -1,6 +1,7 @@
 import { decodeStatementText } from "@/lib/imports/decode";
 import { statementHash } from "@/lib/imports/hash";
 import { parseStatement } from "@/lib/imports/parser";
+import { extractPdfText } from "@/lib/imports/pdf-text";
 import { maskAccountNumbers } from "@/lib/imports/redact";
 import {
   IMPORT_CURRENCY_PATTERN,
@@ -82,25 +83,34 @@ function statementCurrency(parsed: ParsedStatement, debits: readonly ParsedRow[]
   return currencies.size === 1 ? [...currencies][0] : null;
 }
 
-function parse(kind: ImportSourceKind, bytes: Uint8Array): ParsedStatement {
-  // Task I12 adds the PDF reader and replaces this refusal.
-  if (kind === "pdf") throw new ImportError("pdf_not_supported");
+async function parse(kind: ImportSourceKind, bytes: Uint8Array): Promise<ParsedStatement> {
+  if (kind === "pdf") {
+    const pages = await extractPdfText(bytes);
+    return parseStatement({ kind: "pdf", text: pages.flat().join("\n"), pages });
+  }
   return parseStatement({ kind: "csv", text: decodeStatementText(bytes) });
 }
 
 /**
- * Parses an upload into a draft: decodes the text, finds a parser (`unrecognised_layout` when none
+ * Parses an upload into a draft: decodes the text (a PDF's text is read by `extractPdfText`, which
+ * refuses a protected, scanned or over-long PDF), finds a parser (`unrecognised_layout` when none
  * claims it), keeps the debits and counts the credits, masks IBAN- and card-number-shaped text in
  * each description and moves anything past 120 characters to the row's notes, then refuses a
  * statement with no debits (`no_debits`) or more than 500 of them (`too_many_rows`) and hashes the
- * rows. A PDF is refused (`pdf_not_supported`, 415) until I12.
+ * rows.
  *
  * The hash covers the masked descriptions, so an account number never reaches it.
  */
-export function buildDraft({ kind, bytes }: { kind: ImportSourceKind; bytes: Uint8Array }): StatementDraft {
+export async function buildDraft({
+  kind,
+  bytes,
+}: {
+  kind: ImportSourceKind;
+  bytes: Uint8Array;
+}): Promise<StatementDraft> {
   let parsed: ParsedStatement;
   try {
-    parsed = parse(kind, bytes);
+    parsed = await parse(kind, bytes);
   } catch (error) {
     if (error instanceof ImportError) throw error;
     // Whatever went wrong may mention the file; say only that it couldn't be read.

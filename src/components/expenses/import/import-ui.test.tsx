@@ -15,7 +15,6 @@ import {
   DISCARD_NOTE,
   EMPTY_STATEMENT_FILE,
   NOT_A_STATEMENT_FILE,
-  PDF_COMING_SOON,
   statementContentType,
   statementKind,
   UploadStep,
@@ -91,12 +90,14 @@ describe("statement files", () => {
     expect(statementContentType("pdf")).toBe("application/pdf");
   });
 
-  it("accepts a CSV up to 2 MB and refuses everything else before any request", () => {
+  it("accepts a CSV up to 2 MB and a PDF up to 5 MB, and refuses everything else before any request", () => {
     expect(validateStatementFile(file("a.csv", 2 * 1024 * 1024))).toBeNull();
     expect(validateStatementFile(file("a.csv", 2 * 1024 * 1024 + 1))).toBe("Choose a statement under 2 MB.");
     expect(validateStatementFile(file("a.csv", 0))).toBe(EMPTY_STATEMENT_FILE);
     expect(validateStatementFile(file("a.xlsx"))).toBe(NOT_A_STATEMENT_FILE);
-    expect(validateStatementFile(file("a.pdf"))).toBe(PDF_COMING_SOON);
+    expect(validateStatementFile(file("a.pdf", 5 * 1024 * 1024))).toBeNull();
+    expect(validateStatementFile(file("a.pdf", 5 * 1024 * 1024 + 1))).toBe("Choose a statement under 5 MB.");
+    expect(validateStatementFile(file("a.pdf", 0))).toBe(EMPTY_STATEMENT_FILE);
   });
 
   it("shows the server's own message for a refused upload", () => {
@@ -187,14 +188,15 @@ describe("restImportApi", () => {
 });
 
 describe("UploadStep", () => {
-  it("offers a picker for a CSV, names PDFs as coming soon and says the file is discarded", () => {
+  it("offers a picker for a CSV or a PDF and says the file is discarded", () => {
     const html = render(<UploadStep onFile={noop} pending={false} />);
     expect(html).toContain("Drop a statement here");
     expect(html).toContain("Choose a file");
-    expect(html).toContain("PDF statements are coming soon.");
+    expect(html).toContain("or a PDF statement with");
+    expect(html).not.toContain("coming soon");
     expect(html).toContain(DISCARD_NOTE);
     expect(DISCARD_NOTE).toBe("The file is read and discarded. Only the rows below are kept, for 24 hours.");
-    expect(html).toMatch(/<input[^>]*type="file"[^>]*accept="\.csv"/);
+    expect(html).toMatch(/<input[^>]*type="file"[^>]*accept="\.csv,\.pdf"/);
   });
 
   it("shows why the last upload was refused, and a notice", () => {

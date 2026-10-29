@@ -186,7 +186,7 @@ and undo.
 
 | Image | Shows |
 |---|---|
-| `import-upload-1280-light.jpg`, `import-upload-1280-dark.jpg` | The upload step: the drop zone with "Choose a file", PDFs named as coming soon, and "The file is read and discarded. Only the rows below are kept, for 24 hours." |
+| `import-upload-1280-light.jpg`, `import-upload-1280-dark.jpg` | The upload step: the drop zone with "Choose a file", PDFs named as coming soon (captured before I12; the line now offers a PDF statement with selectable text, up to 5 MB), and "The file is read and discarded. Only the rows below are kept, for 24 hours." |
 | `import-review-1280-light.jpg`, `import-review-1280-dark.jpg` | The review: the summary line (parser, period, 12 rows, 3 possible duplicates, 1 in another currency, 5 incoming payments skipped), three unticked "Possible duplicate" rows with "Looks like Lidl, 28 Oct, 45.20", the OMV row's Car / Car Fuel shown as fixed ("Set by a merchant rule"), the RON row unticked, disabled and explained, and the sticky footer with the count, the total, Discard and "Add 8 expenses" |
 | `import-confirm-dialog-1280.jpg` | After unticking Netflix and changing Bolt ride to Transport and Cinema City to Entertainment: "Add 7 expenses?" with the count and the total |
 | `import-result-1280-light.jpg`, `import-result-1280-dark.jpg` | The result: "Added 7 expenses", the total, "View October 2026", Undo and "Import another statement" |

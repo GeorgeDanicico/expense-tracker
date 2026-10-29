@@ -2,8 +2,8 @@ import { genericCsvParser } from "@/lib/imports/parsers/generic-csv";
 import { ImportError, type ImportSourceKind, type ParsedStatement } from "@/lib/imports/types";
 
 /**
- * What a parser reads. A CSV is its decoded text; a PDF is its text as pages of lines (filled by
- * the PDF reader of task I12, which doesn't exist yet).
+ * What a parser reads. A CSV is its decoded text; a PDF is its text (`text`) and the same text as pages of
+ * lines (`pages`), as `extractPdfText` returns them: a table row's columns are separated by a tab.
  */
 export type StatementSource =
   | { kind: "csv"; text: string }
