@@ -8,6 +8,10 @@ import {
   expenseTabExpensesApiKey,
   expenseTabsApiKey,
   expensesApiKey,
+  IMPORTS_API_KEY,
+  importApiUrl,
+  importConfirmApiUrl,
+  importUndoApiUrl,
   investmentsApiKey,
   investmentTransactionsApiKey,
   isCalendarEventsKey,
@@ -89,5 +93,20 @@ describe("calendar keys", () => {
   it("builds an event's URL, with the scope of a delete", () => {
     expect(calendarEventApiUrl("abc")).toBe("/api/calendar/events/abc");
     expect(calendarEventApiUrl("abc", "following")).toBe("/api/calendar/events/abc?scope=following");
+  });
+});
+
+describe("statement import URLs", () => {
+  const id = "20000000-0000-4000-8000-000000000001";
+
+  it("never carries ?member=: imports are the caller's alone", () => {
+    expect(IMPORTS_API_KEY).toBe("/api/imports");
+    expect(importApiUrl(id)).toBe(`/api/imports/${id}`);
+    expect(importConfirmApiUrl(id)).toBe(`/api/imports/${id}/confirm`);
+    expect(importUndoApiUrl(id)).toBe(`/api/imports/${id}/undo`);
+  });
+
+  it("encodes the id", () => {
+    expect(importApiUrl("a/b")).toBe("/api/imports/a%2Fb");
   });
 });

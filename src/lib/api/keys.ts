@@ -4,7 +4,10 @@ import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/f
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { AccountNotice } from "@/lib/account/notice-repository";
 import type { ConnectedApp, OAuthApp } from "@/lib/auth/oauth-consent";
+import type { Expense } from "@/lib/expenses/types";
 import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
+import type { RecentImport } from "@/lib/imports/repository";
+import type { ImportBatch, ImportDraft } from "@/lib/imports/types";
 import { MEMBER_PARAM } from "@/lib/family/viewing";
 import type { McpAccess, McpToken } from "@/lib/mcp/token-repository";
 import type { NotificationSettings } from "@/lib/notifications/settings-repository";
@@ -358,3 +361,33 @@ export type CalendarDeletedResponse = { deletedIds: string[] };
 export const CALENDAR_FEED_LINK_API_KEY = "/api/calendar/feed-link";
 export type CalendarFeedLinkResponse = { feed: CalendarFeed | null };
 export type CreatedCalendarFeedLink = { feed: CalendarFeed; token: string };
+
+/**
+ * GET → {@link ImportsResponse}: the caller's recent imports, newest first (live drafts, then
+ * confirmed and undone imports). POST the raw statement (`Content-Type: text/csv`, never multipart)
+ * → {@link ImportUploadResponse}: 201 for a new draft, 200 with `reopened: true` when the same
+ * statement is still a draft. Imports are the caller's alone: nothing here takes `?member=`.
+ */
+export const IMPORTS_API_KEY = "/api/imports";
+
+/** GET → {@link ImportDetailResponse}: a draft with its rows, or another import's summary; DELETE → 204 (a draft only). */
+export function importApiUrl(id: string) {
+  return `${IMPORTS_API_KEY}/${encodeURIComponent(id)}`;
+}
+
+/** POST `{ rows: [{ id, description, amount, expenseDate, category, subtype?, notes? }] }` → {@link ImportConfirmResponse}; 422 carries `fieldErrors` keyed like `rows.1.amount`. */
+export function importConfirmApiUrl(id: string) {
+  return `${importApiUrl(id)}/confirm`;
+}
+
+/** POST (no body) → {@link ImportUndoResponse}: deletes the expenses the import created. */
+export function importUndoApiUrl(id: string) {
+  return `${importApiUrl(id)}/undo`;
+}
+
+export type ImportUploadResponse = { batch: ImportBatch; reopened: boolean; warnings: string[] };
+export type ImportsResponse = { imports: RecentImport[] };
+/** A draft (`batch` and `rows`) or, for a confirmed or undone import, `batch` alone. */
+export type ImportDetailResponse = ImportDraft | { batch: ImportBatch; rows?: undefined };
+export type ImportConfirmResponse = { batch: ImportBatch; created: Expense[] };
+export type ImportUndoResponse = { batch: ImportBatch; removed: number };

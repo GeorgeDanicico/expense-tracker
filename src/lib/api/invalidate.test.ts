@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   afterExpenseCreated,
   afterExpenseDeleted,
+  afterImportChange,
   afterFamilyDeleted,
   afterFamilyJoined,
   afterMemberRemoved,
@@ -28,6 +29,7 @@ const CACHED_KEYS = [
   "/api/expense-tabs/tab-1/expenses?revision=r1",
   "/api/expense-tabs/tab-2/expenses?revision=r2",
   "/api/dashboard?period=1m&granularity=day&date=2026-10-14",
+  "/api/imports",
   "/api/expenses?month=2026-10",
   "/api/expenses?month=2026-09&context=main",
   "/api/investment-transactions?accountId=a&instrument=X&currency=EUR",
@@ -67,6 +69,18 @@ describe("cache invalidation after mutations", () => {
     expect(update(undefined)).toBeUndefined();
     expect(update({ expenses: [{ id: "e-1", amount: 10 }], total: 10, average: 10 } as ExpensesData))
       .toMatchObject({ expenses: [{ id: "e-2" }, { id: "e-1" }], total: 40, average: 20 });
+  });
+
+  it("afterImportChange refetches every month ledger, tab ledgers, dashboards and the list of imports", () => {
+    const { mutate, calls } = recorder();
+    afterImportChange(mutate);
+
+    expect(calls.map((call) => [call.keys, call.options])).toEqual([
+      [["/api/expenses?month=2026-10", "/api/expenses?month=2026-09&context=main"], undefined],
+      [["/api/expense-tabs/tab-1/expenses?revision=r1", "/api/expense-tabs/tab-2/expenses?revision=r2"], undefined],
+      [["/api/dashboard?period=1m&granularity=day&date=2026-10-14"], undefined],
+      [["/api/imports"], undefined],
+    ]);
   });
 
   it("afterExpenseDeleted removes the expense from every month ledger, then refreshes derived views", async () => {

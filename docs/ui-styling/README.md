@@ -173,3 +173,20 @@ which is where the red "now" line is.
 | `calendar-week-390.jpg` | Phone Week: three days from the chosen date (`?view=week&date=2026-10-29`), the same all-day row and grid |
 | `calendar-add-sheet-390.jpg` | The event form as a full-height sheet on a phone |
 | `calendar-more-sheet-390.jpg` | The More sheet for a family user: Calendar after To-dos in Planning |
+
+## Statement import page and review screen (import I7)
+
+Captured with the in-app browser from `/dev/preview/import`, whose drafts and expenses are kept in
+memory (`src/app/dev/preview/import-fixtures.ts`; it runs the real generic CSV parser, duplicate
+matcher and confirm schema): 1280 × 900 (saved at 800 × 562). The sample statement is the preview
+page's "Download a sample statement" link, uploaded through the file picker. The page isn't linked
+from the navigation yet (I11). The dark captures have `prefers-color-scheme: dark` emulated; the app
+forces its light theme, so they match the light ones. `?failWrites=1` refuses every confirm, discard
+and undo.
+
+| Image | Shows |
+|---|---|
+| `import-upload-1280-light.jpg`, `import-upload-1280-dark.jpg` | The upload step: the drop zone with "Choose a file", PDFs named as coming soon, and "The file is read and discarded. Only the rows below are kept, for 24 hours." |
+| `import-review-1280-light.jpg`, `import-review-1280-dark.jpg` | The review: the summary line (parser, period, 12 rows, 3 possible duplicates, 1 in another currency, 5 incoming payments skipped), three unticked "Possible duplicate" rows with "Looks like Lidl, 28 Oct, 45.20", the OMV row's Car / Car Fuel shown as fixed ("Set by a merchant rule"), the RON row unticked, disabled and explained, and the sticky footer with the count, the total, Discard and "Add 8 expenses" |
+| `import-confirm-dialog-1280.jpg` | After unticking Netflix and changing Bolt ride to Transport and Cinema City to Entertainment: "Add 7 expenses?" with the count and the total |
+| `import-result-1280-light.jpg`, `import-result-1280-dark.jpg` | The result: "Added 7 expenses", the total, "View October 2026", Undo and "Import another statement" |
