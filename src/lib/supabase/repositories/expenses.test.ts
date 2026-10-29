@@ -267,6 +267,32 @@ describe("listMonth", () => {
   });
 });
 
+describe("listRange", () => {
+  it("returns the owner's expenses from the start date up to, not including, the end, newest first", async () => {
+    const { queries } = useDatabase([
+      anExpenseRow({ id: "before", expenseDate: "2026-09-30" }),
+      anExpenseRow({ id: "first", expenseDate: "2026-10-01" }),
+      anExpenseRow({ id: "last", expenseDate: "2026-10-15" }),
+      anExpenseRow({ id: "end", expenseDate: "2026-10-16" }),
+      anExpenseRow({ id: "foreign", expenseDate: "2026-10-10" }, "other"),
+    ]);
+
+    const expenses = await repository.listRange("owner", { start: "2026-10-01", endExclusive: "2026-10-16" });
+
+    expect(expenses.map((expense) => expense.id)).toEqual(["last", "first"]);
+    expect(queries[0].filters).toEqual([
+      ["eq", "user_id", "owner"], ["gte", "expense_date", "2026-10-01"], ["lt", "expense_date", "2026-10-16"],
+    ]);
+  });
+
+  it("fails with the load message", async () => {
+    useDatabase([], { fail: () => true });
+
+    await expect(repository.listRange("owner", { start: "2026-10-01", endExclusive: "2026-10-16" }))
+      .rejects.toThrow(new Error("Unable to load expenses."));
+  });
+});
+
 describe("getDashboard", () => {
   const summary = {
     currentTotal: "12.50", currentCount: 1, currentLargest: "12.50", analyticsTotal: "40.00", analyticsCount: 2,
@@ -365,6 +391,7 @@ describe("update errors", () => {
 describe("owner filters", () => {
   it.each([
     ["listMonth", () => repository.listMonth("owner", "2026-09")],
+    ["listRange", () => repository.listRange("owner", { start: "2026-09-01", endExclusive: "2026-10-01" })],
     ["listForTab", () => repository.listForTab("owner", aTab(), DEFAULT_EXPENSE_TAB_FILTERS)],
     ["getDashboard", () => repository.getDashboard("owner", dashboardRanges)],
     ["update", () => repository.update("owner", "owned", { amount: 2 })],

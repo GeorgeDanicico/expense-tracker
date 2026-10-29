@@ -5,8 +5,9 @@ import { FakeAvatarRepository } from "./avatars";
 import { FakeCalendarFeedRepository, FakeCalendarRepository } from "./calendar";
 import { FakeExpenseTabRepository } from "./expense-tabs";
 import { FakeFamilyRepository } from "./family";
-import { FakeInvestmentRepository } from "./investments";
 import { FakeExpenseRepository } from "./expenses";
+import { FakeImportRepository } from "./imports";
+import { FakeInvestmentRepository } from "./investments";
 import { FakeMcpTokenRepository } from "./mcp-tokens";
 import { FakeNetWorthRepository } from "./net-worth";
 import { FakeNoticeRepository } from "./notices";
@@ -30,6 +31,7 @@ export type FakeRepositories = {
   calendarFeeds: FakeCalendarFeedRepository;
   expenseTabs: FakeExpenseTabRepository;
   family: FakeFamilyRepository;
+  imports: FakeImportRepository;
   investments: FakeInvestmentRepository;
   expenses: FakeExpenseRepository;
   mcpTokens: FakeMcpTokenRepository;
@@ -44,6 +46,7 @@ let current: FakeRepositories | undefined;
 
 export function resetFakeRepositories(): FakeRepositories {
   const family = new FakeFamilyRepository();
+  const expenses = new FakeExpenseRepository();
   current = {
     account: new FakeAccountRepository(),
     avatars: new FakeAvatarRepository(),
@@ -52,8 +55,10 @@ export function resetFakeRepositories(): FakeRepositories {
     calendarFeeds: new FakeCalendarFeedRepository(),
     expenseTabs: new FakeExpenseTabRepository(),
     family,
+    // Acts as the test user; confirm and undo work on `expenses`.
+    imports: new FakeImportRepository(expenses),
     investments: new FakeInvestmentRepository(),
-    expenses: new FakeExpenseRepository(),
+    expenses,
     mcpTokens: new FakeMcpTokenRepository(),
     netWorth: new FakeNetWorthRepository(),
     notices: new FakeNoticeRepository(),
