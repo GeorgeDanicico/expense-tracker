@@ -86,6 +86,7 @@ describe("tick", () => {
       events: { claimed: 0, queued: 0, duplicates: 0, changed: 0 },
       delivery: { claimed: 0, sent: 0, skipped: 0, failed: 0, retried: 0, devicesRemoved: 0 },
       cleaned: 0,
+      importsPurged: 0,
       // 11:00 in Bucharest: the first tick after 09:00 runs the day's "Due today" to-dos.
       todosDue: { date: "2026-10-25", found: 0, queued: 0, duplicates: 0, failed: 0 },
     });
@@ -95,7 +96,7 @@ describe("tick", () => {
       fields: {
         claimed: 0, sent: 0, skipped: 0, failed: 0, retried: 0, devicesRemoved: 0,
         remindersClaimed: 0, remindersQueued: 0, remindersDuplicate: 0, remindersChanged: 0,
-        eventsClaimed: 0, eventsQueued: 0, eventsDuplicate: 0, eventsChanged: 0, ms: 75,
+        eventsClaimed: 0, eventsQueued: 0, eventsDuplicate: 0, eventsChanged: 0, ms: 100,
       },
     });
   });
@@ -417,6 +418,86 @@ describe("tick", () => {
       clock.advance(1);
       await run();
       expect(store.cleanups).toHaveLength(2);
+    });
+  });
+
+  describe("import draft purge", () => {
+    const purgeLines = (lines: ReturnType<typeof memoryLog>["lines"]) => lines.filter((line) => line.event.startsWith("import_drafts_"));
+
+    it("purges the expired drafts on the first tick, then once a day, and logs the count", async () => {
+      const { clock, store, lines, run } = setup();
+      store.expiredImportDrafts = 3;
+
+      expect(await run()).toMatchObject({ importsPurged: 3 });
+      expect(store.importPurges).toBe(1);
+      expect(purgeLines(lines)).toEqual([{ level: "info", event: "import_drafts_purged", fields: { purged: 3 } }]);
+
+      store.expiredImportDrafts = 2;
+      clock.advance(CLEANUP_INTERVAL_MS - 1);
+      expect(await run()).toMatchObject({ importsPurged: null });
+      expect(store.importPurges).toBe(1);
+
+      clock.advance(1);
+      expect(await run()).toMatchObject({ importsPurged: 2 });
+      expect(store.importPurges).toBe(2);
+      expect(purgeLines(lines).map((line) => line.fields)).toEqual([{ purged: 3 }, { purged: 2 }]);
+    });
+
+    it("logs a failed purge, goes on with the tick and the other clean-up, and tries again next tick", async () => {
+      const { clock, store, push, lines, run } = setup();
+      store.failPurgeWith = new Error("Unable to purge expired import drafts: function does not exist");
+      store.addDevice(ANA);
+      const old = store.queue({ userId: ANA, status: "sent", createdAt: new Date(clock.now().getTime() - 31 * 24 * 60 * MINUTE) });
+      const due = store.queue({ userId: ANA });
+
+      const result = await run();
+
+      expect(result).toMatchObject({ cleaned: 1, importsPurged: null, delivery: { sent: 1 } });
+      expect(store.notifications.map((row) => row.id)).toEqual([due.id]);
+      expect(push.sends).toHaveLength(1);
+      expect(purgeLines(lines)).toEqual([
+        { level: "error", event: "import_drafts_purge_failed", fields: { error: "Unable to purge expired import drafts: function does not exist" } },
+      ]);
+      expect(old).toBeDefined();
+
+      store.failPurgeWith = null;
+      store.expiredImportDrafts = 1;
+      clock.advance(30_000);
+      const next = await run();
+
+      expect(next).toMatchObject({ cleaned: null, importsPurged: 1 });
+      expect(store.importPurges).toBe(2);
+      expect(store.cleanups).toHaveLength(1);
+    });
+
+    it("doesn't let a failing notification clean-up stop the purge", async () => {
+      const { store, run } = setup();
+      store.deleteOldNotifications = async () => {
+        throw new Error("Unable to delete old notifications: timeout");
+      };
+      store.expiredImportDrafts = 4;
+
+      expect(await run()).toMatchObject({ cleaned: null, importsPurged: 4 });
+    });
+
+    it("logs the number of drafts and nothing else", async () => {
+      const { store, lines, run } = setup();
+      store.expiredImportDrafts = 7;
+
+      await run();
+
+      const [line] = purgeLines(lines);
+      expect(Object.keys(line.fields ?? {})).toEqual(["purged"]);
+      expect(typeof line.fields?.purged).toBe("number");
+    });
+
+    it("isn't run without VAPID keys, as the rest of the clean-up isn't", async () => {
+      const { store, deps } = setup();
+      store.expiredImportDrafts = 1;
+
+      await tick({ ...deps, push: null });
+
+      expect(store.importPurges).toBe(0);
     });
   });
 });

@@ -12,7 +12,7 @@ const UNIQUE_VIOLATION = "23505";
 
 /**
  * `WorkerStore` on `worker_heartbeats`, `notifications`, `reminders`, `notification_settings`,
- * `push_subscriptions`, `todos`, `calendar_events` and `family_members` with the admin client: the worker acts for every user, and the outbox and
+ * `push_subscriptions`, `todos`, `calendar_events` and `family_members` (and the `purge_expired_import_batches` function) with the admin client: the worker acts for every user, and the outbox and
  * heartbeats have no policies for signed-in users.
  * Errors carry the database's message (never the key) so the worker's log says what went wrong.
  *
@@ -220,6 +220,13 @@ export function createSupabaseWorkerStore(client: AdminClient = createAdminClien
         .lt("created_at", before.toISOString());
       if (error) throw new Error(`Unable to delete old notifications: ${error.message}`);
       return count ?? 0;
+    },
+
+    /** Only the count comes back; the function reads no draft into the worker. */
+    async purgeExpiredImportBatches() {
+      const { data, error } = await client.rpc("purge_expired_import_batches");
+      if (error) throw new Error(`Unable to purge expired import drafts: ${error.message}`);
+      return data ?? 0;
     },
   };
 }

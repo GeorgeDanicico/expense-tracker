@@ -128,6 +128,12 @@ export interface WorkerStore {
   /** Deletes `sent` and `skipped` rows created before `before`; returns how many. */
   deleteOldNotifications(before: Date): Promise<number>;
   /**
+   * Deletes every user's expired statement-import drafts, with their rows
+   * (`purge_expired_import_batches`, `service_role` only); returns how many drafts. Nothing of a
+   * draft is read or returned.
+   */
+  purgeExpiredImportBatches(): Promise<number>;
+  /**
    * Leases up to `batch` unmuted reminders whose `next_notify_at` has passed for 2 minutes
    * (`claim_due_reminders`) and returns them.
    */
