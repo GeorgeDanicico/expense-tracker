@@ -27,7 +27,9 @@ import { confirmImportSchema } from "@/lib/validation/import";
 // refuses every confirm, discard and undo, to show the error states. The sample statement below
 // matches the sample expenses (three of its rows are possible duplicates), has a row in RON
 // (the preview account is in EUR), a fuel station the merchant rule knows, and four incoming
-// payments; the preview page offers it as a download.
+// payments; the preview page offers it as a download. A PDF is refused with a message of its own:
+// reading one needs pdf.js (`unpdf`, about 2 MB, with its own worker and font files), which belongs on
+// the server and not in this page's bundle, and no bank's PDF layout is parsed yet (task I13).
 //
 // The list of recent imports starts with a few made-up ones (a draft with 19 hours left that can be
 // resumed, two confirmed imports, one of which has 2 expenses "edited since", and an undone one), so
@@ -292,12 +294,19 @@ function fieldErrorsOf(rows: ConfirmRows, stored: StoredImport) {
   return fieldErrors;
 }
 
+/** What the preview says to a PDF; the real page reads it on the server. */
+export const PREVIEW_PDF_MESSAGE = "The preview can't read PDF statements. Upload the sample CSV; the real import page reads PDFs on the server.";
+
+const isPdf = (bytes: Uint8Array) => new TextDecoder("latin1").decode(bytes.subarray(0, 1024)).includes("%PDF-");
+
 export const previewImportApi: ImportApi = {
   async upload(file) {
     await delay(700);
     let draft;
     try {
-      draft = previewDraft(new Uint8Array(await file.arrayBuffer()));
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (file.name.toLowerCase().endsWith(".pdf") || isPdf(bytes)) throw new ApiError(PREVIEW_PDF_MESSAGE, 415);
+      draft = previewDraft(bytes);
     } catch (caught) {
       if (caught instanceof ImportError) throw new ApiError(caught.message, caught.status);
       throw caught;

@@ -7,6 +7,7 @@ import { IMPORT_CSV_MAX_BYTES, IMPORT_MAX_ROWS } from "@/lib/imports/types";
 import { MODULE_KEYS, type ModuleKey, type Permissions } from "@/lib/permissions";
 import { aKid, aParent, anExpense } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
+import { buildTextPdf } from "@/test/pdf";
 import { callRoute, signedInAs, testUser } from "@/test/route";
 
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
@@ -202,7 +203,7 @@ describe("POST /api/imports", () => {
       const response = await upload(body, { type });
 
       expect(response.status).toBe(415);
-      expect(response.body).toEqual({ error: "Upload a CSV statement.", code: "unsupported_type" });
+      expect(response.body).toEqual({ error: "Upload a CSV or PDF statement.", code: "unsupported_type" });
       expect(repositories.imports.batches).toEqual([]);
     });
 
@@ -220,14 +221,29 @@ describe("POST /api/imports", () => {
       expect(response).toMatchObject({ status: 415, body: { code: "unsupported_type" } });
     });
 
-    it("answers 415 pdf_not_supported for a PDF, however it was declared, until PDFs are turned on", async () => {
-      const pdf = new TextEncoder().encode("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n");
+    it("reads a PDF however it was declared, and answers 422 unrecognised_layout while no bank parser claims it", async () => {
+      const pdf = buildTextPdf([["Some other bank", ["Date", "Description", "Amount"], ["2026-10-12", "Lidl", "-45.20"]]]);
 
       for (const type of ["application/pdf", "text/csv"]) {
         const response = await upload(pdf, { type });
 
-        expect(response).toMatchObject({ status: 415, body: { error: "PDF statements aren't supported yet.", code: "pdf_not_supported" } });
+        expect(response).toMatchObject({
+          status: 422,
+          body: { error: "This statement's layout isn't supported yet.", code: "unrecognised_layout" },
+        });
       }
+      expect(repositories.imports.batches).toEqual([]);
+    });
+
+    it.each([
+      ["a scanned PDF", () => buildTextPdf([[]], { imageOnly: true }), "no_text", "This PDF is a scan; scanned statements aren't supported."],
+      ["a password-protected PDF", () => buildTextPdf([["Lidl"]], { encrypted: true }), "encrypted_pdf", "This PDF is password protected."],
+      ["a PDF of 31 pages", () => buildTextPdf(Array.from({ length: 31 }, () => ["Lidl"])), "too_many_pages", "This PDF has more than 30 pages."],
+      ["a truncated PDF", () => buildTextPdf([["Lidl"]]).subarray(0, 100), "unreadable_statement", "This statement couldn't be read."],
+    ])("answers 422 for %s", async (_name, build, code, error) => {
+      const response = await upload(build(), { type: "application/pdf" });
+
+      expect(response).toMatchObject({ status: 422, body: { error, code } });
       expect(repositories.imports.batches).toEqual([]);
     });
 

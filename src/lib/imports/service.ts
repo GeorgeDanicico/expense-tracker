@@ -71,7 +71,7 @@ export async function createDraft(
   now: Date = new Date(),
 ): Promise<CreatedDraft> {
   void userId;
-  const draft = buildDraft(upload);
+  const draft = await buildDraft(upload);
   const { imports } = getRepositories();
 
   const existing = await imports.findLiveByHash(draft.batch.content_hash);

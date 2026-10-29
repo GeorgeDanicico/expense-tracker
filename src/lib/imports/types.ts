@@ -171,7 +171,6 @@ export const IMPORT_ERROR_CODES = [
   "unsupported_type",
   "file_too_large",
   "empty_file",
-  "pdf_not_supported",
   "unrecognised_layout",
   "unreadable_statement",
   "ambiguous_amounts",
@@ -191,7 +190,6 @@ export const IMPORT_ERROR_STATUS: Record<ImportErrorCode, 409 | 413 | 415 | 422 
   unsupported_type: 415,
   file_too_large: 413,
   empty_file: 422,
-  pdf_not_supported: 415,
   unrecognised_layout: 422,
   unreadable_statement: 422,
   ambiguous_amounts: 422,
@@ -206,10 +204,9 @@ export const IMPORT_ERROR_STATUS: Record<ImportErrorCode, 409 | 413 | 415 | 422 
 
 /** The default message for each code. None of them contains text from the file. */
 export const IMPORT_ERROR_MESSAGES: Record<ImportErrorCode, string> = {
-  unsupported_type: "Upload a CSV statement.",
+  unsupported_type: "Upload a CSV or PDF statement.",
   file_too_large: "Choose a smaller statement.",
   empty_file: "That file is empty.",
-  pdf_not_supported: "PDF statements aren't supported yet.",
   unrecognised_layout: "This statement's layout isn't supported yet.",
   unreadable_statement: "This statement couldn't be read.",
   ambiguous_amounts: "The amounts in this statement can't be read without guessing.",

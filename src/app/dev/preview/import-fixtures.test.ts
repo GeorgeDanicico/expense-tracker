@@ -97,6 +97,16 @@ describe("the import preview API", () => {
       .rejects.toMatchObject({ status: 422, message: "This statement's layout isn't supported yet." });
   });
 
+  it("says it can't read a PDF, whatever the name, and keeps no draft", async () => {
+    const api = await freshApi();
+    const { PREVIEW_PDF_MESSAGE } = await import("./import-fixtures");
+
+    for (const name of ["statement.pdf", "statement.csv"]) {
+      await expect(api.upload(new File(["%PDF-1.4\n1 0 obj\n"], name, { type: "application/pdf" }), "application/pdf"))
+        .rejects.toMatchObject({ status: 415, message: PREVIEW_PDF_MESSAGE });
+    }
+  });
+
   it("discards a draft", async () => {
     const api = await freshApi();
     const { batch } = await api.upload(sample(), "text/csv");

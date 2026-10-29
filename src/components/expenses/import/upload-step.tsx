@@ -16,14 +16,9 @@ import {
   type ImportSourceKind,
 } from "@/lib/imports/types";
 
-/**
- * PDF statements are accepted by the server only from task I12; until then the picker names them
- * as coming soon and a dropped PDF is refused here without a request. Flip this when I12 lands.
- */
-export const PDF_IMPORT_ENABLED = false;
+const MIB = 1024 * 1024;
 
-export const PDF_COMING_SOON = "PDF statements are coming soon. Upload a CSV for now.";
-export const NOT_A_STATEMENT_FILE = "Choose a CSV statement (a .csv file).";
+export const NOT_A_STATEMENT_FILE = "Choose a CSV or PDF statement (a .csv or .pdf file).";
 export const EMPTY_STATEMENT_FILE = "That file is empty.";
 
 /** The line under the picker: what happens to the file. */
@@ -51,7 +46,6 @@ export function statementContentType(kind: ImportSourceKind): string {
 export function validateStatementFile(file: FileFacts): string | null {
   const kind = statementKind(file);
   if (kind === null) return NOT_A_STATEMENT_FILE;
-  if (kind === "pdf" && !PDF_IMPORT_ENABLED) return PDF_COMING_SOON;
   if (file.size === 0) return EMPTY_STATEMENT_FILE;
   if (file.size > (kind === "pdf" ? IMPORT_PDF_MAX_BYTES : IMPORT_CSV_MAX_BYTES)) return tooLargeMessage(kind);
   return null;
@@ -145,14 +139,14 @@ export function UploadStep({
               <Stack gap="0.5">
                 <Text textStyle="sectionTitle">Drop a statement here</Text>
                 <Text textStyle="caption">
-                  A CSV file from your bank, up to {IMPORT_CSV_MAX_BYTES / (1024 * 1024)} MB.{" "}
-                  {PDF_IMPORT_ENABLED ? "PDF statements work too." : "PDF statements are coming soon."}
+                  A CSV file from your bank, up to {IMPORT_CSV_MAX_BYTES / MIB} MB, or a PDF statement with
+                  selectable text, up to {IMPORT_PDF_MAX_BYTES / MIB} MB.
                 </Text>
               </Stack>
               <input
                 ref={input}
                 type="file"
-                accept={PDF_IMPORT_ENABLED ? ".csv,.pdf" : ".csv"}
+                accept=".csv,.pdf"
                 hidden
                 onChange={pick}
                 aria-label="Statement file"
