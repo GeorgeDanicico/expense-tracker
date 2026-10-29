@@ -1,0 +1,12 @@
+{
+  "parserId": "generic-csv",
+  "currency": "EUR",
+  "periodStart": "2026-09-07",
+  "periodEnd": "2026-09-10",
+  "rows": [
+    { "expenseDate": "2026-09-07", "description": "Stationery Shop", "amount": 45.2, "currency": "EUR", "direction": "debit" },
+    { "expenseDate": "2026-09-08", "description": "Bus pass", "amount": 12, "currency": "EUR", "direction": "debit" },
+    { "expenseDate": "2026-09-09", "description": "Friend paid back", "amount": 100, "currency": "EUR", "direction": "credit" },
+    { "expenseDate": "2026-09-10", "description": "Kiosk", "amount": 8.1, "currency": "EUR", "direction": "debit" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "parserId": "generic-csv",
+  "currency": "RON",
+  "periodStart": "2026-09-14",
+  "periodEnd": "2026-09-16",
+  "rows": [
+    { "expenseDate": "2026-09-14", "description": "Piaţa Verde", "amount": 25, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-15", "description": "Băcănia Ţării", "amount": 9.75, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-16", "description": "Cafeneaua îngerilor", "amount": 18.5, "currency": "RON", "direction": "debit" }
+  ]
+}

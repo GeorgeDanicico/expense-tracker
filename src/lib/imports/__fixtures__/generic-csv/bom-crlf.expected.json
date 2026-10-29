@@ -1,0 +1,10 @@
+{
+  "parserId": "generic-csv",
+  "currency": "EUR",
+  "periodStart": "2026-09-10",
+  "periodEnd": "2026-09-11",
+  "rows": [
+    { "expenseDate": "2026-09-10", "description": "Hardware Depot", "amount": 58, "currency": "EUR", "direction": "debit" },
+    { "expenseDate": "2026-09-11", "description": "Bakery Corner", "amount": 6.2, "currency": "EUR", "direction": "debit" }
+  ]
+}

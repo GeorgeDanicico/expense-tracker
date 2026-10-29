@@ -1,0 +1,12 @@
+{
+  "parserId": "generic-csv",
+  "currency": "RON",
+  "periodStart": "2026-09-03",
+  "periodEnd": "2026-09-05",
+  "warnings": ["1 line without a date or an amount skipped."],
+  "rows": [
+    { "expenseDate": "2026-09-03", "description": "Gym membership", "amount": 45, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-04", "description": "Transfer from savings", "amount": 300, "currency": "RON", "direction": "credit" },
+    { "expenseDate": "2026-09-05", "description": "Grocery Hub", "amount": 82.15, "currency": "RON", "direction": "debit" }
+  ]
+}

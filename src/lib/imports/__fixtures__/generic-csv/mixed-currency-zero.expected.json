@@ -1,0 +1,10 @@
+{
+  "parserId": "generic-csv",
+  "periodStart": "2026-09-20",
+  "periodEnd": "2026-09-21",
+  "warnings": ["1 row with a zero amount skipped."],
+  "rows": [
+    { "expenseDate": "2026-09-20", "description": "Local shop", "amount": 20, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-21", "description": "Foreign shop", "amount": 15, "currency": "EUR", "direction": "debit" }
+  ]
+}

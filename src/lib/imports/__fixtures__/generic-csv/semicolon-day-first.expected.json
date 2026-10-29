@@ -1,0 +1,11 @@
+{
+  "parserId": "generic-csv",
+  "currency": "RON",
+  "periodStart": "2026-09-01",
+  "periodEnd": "2026-09-03",
+  "rows": [
+    { "expenseDate": "2026-09-01", "description": "Bookshop Central", "amount": 1234.56, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-02", "description": "Tram ticket", "amount": 3, "currency": "RON", "direction": "debit" },
+    { "expenseDate": "2026-09-03", "description": "Refund Bookshop", "amount": 49.9, "currency": "RON", "direction": "credit" }
+  ]
+}
