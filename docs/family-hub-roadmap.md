@@ -193,7 +193,7 @@ Email isn't part of this phase; it's a later step, after phase 5. When it comes,
 
 ## Phase 6: Family calendar and calendar feeds
 
-**Status (28 October 2026): planned** (tasks C1–C9 in [calendar-plan.md](calendar-plan.md)). The plan changes the steps below: **one calendar per family** with no calendars table, **no kid permission** (every member edits every event), **short repeats only** (daily up to 10 days, weekly up to 10 weeks, stored as one row per occurrence instead of an RRULE), fixed notifications (30 minutes before, 07:30 for all-day events) instead of per-event lead times, and **no Google Calendar sync** (6.5–6.7 and 6.9 are dropped). Each member's feed holds **only the events they attend**, not everything they can see. The steps below are kept as first written; the plan supersedes them.
+**Status (28 October 2026): done** (tasks C1–C9 in [calendar-plan.md](calendar-plan.md), merged in #141–#149: C1 #141, C2 #142, C3 #143, C4 #144, C5 #145, C6 #146, C7 #147, C8 #148, C9 #149), apart from the smoke test on real devices: a Mac and an iPhone subscribing to the feed over Tailscale, a notification arriving on a device, and asking Claude Code "what's on the calendar" through MCP. The plan changes the steps below: **one calendar per family** with no calendars table, **no kid permission** (every member edits every event), **short repeats only** (daily up to 10 days, weekly up to 10 weeks, stored as one row per occurrence instead of an RRULE), fixed notifications (30 minutes before, 07:30 for all-day events) instead of per-event lead times, and **no Google Calendar sync** (6.5–6.7 and 6.9 are dropped). Each member's feed holds **only the events they attend**, not everything they can see. The steps below are kept as first written; the plan supersedes them.
 
 The app gets its own family calendar. Other calendars connect in two ways:
 - **An ICS feed out**: a private `webcal://` link per user that Apple Calendar, Outlook or any other calendar app subscribes to. It's read-only and works for the Mac calendar without any Apple API.
@@ -214,6 +214,8 @@ Two-way sync with iCloud through CalDAV isn't planned. It needs app-specific pas
 | **6.9** | (Optional, needs a public HTTPS URL) **Push webhooks** through `events.watch`, renewed before expiry, replacing polling for connected calendars. | Changes in Google arrive within seconds. |
 
 ## Phase 7: Statement import
+
+**Status (28 October 2026): planned** (tasks I1–I13 in [statement-import-plan.md](statement-import-plan.md)). The plan changes the steps below: imports are linked to the expenses they create through an `import_expenses` table instead of a column on `expenses`, money in (refunds, incoming payments) is skipped, rows in another currency can't be imported, uploads are limited to 2 MB for CSV and 5 MB for PDF, and there are **no MCP tools**. Steps 7.2 and 7.4 become one task per bank and format, which wait for the open "Banks and formats for statement import" decision (a checkpoint in the plan); step 7.5 stays in phase 8. The steps below are kept as first written; the plan supersedes them.
 
 Upload a bank statement and turn it into expenses inside the app. Whatever the format, every import ends in a **review step**, and nothing is saved until you confirm. Importing follows the Expenses permission and only ever creates the caller's own expenses.
 
