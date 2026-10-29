@@ -1,11 +1,13 @@
 "use client";
 
+import { Text } from "@chakra-ui/react";
 import { Suspense } from "react";
 import { SWRConfig, type Middleware } from "swr";
 
 import CalendarPage from "@/app/(app)/calendar/page";
 import DashboardPage from "@/app/(app)/dashboard/page";
 import ExpensesPage from "@/app/(app)/expenses/page";
+import ImportPage from "@/app/(app)/expenses/import/page";
 import InvestmentsPage from "@/app/(app)/investments/page";
 import NetWorthPage from "@/app/(app)/net-worth/page";
 import RemindersPage from "@/app/(app)/reminders/page";
@@ -13,6 +15,7 @@ import SettingsLayout from "@/app/(app)/settings/layout";
 import NotificationsSettingsPage from "@/app/(app)/settings/notifications/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import TodosPage from "@/app/(app)/todos/page";
+import { ImportApiProvider } from "@/components/expenses/import/import-api";
 import { CalendarApiProvider } from "@/components/family-calendar/calendar-api";
 import { AppShell } from "@/components/layout/app-shell";
 import { ReminderApiProvider } from "@/components/reminders/reminder-api";
@@ -20,6 +23,7 @@ import { TodoApiProvider } from "@/components/todos/todo-api";
 
 import { previewCalendarApi } from "../calendar-fixtures";
 import { fixtureFor } from "../fixtures";
+import { previewImportApi, previewSampleStatement } from "../import-fixtures";
 import { previewReminderApi } from "../reminder-fixtures";
 import { previewTodoApi } from "../todo-fixtures";
 import type { PreviewScreen } from "./screens";
@@ -34,7 +38,24 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   reminders: RemindersPreview,
   calendar: CalendarPreview,
   notifications: NotificationsPreview,
+  import: ImportPreview,
 };
+
+/**
+ * The import page with its drafts and expenses kept in memory (see `import-fixtures.ts`). The
+ * sample statement is a download, so a file can be chosen on the upload step as on a real device.
+ */
+function ImportPreview() {
+  const sample = `data:text/csv;charset=utf-8,${encodeURIComponent(previewSampleStatement())}`;
+  return (
+    <ImportApiProvider api={previewImportApi}>
+      <Text textStyle="caption" mb="3">
+        Preview: nothing is saved. <a href={sample} download="sample-statement.csv" data-testid="sample-statement">Download a sample statement</a> to upload.
+      </Text>
+      <ImportPage />
+    </ImportApiProvider>
+  );
+}
 
 /** Settings → Notifications with its tabs. Its writes reach the real API (and fail when signed out). */
 function NotificationsPreview() {

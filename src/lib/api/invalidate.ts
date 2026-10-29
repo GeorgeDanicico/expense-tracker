@@ -6,6 +6,7 @@ import {
   EXPENSE_TABS_API_KEY,
   FAMILY_API_KEY,
   FAMILY_INVITES_API_KEY,
+  IMPORTS_API_KEY,
   INVESTMENTS_API_KEY,
   NET_WORTH_API_KEY,
   expenseTabApiKey,
@@ -65,6 +66,15 @@ export async function afterExpenseCreated(mutate: ScopedMutator, month: string, 
 export function afterExpenseLogged(mutate: ScopedMutator) {
   void mutate(startsWith("/api/expenses?"));
   afterExpenseChange(mutate);
+}
+
+/**
+ * After an import is confirmed or undone, which adds or removes many expenses at once: refetches
+ * every cached month ledger, the tab ledgers and dashboards, and the list of recent imports.
+ */
+export function afterImportChange(mutate: ScopedMutator) {
+  afterExpenseLogged(mutate);
+  void mutate(IMPORTS_API_KEY);
 }
 
 /** Removes the expense from every cached month ledger, then refreshes derived views. */
