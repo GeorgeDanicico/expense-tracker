@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INVITE_CODE_MAX_FAILURES,
   INVITE_CODE_WINDOW_MS,
+  IMPORT_UPLOAD_MAX_ATTEMPTS,
+  IMPORT_UPLOAD_WINDOW_MS,
   createFailureLimiter,
+  importUploadAttempts,
   inviteCodeAttempts,
   resetRateLimits,
 } from "@/lib/http/rate-limit";
@@ -95,5 +98,22 @@ describe("inviteCodeAttempts", () => {
 
     vi.advanceTimersByTime(INVITE_CODE_WINDOW_MS);
     expect(inviteCodeAttempts.isLimited("user")).toBe(false);
+  });
+});
+
+describe("importUploadAttempts", () => {
+  it("allows 30 uploads per user an hour, the 31st is limited", () => {
+    expect(IMPORT_UPLOAD_MAX_ATTEMPTS).toBe(30);
+    expect(IMPORT_UPLOAD_WINDOW_MS).toBe(60 * 60 * 1000);
+
+    fail(importUploadAttempts, "user", 29);
+    expect(importUploadAttempts.isLimited("user")).toBe(false);
+
+    importUploadAttempts.recordFailure("user");
+    expect(importUploadAttempts.isLimited("user")).toBe(true);
+    expect(importUploadAttempts.isLimited("someone-else")).toBe(false);
+
+    vi.advanceTimersByTime(IMPORT_UPLOAD_WINDOW_MS);
+    expect(importUploadAttempts.isLimited("user")).toBe(false);
   });
 });

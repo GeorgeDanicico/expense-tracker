@@ -96,6 +96,22 @@ export const avatarUploadAttempts = createFailureLimiter({
   windowMs: AVATAR_UPLOAD_WINDOW_MS,
 });
 
+/** Statement uploads allowed per user in `IMPORT_UPLOAD_WINDOW_MS`, counting every attempt. */
+export const IMPORT_UPLOAD_MAX_ATTEMPTS = 30;
+export const IMPORT_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Statement uploads per user id for `POST /api/imports`. Like the avatar limiter it records every
+ * attempt (through `recordFailure`), because each one costs a parse.
+ */
+export const importUploadAttempts = createFailureLimiter({
+  maxFailures: IMPORT_UPLOAD_MAX_ATTEMPTS,
+  windowMs: IMPORT_UPLOAD_WINDOW_MS,
+});
+
+/** What the import upload answers, with status 429, past `IMPORT_UPLOAD_MAX_ATTEMPTS`. */
+export const TOO_MANY_IMPORT_UPLOADS = "You've uploaded a lot of statements recently. Try again in an hour.";
+
 /** Personal token changes allowed per user in `MCP_TOKEN_CHANGE_WINDOW_MS`, counting every attempt. */
 export const MCP_TOKEN_CHANGE_MAX_ATTEMPTS = 30;
 export const MCP_TOKEN_CHANGE_WINDOW_MS = 60 * 60 * 1000;
