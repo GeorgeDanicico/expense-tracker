@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { StructuredOutcome } from "@/lib/ai";
+import type { StatementAi } from "@/lib/imports/ai/reader";
 import { statementHash } from "@/lib/imports/hash";
 import { STATEMENT_PARSERS, UnrecognisedLayoutError, type StatementParser } from "@/lib/imports/parser";
 import { buildDraft } from "@/lib/imports/pipeline";
@@ -267,6 +269,183 @@ describe("buildDraft", () => {
       const error = await refusal(() => buildDraft({ kind: "pdf", bytes: build() }));
 
       expect(error).toMatchObject({ code, status: 422 });
+    });
+
+    describe("a PDF with AI on (I21): the model reads it first", () => {
+      const pdfFile = () =>
+        buildTextPdf([["Test bank statement", "Currency RON", ["Date", "Description", "Amount"], ["2026-09-01", "Corner Cafe", "-4.50"], ["2026-09-02", "Fresh Market", "-123.40"]]], {
+          columnWidth: 240,
+        });
+      const unclaimed = () => buildTextPdf([["Some other bank", "Currency RON", ["2026-09-01", "Corner Cafe", "-4.50"], ["2026-09-02", "Fresh Market", "-123.40"]]], { columnWidth: 240 });
+
+      // Lines: 1 title, 2 currency, 3 header, 4 and 5 the rows (the unclaimed file has one line fewer).
+      const reading = (first = 4) => ({
+        r: [
+          { l: [first], d: "2026-09-01", a: "4.50", c: null, t: "d", m: "Corner Cafe" },
+          { l: [first + 1], d: "2026-09-02", a: "123.40", c: null, t: "d", m: "Fresh Market" },
+        ],
+        k: [{ m: "Corner Cafe", c: "entertainment", s: null }, { m: "Fresh Market", c: "groceries", s: null }],
+        s: { c: "RON", t: null, l: null },
+      });
+
+      type Script = { reading?: StructuredOutcome<unknown>; categories?: StructuredOutcome<unknown> };
+      const answered = (value: unknown) => ({ ok: true, value, usage: { inputTokens: 1, outputTokens: 1, cachedInputTokens: 0 }, provider: "fake", model: "m", costMicros: 0 }) as unknown as StructuredOutcome<unknown>;
+      const gateRefused = { ok: false, called: false, reason: "disabled", message: "AI features are paused for everyone right now." } as unknown as StructuredOutcome<unknown>;
+      const failed = (reason: string) => ({ ok: false, called: true, reason, provider: "fake", model: "m", usage: null, costMicros: 0 }) as unknown as StructuredOutcome<unknown>;
+
+      function setUp(script: Script) {
+        const asked: string[] = [];
+        const logged: Record<string, unknown>[] = [];
+        const ai: StatementAi = {
+          call: (async (request: { schemaName: string }) => {
+            asked.push(request.schemaName);
+            return (request.schemaName === "statement_reading" ? script.reading : script.categories) ?? gateRefused;
+          }) as StatementAi["call"],
+          loadHistory: async () => new Map(),
+        };
+        return { asked, logged, options: { ai, log: (line: Record<string, unknown>) => logged.push(line) } };
+      }
+
+      it("goes to the model although a parser claims it, and takes its rows and categories", async () => {
+        const { asked, options } = setUp({ reading: answered(reading()) });
+
+        const draft = await buildDraft({ kind: "pdf", bytes: pdfFile() }, options);
+
+        expect(asked).toEqual(["statement_reading"]);
+        expect(draft.batch).toMatchObject({ source_kind: "pdf", parser_id: "ai:statement-reader-v2", currency: "RON" });
+        expect(draft.rows.map((row) => [row.expense_date, row.description, row.amount, row.category, row.category_source])).toEqual([
+          ["2026-09-01", "Corner Cafe", 4.5, "entertainment", "ai"],
+          ["2026-09-02", "Fresh Market", 123.4, "groceries", "ai"],
+        ]);
+      });
+
+      it("gives the merchant rule and the user's history their say before the model's category", async () => {
+        const { options } = setUp({ reading: answered(reading()) });
+        options.ai.loadHistory = async () => new Map([["corner cafe", "shopping"]]) as never;
+
+        const draft = await buildDraft({ kind: "pdf", bytes: pdfFile() }, options);
+
+        expect(draft.rows.map((row) => row.category_source)).toEqual(["history", "ai"]);
+      });
+
+      describe("falls back to the parser that claims it", () => {
+        const categories = answered({ k: [{ c: "entertainment", s: null }, { c: "groceries", s: null }] });
+        const fromParser = (draft: Awaited<ReturnType<typeof buildDraft>>) => {
+          expect(draft.batch.parser_id).toBe("test-pdf+ai:statement-categorise-v1");
+          expect(draft.rows.map((row) => [row.description, row.amount])).toEqual([["Corner Cafe", 4.5], ["Fresh Market", 123.4]]);
+        };
+
+        it("when the AI can't be used for this call", async () => {
+          const { asked, logged, options } = setUp({ reading: gateRefused, categories });
+
+          fromParser(await buildDraft({ kind: "pdf", bytes: pdfFile() }, options));
+
+          expect(asked).toEqual(["statement_reading", "statement_categories"]);
+          expect(logged).toContainEqual({ mode: "read", fallbackTo: "parser", reason: "unrecognised_layout" });
+        });
+
+        it("when the model's answer fails verification", async () => {
+          const wrong = reading();
+          wrong.r = wrong.r.map((row) => ({ ...row, a: "9.99" }));
+          const { asked, logged, options } = setUp({ reading: answered(wrong), categories });
+
+          fromParser(await buildDraft({ kind: "pdf", bytes: pdfFile() }, options));
+
+          expect(asked).toEqual(["statement_reading", "statement_categories"]);
+          expect(logged).toContainEqual({ mode: "read", outcome: "unverified", reason: "amount_not_found", row: 0 });
+          expect(logged).toContainEqual({ mode: "read", fallbackTo: "parser", reason: "unverified_statement" });
+        });
+
+        it("when the model's call fails", async () => {
+          const { options } = setUp({ reading: failed("timeout"), categories });
+
+          fromParser(await buildDraft({ kind: "pdf", bytes: pdfFile() }, options));
+        });
+
+        it("keeping the rows' content hash a parser's, so the same rows from a CSV are the same statement", async () => {
+          const { options } = setUp({ reading: gateRefused, categories });
+
+          const draft = await buildDraft({ kind: "pdf", bytes: pdfFile() }, options);
+
+          expect(draft.batch.content_hash).toBe(
+            statementHash([
+              { expenseDate: "2026-09-01", description: "Corner Cafe", amount: 4.5, currency: "RON" },
+              { expenseDate: "2026-09-02", description: "Fresh Market", amount: 123.4, currency: "RON" },
+            ]),
+          );
+        });
+      });
+
+      describe("when the parser can't read it either", () => {
+        beforeEach(() => {
+          vi.spyOn(pdfParser, "parse").mockImplementation(() => {
+            throw new ImportError("unreadable_statement", "Row 2 of this statement couldn't be read.");
+          });
+        });
+
+        it("gives the parser's own error when the model was never asked, as with AI off", async () => {
+          const { options } = setUp({ reading: gateRefused });
+
+          expect(await refusal(() => buildDraft({ kind: "pdf", bytes: pdfFile() }, options))).toMatchObject({
+            code: "unreadable_statement",
+            message: "Row 2 of this statement couldn't be read.",
+          });
+        });
+
+        it("gives the AI's error when the model was asked and its answer didn't hold up", async () => {
+          const wrong = reading();
+          wrong.r = wrong.r.map((row) => ({ ...row, a: "9.99" }));
+          const { options } = setUp({ reading: answered(wrong) });
+
+          expect(await refusal(() => buildDraft({ kind: "pdf", bytes: pdfFile() }, options))).toMatchObject({ code: "unverified_statement" });
+        });
+      });
+
+      describe("when no parser claims it", () => {
+        it("is refused as an unrecognised layout, with the gate's reason, when the AI can't be used", async () => {
+          const { options } = setUp({ reading: gateRefused });
+
+          const error = await refusal(() => buildDraft({ kind: "pdf", bytes: unclaimed() }, options));
+
+          expect(error).toBeInstanceOf(ImportError);
+          expect(error).toMatchObject({ code: "unrecognised_layout", status: 422 });
+          expect(error.message).toBe(
+            "This statement's layout isn't supported yet, and the AI reader can't be used right now. AI features are paused for everyone right now.",
+          );
+        });
+
+        it("is refused as unverified when the model's answer didn't hold up", async () => {
+          const wrong = reading(3);
+          wrong.r = wrong.r.map((row) => ({ ...row, a: "9.99" }));
+          const { options } = setUp({ reading: answered(wrong) });
+
+          expect(await refusal(() => buildDraft({ kind: "pdf", bytes: unclaimed() }, options))).toMatchObject({ code: "unverified_statement" });
+        });
+      });
+
+      it("is read by the parser, with no model, when AI is off", async () => {
+        const draft = await buildDraft({ kind: "pdf", bytes: pdfFile() });
+
+        expect(draft.batch.parser_id).toBe("test-pdf");
+      });
+    });
+  });
+
+  describe("a CSV with AI on keeps the parser first", () => {
+    it("reads it with the parser and asks the model only for categories", async () => {
+      const asked: string[] = [];
+      const ai: StatementAi = {
+        call: (async (request: { schemaName: string }) => {
+          asked.push(request.schemaName);
+          return { ok: true, value: { k: [{ c: "entertainment", s: null }] }, usage: { inputTokens: 1, outputTokens: 1, cachedInputTokens: 0 }, provider: "fake", model: "m", costMicros: 0 };
+        }) as StatementAi["call"],
+        loadHistory: async () => new Map(),
+      };
+
+      const draft = await buildDraft(csv(HEADER, "2026-09-01,Corner Cafe,-4.50,RON"), { ai, log: () => undefined });
+
+      expect(asked).toEqual(["statement_categories"]);
+      expect(draft.batch.parser_id).toBe("generic-csv+ai:statement-categorise-v1");
     });
   });
 

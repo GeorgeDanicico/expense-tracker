@@ -91,6 +91,8 @@ describe("the synthetic statements", () => {
     expect(rows.some((row) => row.currency !== "RON")).toBe(true);
     expect(rows.some((row) => row.direction === "credit")).toBe(true);
     expect(all.some((s) => /printed total/.test(s.expected.description))).toBe(true);
+    // Dates printed with a month name, which the model normalises (I21).
+    expect(all.find((s) => /month name/.test(s.expected.description))?.id).toBe("pdf-en-month-names");
     // The shapes that were known gaps of the reader before I20 stay in the set, now as ordinary statements.
     expect(all.find((s) => /day and month only/.test(s.expected.description))?.id).toBe("pdf-ro-no-year");
     expect(all.find((s) => /store number/.test(s.expected.description))?.id).toBe("csv-ro-comma-digits-before-amount");
@@ -175,11 +177,23 @@ describe("the dry run", () => {
     expect(report).toContain("Estimated cost $");
   });
 
+  it("hands the model's normalised dates and amounts to verification, whatever the statement prints", async () => {
+    const monthNames = (await statements()).find((s) => s.id === "pdf-en-month-names")!;
+    const { numbered } = await prepareStatement(monthNames);
+
+    expect(numbered.lines.some((line) => line.startsWith("12 Oct 2026\tZARA RO 0123\t-1,234.56\t"))).toBe(true);
+    expect(monthNames.answer!.r.find((row) => row.m === "Zara")).toMatchObject({ d: "2026-10-12", a: "1234.56", t: "d" });
+    expect(monthNames.answer!.s).toEqual({ c: "RON", t: "3571.66", l: expect.any(Number) });
+    // A year-less date is still given as the best full date.
+    const noYear = (await statements()).find((s) => s.id === "pdf-ro-no-year")!;
+    expect(noYear.answer!.r[0].d).toBe("2026-10-02");
+  });
+
   it("still labels a statement that is marked as a known gap of the reader", () => {
     const failed: StatementResult = {
       id: "gap-example", kind: "csv", mode: "read", outcome: "unverified", detail: "date_unreadable (row 1)", knownGap: true,
       expectedRows: 3, matchedRows: 0, extraRows: 0, categoryScored: 0, categoryCorrect: 0, categorySubtypeCorrect: 0,
-      perfect: false, warnings: 0, usage: null, costMicros: 0, ms: 0, answer: null,
+      perfect: false, warnings: 0, dropped: 0, usage: null, costMicros: 0, ms: 0, answer: null,
     };
 
     const report = renderMarkdown({
@@ -362,10 +376,21 @@ describe("running", () => {
     expect(result).toMatchObject({ outcome: "ok", matchedRows: 14, categoryScored: 11, categoryCorrect: 10, perfect: false });
   });
 
-  it("fails verification for an amount the statement doesn't have, as production would", async () => {
+  it("drops a row whose amount the statement doesn't have and keeps the rest, as production would", async () => {
     const item = await prepared("csv-en-iso-signed");
     const answer: ReaderAnswer = structuredClone(item.statement.answer!);
-    answer.r[0] = { ...answer.r[0], a: "-45.30" };
+    answer.r[0] = { ...answer.r[0], a: "45.30" };
+
+    const { jobs } = planJobs([item], ["read"]);
+    const [result] = await runJobs(jobs, { provider: new FakeProvider().willReturn(answer), model: "fake-model", effort: "none", price: LUNA });
+
+    expect(result).toMatchObject({ outcome: "ok", dropped: 1, matchedRows: 13, perfect: false });
+  });
+
+  it("fails verification when most of the rows don't match the statement", async () => {
+    const item = await prepared("csv-en-iso-signed");
+    const answer: ReaderAnswer = structuredClone(item.statement.answer!);
+    answer.r = answer.r.map((row) => ({ ...row, a: "0.07" }));
 
     const { jobs } = planJobs([item], ["read"]);
     const [result] = await runJobs(jobs, { provider: new FakeProvider().willReturn(answer), model: "fake-model", effort: "none", price: LUNA });

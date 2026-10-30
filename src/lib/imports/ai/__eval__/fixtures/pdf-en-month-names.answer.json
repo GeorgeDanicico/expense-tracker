@@ -1,0 +1,31 @@
+{
+  "r": [
+    {"l":[6],"d":"2026-10-01","a":"1500.00","c":null,"t":"d","m":"Rent"},
+    {"l":[7],"d":"2026-10-02","a":"45.20","c":null,"t":"d","m":"Lidl Cluj"},
+    {"l":[8],"d":"2026-10-05","a":"12.50","c":null,"t":"d","m":"Starbucks"},
+    {"l":[9],"d":"2026-10-07","a":"4500.00","c":null,"t":"c","m":"Salary Exemplu"},
+    {"l":[10],"d":"2026-10-09","a":"245.00","c":null,"t":"d","m":"Rompetrol"},
+    {"l":[11],"d":"2026-10-12","a":"1234.56","c":null,"t":"d","m":"Zara"},
+    {"l":[12],"d":"2026-10-15","a":"59.00","c":null,"t":"d","m":"Digi"},
+    {"l":[13,14],"d":"2026-10-18","a":"89.00","c":null,"t":"c","m":"Farmacia Catena"},
+    {"l":[15],"d":"2026-10-21","a":"76.40","c":null,"t":"d","m":"Dr Max"},
+    {"l":[16],"d":"2026-10-27","a":"399.00","c":null,"t":"d","m":"Udemy"}
+  ],
+  "k": [
+    {"m":"Rent","c":"housing","s":null},
+    {"m":"Lidl Cluj","c":"groceries","s":null},
+    {"m":"Starbucks","c":"entertainment","s":null},
+    {"m":"Salary Exemplu","c":"other","s":null},
+    {"m":"Rompetrol","c":"car","s":"car_fuel"},
+    {"m":"Zara","c":"shopping","s":null},
+    {"m":"Digi","c":"utilities","s":null},
+    {"m":"Farmacia Catena","c":"health","s":null},
+    {"m":"Dr Max","c":"health","s":null},
+    {"m":"Udemy","c":"education","s":null}
+  ],
+  "s": {
+    "c": "RON",
+    "t": "3571.66",
+    "l": 18
+  }
+}

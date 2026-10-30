@@ -16,8 +16,8 @@ import { IMPORT_DESCRIPTION_MAX_LENGTH } from "@/lib/imports/types";
  *
  * - `statement-categorise-v1`: code has read the rows and the model only names a category for each
  *   merchant nobody knew.
- * - `statement-reader-v1`: no parser claims the layout, so the model also finds the transactions
- *   in the numbered lines. Code then checks every row against the text (`verify.ts`).
+ * - `statement-reader-v2`: the model finds the transactions in the numbered lines and normalises
+ *   each one's date and amount. Code then checks every row against the text (`verify.ts`).
  *
  * The ids are versions: they go into the batch's `parser_id`, so a change to a prompt is visible on
  * every batch it touched. Change the text only together with the id.
@@ -34,7 +34,7 @@ import { IMPORT_DESCRIPTION_MAX_LENGTH } from "@/lib/imports/types";
  */
 
 export const STATEMENT_CATEGORISE_PROMPT_ID = "statement-categorise-v1";
-export const STATEMENT_READER_PROMPT_ID = "statement-reader-v1";
+export const STATEMENT_READER_PROMPT_ID = "statement-reader-v2";
 
 /** One line for each category, in the app's own words for it. */
 const CATEGORY_DESCRIPTIONS: Record<ExpenseCategory, string> = {
@@ -79,7 +79,7 @@ The input is a list of merchant names, one per line. Answer with k: one entry pe
 
 ${CATEGORY_RULES}`;
 
-export const READER_SYSTEM_PROMPT = `You read the text of a bank or card statement for a personal expense tracker and list its transactions. (${STATEMENT_READER_PROMPT_ID})
+export const READER_SYSTEM_PROMPT = `You read the text of a bank or card statement for a personal expense tracker, extract its transactions and categorise them. (${STATEMENT_READER_PROMPT_ID})
 
 ${DATA_RULE}
 
@@ -89,16 +89,16 @@ Answer with three parts.
 
 r: one entry for every transaction (a payment, a purchase, a fee, a transfer, a refund or any other movement of money), in statement order. Money in is listed too, with t "c"; money out has t "d". Skip headers, page footers, opening and closing balances, running balances, summaries and totals. Fields:
 - l: the line numbers the transaction is written on, 1 to 3 consecutive lines (a transaction may continue on the next lines). Cite every line that holds its date, its amount or its description, and no more.
-- d: the transaction's date, copied exactly as it is written on those lines. Never reformat it, never add a year the statement does not print.
-- a: the transaction's amount, copied exactly as it is written on those lines, with its separators and sign if any. Copy the transaction's own amount, never a running balance and never a total.
+- d: the transaction's date as YYYY-MM-DD, whatever format the statement prints it in (numbers, or a month name in English or Romanian). Read a numeric date day first: the statement is European, so 10/12 is the tenth of December. When the lines print no year, give your best full date: the year of the statement's period or of its other dates. Never move a date to another day or month.
+- a: the transaction's amount as a plain positive decimal in the transaction's currency: a dot as the decimal point, no thousands separator, no sign, no currency symbol or code, at most two decimals. Read the statement's own number format, so that "1.234,56" and "1,234.56" both become 1234.56. Give the transaction's own amount, never a running balance and never a total. The direction is t, not the sign.
 - c: the three-letter currency code (RON, EUR, USD) when the lines say which currency the amount is in, for example as a code or a symbol next to it; otherwise null.
 - t: "d" for money out (a payment, card purchase, fee, withdrawal, outgoing transfer), "c" for money in (salary, refund, incoming transfer, interest).
-- m: the merchant as a short, clean name in at most ${IMPORT_DESCRIPTION_MAX_LENGTH} characters, using only words that appear on the cited lines. Drop noise such as terminal numbers, card suffixes, dates and country codes; keep what identifies the shop or the payee. Never translate, never add a word that is not there.
+- m: the merchant as a short, clean name in at most ${IMPORT_DESCRIPTION_MAX_LENGTH} characters, made of words from the cited lines. Drop noise such as terminal numbers, card suffixes, dates and country codes, and fix the capitalisation; keep what identifies the shop or the payee. Never add a word that is not there.
 Never invent a transaction, and never list one transaction twice.
 
 k: one entry for each distinct merchant name m used in r, written exactly as in r, with its category c and, only when c is car, its subtype s (otherwise null). A merchant that appears in many transactions has one entry.
 
-s: the statement itself. c is its currency code when the statement states one, otherwise null. t is the total of money out that the statement itself prints (for example "total debits" or "total payments"), copied exactly as written, and l the number of the line it is printed on; both null when the statement prints no such total. Never compute a total yourself.
+s: the statement itself. c is its currency code when the statement states one, otherwise null. t is the total of money out that the statement itself prints (for example "total debits" or "total payments"), as a plain positive decimal in the same format as a, and l the number of the line it is printed on; both null when the statement prints no such total. Never compute a total yourself.
 
 ${CATEGORY_RULES}`;
 
@@ -124,11 +124,11 @@ export const readerSchema = z.object({
     .array(
       z.object({
         l: z.array(z.number()).describe("The 1 to 3 consecutive whole line numbers the transaction is written on."),
-        d: z.string().describe("The date, copied exactly as written on those lines."),
-        a: z.string().describe("The amount, copied exactly as written on those lines."),
+        d: z.string().describe("The date as YYYY-MM-DD, whatever format the lines print it in."),
+        a: z.string().describe("The amount as a plain positive decimal with a dot, no thousands separator, such as 1234.56."),
         c: z.string().nullable().describe("Three-letter currency code, or null when the lines do not say."),
         t: z.enum(["d", "c"]).describe("d for money out, c for money in."),
-        m: z.string().describe("A short, clean merchant name using only words found on those lines."),
+        m: z.string().describe("A short, clean merchant name made of words found on those lines."),
       }),
     )
     .describe("Every transaction in the statement, in order, money in included."),
@@ -144,7 +144,7 @@ export const readerSchema = z.object({
   s: z
     .object({
       c: z.string().nullable().describe("The statement's currency code, or null when it does not state one."),
-      t: z.string().nullable().describe("The total of money out the statement prints, copied exactly, or null when none is printed."),
+      t: z.string().nullable().describe("The total of money out the statement prints, as a plain positive decimal like a, or null when none is printed."),
       l: z.number().nullable().describe("The whole number of the line the printed total is on, or null."),
     })
     .describe("The statement's currency and its printed total of money out."),

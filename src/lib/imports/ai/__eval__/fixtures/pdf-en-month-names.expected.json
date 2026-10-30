@@ -1,0 +1,18 @@
+{
+  "description": "English PDF table whose dates are printed with a month name and a year (12 Oct 2026), dot decimals with comma thousands, signed amounts, a running balance, a refund over two lines, a printed total of money out.",
+  "currency": "RON",
+  "parser": "none",
+  "knownGap": null,
+  "rows": [
+    {"date":"2026-10-01","amount":"1500.00","currency":"RON","direction":"debit","merchant":"Rent","category":"housing","subtype":null},
+    {"date":"2026-10-02","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-10-05","amount":"12.50","currency":"RON","direction":"debit","merchant":"Starbucks","category":"entertainment","subtype":null},
+    {"date":"2026-10-07","amount":"4500.00","currency":"RON","direction":"credit","merchant":"Salary Exemplu","category":"other","subtype":null},
+    {"date":"2026-10-09","amount":"245.00","currency":"RON","direction":"debit","merchant":"Rompetrol","category":"car","subtype":"car_fuel"},
+    {"date":"2026-10-12","amount":"1234.56","currency":"RON","direction":"debit","merchant":"Zara","category":"shopping","subtype":null},
+    {"date":"2026-10-15","amount":"59.00","currency":"RON","direction":"debit","merchant":"Digi","category":"utilities","subtype":null},
+    {"date":"2026-10-18","amount":"89.00","currency":"RON","direction":"credit","merchant":"Farmacia Catena","category":"health","subtype":null},
+    {"date":"2026-10-21","amount":"76.40","currency":"RON","direction":"debit","merchant":"Dr Max","category":"health","subtype":null},
+    {"date":"2026-10-27","amount":"399.00","currency":"RON","direction":"debit","merchant":"Udemy","category":"education","subtype":null}
+  ]
+}

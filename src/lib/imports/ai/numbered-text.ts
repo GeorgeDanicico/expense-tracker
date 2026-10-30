@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { detectDelimiter, splitCsvLines, type CsvDelimiter } from "@/lib/imports/csv";
-import { parseStatementDate } from "@/lib/imports/date";
+import { findPrintedDates } from "@/lib/imports/date";
 import type { StatementSource } from "@/lib/imports/parser";
 import { maskAccountNumbers } from "@/lib/imports/redact";
 
@@ -39,31 +39,34 @@ export type NumberedStatement = {
   csv: { delimiter: CsvDelimiter; fields: string[][] } | null;
 };
 
-/** A date as `parseStatementDate` reads one: `YYYY-MM-DD` or day first with `.`, `/` or `-`, a time after it allowed. */
-const DATE_IN_TEXT = /(?<![\d./-])(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}([./-])\d{1,2}\1\d{4})(?!\d|[./-]\d)/g;
-
 /** An amount: digits with a decimal mark and one or two decimals ("45,20", "1.234,56", "-12.5"). */
 const AMOUNT_IN_TEXT = /(?<!\d)(?<!\d[.,])\d[\d.,' ]*[.,]\d{1,2}(?!\d)/;
 
-/** Whether a line has a date and an amount on it. Dates are taken out first, so "12.10.2026" isn't read as the amount "12.10". */
+/**
+ * Whether a line has a date and an amount on it. Only a date that prints its year counts (`2026-10-02`,
+ * `02.10.2026`, `2 Oct 2026`): "12.10" could as well be an amount. Dates are taken out first, so
+ * "12.10.2026" isn't read as the amount "12.10".
+ */
 export function looksLikeTransaction(line: string): boolean {
   const withoutDates = blankDates(line);
   return withoutDates !== line && AMOUNT_IN_TEXT.test(withoutDates);
 }
 
-/** The line with every date replaced by spaces of the same length, so offsets are kept and a date's digits are never read as an amount. */
-export function blankDates(line: string): string {
-  return line.replace(DATE_IN_TEXT, (date) => " ".repeat(date.length));
+/** The dates of a line that print a year, as `findPrintedDates` reads them. */
+function datesWithYear(line: string, options?: Parameters<typeof findPrintedDates>[1]) {
+  return findPrintedDates(line, options).filter((date) => date.year !== null);
 }
 
-/** The dates with a year written in a line, as `YYYY-MM-DD`; one `parseStatementDate` cannot read (31.02.2026) is left out. */
+/** The line with every date that prints a year (a 31.02.2026 too) replaced by spaces of the same length, so offsets are kept and a date's digits are never read as an amount. */
+export function blankDates(line: string): string {
+  let blanked = line;
+  for (const { start, end } of datesWithYear(line, { impossible: true })) blanked = `${blanked.slice(0, start)}${" ".repeat(end - start)}${blanked.slice(end)}`;
+  return blanked;
+}
+
+/** The dates with a year written in a line, as `YYYY-MM-DD`; one that doesn't exist (31.02.2026) is left out. */
 export function fullDatesIn(line: string): string[] {
-  const found: string[] = [];
-  for (const match of line.matchAll(DATE_IN_TEXT)) {
-    const date = parseStatementDate(match[0]);
-    if (date) found.push(date);
-  }
-  return found;
+  return datesWithYear(line).map(({ day, month, year }) => `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
 }
 
 function pad(number: number): string {

@@ -35,18 +35,23 @@ import {
  * payments, masks account numbers, checks the limits and hashes the result. Every error it throws
  * is an `ImportError` whose message never contains text from the file.
  *
- * Who reads the rows depends on the user's AI state (`options.ai`, present only when they opted in):
+ * Who reads the rows depends on the file and on the user's AI state (`options.ai`, present only
+ * when they opted in):
  *
- * - A parser claims the layout: it reads the rows, as built. With AI on, the merchants neither the
- *   merchant rule nor the user's history know go to the model in one small call (mode
- *   "categorise") for a category each.
- * - No parser claims it and AI is on: the model reads the numbered text (mode "read") and code
- *   verifies every row against that text before anything becomes a draft.
+ * - A PDF with AI on: the model reads the numbered text (mode "read") and code checks every row
+ *   against that text before anything becomes a draft, whether or not a parser would have claimed
+ *   it. If the model can't be asked (the flag is off, the month's budget is used up, the statement
+ *   is too long) or its answer doesn't hold up, a parser that claims the file reads it instead, as
+ *   with AI off. With no parser either, the user gets the reader's error: `unrecognised_layout`
+ *   with the gate's reason when it couldn't be asked, `unverified_statement` when it was.
+ * - A CSV, or a PDF with AI off, that a parser claims: the parser reads the rows, as built. With AI
+ *   on, the merchants neither the merchant rule nor the user's history know go to the model in one
+ *   small call (mode "categorise") for a category each.
+ * - A CSV no parser claims and AI is on: the model reads it (mode "read").
  * - No parser claims it and AI is off: `unrecognised_layout`, as before.
- * - A parser claims it and then can't read its rows (`PARSER_ERRORS_READ_BY_MODEL`) and AI is on:
- *   the model reads it as if no parser had claimed it. If the AI gate then refuses to make the call
- *   (the flag is off, the month's budget is used up, the user hasn't opted in) the parser's own
- *   error is what the user gets, exactly as with AI off.
+ * - A parser claims a CSV and then can't read its rows (`PARSER_ERRORS_READ_BY_MODEL`) and AI is
+ *   on: the model reads it as if no parser had claimed it. If the AI gate then refuses to make the
+ *   call the parser's own error is what the user gets, exactly as with AI off.
  */
 
 /** What `buildDraft` returns: the `create_import_batch` arguments, plus what the screen shows. */
@@ -122,10 +127,10 @@ export const READER_PARSER_ID = `ai:${STATEMENT_READER_PROMPT_ID}`;
  * The errors of a claiming parser that mean "I recognised the layout but couldn't read its rows",
  * which the model may still be able to read: `unreadable_statement` (a row that isn't a date, a
  * description and an amount, no currency on the rows, a quote that is never closed). Everything
- * else stays the parser's refusal, with no call: `ambiguous_amounts` (the model would face the same
- * decimal mark that nothing settles, and is never allowed to guess it) and the limits, which are
- * not parser errors at all: the size and signature checks come before any parsing, and `no_debits`
- * and `too_many_rows` are decided after a successful read, whoever read it.
+ * else stays the parser's refusal, with no call: `ambiguous_amounts` (a parser's own refusal to
+ * guess the decimal mark of its column) and the limits, which are not parser errors at all: the
+ * size and signature checks come before any parsing, and `no_debits` and `too_many_rows` are
+ * decided after a successful read, whoever read it.
  */
 const PARSER_ERRORS_READ_BY_MODEL: ReadonlySet<ImportErrorCode> = new Set(["unreadable_statement"]);
 
@@ -153,10 +158,10 @@ type Reading = { parsed: Omit<ParsedStatement, "rows"> & { rows: VerifiedRow[] }
 
 /**
  * Mode "read": numbers the masked lines, asks the model for the rows and checks every one against
- * the text. Refuses, with a message that never quotes the statement, when the model can't be asked
- * (`unrecognised_layout`, with the gate's reason), when its answer is unusable or doesn't hold up
- * against the text (`unverified_statement`), when the amounts can't be read without guessing
- * (`ambiguous_amounts`) or when no currency is stated.
+ * the text; a row that doesn't hold up is left out with a warning. Refuses, with a message that
+ * never quotes the statement, when the model can't be asked (`unrecognised_layout`, with the
+ * gate's reason), when its answer is unusable or most of it doesn't hold up against the text
+ * (`unverified_statement`) or when no currency is stated.
  */
 async function readWithModel(
   ai: StatementAi,
@@ -196,11 +201,17 @@ async function readWithModel(
   if (!verified.ok) {
     // The reason and the row's position only; the text stays out of the log.
     log({ mode: "read", outcome: "unverified", reason: verified.reason, row: verified.row });
-    if (verified.reason === "ambiguous_amounts") throw new ImportError("ambiguous_amounts");
     if (verified.reason === "no_currency") throw new ImportError("unreadable_statement", NO_CURRENCY);
     throw new ImportError("unverified_statement");
   }
-  log({ mode: "read", outcome: "ok", rows: verified.rows.length, warnings: verified.warnings.length });
+  // The rows left out are named by reason and position only; the text stays out of the log.
+  log({
+    mode: "read",
+    outcome: "ok",
+    rows: verified.rows.length,
+    warnings: verified.warnings.length,
+    ...(verified.dropped.length > 0 ? { dropped: verified.dropped } : {}),
+  });
 
   const dates = verified.rows.map((row) => row.expenseDate).sort();
   return {
@@ -282,11 +293,11 @@ async function chooseCategories(
 
 /**
  * Parses an upload into a draft: decodes the text (a PDF's text is read by `extractPdfText`, which
- * refuses a protected, scanned or over-long PDF), finds a parser, or with AI on has the model read
- * the text and verifies its rows (`unrecognised_layout` when no parser claims it and AI is off; a
- * parser that claims a file and then can't read its rows hands it to the model too, see
- * `PARSER_ERRORS_READ_BY_MODEL`),
- * keeps the debits and counts the credits, masks IBAN- and card-number-shaped text in each
+ * refuses a protected, scanned or over-long PDF), then has the file read as the module comment
+ * says: a PDF by the model when AI is on, a parser's file by the parser, a CSV no parser claims or
+ * claims and can't read (see `PARSER_ERRORS_READ_BY_MODEL`) by the model when AI is on, and
+ * `unrecognised_layout` when nobody can. The model's rows are verified against the text first.
+ * Then it keeps the debits and counts the credits, masks IBAN- and card-number-shaped text in each
  * description and moves anything past 120 characters to the row's notes, then refuses a statement
  * with no debits (`no_debits`) or more than 500 of them (`too_many_rows`) and hashes it. With AI on,
  * each row also gets a first category, from the merchant rule, the user's history or the model.
@@ -321,12 +332,37 @@ export async function buildDraft(
       throw new ImportError("unreadable_statement");
     }
   };
-
-  if (findParser(source)) {
+  /** The claiming parser's rows; its refusal is an `ImportError` with nothing from the file in it. */
+  const readByParser = (): ParsedCandidates => {
     try {
-      parsed = parseStatement(source);
+      return parseStatement(source);
     } catch (error) {
-      const refusal = error instanceof ImportError ? error : new ImportError("unreadable_statement");
+      throw error instanceof ImportError ? error : new ImportError("unreadable_statement");
+    }
+  };
+
+  const claimed = findParser(source) !== null;
+
+  if (kind === "pdf" && ai) {
+    // The model reads a PDF whenever it can be asked; a parser is the way out when it can't or when
+    // its answer doesn't hold up.
+    try {
+      ({ parsed, numbered } = await readByModel(ai));
+    } catch (readError) {
+      if (!claimed) throw readError;
+      log({ mode: "read", fallbackTo: "parser", ...(readError instanceof ImportError ? { reason: readError.code } : {}) });
+      try {
+        parsed = readByParser();
+      } catch (parseError) {
+        // Not asked: the parser's own error, as with AI off. Asked and failed: the reader's, which says more.
+        throw readError instanceof ReaderUnavailableError ? parseError : readError;
+      }
+    }
+  } else if (claimed) {
+    try {
+      parsed = readByParser();
+    } catch (error) {
+      const refusal = error as ImportError;
       if (!ai || !PARSER_ERRORS_READ_BY_MODEL.has(refusal.code)) throw refusal;
 
       // A parser claimed the layout and couldn't read its rows: the model reads the text instead.

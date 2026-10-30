@@ -1,0 +1,89 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Filter /Standard /V 1 /R 2 /P -4 /O <abababababababababababababababababababababababababababababababab> /U <cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd> >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 2357 >>
+stream
+BT /F1 10 Tf 50 792 Td (Example Bank - Account statement) Tj ET
+BT /F1 10 Tf 50 776 Td (Statement period 1 Oct 2026 to 31 Oct 2026) Tj ET
+BT /F1 10 Tf 50 760 Td (Currency: RON) Tj ET
+BT /F1 10 Tf 50 744 Td (Date) Tj ET
+BT /F1 10 Tf 185 744 Td (Description) Tj ET
+BT /F1 10 Tf 320 744 Td (Amount) Tj ET
+BT /F1 10 Tf 455 744 Td (Balance) Tj ET
+BT /F1 10 Tf 50 728 Td (Opening balance) Tj ET
+BT /F1 10 Tf 185 728 Td (9,000.00) Tj ET
+BT /F1 10 Tf 50 712 Td (1 Oct 2026) Tj ET
+BT /F1 10 Tf 185 712 Td (RENT OCTOBER) Tj ET
+BT /F1 10 Tf 320 712 Td (-1,500.00) Tj ET
+BT /F1 10 Tf 455 712 Td (7,500.00) Tj ET
+BT /F1 10 Tf 50 696 Td (2 Oct 2026) Tj ET
+BT /F1 10 Tf 185 696 Td (POS LIDL CLUJ) Tj ET
+BT /F1 10 Tf 320 696 Td (-45.20) Tj ET
+BT /F1 10 Tf 455 696 Td (7,454.80) Tj ET
+BT /F1 10 Tf 50 680 Td (5 Oct 2026) Tj ET
+BT /F1 10 Tf 185 680 Td (STARBUCKS CLUJ) Tj ET
+BT /F1 10 Tf 320 680 Td (-12.50) Tj ET
+BT /F1 10 Tf 455 680 Td (7,442.30) Tj ET
+BT /F1 10 Tf 50 664 Td (7 Oct 2026) Tj ET
+BT /F1 10 Tf 185 664 Td (SALARY EXEMPLU SRL) Tj ET
+BT /F1 10 Tf 320 664 Td (+4,500.00) Tj ET
+BT /F1 10 Tf 455 664 Td (11,942.30) Tj ET
+BT /F1 10 Tf 50 648 Td (9 Oct 2026) Tj ET
+BT /F1 10 Tf 185 648 Td (ROMPETROL 0412) Tj ET
+BT /F1 10 Tf 320 648 Td (-245.00) Tj ET
+BT /F1 10 Tf 455 648 Td (11,697.30) Tj ET
+BT /F1 10 Tf 50 632 Td (12 Oct 2026) Tj ET
+BT /F1 10 Tf 185 632 Td (ZARA RO 0123) Tj ET
+BT /F1 10 Tf 320 632 Td (-1,234.56) Tj ET
+BT /F1 10 Tf 455 632 Td (10,462.74) Tj ET
+BT /F1 10 Tf 50 616 Td (15 Oct 2026) Tj ET
+BT /F1 10 Tf 185 616 Td (DIGI ROMANIA SA) Tj ET
+BT /F1 10 Tf 320 616 Td (-59.00) Tj ET
+BT /F1 10 Tf 455 616 Td (10,403.74) Tj ET
+BT /F1 10 Tf 50 600 Td (18 Oct 2026) Tj ET
+BT /F1 10 Tf 185 600 Td (REFUND FARMACIA) Tj ET
+BT /F1 10 Tf 320 600 Td (+89.00) Tj ET
+BT /F1 10 Tf 455 600 Td (10,492.74) Tj ET
+BT /F1 10 Tf 50 584 Td (CATENA 331) Tj ET
+BT /F1 10 Tf 50 568 Td (21 Oct 2026) Tj ET
+BT /F1 10 Tf 185 568 Td (DR MAX 1045) Tj ET
+BT /F1 10 Tf 320 568 Td (-76.40) Tj ET
+BT /F1 10 Tf 455 568 Td (10,416.34) Tj ET
+BT /F1 10 Tf 50 552 Td (27 Oct 2026) Tj ET
+BT /F1 10 Tf 185 552 Td (UDEMY U1234) Tj ET
+BT /F1 10 Tf 320 552 Td (-399.00) Tj ET
+BT /F1 10 Tf 455 552 Td (10,017.34) Tj ET
+BT /F1 10 Tf 50 536 Td (Closing balance) Tj ET
+BT /F1 10 Tf 185 536 Td (10,017.34) Tj ET
+BT /F1 10 Tf 50 520 Td (Total money out) Tj ET
+BT /F1 10 Tf 185 520 Td (3,571.66) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000212 00000 n 
+0000000407 00000 n 
+0000000533 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2941
+%%EOF
