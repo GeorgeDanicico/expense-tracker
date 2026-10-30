@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { getBucharestToday } from "@/lib/calendar";
 import { numberStatement } from "@/lib/imports/ai/numbered-text";
 import type { ReaderAnswer } from "@/lib/imports/ai/prompts";
 import { verifyReading } from "@/lib/imports/ai/verify";
@@ -94,7 +95,7 @@ describe("verifyReading: what is accepted", () => {
 describe("verifyReading: every number is found whole", () => {
   it.each([
     ["an amount inside a longer one", "-45.20", "2026-10-02,Corner Cafe,-145.20"],
-    ["an amount from the middle of a grouped one", "-234.56", "2026-10-02,Corner Cafe,-1,234.56"],
+    ["an amount from the middle of a grouped one", "-234.56", '2026-10-02,Corner Cafe,"-1,234.56"'],
     ["an amount missing a decimal", "-45.2", "2026-10-02,Corner Cafe,-45.20"],
     ["an amount that is only a part of a date", "-12.10", "12.10.2026,Corner Cafe,-4.50"],
     ["an amount that is not there", "-4.51", "2026-10-02,Corner Cafe,-4.50"],
@@ -123,10 +124,10 @@ describe("verifyReading: every number is found whole", () => {
   });
 
   it("refuses a date that is on the line but is not one code can read", () => {
-    const text = statement("2026-13-45,Corner Cafe,-4.50", "2 Oct,Corner Cafe,-4.50");
+    const text = statement("2026-13-45,Corner Cafe,-4.50", "2 Foo,Corner Cafe,-4.50");
 
     expect(failureOf(verifyReading(answer([row({ d: "2026-13-45" })]), text)).reason).toBe("date_unreadable");
-    expect(failureOf(verifyReading(answer([row({ l: [3], d: "2 Oct" })]), text)).reason).toBe("date_unreadable");
+    expect(failureOf(verifyReading(answer([row({ l: [3], d: "2 Foo" })]), text)).reason).toBe("date_unreadable");
   });
 });
 
@@ -269,5 +270,231 @@ describe("verifyReading: the model's categories", () => {
     const result = verifyReading(answer([row()], { k: [] }), text);
 
     expect(result).toMatchObject({ ok: true, rows: [{ suggestion: null }] });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Dates printed without a year
+// ---------------------------------------------------------------------------------------------
+
+describe("verifyReading: dates printed without a year", () => {
+  /** A PDF-like statement: the given lines, one per line, with columns separated by tabs. */
+  const pdf = (...lines: string[]) => numberStatement({ kind: "pdf", text: lines.join("\n"), pages: [lines] });
+  const October = ["Perioada 01.10.2026 - 31.10.2026", "Moneda: RON", "Data\tDescriere\tSuma"];
+  const dated = (d: string, extra: Partial<Row> = {}) => row({ l: [4], d, a: "-4,50", ...extra });
+
+  it.each([
+    ["12.10", "12.10\tCORNER CAFE\t-4,50"],
+    ["12/10", "12/10\tCORNER CAFE\t-4,50"],
+    ["12.10.", "12.10.\tCORNER CAFE\t-4,50"],
+    ["12 Oct", "12 Oct\tCORNER CAFE\t-4,50"],
+    ["12 oct.", "12 oct.\tCORNER CAFE\t-4,50"],
+    ["12 octombrie", "12 octombrie\tCORNER CAFE\t-4,50"],
+  ])("reads %j, taking the year from the period the statement prints", (printed, line) => {
+    const result = verifyReading(answer([dated(printed)]), pdf(...October, line), { today: "2030-01-01" });
+
+    expect(result).toMatchObject({ ok: true, rows: [{ expenseDate: "2026-10-12", amount: 4.5 }] });
+  });
+
+  it("warns that the year was worked out, without quoting the statement", () => {
+    const result = verifyReading(answer([dated("12.10")]), pdf(...October, "12.10\tCORNER CAFE\t-4,50"));
+
+    expect(result).toMatchObject({
+      ok: true,
+      warnings: ["1 date is printed without a year; the year was worked out from the statement's other dates. Check it below."],
+    });
+  });
+
+  it("gives each date its year in a statement that runs over New Year", () => {
+    const text = pdf(
+      "Perioada 05.12.2026 - 04.01.2027",
+      "Moneda: RON",
+      "Data\tDescriere\tSuma",
+      "28.12\tCORNER CAFE\t-4,50",
+      "02.01\tCORNER CAFE\t-6,00",
+    );
+
+    const result = verifyReading(answer([dated("28.12"), row({ l: [5], d: "02.01", a: "-6,00" })]), text);
+
+    expect(result).toMatchObject({ ok: true, rows: [{ expenseDate: "2026-12-28" }, { expenseDate: "2027-01-02" }] });
+  });
+
+  it("uses the full dates of other rows when there is no heading", () => {
+    const text = pdf("Moneda: RON", "02.10.2026\tSHOP A\t-1,00", "12.10\tCORNER CAFE\t-4,50", "30.10.2026\tSHOP B\t-2,00");
+
+    const result = verifyReading(answer([row({ l: [3], d: "12.10", a: "-4,50" })]), text);
+
+    expect(result).toMatchObject({ ok: true, rows: [{ expenseDate: "2026-10-12" }] });
+  });
+
+  describe("with no full date anywhere", () => {
+    const text = pdf("Moneda: RON", "12.10\tCORNER CAFE\t-4,50", "31.10\tCORNER CAFE\t-4,50", "29.02\tCORNER CAFE\t-4,50");
+    const read = (printed: string, line: number) => verifyReading(answer([row({ l: [line], d: printed, a: "-4,50" })]), text, { today: "2026-10-30" });
+
+    it("takes the most recent occurrence that is not after today", () => {
+      expect(read("12.10", 2)).toMatchObject({ ok: true, rows: [{ expenseDate: "2026-10-12" }] });
+      expect(read("31.10", 3)).toMatchObject({ ok: true, rows: [{ expenseDate: "2025-10-31" }] });
+      expect(read("29.02", 4)).toMatchObject({ ok: true, rows: [{ expenseDate: "2024-02-29" }] });
+    });
+
+    it("says so in the warning", () => {
+      expect(read("12.10", 2)).toMatchObject({
+        warnings: ["1 date is printed without a year; the most recent year that isn't in the future was used. Check it below."],
+      });
+    });
+
+    it("defaults to today in Europe/Bucharest", () => {
+      const result = verifyReading(answer([row({ l: [2], d: "12.10", a: "-4,50" })]), text);
+
+      expect(result.ok && result.rows[0].expenseDate <= getBucharestToday()).toBe(true);
+    });
+  });
+
+  describe("refuses", () => {
+    it.each([
+      ["a day that does not exist", "31.11"],
+      ["a 30 February", "30.02"],
+      ["a month-first date, which a day-first reader cannot read", "10/25"],
+      ["a month that is no month", "12.13"],
+      ["a name that is no month", "12 Foo"],
+    ])("%s", (_name, printed) => {
+      const text = pdf(...October, `${printed}\tCORNER CAFE\t-4,50`);
+
+      expect(failureOf(verifyReading(answer([dated(printed)]), text))).toMatchObject({ reason: "date_unreadable", row: 0 });
+    });
+
+    it("a date that is not written on the cited lines, or only as part of something longer", () => {
+      const text = pdf(...October, "12.10\tCORNER CAFE\t-4,50", "112.10\tCORNER CAFE\t-4,50", "12 octombrie\tCORNER CAFE\t-4,50");
+
+      expect(failureOf(verifyReading(answer([dated("13.10")]), text)).reason).toBe("date_not_found");
+      expect(failureOf(verifyReading(answer([dated("12.10", { l: [5] })]), text)).reason).toBe("date_not_found");
+      expect(failureOf(verifyReading(answer([dated("12 oct", { l: [6] })]), text)).reason).toBe("date_not_found");
+    });
+
+    it("a date copied without the year that the statement prints right after it", () => {
+      const text = pdf(...October, "12.10.2026\tCORNER CAFE\t-4,50", "13 oct. 2026\tCORNER CAFE\t-4,50", "14.10 2026\tCORNER CAFE\t-4,50");
+
+      expect(failureOf(verifyReading(answer([dated("12.10")]), text)).reason).toBe("date_not_found");
+      expect(failureOf(verifyReading(answer([dated("13 oct.", { l: [5] })]), text)).reason).toBe("date_not_found");
+      expect(failureOf(verifyReading(answer([dated("14.10", { l: [6] })]), text)).reason).toBe("date_not_found");
+    });
+
+    it("a date that is really the row's amount", () => {
+      const text = pdf(...October, "CORNER CAFE\t12.10", "12.10\tCORNER CAFE\t12.10");
+
+      expect(failureOf(verifyReading(answer([dated("12.10", { a: "12.10" })]), text)).reason).toBe("date_not_found");
+      expect(verifyReading(answer([dated("12.10", { a: "12.10", l: [5] })]), text).ok).toBe(true);
+    });
+
+    it("a date whose year cannot be told: a period of more than a year with the date inside it twice", () => {
+      const text = pdf("Perioada 01.01.2025 - 31.12.2026", "Moneda: RON", "Data\tDescriere\tSuma", "12.10\tCORNER CAFE\t-4,50");
+
+      expect(failureOf(verifyReading(answer([dated("12.10")]), text)).reason).toBe("date_unreadable");
+    });
+  });
+
+  it("leaves full dates exactly as they were read", () => {
+    const text = pdf(...October, "12.10.2025\tCORNER CAFE\t-4,50");
+
+    const result = verifyReading(answer([dated("12.10.2025")]), text);
+
+    expect(result).toMatchObject({ ok: true, rows: [{ expenseDate: "2025-10-12" }], warnings: [] });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Amounts in a CSV are matched field by field
+// ---------------------------------------------------------------------------------------------
+
+describe("verifyReading: amounts in a CSV are matched by field", () => {
+  const csv = (header: string, ...lines: string[]) => numberStatement({ kind: "csv", text: [header, ...lines].join("\n") });
+  const debit = (d: string, a: string, m: string, l = 2) => row({ l: [l], d, a, m });
+
+  describe("a store number before the amount in a comma file", () => {
+    const text = csv("Data,Detalii,Debit RON,Credit", "2026-09-03,Plata POS Mega Image 118,118.40,", "2026-09-04,Plata POS Lidl,45.20,");
+
+    it("reads the amount as the field it is", () => {
+      const result = verifyReading(answer([debit("2026-09-03", "118.40", "Mega Image")], { s: { c: "RON", t: null, l: null } }), text);
+
+      expect(result).toMatchObject({ ok: true, rows: [{ amount: 118.4, description: "Mega Image" }] });
+    });
+
+    it.each([
+      ["the two numbers read as one", "118,118.40"],
+      ["a part of the amount", "18.40"],
+      ["the amount with a digit changed", "118.41"],
+      ["the amount with its cents dropped", "118.4"],
+      ["an amount from another line", "45.20"],
+    ])("still refuses %s", (_name, claimed) => {
+      expect(failureOf(verifyReading(answer([debit("2026-09-03", claimed, "Mega Image")]), text))).toMatchObject({ reason: "amount_not_found", row: 0 });
+    });
+
+    it("keeps the other rows working", () => {
+      const result = verifyReading(answer([debit("2026-09-04", "45.20", "Lidl", 3)]), text);
+
+      expect(result).toMatchObject({ ok: true, rows: [{ amount: 45.2 }] });
+    });
+  });
+
+  describe("a thousands number inside one quoted field", () => {
+    const text = csv("Data,Detalii,Suma RON", '2026-09-03,Plata POS Mega Image,"1,118.40"');
+
+    it("is one amount, 1118.40", () => {
+      const result = verifyReading(answer([debit("2026-09-03", "1,118.40", "Mega Image")]), text);
+
+      expect(result).toMatchObject({ ok: true, rows: [{ amount: 1118.4 }] });
+    });
+
+    it.each([
+      ["the part after the group", "118.40"],
+      ["the part before it", "1"],
+      ["the group dropped", "1118.40"],
+    ])("still refuses a model claiming %s", (_name, claimed) => {
+      expect(failureOf(verifyReading(answer([debit("2026-09-03", claimed, "Mega Image")]), text)).reason).toBe("amount_not_found");
+    });
+  });
+
+  it("keeps a comma inside the field when another delimiter separates the fields", () => {
+    const text = csv("Data;Detalii;Suma RON", "2026-09-03;Plata POS Mega Image 118,118.40;118,40", "2026-09-04;Plata POS Lidl;1.118,40");
+
+    expect(verifyReading(answer([debit("2026-09-03", "118,40", "Mega Image")]), text).ok).toBe(true);
+    expect(verifyReading(answer([debit("2026-09-04", "1.118,40", "Lidl", 3)]), text).ok).toBe(true);
+    // Not the stretch of the description that only looks like a thousands number.
+    expect(failureOf(verifyReading(answer([debit("2026-09-04", "118,40", "Lidl", 3)]), text)).reason).toBe("amount_not_found");
+  });
+
+  it("matches a number that is part of a longer text in a field, but only as a whole number", () => {
+    const text = csv("Data,Detalii,Suma RON", "2026-09-03,Plata POS Mega Image 118 EUR 45.20,-45.20 RON");
+
+    expect(verifyReading(answer([debit("2026-09-03", "-45.20 RON", "Mega Image")]), text).ok).toBe(true);
+    expect(verifyReading(answer([debit("2026-09-03", "45.20", "Mega Image")]), text).ok).toBe(true);
+    expect(failureOf(verifyReading(answer([debit("2026-09-03", "5.20", "Mega Image")]), text)).reason).toBe("amount_not_found");
+  });
+
+  it("finds the amount on the last line of a quoted field that runs over several lines", () => {
+    const text = csv("Data,Detalii,Suma RON", '2026-09-03,"Plata POS', 'Mega Image 118",-118.40');
+
+    const result = verifyReading(answer([row({ l: [2, 3], d: "2026-09-03", a: "-118.40", m: "Mega Image" })]), text);
+
+    expect(result).toMatchObject({ ok: true, rows: [{ amount: 118.4 }] });
+  });
+
+  it("finds a printed total by field as well, and warns when the rows do not add up to it", () => {
+    const text = csv("Data,Detalii,Debit RON", "2026-09-03,Plata POS Mega Image 118,118.40", "Total,Total plati 2,200.00");
+    const reading = (printed: string) => answer([debit("2026-09-03", "118.40", "Mega Image")], { s: { c: "RON", t: printed, l: 3 } });
+
+    expect(verifyReading(reading("200.00"), text)).toMatchObject({
+      ok: true,
+      warnings: ["The rows read add up to 118.40, but the statement's printed total of money out is 200.00 (a difference of 81.60)."],
+    });
+    // "2,200.00" is two fields in a comma file, so it is not a number of the line and no total is compared.
+    expect(verifyReading(reading("2,200.00"), text)).toMatchObject({ ok: true, warnings: [] });
+  });
+
+  it("does not change how a PDF line is read: the same text is one number there", () => {
+    const text = numberStatement({ kind: "pdf", text: "x", pages: [["Moneda: RON", "03.09.2026\tPlata POS Mega Image 118,118.40"]] });
+
+    expect(failureOf(verifyReading(answer([debit("03.09.2026", "118.40", "Mega Image")]), text)).reason).toBe("amount_not_found");
+    expect(verifyReading(answer([debit("03.09.2026", "118,118.40", "Mega Image")]), text)).toMatchObject({ ok: true, rows: [{ amount: 118118.4 }] });
   });
 });

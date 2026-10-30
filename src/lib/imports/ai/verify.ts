@@ -1,6 +1,7 @@
 import { centsToAmount, detectDecimalMark, parseAmount, type DecimalMark } from "@/lib/imports/amount";
 import { subtypeForCategory } from "@/lib/expenses/categories";
-import { parseStatementDate } from "@/lib/imports/date";
+import { getBucharestToday } from "@/lib/calendar";
+import { parseStatementDate, parseYearlessStatementDate, resolveYearlessDate } from "@/lib/imports/date";
 import { blankDates, type NumberedStatement } from "@/lib/imports/ai/numbered-text";
 import type { Classification } from "@/lib/imports/ai/categories";
 import type { ReaderAnswer } from "@/lib/imports/ai/prompts";
@@ -13,7 +14,12 @@ import { IMPORT_CURRENCY_PATTERN, type ParsedRow } from "@/lib/imports/types";
  * 1. The date `d` and the amount `a` occur on the lines the row cites, as whole numbers (the
  *    amount "45.20" is not found in "145.20", nor "234.56" in "1,234.56"). Then code parses them,
  *    the amount with one decimal mark decided over every amount (`detectDecimalMark`) and the date
- *    with `parseStatementDate`: the model never supplies a number.
+ *    with `parseStatementDate`: the model never supplies a number. In a CSV an amount is matched
+ *    field by field, with the CSV reader's own delimiter and quoting, so "Mega Image 118,118.40"
+ *    in a comma file is the store number 118 and the amount 118.40, while "1,118.40" in quotes is
+ *    still the one amount 1118.40. A date printed without a year ("12.10", "12 oct.") is found the
+ *    same way, and code gives it its year (`resolveYearlessDate`) from the other dates the
+ *    statement prints, or else from today; the model never supplies a year either.
  * 2. Every word of the merchant `m` (case and accents folded) occurs on the cited lines, so a
  *    cleaned name can drop noise but cannot invent a shop.
  * 3. No line carries the amounts of two different transactions.
@@ -84,7 +90,7 @@ function numbers(text: string): { text: string; start: number }[] {
  * on the line: the text occurs, and the number inside it is a whole number of the line, not a part
  * of a longer one. Dates are blanked first.
  */
-function amountOnLine(value: string, line: string): boolean {
+function amountInText(value: string, line: string): boolean {
   const wanted = collapse(value);
   const inValue = numbers(wanted);
   if (inValue.length !== 1) return false;
@@ -94,6 +100,17 @@ function amountOnLine(value: string, line: string): boolean {
   return numbers(haystack).some(
     (found) => found.text === digits && haystack.slice(found.start - offset, found.start - offset + wanted.length) === wanted,
   );
+}
+
+/**
+ * Whether the amount is written on the numbered line `lineNumber`. In a PDF it is a whole number of
+ * the line's text; in a CSV it is a whole number of one of the line's fields, so a number that runs
+ * into the amount only through the delimiter ("118,118.40" in a comma file) is two numbers.
+ */
+function amountOnLine(value: string, lineNumber: number, statement: NumberedStatement): boolean {
+  const fields = statement.csv?.fields[lineNumber - 1];
+  if (!fields) return amountInText(value, statement.lines[lineNumber - 1]);
+  return fields.some((field) => amountInText(value, field));
 }
 
 /** Whether the date, as the model copied it, is written in the text on its own: not inside a longer number or date. */
@@ -109,6 +126,36 @@ function dateOnLines(value: string, text: string): boolean {
     if (!/[\d./-]$/.test(before) && !/^(?:\d|[./-]\d)/.test(after)) return true;
     from = at + 1;
   }
+}
+
+/**
+ * Whether a date printed without a year, as the model copied it, is written in the text on its own:
+ * not a part of a longer number or date ("12.10" is not in "112.10", "12.10.2026" or a signed
+ * amount), not the first letters of a longer word ("12 oct" is not in "12 octombrie"), and not a
+ * date whose year is printed right after it (the model must copy the year it is shown). When the
+ * amount reads the same as the date, the text must hold it twice.
+ */
+function yearlessDateOnLines(value: string, text: string, amount: string): boolean {
+  const wanted = collapse(value);
+  if (wanted === "") return false;
+  const amountDigits = numbers(collapse(amount))[0]?.text;
+  const needed = amountDigits === wanted ? 2 : 1;
+
+  let count = 0;
+  let from = 0;
+  while (true) {
+    const at = text.indexOf(wanted, from);
+    if (at < 0) break;
+    const before = text.slice(0, at);
+    const after = text.slice(at + wanted.length);
+    const standsAlone =
+      !/[\p{L}\p{N}./+-]$/u.test(before) &&
+      !/^(?:\p{L}|\d|[./-]\d|,\d)/u.test(after) &&
+      !/^[\s./-]*(?:19|20)\d{2}(?!\d|[.,]\d)/.test(after);
+    if (standsAlone) count += 1;
+    from = at + 1;
+  }
+  return count >= needed;
 }
 
 const CURRENCY_SYMBOLS: Record<string, RegExp> = {
@@ -144,11 +191,20 @@ function citedLines(lines: readonly number[], lineCount: number): number[] | nul
   return [...lines];
 }
 
+export type VerifyOptions = {
+  /** Today as `YYYY-MM-DD` in Europe/Bucharest (the default), for dates printed without a year in a statement that prints no date with one. */
+  today?: string;
+};
+
 /**
  * Checks the model's reading against the numbered statement. Returns the verified rows (typed by
  * code, with the model's category for each merchant) and warnings, or the first check that failed.
  */
-export function verifyReading(answer: ReaderAnswer, statement: NumberedStatement): VerifyResult {
+export function verifyReading(
+  answer: ReaderAnswer,
+  statement: NumberedStatement,
+  options: VerifyOptions = {},
+): VerifyResult {
   const { lines, transactionLines } = statement;
   const readRows = answer.r;
 
@@ -170,6 +226,8 @@ export function verifyReading(answer: ReaderAnswer, statement: NumberedStatement
   const used = new Set<number>();
   const rows: VerifiedRow[] = [];
   let zeroAmounts = 0;
+  let yearless = 0;
+  const today = options.today ?? getBucharestToday();
 
   const suggestions = new Map<string, Classification>();
   for (const entry of answer.k) {
@@ -182,11 +240,20 @@ export function verifyReading(answer: ReaderAnswer, statement: NumberedStatement
     const text = numbersCited.map((number) => lines[number - 1]).join(" ");
 
     // 1. The date and the amount are on the lines, and code reads them.
-    if (!dateOnLines(row.d, collapse(text))) return failure("date_not_found", index);
-    const expenseDate = parseStatementDate(row.d);
+    let expenseDate: string | null;
+    const dayMonth = parseStatementDate(row.d) === null ? parseYearlessStatementDate(row.d) : null;
+    if (dayMonth) {
+      // Printed without a year: found as written, then given a year by code, never by the model.
+      if (!yearlessDateOnLines(row.d, collapse(text), row.a)) return failure("date_not_found", index);
+      expenseDate = resolveYearlessDate(dayMonth, { fullDates: statement.fullDates, today });
+      if (expenseDate) yearless += 1;
+    } else {
+      if (!dateOnLines(row.d, collapse(text))) return failure("date_not_found", index);
+      expenseDate = parseStatementDate(row.d);
+    }
     if (!expenseDate) return failure("date_unreadable", index);
 
-    const onLine = numbersCited.filter((number) => amountOnLine(row.a, lines[number - 1]));
+    const onLine = numbersCited.filter((number) => amountOnLine(row.a, number, statement));
     if (onLine.length === 0) return failure("amount_not_found", index);
     const signed = parseAmount(row.a, { decimal });
     if (signed === null) return failure("amount_unreadable", index);
@@ -225,12 +292,19 @@ export function verifyReading(answer: ReaderAnswer, statement: NumberedStatement
 
   const warnings: string[] = [];
   if (zeroAmounts > 0) warnings.push(`${zeroAmounts} ${zeroAmounts === 1 ? "row" : "rows"} with a zero amount skipped.`);
+  if (yearless > 0) {
+    warnings.push(
+      `${yearless} ${yearless === 1 ? "date is" : "dates are"} printed without a year; ${
+        statement.fullDates.length > 0 ? "the year was worked out from the statement's other dates" : "the most recent year that isn't in the future was used"
+      }. Check ${yearless === 1 ? "it" : "them"} below.`,
+    );
+  }
 
   // 4. The printed total of money out, when it is on its line and reads as an amount.
   const { t: printed, l: printedLine } = answer.s;
   let totalLine: number | null = null;
   if (printed !== null && printedLine !== null && Number.isInteger(printedLine) && printedLine >= 1 && printedLine <= lines.length) {
-    if (amountOnLine(printed, lines[printedLine - 1])) {
+    if (amountOnLine(printed, printedLine, statement)) {
       totalLine = printedLine;
       const total = parseAmount(printed, { decimal });
       if (total !== null) {
