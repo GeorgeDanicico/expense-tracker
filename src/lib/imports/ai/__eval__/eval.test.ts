@@ -10,6 +10,7 @@ import { CONFIRMATION_WORD, main, parseCli, type CliIo } from "@/lib/imports/ai/
 import { FIXTURES_DIR, fixtureFiles } from "@/lib/imports/ai/__eval__/fixture-files";
 import { estimateCost, estimateJobInputTokens, planJobs, prepareStatement, runJobs, type StatementResult } from "@/lib/imports/ai/__eval__/harness";
 import { loadStatements, pdfFromText } from "@/lib/imports/ai/__eval__/load";
+import { renderMarkdown } from "@/lib/imports/ai/__eval__/report";
 import { merchantMatches, scoreReading } from "@/lib/imports/ai/__eval__/score";
 import type { EvalStatement } from "@/lib/imports/ai/__eval__/types";
 import { generateAll } from "@/lib/imports/ai/__eval__/statements";
@@ -90,7 +91,11 @@ describe("the synthetic statements", () => {
     expect(rows.some((row) => row.currency !== "RON")).toBe(true);
     expect(rows.some((row) => row.direction === "credit")).toBe(true);
     expect(all.some((s) => /printed total/.test(s.expected.description))).toBe(true);
-    expect(all.find((s) => s.expected.knownGap?.reason === "date_unreadable")?.id).toBe("pdf-ro-no-year");
+    // The shapes that were known gaps of the reader before I20 stay in the set, now as ordinary statements.
+    expect(all.find((s) => /day and month only/.test(s.expected.description))?.id).toBe("pdf-ro-no-year");
+    expect(all.find((s) => /store number/.test(s.expected.description))?.id).toBe("csv-ro-comma-digits-before-amount");
+    expect(all.find((s) => s.expected.parser === "refused")?.id).toBe("csv-en-currency-in-preamble");
+    expect(all.every((s) => s.expected.knownGap === null)).toBe(true);
     expect(all.every((s) => s.answer !== null)).toBe(true);
   });
 
@@ -126,7 +131,7 @@ describe("the synthetic statements", () => {
 });
 
 describe("the dry run", () => {
-  it("runs every statement through the real reader code with the stand-in model, and only the known gaps fail", async () => {
+  it("runs every statement through the real reader code with the stand-in model, and every one passes", async () => {
     // No network, whatever happens.
     const fetchSpy = vi.fn(() => {
       throw new Error("The dry run must not make a network call.");
@@ -146,11 +151,11 @@ describe("the dry run", () => {
     expect(t.written[0].fileName.startsWith("dry-run-statements-fake-gpt-5.6-luna-none-")).toBe(true);
 
     const failed = raw.results.filter((result) => result.outcome !== "ok");
-    expect(failed.map((result) => [result.id, result.detail, result.knownGap])).toEqual([
-      ["csv-ro-comma-digits-before-amount", "amount_not_found (row 2)", true],
-      ["pdf-ro-no-year", "date_unreadable (row 1)", true],
-    ]);
-    for (const result of raw.results.filter((r) => r.outcome === "ok")) {
+    expect(failed.map((result) => [result.id, result.detail])).toEqual([]);
+    expect(raw.results.some((result) => result.id === "pdf-ro-no-year")).toBe(true);
+    expect(raw.results.some((result) => result.id === "csv-ro-comma-digits-before-amount")).toBe(true);
+    expect(raw.results.some((result) => result.id === "csv-en-currency-in-preamble" && result.mode === "read")).toBe(true);
+    for (const result of raw.results) {
       expect(result.perfect, `${result.id} ${result.mode}`).toBe(true);
       expect(result.matchedRows, result.id).toBe(result.mode === "read" ? result.expectedRows : 0);
       expect(result.costMicros).toBeGreaterThan(0);
@@ -164,10 +169,28 @@ describe("the dry run", () => {
 
     expect(report).toContain("FAKE PROVIDER OUTPUT, NOT RESULTS");
     expect(report).toContain("| Mode | Statements OK | Rows exactly right |");
-    expect(report).toMatch(/\| read \(verified\) \| 1\/2 \(50\.0%\) \| 14\/22 \(63\.6%\) \|/);
-    expect(report).toContain("known gap");
+    expect(report).toMatch(/\| read \(verified\) \| 2\/2 \(100\.0%\) \| 22\/22 \(100\.0%\) \|/);
+    expect(report).not.toContain("known gap");
     expect(report).toContain("$0.0100");
     expect(report).toContain("Estimated cost $");
+  });
+
+  it("still labels a statement that is marked as a known gap of the reader", () => {
+    const failed: StatementResult = {
+      id: "gap-example", kind: "csv", mode: "read", outcome: "unverified", detail: "date_unreadable (row 1)", knownGap: true,
+      expectedRows: 3, matchedRows: 0, extraRows: 0, categoryScored: 0, categoryCorrect: 0, categorySubtypeCorrect: 0,
+      perfect: false, warnings: 0, usage: null, costMicros: 0, ms: 0, answer: null,
+    };
+
+    const report = renderMarkdown({
+      meta: { provider: "fake", model: "m", effort: "none", dryRun: true, at: "2026-10-30T00:00:00Z" },
+      results: [failed],
+      skipped: [],
+      estimate: null,
+    });
+
+    expect(report).toContain("unverified: date_unreadable (row 1) (known gap)");
+    expect(report).toContain("**Known gap** `gap-example`");
   });
 
   it("needs no key and no model name", async () => {

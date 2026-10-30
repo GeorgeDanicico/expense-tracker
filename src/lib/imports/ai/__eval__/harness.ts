@@ -139,7 +139,7 @@ export function planJobs(prepared: readonly PreparedStatement[], modes: readonly
       if (parsing.status === "none") {
         skipped.push({ statementId: statement.id, mode: "categorise", reason: "no parser reads this layout, so production would use mode read" });
       } else if (parsing.status === "refused") {
-        skipped.push({ statementId: statement.id, mode: "categorise", reason: `a parser claims it and then refuses it (${parsing.code}); production does not fall back to the model` });
+        skipped.push({ statementId: statement.id, mode: "categorise", reason: `a parser claims it and then refuses it (${parsing.code}); production reads it with mode read instead (see the read row)` });
       } else if (parsing.debitRows !== debits.length) {
         skipped.push({ statementId: statement.id, mode: "categorise", reason: `the parser reads ${parsing.debitRows} debit rows but the expected file has ${debits.length}` });
       } else if (parsing.plan.unknown.length === 0) {

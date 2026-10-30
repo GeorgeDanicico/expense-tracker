@@ -64,8 +64,8 @@ invention.
 **Mode `categorise`** only runs for statements a parser reads (today the generic CSV parser, English
 headers). It sends the parser's debit descriptions, minus the merchants the merchant rule knows, with
 an empty history, so every merchant is unknown. Statements no parser reads are read by the model (mode
-`read`); a statement a parser claims and then refuses is not handed to the model by production, and
-the report says so.
+`read`); a statement a parser claims and then refuses is read by mode `read` in production (when the
+parser's error is an `unreadable_statement`), so it is skipped here with that note.
 
 ## The statements
 
@@ -89,18 +89,20 @@ back).
 | `csv-en-debit-credit-comma` | Semicolons, DD.MM.YYYY, comma decimals with dot thousands, debit and credit columns, a balance |
 | `csv-ro-multiline` | Romanian headers and diacritics, CRLF, descriptions over two or three lines, printed totals |
 | `csv-ro-foreign` | Romanian headers, a currency per row, EUR and USD rows, a EUR refund |
-| `csv-en-currency-in-preamble` | A preamble with a fake IBAN, the currency stated only above the table, a printed total; a parser claims it and then refuses it |
-| `csv-ro-comma-digits-before-amount` | **Known gap**: unquoted comma CSV where "Mega Image 118,118.40" is read as one number |
+| `csv-en-currency-in-preamble` | A preamble with a fake IBAN, the currency stated only above the table, a printed total; a parser claims it and then refuses it, and with AI on the pipeline hands it to the model |
+| `csv-ro-comma-digits-before-amount` | Unquoted comma CSV where a store number runs into the amount ("Mega Image 118,118.40"); verification matches CSV amounts field by field |
 | `pdf-en-two-pages` | A PDF table over two pages, wrapped descriptions, a balance, a printed total |
 | `pdf-ro-table` | A Romanian PDF table, the currency after every amount, a printed total |
 | `pdf-card-multiline` | A card statement, three lines per transaction, `CR` for money in, two EUR rows |
-| `pdf-ro-no-year` | **Known gap**: dates printed as "12.10", which `parseStatementDate` cannot read |
+| `pdf-ro-no-year` | Dates printed as "12.10"; the year is only in the period heading, and code takes it from there |
 | `pdf-ro-large-month` | About 110 transactions over three pages, for realistic size and cost |
 | `csv-en-month` | About 50 rows a parser reads, for a realistic mode `categorise` |
 
-A **known gap** is a shortcoming of the reader that the statement is there to measure. The eval counts
-it as failed and labels it; its `expected.json` says why. When the reader is fixed, the dry-run test
-fails and tells whoever fixed it to update the statement.
+A **known gap** is a shortcoming of the reader that a statement is there to measure: the eval counts it as
+failed and labels it, and its `expected.json` says why (`knownGap`). When the reader is fixed, the dry-run
+test fails and tells whoever fixed it to remove the label. There are none at the moment: the three
+statements that were gaps (year-less dates, a store number before the amount, a CSV a parser claims and
+refuses) are read since I20.
 
 ## Adding George's anonymised samples
 

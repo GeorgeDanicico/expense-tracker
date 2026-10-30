@@ -455,6 +455,7 @@ that provider's official SDK documentation first and never guess API names.
 | I17 | The statement reader: numbered text, prompt, schema, the call, verification, category order, the pipeline switch | I15 | |
 | I18 | Review screen for read statements: category sources, warnings, the AI-off hint; preview fixtures | I17 | |
 | I19 | Eval: synthetic statements and a hand-run live eval comparing models | I17 | |
+| I20 | Reader fixes the eval found: dates printed without a year, a store number before the amount in a comma CSV, a CSV a parser claims and refuses | I19 | |
 | — | **Checkpoint:** George adds `OPENAI_API_KEY` and the AI env to production (vps-apps) and sets the provider's spend limit | I15, I19 | |
 | I11 | The Import button on the Expenses page | I18 | |
 | — | **Checkpoint:** smoke test | I11, the checkpoint above | |
@@ -1040,6 +1041,35 @@ go: `src/lib/imports/ai/__eval__/README.md`. The command is `npm run eval:statem
 gpt-5.6-luna`; `--dry-run` runs the harness offline with a stand-in model and is what the tests use.
 It calls the reader's code and the provider directly and skips the per-user budget gate and the
 ledger, since a hand-run eval has no signed-in user.
+
+### I20: Reader fixes the eval found
+
+Three weak spots the I19 eval exposed, fixed without loosening the rule that the model never supplies
+a number or a date that code hasn't found in the statement.
+
+- **Dates printed without a year** (`12.10`, `12/10`, `12 Oct`, `12 oct.`). The model copies the date as
+  printed; code finds it on the cited lines (not part of a longer number or word, and not followed by
+  a year the model dropped), reads it day first like every other date, and gives it its year itself
+  (`resolveYearlessDate` in `date.ts`). With full dates anywhere in the numbered lines (the period in
+  the heading, other rows) the year is the one that puts the day and month inside the span of those
+  dates or else nearest to it, so a December to January statement works; a tie is refused. With none,
+  it is the most recent occurrence that isn't after today in Europe/Bucharest. A day or month that
+  doesn't exist (31.11) or that day-first reading rejects (`10/25`) is refused (`date_unreadable`). The
+  review screen gets a warning saying the year was worked out. Dates with a year are read as before.
+- **A store number before the amount in a comma CSV** (`…,118,118.40`). For a CSV, an amount must be a
+  whole number inside one field, the fields being cut with the CSV reader's own delimiter detection and
+  quoting (`splitCsvLines`); the numbered statement carries them for `verify.ts` and sends nothing
+  new. `118.40` is found, `118,118.40` is not (it is two fields), and `"1,118.40"` in quotes is still
+  one amount. PDFs are matched as text, as before.
+- **A CSV a parser claims and then can't read.** With AI on, a parser error of `unreadable_statement`
+  (a row that can't be read, no currency on the rows, an unclosed quote) hands the file to mode
+  "read". If the gate then refuses the call, the parser's own error is returned, as with AI off.
+  `ambiguous_amounts` is not handed over (the model may not guess the decimal mark either), and the
+  size, signature, `no_debits` and `too_many_rows` limits are decided before the model or regardless of
+  who read the rows.
+
+No prompt changed (the reader prompt already says to copy dates as printed and never add a year), so
+the prompt id stays `statement-reader-v1`.
 
 ### Checkpoint: production AI settings
 
