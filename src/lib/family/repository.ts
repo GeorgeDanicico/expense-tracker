@@ -12,6 +12,7 @@ export const PARENT_PERMISSIONS: Permissions = {
   net_worth: "edit",
   family_finance: "view",
   mcp: "edit",
+  ai: "edit",
 };
 
 /**

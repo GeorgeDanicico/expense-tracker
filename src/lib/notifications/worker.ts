@@ -197,12 +197,13 @@ export function payloadFor(kind: string, payload: unknown, now: Date): PushPaylo
 
 /**
  * Whether the recipient wants this kind of notification: the Browser notifications switch, then
- * the kind's own switch. A test needs only the first. Null for a kind this code doesn't know.
+ * the kind's own switch. A test and an AI budget warning need only the first. Null for a kind this code doesn't know.
  */
 export function kindAllowed(kind: string, settings: RecipientSettings): boolean | null {
   if (!settings.pushEnabled) return false;
   switch (kind) {
     case "test":
+    case "ai_budget":
       return true;
     case "reminder":
       return settings.remindersEnabled;

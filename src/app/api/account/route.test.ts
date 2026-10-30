@@ -155,7 +155,7 @@ describe("GET /api/account", () => {
 
   it("returns a kid's membership with their own permissions", async () => {
     vi.stubEnv("FAMILY_ENABLED", "true");
-    const permissions = { expenses: "edit", investments: "off", net_worth: "edit", family_finance: "off", mcp: "off" } as const;
+    const permissions = { expenses: "edit", investments: "off", net_worth: "edit", family_finance: "off", mcp: "off", ai: "off" } as const;
     repositories.family.membership = aKid({ permissions });
 
     const response = await callRoute(GET);

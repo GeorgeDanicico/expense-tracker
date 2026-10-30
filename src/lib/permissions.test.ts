@@ -40,13 +40,13 @@ describe("permission catalogue", () => {
 describe("presets", () => {
   it("gives a young kid the defaults", () => {
     expect(PERMISSION_PRESETS.young_kid).toEqual({
-      expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off",
+      expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off", ai: "off",
     });
   });
 
   it("gives a teen every finance module but not family finance", () => {
     expect(PERMISSION_PRESETS.teen).toEqual({
-      expenses: "edit", investments: "edit", net_worth: "edit", family_finance: "off", mcp: "off",
+      expenses: "edit", investments: "edit", net_worth: "edit", family_finance: "off", mcp: "off", ai: "off",
     });
   });
 });
@@ -95,7 +95,7 @@ describe("can", () => {
 describe("normalizePermissions", () => {
   it("fills missing modules with off and keeps the given ones", () => {
     expect(normalizePermissions({ investments: "edit", family_finance: "view" })).toEqual({
-      expenses: "off", investments: "edit", net_worth: "off", family_finance: "view", mcp: "off",
+      expenses: "off", investments: "edit", net_worth: "off", family_finance: "view", mcp: "off", ai: "off",
     });
   });
 

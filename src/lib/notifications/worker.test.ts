@@ -534,6 +534,12 @@ describe("kindAllowed", () => {
     expect(kindAllowed("reminder", { ...on, calendarEnabled: false })).toBe(true);
     expect(kindAllowed("todo_due", { ...on, calendarEnabled: false })).toBe(true);
   });
+
+  it("sends an AI budget warning whenever Browser notifications are on", () => {
+    const allOff = { pushEnabled: true, remindersEnabled: false, todosEnabled: false, calendarEnabled: false };
+    expect(kindAllowed("ai_budget", allOff)).toBe(true);
+    expect(kindAllowed("ai_budget", { ...on, pushEnabled: false })).toBe(false);
+  });
 });
 
 describe("pushPayload", () => {

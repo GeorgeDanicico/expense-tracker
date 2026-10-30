@@ -72,7 +72,7 @@ insert into public.family_invites
   (id, family_id, code_hash, role, permissions, created_by, created_at, expires_at, used_at, used_by, revoked_at)
 values
   ('f0900000-0000-4000-8000-0000000000e1', 'f0900000-0000-4000-8000-0000000000a1', pg_temp.h('e1'), 'kid',
-   '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}',
+   '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}',
    'f0900000-0000-4000-8000-000000000001', now() - interval '8 days', now() - interval '1 day', null, null, null),
   ('f0900000-0000-4000-8000-0000000000e2', 'f0900000-0000-4000-8000-0000000000a1', pg_temp.h('x0'), 'parent', null,
    'f0900000-0000-4000-8000-000000000001', now() - interval '48 hours', now(), null, null, null),
@@ -92,10 +92,10 @@ values
    '{"expenses":"edit","investments":"off","net_worth":"off"}',
    'f0900000-0000-4000-8000-000000000001', now() - interval '1 hour', now() + interval '167 hours', null, null, null),
   ('f0900000-0000-4000-8000-0000000000c1', 'f0900000-0000-4000-8000-0000000000a1', pg_temp.h('k1'), 'kid',
-   '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off"}',
+   '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}',
    'f0900000-0000-4000-8000-000000000001', now() - interval '1 hour', now() + interval '167 hours', null, null, null),
   ('f0900000-0000-4000-8000-0000000000c3', 'f0900000-0000-4000-8000-0000000000a1', pg_temp.h('k3'), 'kid',
-   '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}',
+   '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}',
    'f0900000-0000-4000-8000-000000000002', now() - interval '2 hours', now() + interval '166 hours', null, null, null),
   ('f0900000-0000-4000-8000-0000000000c2', 'f0900000-0000-4000-8000-0000000000a1', pg_temp.h('p1'), 'parent', null,
    'f0900000-0000-4000-8000-000000000002', now() - interval '1 hour', now() + interval '47 hours', null, null, null),
@@ -273,7 +273,7 @@ select is(
     'family_name', 'Family A',
     'inviter_name', 'Ana',
     'role', 'kid',
-    'permissions', '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off"}'::jsonb,
+    'permissions', '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}'::jsonb,
     'expires_at', now() + interval '167 hours'
   ),
   'a kid invite previews the family, the inviter''s display name, the role, the permissions and the expiry'
@@ -406,7 +406,7 @@ select is(
 );
 select is(
   (select m.permissions from public.get_my_membership() m),
-  '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off"}'::jsonb,
+  '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}'::jsonb,
   'the new kid has the invite''s permissions'
 );
 
@@ -427,7 +427,7 @@ select is(
    from public.member_permissions p
    join redeemed r on r.member_id = p.member_id
    where r.label = 'k1'),
-  array['expenses:edit', 'family_finance:view', 'investments:off', 'mcp:off', 'net_worth:edit'],
+  array['ai:off', 'expenses:edit', 'family_finance:view', 'investments:off', 'mcp:off', 'net_worth:edit'],
   'a kid code writes one permission row per module'
 );
 select is(

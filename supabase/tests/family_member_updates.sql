@@ -112,15 +112,15 @@ select is(
 -- ---------------------------------------------------------------------------
 
 select ok(
-  family_private.is_valid_permissions('{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}'),
+  family_private.is_valid_permissions('{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}'),
   'the young_kid preset is valid'
 );
 select ok(
-  family_private.is_valid_permissions('{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off"}'),
+  family_private.is_valid_permissions('{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off","ai":"off"}'),
   'the teen preset is valid'
 );
 select ok(
-  family_private.is_valid_permissions('{"family_finance":"view","mcp":"off","net_worth":"off","investments":"off","expenses":"off"}'),
+  family_private.is_valid_permissions('{"family_finance":"view","mcp":"off","ai":"off","net_worth":"off","investments":"off","expenses":"off"}'),
   'every module off except family_finance at view is valid, in any key order'
 );
 select is(
@@ -129,42 +129,42 @@ select is(
   'a missing module is invalid'
 );
 select is(
-  family_private.is_valid_permissions('{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","boats":"off"}'),
+  family_private.is_valid_permissions('{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off","boats":"off"}'),
   false,
   'an unknown extra module is invalid'
 );
 select is(
-  family_private.is_valid_permissions('{"Expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}'),
+  family_private.is_valid_permissions('{"Expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}'),
   false,
   'module keys are case-sensitive'
 );
 select is(
-  family_private.is_valid_permissions('{"expenses":"view","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}'),
+  family_private.is_valid_permissions('{"expenses":"view","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}'),
   false,
   'view is not allowed for expenses'
 );
 select is(
-  family_private.is_valid_permissions('{"expenses":"off","investments":"off","net_worth":"off","family_finance":"edit","mcp":"off"}'),
+  family_private.is_valid_permissions('{"expenses":"off","investments":"off","net_worth":"off","family_finance":"edit","mcp":"off","ai":"off"}'),
   false,
   'edit is not allowed for family_finance'
 );
 select is(
-  family_private.is_valid_permissions('{"expenses":"full","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}'),
+  family_private.is_valid_permissions('{"expenses":"full","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}'),
   false,
   'an unknown level is invalid'
 );
 select is(
-  family_private.is_valid_permissions('{"expenses":"Edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}'),
+  family_private.is_valid_permissions('{"expenses":"Edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}'),
   false,
   'levels are case-sensitive'
 );
 select is(
-  family_private.is_valid_permissions('{"expenses":null,"investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}'),
+  family_private.is_valid_permissions('{"expenses":null,"investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}'),
   false,
   'a JSON null level is invalid'
 );
 select is(
-  family_private.is_valid_permissions('{"expenses":["edit"],"investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}'),
+  family_private.is_valid_permissions('{"expenses":["edit"],"investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}'),
   false,
   'a non-string level is invalid'
 );
@@ -183,25 +183,25 @@ select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-0000000
 
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a4',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   '42501', 'Only parents can change a kid''s permissions.',
   'a kid cannot change their own permissions'
 );
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a5',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   '42501', 'Only parents can change a kid''s permissions.',
   'a kid cannot change a sibling''s permissions'
 );
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000b3',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   '42501', 'Only parents can change a kid''s permissions.',
   'a kid gets 42501, not 404, for another family''s kid'
 );
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-00000000ffff',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   '42501', 'Only parents can change a kid''s permissions.',
   'a kid gets 42501, not 404, for an unknown member'
 );
@@ -214,7 +214,7 @@ select throws_ok(
 select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-000000000007","role":"authenticated"}', true);
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a4',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   '42501', 'Only parents can change a kid''s permissions.',
   'a user without a family cannot change anyone''s permissions'
 );
@@ -222,7 +222,7 @@ select throws_ok(
 select set_config('request.jwt.claims', '{"role":"authenticated"}', true);
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a4',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   '42501', 'Only parents can change a kid''s permissions.',
   'a caller without a user id cannot change anyone''s permissions'
 );
@@ -241,37 +241,37 @@ select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-0000000
 
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a2',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   '42501', 'Parents always have full access, so their permissions can''t be changed.',
   'a parent cannot change the creator''s permissions'
 );
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a3',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   '42501', 'Parents always have full access, so their permissions can''t be changed.',
   'a parent cannot change their own permissions'
 );
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000b3',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   'P0002', 'That family member wasn''t found.',
   'a parent cannot change another family''s kid'
 );
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000b2',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   'P0002', 'That family member wasn''t found.',
   'another family''s parent is not found either, so their role is not revealed'
 );
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-00000000ffff',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   'P0002', 'That family member wasn''t found.',
   'an unknown member is not found'
 );
 select throws_ok(
   $$ select public.set_member_permissions(null,
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   'P0002', 'That family member wasn''t found.',
   'a null member id is not found'
 );
@@ -283,13 +283,13 @@ select throws_ok(
 );
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a4',
-       '{"expenses":"view","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"view","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}') $$,
   '23514', 'Choose an allowed level for every module.',
   'a level the module does not allow is refused'
 );
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a4',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","boats":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off","boats":"off"}') $$,
   '23514', 'Choose an allowed level for every module.',
   'an unknown module is refused'
 );
@@ -314,17 +314,17 @@ select is(
 -- Parents replace a kid's permissions
 -- ---------------------------------------------------------------------------
 
--- The second parent (not the creator) turns a4's two rows into five, flipping
--- every module except mcp, which stays off.
+-- The second parent (not the creator) turns a4's two rows into six, flipping
+-- every module except mcp and ai, which stay off.
 select lives_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a4',
-       '{"expenses":"off","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off"}') $$,
+       '{"expenses":"off","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off","ai":"off"}') $$,
   'a second parent can change a kid''s permissions'
 );
 select is(
   pg_temp.all_permissions(),
   array[
-    'a4:expenses=off', 'a4:family_finance=off', 'a4:investments=edit', 'a4:mcp=off', 'a4:net_worth=edit',
+    'a4:ai=off', 'a4:expenses=off', 'a4:family_finance=off', 'a4:investments=edit', 'a4:mcp=off', 'a4:net_worth=edit',
     'b3:investments=edit'
   ],
   'the update replaces every module of that kid and nothing else'
@@ -332,22 +332,22 @@ select is(
 select is(
   (select count(*)::integer from public.member_permissions
    where member_id = 'f1000000-0000-4000-8000-0000000000a4'),
-  5,
-  'the parent reads the kid''s five new rows through the read policy'
+  6,
+  'the parent reads the kid''s six new rows through the read policy'
 );
 
 -- The creator gives a5, who had no rows, the teen preset.
 select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
 select lives_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a5',
-       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"edit","family_finance":"off","mcp":"off","ai":"off"}') $$,
   'the creator can change a kid''s permissions'
 );
 select is(
   pg_temp.all_permissions(),
   array[
-    'a4:expenses=off', 'a4:family_finance=off', 'a4:investments=edit', 'a4:mcp=off', 'a4:net_worth=edit',
-    'a5:expenses=edit', 'a5:family_finance=off', 'a5:investments=edit', 'a5:mcp=off', 'a5:net_worth=edit',
+    'a4:ai=off', 'a4:expenses=off', 'a4:family_finance=off', 'a4:investments=edit', 'a4:mcp=off', 'a4:net_worth=edit',
+    'a5:ai=off', 'a5:expenses=edit', 'a5:family_finance=off', 'a5:investments=edit', 'a5:mcp=off', 'a5:net_worth=edit',
     'b3:investments=edit'
   ],
   'a kid without rows gets a row for every module'
@@ -356,14 +356,14 @@ select is(
 -- Saving the same kid twice applies the second set in full.
 select lives_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a4',
-       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"view","mcp":"off"}') $$,
+       '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"view","mcp":"off","ai":"off"}') $$,
   'a kid''s permissions can be changed again'
 );
 select is(
   pg_temp.all_permissions(),
   array[
-    'a4:expenses=edit', 'a4:family_finance=view', 'a4:investments=off', 'a4:mcp=off', 'a4:net_worth=off',
-    'a5:expenses=edit', 'a5:family_finance=off', 'a5:investments=edit', 'a5:mcp=off', 'a5:net_worth=edit',
+    'a4:ai=off', 'a4:expenses=edit', 'a4:family_finance=view', 'a4:investments=off', 'a4:mcp=off', 'a4:net_worth=off',
+    'a5:ai=off', 'a5:expenses=edit', 'a5:family_finance=off', 'a5:investments=edit', 'a5:mcp=off', 'a5:net_worth=edit',
     'b3:investments=edit'
   ],
   'the second change replaces the first'
@@ -373,7 +373,7 @@ select is(
 select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-000000000005","role":"authenticated"}', true);
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a4',
-       '{"expenses":"off","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
+       '{"expenses":"off","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}') $$,
   'P0002', 'That family member wasn''t found.',
   'another family''s creator cannot change a kid''s permissions'
 );
@@ -382,7 +382,7 @@ select throws_ok(
 select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-000000000003","role":"authenticated"}', true);
 select is(
   (select permissions from public.get_my_membership()),
-  '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"view","mcp":"off"}'::jsonb,
+  '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"view","mcp":"off","ai":"off"}'::jsonb,
   'the kid''s membership shows the new permissions'
 );
 
@@ -465,7 +465,7 @@ select set_config('request.jwt.claims', '{"role":"anon"}', true);
 
 select throws_ok(
   $$ select public.set_member_permissions('f1000000-0000-4000-8000-0000000000a4',
-       '{"expenses":"off","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}') $$,
+       '{"expenses":"off","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}') $$,
   '42501', null, 'anon cannot call set_member_permissions'
 );
 select throws_ok($$ select public.touch_last_active() $$, '42501', null, 'anon cannot call touch_last_active');

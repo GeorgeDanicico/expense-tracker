@@ -67,17 +67,17 @@ select is(
 );
 select ok(
   family_private.is_valid_permissions(
-    '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off"}'),
+    '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}'),
   'a permissions object with mcp off is valid'
 );
 select ok(
   family_private.is_valid_permissions(
-    '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"edit"}'),
+    '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"edit","ai":"off"}'),
   'a permissions object with mcp edit is valid'
 );
 select ok(
   not family_private.is_valid_permissions(
-    '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"view"}'),
+    '{"expenses":"edit","investments":"off","net_worth":"off","family_finance":"off","mcp":"view","ai":"off"}'),
   'view is not allowed for mcp'
 );
 select ok(
@@ -87,8 +87,8 @@ select ok(
 );
 select is(
   family_private.module_keys(),
-  array['expenses', 'investments', 'net_worth', 'family_finance', 'mcp'],
-  'module_keys ends with mcp'
+  array['expenses', 'investments', 'net_worth', 'family_finance', 'mcp', 'ai'],
+  'module_keys lists mcp after the four finance modules'
 );
 
 -- A pending kid invite from before the migration: the old four-module object.
@@ -108,12 +108,12 @@ select ok(
 );
 
 update public.family_invites
-set permissions = permissions || '{"mcp": "off"}'::jsonb
+set permissions = permissions || '{"mcp": "off", "ai": "off"}'::jsonb
 where role = 'kid' and not permissions ? 'mcp';
 
 select is(
   (select i.permissions from public.family_invites i where i.id = 'e1000000-0000-4000-8000-0000000000c1'),
-  '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off"}'::jsonb,
+  '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}'::jsonb,
   'the backfill adds mcp off and keeps the other levels'
 );
 
@@ -131,7 +131,7 @@ select lives_ok(
 );
 select is(
   (select m.permissions from public.get_my_membership() m),
-  '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off"}'::jsonb,
+  '{"expenses":"edit","investments":"off","net_worth":"edit","family_finance":"view","mcp":"off","ai":"off"}'::jsonb,
   'the kid who redeemed it has mcp off'
 );
 
@@ -141,7 +141,7 @@ select is(
   (select e -> 'permissions'
    from jsonb_array_elements(public.get_family() -> 'members') as e
    where e ->> 'memberId' = 'e1000000-0000-4000-8000-0000000000a3'),
-  '{"expenses":"edit","investments":"edit","net_worth":"off","family_finance":"off","mcp":"off"}'::jsonb,
+  '{"expenses":"edit","investments":"edit","net_worth":"off","family_finance":"off","mcp":"off","ai":"off"}'::jsonb,
   'get_family reports mcp off for an existing kid without an mcp row'
 );
 select throws_ok(
@@ -152,13 +152,13 @@ select throws_ok(
 );
 select throws_ok(
   $$ select public.set_member_permissions('e1000000-0000-4000-8000-0000000000a3',
-       '{"expenses":"edit","investments":"edit","net_worth":"off","family_finance":"off","mcp":"view"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"off","family_finance":"off","mcp":"view","ai":"off"}') $$,
   '23514', 'Choose an allowed level for every module.',
   'set_member_permissions refuses mcp at view'
 );
 select lives_ok(
   $$ select public.set_member_permissions('e1000000-0000-4000-8000-0000000000a3',
-       '{"expenses":"edit","investments":"edit","net_worth":"off","family_finance":"off","mcp":"edit"}') $$,
+       '{"expenses":"edit","investments":"edit","net_worth":"off","family_finance":"off","mcp":"edit","ai":"off"}') $$,
   'set_member_permissions takes an object with mcp'
 );
 select is(

@@ -47,7 +47,7 @@ const ION = { memberId: "60000000-0000-4000-8000-000000000004", userId: "1000000
 const OUTSIDER_MEMBER_ID = "60000000-0000-4000-8000-000000000099";
 
 const finance = (family_finance: Permissions["family_finance"]): Permissions =>
-  ({ expenses: "edit", investments: "edit", net_worth: "edit", family_finance, mcp: "off" });
+  ({ expenses: "edit", investments: "edit", net_worth: "edit", family_finance, mcp: "off", ai: "off" });
 
 function smiths(): FamilyData {
   const base = aFamily();
