@@ -2,16 +2,17 @@
 
 This plan covers importing a bank statement into the Expenses module: you upload a CSV (later a PDF
 with text), the app turns it into draft rows, you review them, and only then are they saved as your
-own expenses, linked to the import so the whole import can be undone. It replaces steps 7.1–7.4
-in [family-hub-roadmap.md](family-hub-roadmap.md). **Step 7.5 (an LLM for layouts no parser
-recognises) belongs to phase 8 and is not planned here**; the parser design only leaves the door
-open for it (see "Not in this plan").
+own expenses, linked to the import so the whole import can be undone. It replaces steps 7.1–7.5
+in [family-hub-roadmap.md](family-hub-roadmap.md), and pulls roadmap steps 8.1 and 8.2 (the AI cost
+gate and the AI client) forward, because the import now needs them.
 
-The plan stops at one point it can't pass alone: **which banks and formats to support is still an
-open decision** in the roadmap. Everything that doesn't depend on it (the schema, the pipeline, the
-review screen, undo) comes first. The per-bank parsers come after a checkpoint where George names
-his banks and supplies anonymised sample statements. No bank name or column layout is assumed
-anywhere in this plan.
+**Status (30 October 2026).** I1–I9 and I12 are merged (#151–#160) and the I1 migration is live.
+**The rest of the plan was rewritten on 30 October** (see "Revision: the AI reads the statement"
+below): instead of one hand-written parser per bank (the old I10 and I13), **a model reads the
+statement text and returns typed, categorised rows, and code checks every row against the text**
+before it becomes a draft. That removes the wait for George's banks and samples: they become
+optional eval material rather than a blocker. Sections from "The design in one page" to I9, and
+I12, describe what is built; where the revision changes one of their answers, the row says so.
 
 ## The design in one page
 
@@ -22,17 +23,17 @@ anywhere in this plan.
 | What is uploaded? | A CSV or a PDF as the **raw request body** (`Content-Type: text/csv` or `application/pdf`), as the avatar upload does, never multipart. Limits: **2 MB for CSV, 5 MB for PDF**, at most **500 rows** after parsing. The type is decided by the bytes, not by the header or the file name. |
 | Is the file stored? | **Never.** It's read into memory, parsed and dropped. No disk, no Supabase Storage, no log line with its content, and the file name isn't read. Statements carry IBANs and account numbers. |
 | What is stored? | **Draft rows** only: `import_batches` (one per upload) and `import_rows` (one per debit), for **24 hours** or until confirmed. IBAN-shaped and card-number-shaped text is masked in descriptions before a row is drafted. |
-| How is the layout recognised? | Parsers sit behind a **`StatementParser`** interface and a registry picks one by the file's **header or layout**. A generic CSV parser (recognisable headers such as date, description, amount) is the baseline; per-bank parsers come after the checkpoint. A layout nobody recognises is refused with a clear message, never guessed. |
+| How is the layout recognised? | Parsers sit behind a **`StatementParser`** interface and a registry picks one by the file's **header or layout**. A generic CSV parser (recognisable headers such as date, description, amount) is the baseline. A layout nobody recognises is refused with a clear message, never guessed. **Revised:** for a user with AI on, the model reads every statement and the parsers are the path without AI (see the revision). |
 | What happens to money in? | **Skipped.** An expense must be greater than zero, so refunds and incoming payments are counted ("4 incoming payments skipped") and not imported. See question 2. |
 | What about other currencies? | A row whose currency differs from the user's currency (`profiles.currency`) is **shown but can't be imported**; there is no conversion, as with family totals. See question 3. |
 | What does the review screen show? | A table of the draft rows: tick box, date, merchant, amount, currency, category and subtype. Each row can be edited or unticked. **Nothing is saved until you press Confirm.** |
 | How are duplicates found? | A draft row is flagged as a **possible duplicate** when one of your existing expenses has the **same date and amount** and a **similar merchant**. Flagged rows are **unticked** by default. Flags are worked out each time the draft is read, so they're never stale. |
-| Where do category suggestions come from? | From the **existing merchant classification** in the database (`expense_classification_private.classify_expense_merchant`), called while the draft is created. A row it recognises gets its car category and subtype and is shown as "set by a merchant rule", because the `expenses_classify_merchant` trigger would apply the same rule on insert anyway. Every other row starts as **Other**; you pick. |
+| Where do category suggestions come from? | From the **existing merchant classification** in the database (`expense_classification_private.classify_expense_merchant`), called while the draft is created. A row it recognises gets its car category and subtype and is shown as "set by a merchant rule", because the `expenses_classify_merchant` trigger would apply the same rule on insert anyway. Every other row starts as **Other**; you pick. **Revised:** the merchant rule still wins, then the category you gave the same merchant before, then the model's category (see the revision). |
 | What does Confirm do? | One SQL function inserts every ticked row into `expenses` **in one transaction**, links each new expense to the batch in `import_expenses`, and marks the batch confirmed. All or nothing. Confirming twice is refused. |
 | Can I undo? | **Yes, a whole import**: one function deletes the caller's expenses linked to that batch and marks the batch undone. See question 4 for how long and what happens to edited rows. |
-| Is the same statement imported twice? | **No.** Each batch carries a hash of its normalised rows (not of the file bytes, so a re-download of the same statement matches). Uploading a statement whose hash belongs to a draft **reopens that draft**; one that belongs to a confirmed import is **refused** with the date it was imported. An overlapping statement (two months that share days) is caught by the duplicate flags instead. |
+| Is the same statement imported twice? | **No.** Each batch carries a hash of its normalised rows (not of the file bytes, so a re-download of the same statement matches). Uploading a statement whose hash belongs to a draft **reopens that draft**; one that belongs to a confirmed import is **refused** with the date it was imported. An overlapping statement (two months that share days) is caught by the duplicate flags instead. **Revised:** a statement the model reads is hashed by its masked text, because two readings of one file may not give byte-identical rows. |
 | When does a draft expire? | **24 hours after upload**, fixed (viewing doesn't extend it). An expired draft counts as missing everywhere (every read and `confirm_import_batch` check `expires_at`), and is deleted by the user's next upload and by the worker's daily clean-up. |
-| Feature flag? | **None**, as in phases 4–6. The API and the page land unlinked, and the **Import button on the Expenses page lands last** among the CSV tasks (I11), once at least one real bank parses. Routes use `withPermission`. |
+| Feature flag? | **None**, as in phases 4–6. The API and the page land unlinked, and the **Import button on the Expenses page lands last** (I11), once the AI reader and its review screen are in. Routes use `withPermission`. |
 | MCP | **None.** See "Why there are no MCP tools". |
 
 ### How an upload becomes a draft
@@ -124,11 +125,11 @@ before the task that uses it starts.
 | Draft storage | `import_batches` and `import_rows`, 24 hours | Roadmap. |
 | Parser design | A `StatementParser` interface, picked by header or layout | Roadmap. |
 | Duplicates | Same date and amount, similar merchant; flagged and unticked | Roadmap. The matching rule above is Proposed. |
-| Category suggestions | The existing merchant classification | Roadmap. Called from SQL so there is one rule, not a TypeScript copy that could drift. |
+| Category suggestions | The existing merchant classification | Roadmap. Called from SQL so there is one rule, not a TypeScript copy that could drift. **Revised:** the rule still wins; your history and then the model fill in the rest. |
 | Confirm and undo | One transaction, each expense linked to the batch | Roadmap. |
 | How expenses are tagged | A link table, `import_expenses (expense_id, batch_id)`, not a column on `expenses` | Proposed. `restore_historical_merchants()` compares whole-row `to_jsonb(expenses)` against snapshots taken on 3 October ([expense-classification-rollout.md](expense-classification-rollout.md)); a new column would make it report every backed-up row as edited. A link table leaves `expenses` and its triggers alone. |
 | Format order | CSV first, then PDF with text | Roadmap. |
-| LLM for unknown layouts (7.5) | Phase 8, not planned here | Roadmap. |
+| LLM for unknown layouts (7.5) | ~~Phase 8, not planned here~~ **Revised:** the model reads every statement for users with AI on; see the revision | George, 30 October 2026. |
 | Upload shape | Raw body with `text/csv` or `application/pdf`, not multipart, not `text/plain` | Proposed. Same reasoning as the avatar route: those types need a CORS preflight, which is never granted, so another site's HTML form can't post a file to the app. |
 | Size limits | 2 MB CSV, 5 MB PDF, 500 rows, 30 PDF pages | Proposed. Both byte limits are under the 10 MB that `proxy.ts` buffers before a route sees the body (`experimental.proxyClientMaxBodySize`, which truncates silently instead of failing), so nothing in `next.config.ts` changes. A month of card transactions is tens to a few hundred rows; raise the limits only if a real statement doesn't fit. |
 | Rate limit | 30 uploads per user per hour, every attempt counted | Proposed. Each upload costs a parse; same limiter as avatars (`createFailureLimiter`). |
@@ -143,12 +144,12 @@ before the task that uses it starts.
 
 ## Questions for George
 
-Each has a default that the plan uses unless you say otherwise, so none of them blocks I1–I9. The
-first is the roadmap's open decision and blocks I10.
+Each has a default that the plan uses unless you say otherwise. Questions 2–4 were answered with
+their defaults on 29 October 2026 (#150).
 
 1. **Which banks and formats?** For each bank or card you import from: current account or card,
-   and whether you can download CSV, PDF or both. Answered at the checkpoint before I10, with the
-   sample statements.
+   and whether you can download CSV, PDF or both. **No longer blocking** since the revision:
+   anonymised samples, when you have them, are added to I19's eval set.
 2. **Refunds and incoming money.** Default: skipped, counted on the review screen, never imported,
    because an expense must be greater than zero. Alternative: a refund could reduce a matching
    expense, which is a different feature. Needed by I2.
@@ -161,33 +162,173 @@ first is the roadmap's open decision and blocks I10.
    telling you how many that is ("This removes 37 expenses, 2 of them changed since you imported
    them"). Alternatives: a time limit such as 30 days, or leaving edited expenses alone. Needed by I8.
 
+## Revision: the AI reads the statement
+
+Decided by George on 30 October 2026, after I1–I9 and I12 had merged. The merchant rules only know
+car fuel and car maintenance, so almost every imported row arrived as **Other**, and every bank
+needed its own parser built from anonymised samples. Instead, **a model reads the statement's text
+and returns typed rows with a category**, and **code verifies every row against that text** before
+anything becomes a draft. The draft, review, confirm and undo flow from I1–I9 is unchanged: the
+model only replaces where the rows and their first category come from.
+
+### How a statement is read
+
+```
+upload (I4 guard, unchanged) → CSV decoded / PDF text extracted (I3, I12, unchanged)
+  → maskAccountNumbers on every line                     (no IBAN or card number leaves the server)
+  → numbered lines: "0001⇥…", with "--- page 2 ---" markers for PDFs
+  ─ AI on for this user, and the gate allows the call? ───────────────────────────────┐
+  │ yes                                                                                │ no
+  ▼                                                                                    ▼
+  count tokens → over the input cap: 422 statement_too_long                 parsers, as built
+  → one call through the AI gate (src/lib/ai/client.ts), structured output   (generic CSV parser;
+    with a Zod schema: rows + statement summary                               unrecognised_layout
+  → verify every row against the numbered text (below); any failure: 422      tells you AI can read
+    unverified_statement, nothing drafted, the cost still recorded            it, with a link)
+  → category: merchant rule > your history > the model's
+  → content hash of the masked text → create_import_batch (I1, unchanged)
+```
+
+### What the model returns
+
+One JSON object, validated with a Zod schema through the SDK's structured outputs
+(`client.messages.parse` with `zodOutputFormat`; schema constraints the API doesn't take, such as
+string lengths, are checked client-side by the SDK and again by our own schema):
+
+- `rows[]`, one per transaction, money in included (it is counted and skipped as before):
+  - `lines`: the 1 to 3 consecutive line numbers the transaction is written on;
+  - `dateText` and `amountText`: **copied exactly** as they appear on those lines;
+  - `currency`: a three-letter code, or null when the statement doesn't say;
+  - `direction`: `debit` or `credit`;
+  - `merchant`: a short, cleaned merchant name ("Lidl Cluj" for "POS 4411 LIDL CLUJ RO"), at most
+    120 characters;
+  - `category` and `subtype`: from the app's fixed lists (the enum the expense schema uses), with
+    `subtype` only for `car`.
+- `statement`: `currency`, `periodStart` and `periodEnd` as text if printed, and
+  `totalDebitsText` with its line, if the statement prints a total of money out.
+
+The system prompt and the schema are fixed text, so they are cached (prompt caching) across
+statements; only the numbered lines change. The prompt has a version (`statement-reader-v1`) that
+becomes the batch's `parser_id` (`ai:statement-reader-v1`), so a prompt change is visible on every
+batch it read.
+
+### How code checks the model
+
+Nothing the model says is trusted until code has found it in the statement:
+
+1. **Every date and amount is in the text.** `dateText` and `amountText` must occur on the lines
+   the row cites. The amount is then parsed by code (`detectDecimalMark` over all amount texts, then
+   `parseAmount`), and the date by `parseStatementDate`: the model never supplies a number.
+2. **Every merchant word is in the text.** Each word of `merchant` (case and accents folded) must
+   occur on the cited lines, so a cleaned name can drop noise but can't invent a shop.
+3. **No line is used twice** for two different transactions' amounts.
+4. **Totals, when printed.** If `totalDebitsText` is found on its line and parses, the sum of the
+   debit rows must equal it to the cent. A mismatch is shown on the review screen as a warning with
+   the difference (question 7); it does not refuse the statement.
+5. **Lines that look like transactions but no row cites** (a date and an amount on the same line)
+   are counted and shown as a warning ("3 lines with an amount weren't read as transactions").
+6. The checks of I4 still apply: 1 to 500 debits, descriptions masked and cut at 120, a currency
+   per row (the statement's, when the row has none; refused when neither has one).
+
+A row that fails 1–3 refuses the whole statement (`unverified_statement`, 422, "The statement
+couldn't be read reliably."). The call's cost is recorded either way. No retry is made
+automatically: the user can upload again, which is a new, counted call.
+
+### Where a row's category comes from
+
+In this order, and the review screen shows which one it was:
+
+1. **A merchant rule** (the database's `classify_expense_merchant`), as now; the insert trigger would
+   apply it anyway.
+2. **Your history:** the category you gave the most recent of your own expenses with the same
+   normalised merchant (the duplicate matcher's normalisation) in the last 12 months. Read with an
+   explicit `user_id` filter, as `listRange` does. This is computed in code after the call, so your
+   history is **not** sent to the model.
+3. **The model's category.**
+
+### What is sent, and what it costs
+
+- **Sent:** the masked, numbered statement text and the fixed prompt. Not sent: your name or email,
+  your history, the file itself, the file name. Statement headers can still carry a name and
+  address; the opt-in text says so.
+- **Opt-in, per user, off by default**, as the roadmap's phase 8 says: Settings → AI. A kid also
+  needs a parent's permission (a new `ai` module in `member_permissions`, as `mcp` was added in
+  phase 3). With AI off, the parsers are used and the upload step says AI reading is available.
+- **The gate** (roadmap 8.1, built here as I14): every call is checked against the global monthly
+  budget and the user's daily and monthly caps **before** it is made, with an estimate from the
+  token count, and settled with the real usage after. `app_flags.ai_enabled` is the kill switch and
+  turns itself off at the global budget.
+- **Limits per statement:** input capped at 80,000 tokens (counted with the token-counting endpoint
+  before the call; a month of a few hundred rows is well under), output `max_tokens` 64,000 with a
+  streaming request so it can't time out. A response that stops at `max_tokens` or with a refusal is
+  `unverified_statement`.
+- **Model:** `AI_MODEL_STATEMENTS` in env, **default `claude-opus-5-5`**. Roadmap phase 8 wanted a
+  small model for parsing; `claude-haiku-5-5` is one env change away, and I19's eval measures both
+  on the same statements before George picks (question 5). For scale, with the published prices
+  cached on 6 October 2026 (Opus 5.5 $4 / $20, Haiku 5.5 $0.10 / $0.50 per million input / output
+  tokens), a 300-row statement of roughly 20,000 input and 15,000 output tokens is about $0.38 on
+  Opus 5.5 and about $0.01 on Haiku 5.5, before thinking tokens. Prices are re-read from
+  Anthropic's pricing page when I15 writes the pricing table.
+
+### Decisions added by the revision
+
+| Decision | Choice | Why |
+| --- | --- | --- |
+| Who reads the statement | The model, for users with AI on; the parsers otherwise | George. Removes one parser per bank. |
+| What the model may decide | Which lines are transactions, debit or credit, a cleaned merchant name, a category | Everything else (amounts, dates, currency rules, masking, limits) stays in code. |
+| Verification | Dates, amounts and merchant words must be found on the cited lines; amounts and dates parsed by code | A model can misread or invent a row; a row that can't be found in the text is refused. |
+| A failed check | Refuses the statement, nothing drafted | A partial draft would look complete. |
+| Category order | Merchant rule, then your history, then the model | Rules are George's; history is personal and free; the model is the fallback. |
+| History sent to the model | No | Cheaper and more private; the override is applied after the call. |
+| Content hash for AI reads | SHA-256 of the masked, numbered text | Two readings of one file can differ; the text doesn't. A statement read once with AI and once without gets two hashes; the duplicate flags still catch the rows. |
+| The AI gate | Built in this phase (I14, I15) as roadmap 8.1 and 8.2 describe, used by statements first | Phase 8's later features reuse it unchanged. |
+| SDK | `@anthropic-ai/sdk`, pinned to an exact version at least two weeks old, server-only | The repo pins every dependency; the key must never reach a client bundle. |
+| Tests | Recorded responses only; no live call in CI | Live calls cost money and aren't repeatable. I19's eval runs live, by hand. |
+| Bank parsers (old I10, I13) | Dropped; a bank-specific parser is added only if the eval shows the model can't read that bank | Kept as an escape hatch, not planned work. |
+
+### Questions the revision adds
+
+5. **Which model?** Default `claude-opus-5-5`. I19 runs the same statements through Opus 5.5 and
+   Haiku 5.5 and reports accuracy and cost per statement; George picks, and it's one env value.
+6. **Budgets.** Default: global **$15 a month**, per user **$2 a day and $5 a month**; also set a
+   monthly spend limit in the Anthropic console as the last line of defence. Needed before I14's
+   checkpoint.
+7. **Totals that don't add up.** Default: a warning on the review screen with the difference, and the
+   rows as read. Alternative: refuse the statement.
+8. **Kids and AI.** Default: a kid needs a parent to turn the `ai` permission on, then their own
+   switch, as with MCP.
+
 ## Tasks
 
 The workflow is the same as phases 1–6: one task, one branch (`family/<id>-<slug>` from `main`),
-one PR, one fresh agent per task, run one at a time. All SQL is in I1; George applies the
-migration at the checkpoint. Read the relevant guide in `node_modules/next/dist/docs/` before
-writing route or page code, as `AGENTS.md` asks.
+one PR, one fresh agent per task, run one at a time. All import SQL was in I1; the revision's SQL is
+all in I14, applied at its checkpoint. Read the relevant guide in `node_modules/next/dist/docs/`
+before writing route or page code, as `AGENTS.md` asks. Tasks that call the Claude API read the
+`claude-api` skill first and never guess SDK names.
 
-| Task | What | Depends on |
-| --- | --- | --- |
-| I1 | Migration: import tables, the link from imports to expenses, the create, confirm, undo and purge functions, guard, RLS, SQL tests | — |
-| — | **Checkpoint:** George applies the I1 migration | I1 |
-| I2 | Domain: types, limits, Zod schemas, amount and date parsing, masking, content hash | — (can run alongside I1) |
-| I3 | `StatementParser` interface, registry, text decoding, CSV reader, generic CSV parser, fixtures | I2 |
-| I4 | Upload guard and pipeline: size limits, signature check, rate limit, parse to draft rows | I3 |
-| I5 | `ImportRepository`, `ExpenseRepository.listRange`, duplicate matcher and the import service | I1, I2, I4 |
-| I6 | API routes: upload, list, read, confirm, undo, discard | I5 |
-| I7 | The import page: upload step and review screen (not linked yet) | I6 |
-| I8 | Recent imports, resume, undo, expiry states, phone layout | I7 |
-| I9 | The worker's daily purge of expired drafts | I1 |
-| — | **Checkpoint:** George names his banks and formats and supplies anonymised sample statements | — (can happen any time before I10) |
-| I10a, I10b, … | One CSV parser per bank and format, each with anonymised fixtures | the checkpoint, I3 |
-| I11 | The Import button on the Expenses page | I8, I10a |
-| I12 | PDF text extraction: the dependency, `extractPdfText`, PDFs accepted by the route | I4, I6 |
-| I13a, I13b, … | One PDF parser per bank that offers PDF only, or whose PDF layout differs from its CSV, each with fixtures | the checkpoint, I12 |
-| — | **Checkpoint:** smoke test | I11, I13 (or I11 alone if no bank needs PDF) |
-
-The number of I10 and I13 tasks is decided at the second checkpoint: one task per bank and format.
+| Task | What | Depends on | Status |
+| --- | --- | --- | --- |
+| I1 | Migration: import tables, the link from imports to expenses, the create, confirm, undo and purge functions, guard, RLS, SQL tests | — | Merged (#151), live |
+| I2 | Domain: types, limits, Zod schemas, amount and date parsing, masking, content hash | — | Merged (#152) |
+| I3 | `StatementParser` interface, registry, text decoding, CSV reader, generic CSV parser, fixtures | I2 | Merged (#153) |
+| I4 | Upload guard and pipeline: size limits, signature check, rate limit, parse to draft rows | I3 | Merged (#154) |
+| I5 | `ImportRepository`, `ExpenseRepository.listRange`, duplicate matcher and the import service | I1, I2, I4 | Merged (#155) |
+| I6 | API routes: upload, list, read, confirm, undo, discard | I5 | Merged (#156) |
+| I7 | The import page: upload step and review screen (not linked yet) | I6 | Merged (#157) |
+| I8 | Recent imports, resume, undo, expiry states, phone layout | I7 | Merged (#158) |
+| I9 | The worker's daily purge of expired drafts | I1 | Merged (#159) |
+| I12 | PDF text extraction: the dependency, `extractPdfText`, PDFs accepted by the route | I4, I6 | Merged (#160) |
+| ~~I10, I13~~ | ~~One CSV or PDF parser per bank~~ | — | Dropped by the revision |
+| I14 | AI gate, part 1 (roadmap 8.1): migration for `app_flags`, `ai_usage`, `profiles.ai_enabled`, the `ai` module permission, and categories passed into `create_import_batch`; the budget gate and kill switch with a fake model | — | |
+| — | **Checkpoint:** George applies the I14 migration and confirms the budgets (question 6) | I14 | |
+| I15 | AI gate, part 2 (roadmap 8.2): the Claude API client behind the gate, pricing table, token pre-count, usage recording | I14 | |
+| I16 | Settings → AI: the opt-in switch, the kid permission, the privacy text | I14 | |
+| I17 | The statement reader: numbered text, prompt, schema, the call, verification, category order, the pipeline switch | I15 | |
+| I18 | Review screen for read statements: category sources, warnings, the AI-off hint; preview fixtures | I17 | |
+| I19 | Eval: synthetic statements and a hand-run live eval comparing models | I17 | |
+| — | **Checkpoint:** George adds `ANTHROPIC_API_KEY` and the AI env to production (vps-apps), sets the console spend limit, and picks the model (question 5) | I15, I19 | |
+| I11 | The Import button on the Expenses page | I18 | |
+| — | **Checkpoint:** smoke test | I11, the checkpoint above | |
 
 ### I1: Migration
 
@@ -569,68 +710,181 @@ or the other clean-up, and the log carries a number and nothing else.
 **Done when** the worker tests pass and the purge is exercised against the I1 function in
 `import_save.sql` (already covered there).
 
-### Checkpoint: George names his banks and formats and supplies anonymised sample statements
+### Sample statements (optional since the revision)
 
-This is the roadmap's open decision ("Banks and formats for statement import"), and it can happen
-at any time before I10. **Nothing in the plan assumes an answer.** What is needed:
+The old checkpoint before I10 asked George for his banks and anonymised samples. The revision no
+longer needs them to start, but real layouts make I19's eval worth more. When George has them:
 
-1. **The list.** For each bank or card you import from: whether it's a current account or a card,
-   and whether you can download CSV, PDF or both. Fill in this table in the PR that adds the
-   samples:
+1. **The list.** For each bank or card: current account or card, CSV, PDF or both, and the
+   language.
+2. **One anonymised sample per format**, ideally with an ordinary month, a refund or incoming
+   payment, a payment in another currency, a transfer, a long description, a description with
+   accents, and rows on the first and last day.
+3. **How to anonymise** (the repository is treated as public): edit CSVs in a plain-text editor, not
+   a spreadsheet, which changes delimiters, encodings and dates. Replace names, addresses, IBANs,
+   card and account numbers, references and balances with invented values, keeping the shape (same
+   headers, column order, delimiter, quoting, date and number formats, encoding). Use obviously fake
+   IBAN bodies (`RO00FAKE…`). For a PDF, either keep it a text PDF with the values replaced, or paste
+   its text into a file with the values replaced, which I12's helper turns back into a PDF.
+4. **Answers about the data:** which date the expense should carry (transaction or posting), which
+   amount for card payments abroad, and how refunds look. These become instructions in the prompt
+   (a new prompt version) and expected rows in the eval.
 
-   | Bank or card | Account type | CSV? | PDF with selectable text? | Notes (language, one account per file, ...) |
-   | --- | --- | --- | --- | --- |
-   | *to be filled in by George* | | | | |
+### I14: The AI gate, part 1 (roadmap 8.1)
 
-2. **One anonymised sample per format**, ideally one that contains: an ordinary month, a refund or
-   incoming payment, a payment in another currency, a transfer, a long description, a description
-   with accents, and a row on the first and the last day of the period. If the bank changed its
-   format over the years, one of each.
-3. **How to anonymise** (so the samples can be committed as fixtures; treat the repository as public):
-   - Edit CSVs in a **plain-text editor**, not a spreadsheet. A spreadsheet changes the delimiter,
-     the encoding, the dates and the leading zeros, which are exactly what the parser must handle.
-   - Replace names, addresses, IBANs, card and account numbers, references and balances with
-     invented values. Keep the **shape**: same headers, column order, delimiter, quoting, date and
-     number formats, line endings and encoding. For IBANs, keep the length and use an obviously fake
-     body (`RO00FAKE...`) so the masking tests still mean something.
-   - For a PDF, say whether the text is selectable. Replace the values in the PDF with an editor
-     that keeps it text; if that isn't possible, paste the statement's text into a text file with
-     the values replaced, and I12's test helper builds a text PDF from the lines. That keeps the text
-     but not the exact column positions, so tell the agent if the bank's PDF needs them.
-4. **Answers about the data**: which date should the expense carry, the transaction date or the
-   posting date (if the file has both)? For card payments abroad, which amount is the expense
-   (your account's currency, or the original)? Does the statement list refunds, and how? Is the
-   merchant in the description column, or in a separate field with a neutral description such as
-   "Card payment"?
-5. **The notes envelope.** The classification trigger reads a merchant from a notes envelope
-   (`BT Star Forte statement YYYY-MM; processed: …; transaction: …; source: …`) that existing
-   expenses carry, written by an importer outside this repository, but only when the description is
-   neutral. If one of your banks puts the
-   merchant in a separate field, say whether new imports should write the same envelope so the
-   existing merchant rules keep working for it. Default: they don't, and the parser puts the
-   merchant in the description.
+Migration `create_ai_gate`, all the revision's SQL:
 
-The agent for each I10 task reads the table and the samples, and the PR that adds them is merged
-before the first I10 starts.
+- `app_flags (key text primary key, value jsonb, updated_at, updated_by)` with one row,
+  `ai_enabled = true`. Readable by `authenticated`; written by `service_role` and a security-definer
+  function for admins (8.3 adds the admin page; until then George flips it with SQL).
+- `ai_usage (id, user_id, feature text, model text, input_tokens, output_tokens,
+  cache_read_tokens, cache_write_tokens, cost_micros bigint, outcome text, created_at)`: the
+  ledger, one row per call, inserted by the server after the call. Owner can read their own rows;
+  nobody updates or deletes them. `feature` is a short key (`statements` first).
+- `profiles.ai_enabled boolean not null default false`, the per-user switch, with the same guard
+  as `mcp_enabled` (`guard_profile_mcp_enabled` in `20261023000200_create_mcp_access.sql`): a kid
+  can only turn it on while their `ai` permission is `edit`, and turning the permission off turns
+  the switch off.
+- `member_permissions` gains the `ai` module (`off`, `edit`), off for kids by default, following
+  `20261023000100_add_mcp_permission.sql` (`module_keys()`, the level check, the defaults for new
+  kids and invites).
+- A function `ai_spend(p_user_id, p_since)` returning the summed `cost_micros`, for the gate, and
+  one for the global month.
+- For the statement reader: `import_rows.category_source text` (`rule`, `history`, `ai`, or null
+  for rows read by a parser), and `create_import_batch` accepts an optional `category`, `subtype`
+  and `category_source` per row. The merchant rule still runs inside the function and **wins** when
+  it recognises the row (source `rule`); otherwise the row keeps the category it was given, or
+  `other` as today. The existing `import_save.sql` tests run unchanged, plus new ones for the
+  optional fields.
+- SQL tests in `supabase/tests/ai_gate.sql`: RLS on both tables, the guard, the permission defaults,
+  the spend sums.
 
-### I10a, I10b, …: One CSV parser per bank and format
+In code, `src/lib/ai/gate.ts` (no model, no SDK yet):
 
-One task per row of the table whose CSV column says yes. Each:
+- `checkBudget({ userId, feature, estimatedMicros })` refuses with a typed error when the flag is
+  off, the user hasn't opted in (or a kid's permission is off), or the estimate would cross the
+  user's daily or monthly cap or the global monthly budget. Caps come from env
+  (`AI_MONTHLY_BUDGET_USD`, `AI_USER_DAILY_USD`, `AI_USER_MONTHLY_USD`), with question 6's
+  defaults.
+- `recordUsage(...)` writes the ledger row with the real tokens and cost after every call,
+  including failed and refused ones, and turns `app_flags.ai_enabled` off when the global month
+  reaches the budget. At 80% and at 100% it queues a notification to the admins in
+  `APP_ADMIN_USER_IDS` through the phase 5 outbox.
+- A fake model in `src/test/fakes/ai.ts` for every test from here on.
 
-- `src/lib/imports/parsers/<parser-id>.ts` implementing `StatementParser`, with `matches` looking
-  at that bank's exact header (or first lines) and nothing looser, registered **before**
-  `generic-csv`.
-- The anonymised sample(s) under `src/lib/imports/__fixtures__/<parser-id>/`, with an expected-rows
-  JSON beside each, chosen on the checkpoint's answers: the date, the amount column, the
-  currency, how a credit is marked, how a refund looks, the merchant field, the encoding and delimiter.
-- A fixtures test for every file, the shared "no fixture is claimed by two parsers" test, and the
-  fixture scan from I3.
-- The duplicate matcher is run on the parser's output against expenses written the way this bank's
-  rows were saved before (as the samples suggest), and its threshold is adjusted in `duplicates.ts`
-  only if that fixture needs it.
+**Done when** `npm run test:db` passes, and gate tests show refusals for each cap, the flag turning
+off at the global budget, and a failed call still being recorded.
 
-**Done when** each fixture parses to its expected rows, nothing else matches it, and uploading it
-through `/dev/preview/import` produces a sensible review.
+### Checkpoint: apply the AI gate migration
+
+George applies `create_ai_gate` to the live project and confirms the budgets (question 6). Nothing
+calls a model yet.
+
+### I15: The AI gate, part 2: the Claude API client (roadmap 8.2)
+
+- Add `@anthropic-ai/sdk`, pinned to an exact version **at least two weeks old** when the task runs
+  (check `npm view @anthropic-ai/sdk time --json`), and confirm that its Zod helper
+  (`@anthropic-ai/sdk/helpers/zod`) works with the repo's `zod` 4. Licence and size in the PR. Read
+  the `claude-api` skill's TypeScript guide before writing any call.
+- `src/lib/ai/client.ts`, `import "server-only"`, the only file that imports the SDK. One function
+  per call shape, starting with `structuredCall({ feature, userId, model, system, input, schema,
+  maxTokens, maxInputTokens })`:
+  1. count the input tokens (`messages.countTokens`) and refuse over `maxInputTokens`;
+  2. `checkBudget` with the estimate (input at full price, output at `maxTokens`, the worst case);
+  3. a streaming `messages.parse`-style call with `output_config.format` from the Zod schema, the
+     fixed system prompt marked for prompt caching, a timeout, the SDK's retries;
+  4. handle `stop_reason`: `max_tokens` and `refusal` are typed failures, never parsed as a result;
+  5. `recordUsage` with `usage` from the response (input, output, cache reads and writes), priced
+     from `src/lib/ai/pricing.ts`.
+- `src/lib/ai/pricing.ts`: a table of model id → price per million tokens for input, output, cache
+  writes and cache reads, copied from Anthropic's pricing page on the day of the task, with the date
+  in a comment. An unknown model id refuses the call rather than pricing it at zero.
+- Env: `ANTHROPIC_API_KEY` (server only, never `NEXT_PUBLIC_`), `AI_MODEL_STATEMENTS` (default
+  `claude-opus-5-5`). Check `npm run build`'s client bundles contain no SDK code and no key.
+- The worker bundle (`build:worker`) must not import the SDK.
+- Logging: one line per call with feature, model, tokens, cost and outcome; never the prompt, the
+  input or the output.
+
+**Done when** tests with a fake transport show a call recorded with its exact token counts and cost,
+refusals over each cap, an unknown model refused, `max_tokens` and refusal stops handled, and no
+SDK code in client bundles.
+
+### I16: Settings → AI
+
+- A section in Settings, next to AI assistants (MCP): one switch, **"Read statements with AI"**,
+  off by default, with the privacy text: what is sent (the masked statement text), what isn't (the
+  file, your name, your history), that statements can still carry a name and address, and that API
+  data isn't used for training.
+- For a kid, the switch is disabled until a parent turns the `ai` permission on in Family; the
+  permission appears in the parent's member editor next to MCP.
+- Routes: `GET` and `PATCH /api/settings/ai` (or the existing settings route, whichever the MCP
+  switch uses), through the service and repository pattern.
+
+**Done when** screenshots at 390 and 1280 px, and tests show a kid can't turn it on without the
+permission and turning the permission off turns the switch off.
+
+### I17: The statement reader
+
+- `src/lib/imports/ai/numbered-text.ts`: the masked lines of a CSV or a PDF, numbered, with page
+  markers, and the SHA-256 of that text as the content hash.
+- `src/lib/imports/ai/prompt.ts`: the system prompt (`statement-reader-v1`) and the Zod schema of
+  "What the model returns". The prompt describes the task, the app's categories and subtypes with a
+  line each, the copy-exactly rule for `dateText` and `amountText`, and that money in is listed with
+  `direction: credit`. No examples taken from real statements.
+- `src/lib/imports/ai/verify.ts`: every check in "How code checks the model", returning either the
+  parsed rows and warnings or the reason it failed (for the log, never quoting the text).
+- `src/lib/imports/ai/categories.ts`: the category order, with the history lookup through a new
+  `ExpenseRepository.recentCategoriesByMerchant(userId, since)` (explicit `user_id` filter) and its
+  fake.
+- `pipeline.ts`: `buildDraft` takes the user's AI state; when it is on and the gate allows, the
+  reader runs instead of the parsers. A refusal by the gate (flag off, over a cap) falls back to the
+  parsers with a warning saying why; a failed check does not fall back (`unverified_statement`).
+- The draft rows are created with the category and source from history or the model, through the
+  optional row fields I14 added to `create_import_batch`; the merchant rule inside the function
+  still wins. `StoredImportRow` and `DraftRow` gain `categorySource`.
+- New error codes: `statement_too_long`, `unverified_statement`; both 422.
+
+Tests use **recorded responses** for synthetic statements: a clean CSV, a PDF with columns, a
+multi-line transaction, money in and out, a foreign-currency row, and printed totals. Plus
+tampered responses: an amount not on its line, a date changed by a day, an invented merchant word,
+a line used twice, a missing row (the "lines not read" warning), totals that don't add up, a
+`max_tokens` stop and a refusal.
+
+**Done when** each recorded response becomes the expected draft or the expected refusal, and an
+upload with AI off still goes through the parsers unchanged.
+
+### I18: The review screen for read statements
+
+- Each row shows where its category came from: "Merchant rule", "Like last time" (history) or "AI
+  suggestion", as a small label under the category, the way the merchant-rule label works today.
+- The verification warnings ("totals differ by 12.40", "3 lines weren't read as transactions") in
+  the summary area, above the rows.
+- With AI off, a line on the upload step: "Turn on AI reading in Settings to import any bank's
+  statement." linking to Settings → AI. After an `unrecognised_layout` refusal, the same hint.
+- `/dev/preview/import` gets a read statement with each category source and both warnings.
+
+**Done when** screenshots at 390 and 1280 px of a read statement and of the AI-off upload step.
+
+### I19: The eval
+
+- `src/lib/imports/ai/__eval__/`: synthetic statements (generated by a script, never real data) in
+  several shapes: English and Romanian headers, comma and dot decimals, CSV and PDF text, multi-line
+  descriptions, foreign-currency rows, refunds, printed totals; and George's anonymised samples when
+  he adds them. Each with expected rows and categories.
+- `npm run eval:statements -- --model <id>`: runs each statement through the real reader, live,
+  and reports per model: statements passed verification, rows exactly right, category accuracy,
+  tokens and cost per statement. **It spends real money, so it runs only by hand**, never in CI,
+  and asks for confirmation with the estimated cost before it starts.
+- The first run compares `claude-opus-5-5` and `claude-haiku-5-5`; the PR reports both, for
+  question 5.
+
+**Done when** the eval runs against both models and the PR has the table.
+
+### Checkpoint: production AI settings
+
+George adds `ANTHROPIC_API_KEY`, `AI_MODEL_STATEMENTS` (question 5), the budget variables
+(question 6) and `APP_ADMIN_USER_IDS` to the production env in vps-apps, and sets a monthly spend
+limit in the Anthropic console.
 
 ### I11: The Import button
 
@@ -684,53 +938,45 @@ the signature check says.
 **Done when** the tests pass, `npm run build` succeeds, and the standalone server extracts the text
 of a generated PDF.
 
-### I13a, I13b, …: One PDF parser per bank
-
-One task per bank that offers PDF only, or whose PDF layout differs from its CSV. Same shape as
-I10: a parser registered before the generic one, its `matches` looking at the bank's exact
-header lines, anonymised fixtures (PDFs or line files rebuilt by the test helper, as agreed at the
-checkpoint), expected rows, and the shared tests. A bank whose PDF and CSV carry the same rows needs
-nothing here: the CSV parser is enough and the PDF is not offered for it.
-
-**Done when** each PDF fixture parses to its expected rows and nothing else matches it.
-
 ### Checkpoint: smoke test
 
-With the app on your phone and a Mac, and a real statement of each bank (not the anonymised one):
+With the app on your phone and a Mac, and real statements (not the anonymised ones):
 
-1. Import a CSV from your first bank. Check the summary line, that the rows match the statement, that
-   the refunds and incoming payments were skipped and counted, and that known car merchants arrive
-   in the car category with their subtype.
-2. Untick two rows, change a category, confirm. The new expenses appear in the right months and the
+1. With AI **off**, upload a statement: the generic parser reads it or refuses it with the hint
+   pointing at Settings → AI. Turn AI on in Settings.
+2. Import a CSV statement. Check the summary line, that the rows match the statement, that refunds and
+   incoming payments were skipped and counted, that known car merchants arrive as "Merchant rule",
+   and that the other rows carry sensible categories marked "AI suggestion".
+3. Untick two rows, change a category, confirm. The new expenses appear in the right months and the
    dashboard totals move by the amount you ticked.
-3. Upload the same statement again: you are told when you imported it and nothing is added. Upload
-   the next month's statement, which overlaps by a few days: the overlapping rows are flagged and
-   unticked.
-4. Undo the first import. Exactly its expenses go; expenses you added by hand are still there. Import
-   the statement again and confirm it works.
-5. Leave a draft for more than 24 hours: it can't be opened and is gone from the list; the next
-   morning, check the worker log shows the daily purge count.
-6. Do the same with a PDF statement of each bank that has one.
-7. Try the refusals: a photo, an `.xlsx`, a CSV from a bank not on your list (clear message, nothing
-   saved), a file over the limit.
-8. Do steps 1 and 2 on the phone, at 390 px.
-9. As a kid with Expenses on, import a statement and see that a parent's family view shows the kid's
-   expenses but not the draft; as a kid with Expenses off, find no Import button.
-10. Check that the container has no copy of any statement: no new file under the app's directories
-    and the Supabase Storage buckets are unchanged.
+4. Import the next month's statement: merchants you categorised last time are now "Like last time",
+   and rows overlapping the first statement are flagged as duplicates and unticked.
+5. Upload the first statement again: you are told when you imported it and nothing is added.
+6. Undo the first import. Exactly its expenses go; expenses you added by hand are still there.
+7. Import a PDF statement of each bank that has one.
+8. Check the cost: one `ai_usage` row per upload, with tokens and cost, and spend that matches the
+   Anthropic console for the day.
+9. Lower `AI_USER_DAILY_USD` to below one statement's cost: the next upload falls back to the
+   parsers with a message saying the daily AI limit was reached. Put it back.
+10. Leave a draft for more than 24 hours: it can't be opened and is gone from the list; the next
+    morning, the worker log shows the daily purge count.
+11. Try the refusals: a photo, an `.xlsx`, a scanned PDF, a file over the limit.
+12. Do steps 2 and 3 on the phone, at 390 px.
+13. As a kid with Expenses on but no `ai` permission: the AI switch is disabled and imports use the
+    parsers. As a kid with Expenses off: no Import button.
+14. Check that the container has no copy of any statement, the logs hold no statement text, and the
+    Supabase Storage buckets are unchanged.
 
 ## Not in this plan
 
-- **7.5, an LLM for layouts no parser recognises.** It's phase 8. What this plan leaves for it: an
-  unrecognised layout is a distinct error (`unrecognised_layout`) rather than a generic failure,
-  `maskAccountNumbers` already exists and is the helper to run before any text leaves the server,
-  and the draft/review/confirm flow is unchanged by where the rows come from. The opt-in, the cost
-  gate and the extraction belong to 8.x.
-- **Scanned PDFs and OCR.** A PDF without a text layer is refused.
+- **AI for statements without a review.** Every import still ends in the review step.
+- **AI categories for rows read by a parser** or for expenses typed by hand. That is roadmap step
+  8.5; the history lookup from I17 is reusable there.
+- **Scanned PDFs and OCR**, including sending page images to the model. A PDF without a text layer
+  is refused.
 - **Bank connections** (open banking, scraping, background syncing) and **email forwarding** of
   statements.
-- **Other file types**: Excel, OFX, MT940, CAMT and QIF. They can be added as parsers later if a
-  bank offers nothing else.
+- **Other file types**: Excel, OFX, MT940, CAMT and QIF.
 - **Money in.** Refunds and incoming payments aren't imported (question 2); netting a refund
   against an expense, income tracking and transfers between your own accounts are separate features.
 - **Currency conversion.** Rows in another currency can't be imported.
@@ -738,9 +984,8 @@ With the app on your phone and a Mac, and a real statement of each bank (not the
   theirs alone.
 - **Saving review edits as you go**, resuming with the edits intact after a reload, and splitting or
   merging rows.
-- **Categories learned from your history** ("the last time this merchant was Groceries") and
-  **AI category suggestions**. The matcher already loads neighbouring expenses, so history is cheap
-  to add later; AI suggestions are roadmap step 8.5.
+- **The admin usage page** (roadmap 8.3). Until it exists, spend is read from `ai_usage` and the
+  Anthropic console, and the flag is flipped with SQL.
 - **Editing the merchant rules** from the app.
 - **Recurring-payment detection** from imported rows (roadmap step 8.7).
 - **MCP tools** for imports (see above).

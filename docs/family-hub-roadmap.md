@@ -103,8 +103,8 @@ Everything in phases 3–8 ships on the web before the Expo work in phase 9 star
 2. **Phase 4, the to-do board.** Already planned, now as a kanban board.
 3. **Phase 5, the worker, push notifications and reminders.** The background worker and the notification layer are built once here, then reused by the calendar, to-dos and later the phone. Email notifications come in a later step.
 4. **Phase 6, the calendar.** The app's own family calendar, event notifications on the phase 5 worker, and a private feed per member for other calendar apps. Google sync is dropped.
-5. **Phase 7, statement import.** CSV first, then PDF.
-6. **Phase 8, AI assistance**, with the cost gate and kill switch.
+5. **Phase 7, statement import.** CSV first, then PDF, then the AI reader, which brings the AI cost gate and client (8.1 and 8.2) forward.
+6. **Phase 8, AI assistance**, on the gate built in phase 7.
 
 **Features first, improvements after (decided 26 October 2026).** All the planned functionality ships before the improvement phases. That means phases 6–8 here, then the native apps (9), cars and houses (10), smart home (11), polish (12) and the later items (13). After that come the improvements, in this order:
 - **Phase 14, production hardening and security.**
@@ -215,7 +215,7 @@ Two-way sync with iCloud through CalDAV isn't planned. It needs app-specific pas
 
 ## Phase 7: Statement import
 
-**Status (28 October 2026): planned** (tasks I1–I13 in [statement-import-plan.md](statement-import-plan.md)). The plan changes the steps below: imports are linked to the expenses they create through an `import_expenses` table instead of a column on `expenses`, money in (refunds, incoming payments) is skipped, rows in another currency can't be imported, uploads are limited to 2 MB for CSV and 5 MB for PDF, and there are **no MCP tools**. Steps 7.2 and 7.4 become one task per bank and format, which wait for the open "Banks and formats for statement import" decision (a checkpoint in the plan); step 7.5 stays in phase 8. The steps below are kept as first written; the plan supersedes them.
+**Status (30 October 2026): in progress.** I1–I9 and I12 are merged (#151–#160) and the import migration is live. On 30 October the rest was **rewritten around AI reading** ([statement-import-plan.md](statement-import-plan.md), "Revision: the AI reads the statement"): instead of one parser per bank, a model reads the statement text and returns typed, categorised rows, and code checks every date, amount and merchant against the text before anything becomes a draft. That pulls **8.1 and 8.2 (the AI gate and client) into this phase** as I14 and I15, adds an AI opt-in (I16), the reader (I17), its review screen (I18) and an eval (I19), and drops the per-bank parsers (old I10 and I13). The open "Banks and formats" decision no longer blocks anything. Earlier changes still hold: imports are linked through an `import_expenses` table, money in is skipped, rows in another currency can't be imported, uploads are limited to 2 MB for CSV and 5 MB for PDF, and there are **no MCP tools**. The steps below are kept as first written; the plan supersedes them.
 
 Upload a bank statement and turn it into expenses inside the app. Whatever the format, every import ends in a **review step**, and nothing is saved until you confirm. Importing follows the Expenses permission and only ever creates the caller's own expenses.
 
@@ -228,6 +228,8 @@ Upload a bank statement and turn it into expenses inside the app. Whatever the f
 | **7.5** | (AI, see phase 8) **Unknown layouts**: let an LLM extract rows from statements no parser recognises, with account numbers masked in the extracted text before it's sent. Opt-in per user, because it sends financial data to a third party. The rows still go through the review step. | An unrecognised statement produces draft rows only after the user opts in. |
 
 ## Phase 8: AI assistance, with a hard cost limit
+
+**Status (30 October 2026):** steps 8.1 and 8.2 are being built in phase 7 (statement import tasks I14 and I15), with statements as the first feature to use the gate; step 7.5 (statement extraction) is part of phase 7 now. The rest of phase 8 reuses them.
 
 AI helps where it saves typing or thinking. It's built so the spend can't run away: every call goes through one gate that checks a budget, records the cost, and is switched off by a feature flag when usage gets high.
 
@@ -405,9 +407,9 @@ Each PR should include:
 | **Public HTTPS or Tailscale only** | Stay on Tailscale through phase 8. Decide before 3.5 or the store releases. | Phones need the Tailscale app to reach the API. claude.ai MCP connectors (3.5), Google Calendar, new Outlook and Outlook.com subscribing to the calendar feed (C8 in calendar-plan.md) and some OAuth redirects need a public URL (Tailscale Funnel or a Cloudflare Tunnel both work). Web Push needs HTTPS but not a public URL. |
 | **Email provider** | Decided (25 October 2026): Gmail SMTP from George's existing Gmail account with an app password, behind an `EmailSender` interface. Resend if a domain is ever bought | No domain, so providers that need SPF and DKIM on your own domain are out. Supabase Auth's email is only for sign-in emails. |
 | **One to-do board or several** | Decided: one board per family, filtered by member; no private cards. See [todo-board-plan.md](todo-board-plan.md) | Simpler for a family, and member chips cover "show me Ana's to-dos". |
-| **Banks and formats for statement import** | Open, needed before 7.2: which banks, and whether each gives CSV, PDF or both | Every bank needs its own parser and fixtures. |
+| **Banks and formats for statement import** | No longer blocking (30 October 2026): the AI reader replaces per-bank parsers. Anonymised samples still improve the eval (I19). | Kept for the eval. |
 | **How MCP clients sign in** | Decided: OAuth through Supabase Auth's OAuth 2.1 server, behind our own interfaces so leaving Supabase stays cheap, plus personal access tokens (1, 3 or 6 months, or never with a warning) for headless machines. Kids: OAuth only, with a parent's permission and a confirmed real email. See [mcp-access-plan.md](mcp-access-plan.md) | Using the secret key to read data would bypass RLS for every MCP call; a home-made OAuth server would still need Supabase to act as the user. |
-| **AI provider, cost and privacy** | Claude API (a small model for parsing and categories, a larger one for the assistant), opt-in per user, kids with a parent's permission. You choose the global monthly budget and the per-user caps before 8.1. | The budget is what the kill switch enforces. |
+| **AI provider, cost and privacy** | Claude API, opt-in per user, kids with a parent's permission. Statements default to `claude-opus-5-5`; the eval (I19) compares it with `claude-haiku-5-5` before you pick. You choose the global monthly budget and the per-user caps before I14's checkpoint (default $15 a month globally, $2 a day and $5 a month per user). | The budget is what the kill switch enforces. |
 | **Log retention** | 5 days through journald, capped at 300 MB. Your call on the number of days. | Longer means more disk; the cap keeps it bounded either way. |
 | **Who is an admin** | Your own account, by user id in env (`APP_ADMIN_USER_IDS`) | The AI usage page and the kill switch need an owner who isn't tied to a family role. |
 | **UI direction** | Sign off the 17.2 mockups before any screen is rebuilt | Rebuilding screens without an agreed direction would mean doing it twice. |
