@@ -103,8 +103,8 @@ Everything in phases 3–8 ships on the web before the Expo work in phase 9 star
 2. **Phase 4, the to-do board.** Already planned, now as a kanban board.
 3. **Phase 5, the worker, push notifications and reminders.** The background worker and the notification layer are built once here, then reused by the calendar, to-dos and later the phone. Email notifications come in a later step.
 4. **Phase 6, the calendar.** The app's own family calendar, event notifications on the phase 5 worker, and a private feed per member for other calendar apps. Google sync is dropped.
-5. **Phase 7, statement import.** CSV first, then PDF.
-6. **Phase 8, AI assistance**, with the cost gate and kill switch.
+5. **Phase 7, statement import.** CSV first, then PDF, then the AI reader, which brings the AI cost gate and client (8.1 and 8.2) forward.
+6. **Phase 8, AI assistance**, on the gate built in phase 7.
 
 **Features first, improvements after (decided 26 October 2026).** All the planned functionality ships before the improvement phases. That means phases 6–8 here, then the native apps (9), cars and houses (10), smart home (11), polish (12) and the later items (13). After that come the improvements, in this order:
 - **Phase 14, production hardening and security.**
@@ -215,7 +215,7 @@ Two-way sync with iCloud through CalDAV isn't planned. It needs app-specific pas
 
 ## Phase 7: Statement import
 
-**Status (28 October 2026): planned** (tasks I1–I13 in [statement-import-plan.md](statement-import-plan.md)). The plan changes the steps below: imports are linked to the expenses they create through an `import_expenses` table instead of a column on `expenses`, money in (refunds, incoming payments) is skipped, rows in another currency can't be imported, uploads are limited to 2 MB for CSV and 5 MB for PDF, and there are **no MCP tools**. Steps 7.2 and 7.4 become one task per bank and format, which wait for the open "Banks and formats for statement import" decision (a checkpoint in the plan); step 7.5 stays in phase 8. The steps below are kept as first written; the plan supersedes them.
+**Status (30 October 2026): in progress.** I1–I9 and I12 are merged (#151–#160) and the import migration is live. On 30 October the rest was **rewritten around AI reading** ([statement-import-plan.md](statement-import-plan.md), "Revision: the AI reads the statement"): instead of one parser per bank, a model reads the statement text and returns typed, categorised rows, and code checks every date, amount and merchant against the text before anything becomes a draft. That pulls **8.1 and 8.2 (the AI gate and client) into this phase** as I14 and I15, adds an AI opt-in (I16), the reader (I17), its review screen (I18) and an eval (I19), and drops the per-bank parsers (old I10 and I13). The open "Banks and formats" decision no longer blocks anything. Earlier changes still hold: imports are linked through an `import_expenses` table, money in is skipped, rows in another currency can't be imported, uploads are limited to 2 MB for CSV and 5 MB for PDF, and there are **no MCP tools**. The steps below are kept as first written; the plan supersedes them.
 
 Upload a bank statement and turn it into expenses inside the app. Whatever the format, every import ends in a **review step**, and nothing is saved until you confirm. Importing follows the Expenses permission and only ever creates the caller's own expenses.
 
@@ -229,6 +229,8 @@ Upload a bank statement and turn it into expenses inside the app. Whatever the f
 
 ## Phase 8: AI assistance, with a hard cost limit
 
+**Status (30 October 2026):** steps 8.1 and 8.2 are being built in phase 7 (statement import tasks I14 and I15), with statements as the first feature to use the gate; step 7.5 (statement extraction) is part of phase 7 now. The rest of phase 8 reuses them.
+
 AI helps where it saves typing or thinking. It's built so the spend can't run away: every call goes through one gate that checks a budget, records the cost, and is switched off by a feature flag when usage gets high.
 
 **What AI does**, cheapest and most useful first:
@@ -239,18 +241,18 @@ AI helps where it saves typing or thinking. It's built so the spend can't run aw
 - Later: **receipt photos** to an expense, and statement extraction (7.5).
 
 **How cost is kept under control:**
-- **One gate:** every model call goes through `src/lib/ai/client.ts`. It sets `max_tokens` per feature, a timeout, at most N tool steps per assistant turn, prompt caching for the tool definitions, and the cheapest model that does the job (a small model for parsing and categories, a larger one only for the assistant). Model ids come from env.
-- **A usage ledger:** `ai_usage (user_id, feature, model, input_tokens, output_tokens, cache_tokens, cost_micros, created_at)`, priced from a table in config.
-- **Budgets:** a per-user daily and monthly cap, and a global monthly budget (`AI_MONTHLY_BUDGET_USD`). They're checked before every call with an estimate and settled after it.
-- **The kill switch is a feature flag:** `app_flags.ai_enabled`, which an env value can override. The gate turns it **off automatically** when global spend reaches the budget, and warns at 80% through the phase 5 notification layer. A user who hits their own cap is paused until the next day or month. The flag can be flipped by hand on an admin page.
-- **Monitoring:** an admin page with spend per day, feature and user, the remaining budget and the flag. Every call also logs its tokens and cost (phase 15). As a last line of defence, set a monthly spend limit in the Anthropic console too.
-- **Privacy:** AI is opt-in per user, like the MCP switch. Kids need a parent's permission. Only the data a feature needs is sent, and API data isn't used for training.
+- **One gate:** every model call goes through `src/lib/ai/client.ts`. It sets `max_tokens` per feature, a timeout, at most N tool steps per assistant turn, prompt caching for the tool definitions, and the cheapest model that does the job (a small model for parsing and categories, a larger one only for the assistant). Model ids come from env. **Providers sit behind one interface** (`AiProvider`, see the statement import plan): OpenAI first, since that is where the credits are; another provider is one adapter file, and features never import an SDK.
+- **A usage ledger:** `ai_usage (user_id, feature, provider, model, input_tokens, output_tokens, cached_input_tokens, cost_micros, outcome, created_at)`, priced from a table in config.
+- **Budgets:** **$3 a month per family** (decided 30 October 2026; a user without a family has their own $3), and a global monthly backstop (`AI_MONTHLY_BUDGET_USD`). They're checked before every call with a worst-case estimate and settled after it.
+- **The kill switch is a feature flag:** `app_flags.ai_enabled`, which an env value can override. The gate turns it **off automatically** when global spend reaches the budget, and warns at 80% through the phase 5 notification layer. A family that uses up its month is paused until the 1st, and its parents are notified at 80% and 100%. The flag can be flipped by hand on an admin page.
+- **Monitoring:** an admin page with spend per day, feature and user, the remaining budget and the flag. Every call also logs its tokens and cost (phase 15). As a last line of defence, set a monthly spend limit in the provider's console too.
+- **Privacy:** AI is opt-in per user, like the MCP switch. Kids need a parent's permission. Only the data a feature needs is sent, and the opt-in names the provider and what its API data policy says.
 
 | Step | What | Done when |
 | --- | --- | --- |
 | **8.1** | **Flags, ledger and budget gate**, with no AI yet: `app_flags`, `ai_usage`, the budget checks and the automatic switch-off, all tested with a fake model. | Tests show calls are refused over each cap and the flag turns off at the global budget. |
-| **8.2** | **AI client**: the Claude API behind the gate, with timeouts, retries, logging, prompt caching and per-feature limits. The per-user opt-in in Settings, with the kid permission. | A test call is recorded with its exact token counts and cost. |
-| **8.3** | **Admin usage page and alerts**: spend charts, per-user caps, the flag toggle, and the 80% and 100% notifications. Who counts as an admin is set by env (`APP_ADMIN_USER_IDS`). | Crossing a test budget notifies the admin and turns AI off. |
+| **8.2** | **AI client**: the provider interface and its first adapter (OpenAI) behind the gate, with timeouts, retries, logging, prompt caching and per-feature limits. The per-user opt-in in Settings, with the kid permission. | A test call is recorded with its exact token counts and cost. |
+| **8.3** | **Admin usage page and alerts**: spend charts per family and feature, the family budget, the flag toggle, and the 80% and 100% notifications. Who counts as an admin is set by env (`APP_ADMIN_USER_IDS`). | Crossing a test budget notifies the admin and turns AI off. |
 | **8.4** | **Quick add in plain language** for expenses, reminders and to-dos, with a confirm step. | Ten example sentences parse correctly in tests (with recorded responses). |
 | **8.5** | **Category suggestions** for unrecognised merchants, shown as a suggestion, never applied silently. | The suggestion appears on new uncategorised expenses. |
 | **8.6** | **Assistant chat** on the MCP tools: read-only first, then writes behind a confirm. Each conversation has a cost limit. | It answers spending questions and stays within its cost limit. |
@@ -405,9 +407,9 @@ Each PR should include:
 | **Public HTTPS or Tailscale only** | Stay on Tailscale through phase 8. Decide before 3.5 or the store releases. | Phones need the Tailscale app to reach the API. claude.ai MCP connectors (3.5), Google Calendar, new Outlook and Outlook.com subscribing to the calendar feed (C8 in calendar-plan.md) and some OAuth redirects need a public URL (Tailscale Funnel or a Cloudflare Tunnel both work). Web Push needs HTTPS but not a public URL. |
 | **Email provider** | Decided (25 October 2026): Gmail SMTP from George's existing Gmail account with an app password, behind an `EmailSender` interface. Resend if a domain is ever bought | No domain, so providers that need SPF and DKIM on your own domain are out. Supabase Auth's email is only for sign-in emails. |
 | **One to-do board or several** | Decided: one board per family, filtered by member; no private cards. See [todo-board-plan.md](todo-board-plan.md) | Simpler for a family, and member chips cover "show me Ana's to-dos". |
-| **Banks and formats for statement import** | Open, needed before 7.2: which banks, and whether each gives CSV, PDF or both | Every bank needs its own parser and fixtures. |
+| **Banks and formats for statement import** | No longer blocking (30 October 2026): the AI reader replaces per-bank parsers. Anonymised samples still improve the eval (I19). | Kept for the eval. |
 | **How MCP clients sign in** | Decided: OAuth through Supabase Auth's OAuth 2.1 server, behind our own interfaces so leaving Supabase stays cheap, plus personal access tokens (1, 3 or 6 months, or never with a warning) for headless machines. Kids: OAuth only, with a parent's permission and a confirmed real email. See [mcp-access-plan.md](mcp-access-plan.md) | Using the secret key to read data would bypass RLS for every MCP call; a home-made OAuth server would still need Supabase to act as the user. |
-| **AI provider, cost and privacy** | Claude API (a small model for parsing and categories, a larger one for the assistant), opt-in per user, kids with a parent's permission. You choose the global monthly budget and the per-user caps before 8.1. | The budget is what the kill switch enforces. |
+| **AI provider, cost and privacy** | **OpenAI first** (30 October 2026, where the credits are), behind a provider interface so others can be added; opt-in per user, kids with a parent's permission. Statements use `gpt-5.6-luna`, aiming at about $0.01 per statement (measured, not enforced). Budget: **$3 a month per family**, with a global backstop (default $10 a month) before I14's checkpoint. | The budget is what the kill switch enforces. |
 | **Log retention** | 5 days through journald, capped at 300 MB. Your call on the number of days. | Longer means more disk; the cap keeps it bounded either way. |
 | **Who is an admin** | Your own account, by user id in env (`APP_ADMIN_USER_IDS`) | The AI usage page and the kill switch need an owner who isn't tied to a family role. |
 | **UI direction** | Sign off the 17.2 mockups before any screen is rebuilt | Rebuilding screens without an agreed direction would mean doing it twice. |
