@@ -255,10 +255,18 @@ In this order, and the review screen shows which one it was:
 - **Opt-in, per user, off by default**, as the roadmap's phase 8 says: Settings → AI. A kid also
   needs a parent's permission (a new `ai` module in `member_permissions`, as `mcp` was added in
   phase 3). With AI off, the parsers are used and the upload step says AI reading is available.
-- **The gate** (roadmap 8.1, built here as I14): every call is checked against the global monthly
-  budget and the user's daily and monthly caps **before** it is made, with an estimate from the
-  token count, and settled with the real usage after. `app_flags.ai_enabled` is the kill switch and
-  turns itself off at the global budget.
+- **The budget: $3 a month per family.** Every member's calls count against their family's
+  calendar month (Europe/Bucharest); a user without a family is a family of one with the same $3.
+  Every call is checked **before** it is made with a worst-case estimate (the input plus the full
+  output cap at the output price) against what is left of the family's month, and settled with the
+  real usage after. When the family's month is used up, AI is paused for that family until the 1st
+  and imports fall back to the parsers with a message saying so; the family's parents are notified
+  at 80% and 100%. A global monthly backstop (`AI_MONTHLY_BUDGET_USD`) turns
+  `app_flags.ai_enabled`, the kill switch, off for everyone if it is ever reached.
+- **What $3 buys** depends on the model: I19 reports cost per statement, so its table also says how
+  many statements a family can read a month on each model. With $3, the worst-case estimate of a
+  large model can exceed what's left of the month before a single statement; small models are the
+  expected fit.
 - **Limits per statement:** input capped at 80,000 tokens (counted by the provider before the call
   when it can, otherwise estimated conservatively; a month of a few hundred rows is well under),
   output capped at 64,000 tokens, and a timeout long enough for that output (the adapter streams if
@@ -359,6 +367,7 @@ assistant (8.6) is a second method on the same interface, added with that step.
 | Provider | One `AiProvider` interface; **OpenAI first** (the official `openai` package), others added as one adapter file each | George has OpenAI credits now; the interface keeps every feature independent of the provider, so a second one can be added and compared by the same eval. |
 | SDK versions | Each provider's official SDK, pinned to an exact version at least two weeks old, imported only by its adapter | The repo pins every dependency; the key must never reach a client bundle. |
 | Provider-specific features | Not used by features. Caching, structured-output formats and streaming stay inside the adapter | Otherwise the second provider would mean changing every feature. |
+| Budget | **$3 a month per family** (a user without a family has their own), checked before each call with a worst-case estimate; a global backstop turns AI off for everyone | George, 30 October 2026. A family shares one budget, so no per-member caps. |
 | Tests | Recorded responses only; no live call in CI | Live calls cost money and aren't repeatable. I19's eval runs live, by hand. |
 | Bank parsers (old I10, I13) | Dropped; a bank-specific parser is added only if the eval shows the model can't read that bank | Kept as an escape hatch, not planned work. |
 
@@ -368,9 +377,10 @@ assistant (8.6) is a second method on the same interface, added with that step.
    statements through a small and a larger OpenAI model (picked from OpenAI's current list when I15
    runs) and reports accuracy and cost per statement; George picks, and it's one env value. Adding
    another provider later and running the same eval is what the interface is for.
-6. **Budgets.** Default: global **$15 a month**, per user **$2 a day and $5 a month**; also set a
-   monthly spend limit in the provider's own console (OpenAI's usage limits) as the last line of defence. Needed before I14's
-   checkpoint.
+6. **Budgets.** Decided by George on 30 October 2026: **$3 a month per family**, no separate
+   per-member caps. Default for the global backstop: **$10 a month**, about three families' worth.
+   Also set a monthly spend limit in the provider's own console (OpenAI's usage limits) as the last
+   line of defence. Needed before I14's checkpoint.
 7. **Totals that don't add up.** Default: a warning on the review screen with the difference, and the
    rows as read. Alternative: refuse the statement.
 8. **Kids and AI.** Default: a kid needs a parent to turn the `ai` permission on, then their own
@@ -815,8 +825,8 @@ Migration `create_ai_gate`, all the revision's SQL:
 - `app_flags (key text primary key, value jsonb, updated_at, updated_by)` with one row,
   `ai_enabled = true`. Readable by `authenticated`; written by `service_role` and a security-definer
   function for admins (8.3 adds the admin page; until then George flips it with SQL).
-- `ai_usage (id, user_id, feature text, provider text, model text, input_tokens, output_tokens,
-  cached_input_tokens, cost_micros bigint, outcome text, created_at)`: the
+- `ai_usage (id, user_id, family_id, feature text, provider text, model text, input_tokens,
+  output_tokens, cached_input_tokens, cost_micros bigint, outcome text, created_at)`: the
   ledger, one row per call, inserted by the server after the call. Owner can read their own rows;
   nobody updates or deletes them. `feature` is a short key (`statements` first).
 - `profiles.ai_enabled boolean not null default false`, the per-user switch, with the same guard
@@ -826,8 +836,12 @@ Migration `create_ai_gate`, all the revision's SQL:
 - `member_permissions` gains the `ai` module (`off`, `edit`), off for kids by default, following
   `20261023000100_add_mcp_permission.sql` (`module_keys()`, the level check, the defaults for new
   kids and invites).
-- A function `ai_spend(p_user_id, p_since)` returning the summed `cost_micros`, for the gate, and
-  one for the global month.
+  `family_id` is the caller's family **at the time of the call** (null without one), so a family's
+  month is the sum of its rows even after a member leaves, and a member who joins brings no spend.
+- `ai_family_spend(p_month_start)`, security definer: the caller's family's spend this month (the
+  caller's own rows when they have no family), so a kid's call sees the whole family's total without
+  being able to read other members' rows. And `ai_global_spend(p_month_start)` for the backstop,
+  `service_role` only.
 - For the statement reader: `import_rows.category_source text` (`rule`, `history`, `ai`, or null
   for rows read by a parser), and `create_import_batch` accepts an optional `category`, `subtype`
   and `category_source` per row. The merchant rule still runs inside the function and **wins** when
@@ -835,23 +849,27 @@ Migration `create_ai_gate`, all the revision's SQL:
   `other` as today. The existing `import_save.sql` tests run unchanged, plus new ones for the
   optional fields.
 - SQL tests in `supabase/tests/ai_gate.sql`: RLS on both tables, the guard, the permission defaults,
-  the spend sums.
+  the family and global sums (a member who left, a member who joined, a user without a family).
 
 In code, `src/lib/ai/gate.ts` (no model, no SDK yet):
 
 - `checkBudget({ userId, feature, estimatedMicros })` refuses with a typed error when the flag is
-  off, the user hasn't opted in (or a kid's permission is off), or the estimate would cross the
-  user's daily or monthly cap or the global monthly budget. Caps come from env
-  (`AI_MONTHLY_BUDGET_USD`, `AI_USER_DAILY_USD`, `AI_USER_MONTHLY_USD`), with question 6's
-  defaults.
+  off, the user hasn't opted in (or a kid's permission is off), or the estimate would cross what is
+  left of the family's month or of the global backstop. Limits come from env:
+  `AI_FAMILY_MONTHLY_USD` (default `3`) and `AI_MONTHLY_BUDGET_USD` (default `10`). The error says
+  which limit and when it resets (the 1st of next month).
 - `recordUsage(...)` writes the ledger row with the real tokens and cost after every call,
-  including failed and refused ones, and turns `app_flags.ai_enabled` off when the global month
-  reaches the budget. At 80% and at 100% it queues a notification to the admins in
-  `APP_ADMIN_USER_IDS` through the phase 5 outbox.
+  including failed and refused ones. When the family's month crosses 80% and 100% it queues a
+  notification to that family's parents (or the user alone) through the phase 5 outbox; when the
+  global month reaches the backstop it turns `app_flags.ai_enabled` off and notifies the admins in
+  `APP_ADMIN_USER_IDS`.
+- Two calls from one family at the same moment can both pass the check; the overshoot is at most
+  one call's worst case, and the next check sees it. That is accepted rather than locking.
 - A fake model in `src/test/fakes/ai.ts` for every test from here on.
 
-**Done when** `npm run test:db` passes, and gate tests show refusals for each cap, the flag turning
-off at the global budget, and a failed call still being recorded.
+**Done when** `npm run test:db` passes, and gate tests show a family refused once its month is
+used up (and allowed again on the 1st), a user without a family capped alone, the flag turning off
+at the global backstop, and a failed call still being recorded.
 
 ### Checkpoint: apply the AI gate migration
 
@@ -1042,8 +1060,9 @@ With the app on your phone and a Mac, and real statements (not the anonymised on
 7. Import a PDF statement of each bank that has one.
 8. Check the cost: one `ai_usage` row per upload, with tokens and cost, and spend that matches the
    provider's usage page for the day.
-9. Lower `AI_USER_DAILY_USD` to below one statement's cost: the next upload falls back to the
-   parsers with a message saying the daily AI limit was reached. Put it back.
+9. Lower `AI_FAMILY_MONTHLY_USD` to just above this month's spend: the next upload falls back to
+   the parsers with a message saying the family's AI budget for the month is used up, and the
+   parents get the 100% notification. Put it back.
 10. Leave a draft for more than 24 hours: it can't be opened and is gone from the list; the next
     morning, the worker log shows the daily purge count.
 11. Try the refusals: a photo, an `.xlsx`, a scanned PDF, a file over the limit.
