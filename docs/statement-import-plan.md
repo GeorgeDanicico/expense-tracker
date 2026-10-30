@@ -191,9 +191,10 @@ upload (I4 guard, unchanged) → CSV decoded / PDF text extracted (I3, I12, unch
 
 ### What the model returns
 
-One JSON object, validated with a Zod schema through the SDK's structured outputs
-(`client.messages.parse` with `zodOutputFormat`; schema constraints the API doesn't take, such as
-string lengths, are checked client-side by the SDK and again by our own schema):
+One JSON object. The reader asks the provider for **structured output** against the JSON Schema of
+a Zod schema (each provider adapter does that its own way, see "The provider interface"), and the
+result is **always parsed again with our Zod schema**, so a provider that ignores a constraint, such
+as a string length, can't slip a row through:
 
 - `rows[]`, one per transaction, money in included (it is counted and skipped as before):
   - `lines`: the 1 to 3 consecutive line numbers the transaction is written on;
@@ -207,10 +208,10 @@ string lengths, are checked client-side by the SDK and again by our own schema):
 - `statement`: `currency`, `periodStart` and `periodEnd` as text if printed, and
   `totalDebitsText` with its line, if the statement prints a total of money out.
 
-The system prompt and the schema are fixed text, so they are cached (prompt caching) across
-statements; only the numbered lines change. The prompt has a version (`statement-reader-v1`) that
-becomes the batch's `parser_id` (`ai:statement-reader-v1`), so a prompt change is visible on every
-batch it read.
+The system prompt and the schema are fixed text and always come first, so a provider that caches a
+repeated prefix can reuse them across statements; only the numbered lines change. The prompt has
+a version (`statement-reader-v1`) that becomes the batch's `parser_id` (`ai:statement-reader-v1`),
+so a prompt change is visible on every batch it read.
 
 ### How code checks the model
 
@@ -258,17 +259,90 @@ In this order, and the review screen shows which one it was:
   budget and the user's daily and monthly caps **before** it is made, with an estimate from the
   token count, and settled with the real usage after. `app_flags.ai_enabled` is the kill switch and
   turns itself off at the global budget.
-- **Limits per statement:** input capped at 80,000 tokens (counted with the token-counting endpoint
-  before the call; a month of a few hundred rows is well under), output `max_tokens` 64,000 with a
-  streaming request so it can't time out. A response that stops at `max_tokens` or with a refusal is
-  `unverified_statement`.
-- **Model:** `AI_MODEL_STATEMENTS` in env, **default `claude-opus-5-5`**. Roadmap phase 8 wanted a
-  small model for parsing; `claude-haiku-5-5` is one env change away, and I19's eval measures both
-  on the same statements before George picks (question 5). For scale, with the published prices
-  cached on 6 October 2026 (Opus 5.5 $4 / $20, Haiku 5.5 $0.10 / $0.50 per million input / output
-  tokens), a 300-row statement of roughly 20,000 input and 15,000 output tokens is about $0.38 on
-  Opus 5.5 and about $0.01 on Haiku 5.5, before thinking tokens. Prices are re-read from
-  Anthropic's pricing page when I15 writes the pricing table.
+- **Limits per statement:** input capped at 80,000 tokens (counted by the provider before the call
+  when it can, otherwise estimated conservatively; a month of a few hundred rows is well under),
+  output capped at 64,000 tokens, and a timeout long enough for that output (the adapter streams if
+  its SDK needs it to avoid HTTP timeouts). A response that stops at the output cap, is refused, or
+  fails the Zod parse is `unverified_statement`.
+- **Provider and model:** `AI_PROVIDER` and `AI_MODEL_STATEMENTS` in env. **OpenAI first**,
+  because that is where George has API credits; the reader never names a provider (see "The
+  provider interface"). No model id is fixed in this plan: I15 lists the provider's current models
+  that support structured outputs, and I19's eval runs the same statements through a small and a
+  larger one before George picks (question 5). Prices are copied from the provider's pricing page
+  into the pricing table when I15 runs, and every call is priced from that table.
+
+### The provider interface
+
+Every model call goes through **one interface**, so a feature (statements now; quick add, category
+suggestions, the assistant and the monthly summary in phase 8) never imports a provider's SDK, and a
+provider is added as **one adapter file plus its pricing rows**, with no change to any feature.
+
+```
+feature (statement reader)
+  → ai.structured({ feature, userId, … })        src/lib/ai/index.ts: the only entry point
+      → gate: opt-in, permission, flag, budget    src/lib/ai/gate.ts (I14)
+      → provider.structured(request)              src/lib/ai/providers/<id>.ts, picked by AI_PROVIDER
+      → ledger: tokens and cost, priced           src/lib/ai/pricing.ts
+  ← { ok: true, value } or { ok: false, reason }
+```
+
+`src/lib/ai/provider.ts`:
+
+```ts
+export type AiProviderId = "openai" | "fake"; // "anthropic", … added with their adapters
+
+export type AiUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number; // 0 when the provider doesn't report it
+};
+
+export type StructuredRequest<T> = {
+  model: string;
+  system: string;            // fixed text first, so prefix caching works where the provider has it
+  input: string;             // the variable part
+  schema: z.ZodType<T>;      // the adapter turns it into the provider's JSON Schema format
+  schemaName: string;
+  maxOutputTokens: number;
+  timeoutMs: number;
+  signal?: AbortSignal;
+};
+
+export type StructuredResult<T> =
+  | { ok: true; value: T; usage: AiUsage; model: string }
+  | {
+      ok: false;
+      reason: "max_tokens" | "refusal" | "invalid_output" | "timeout" | "rate_limited" | "provider_error";
+      usage: AiUsage | null;  // recorded when the provider billed the call
+    };
+
+export interface AiProvider {
+  id: AiProviderId;
+  /** Exact input token count when the provider offers one; otherwise null and the gate estimates. */
+  countInputTokens(request: StructuredRequest<unknown>): Promise<number | null>;
+  structured<T>(request: StructuredRequest<T>): Promise<StructuredResult<T>>;
+}
+```
+
+Rules every adapter follows, checked by one **contract test suite** that runs against each adapter
+with a recorded transport:
+
+- **Server only** (`import "server-only"`); the SDK and the key never reach a client bundle or the
+  worker bundle.
+- **It returns, it doesn't throw**, for every expected failure: a truncated answer is `max_tokens`,
+  a declined one `refusal`, output that fails the Zod parse `invalid_output`. Only programming errors
+  throw.
+- **Usage is reported whenever the provider billed**, including failures, so the ledger is complete.
+- **The value is parsed with the request's Zod schema** before `ok: true`, whatever the provider
+  promised.
+- **No logging of prompts, inputs or outputs**; the gate logs feature, provider, model, tokens, cost
+  and outcome.
+- **Retries** follow the SDK's own retry settings (a small number, on rate limits and server errors);
+  the gate never retries a call that returned an answer.
+
+When the provider can't count tokens before a call, the gate estimates conservatively (characters ÷
+3, rounded up) and the 80,000-token input cap applies to that estimate. Tool calling for the phase 8
+assistant (8.6) is a second method on the same interface, added with that step.
 
 ### Decisions added by the revision
 
@@ -282,16 +356,20 @@ In this order, and the review screen shows which one it was:
 | History sent to the model | No | Cheaper and more private; the override is applied after the call. |
 | Content hash for AI reads | SHA-256 of the masked, numbered text | Two readings of one file can differ; the text doesn't. A statement read once with AI and once without gets two hashes; the duplicate flags still catch the rows. |
 | The AI gate | Built in this phase (I14, I15) as roadmap 8.1 and 8.2 describe, used by statements first | Phase 8's later features reuse it unchanged. |
-| SDK | `@anthropic-ai/sdk`, pinned to an exact version at least two weeks old, server-only | The repo pins every dependency; the key must never reach a client bundle. |
+| Provider | One `AiProvider` interface; **OpenAI first** (the official `openai` package), others added as one adapter file each | George has OpenAI credits now; the interface keeps every feature independent of the provider, so a second one can be added and compared by the same eval. |
+| SDK versions | Each provider's official SDK, pinned to an exact version at least two weeks old, imported only by its adapter | The repo pins every dependency; the key must never reach a client bundle. |
+| Provider-specific features | Not used by features. Caching, structured-output formats and streaming stay inside the adapter | Otherwise the second provider would mean changing every feature. |
 | Tests | Recorded responses only; no live call in CI | Live calls cost money and aren't repeatable. I19's eval runs live, by hand. |
 | Bank parsers (old I10, I13) | Dropped; a bank-specific parser is added only if the eval shows the model can't read that bank | Kept as an escape hatch, not planned work. |
 
 ### Questions the revision adds
 
-5. **Which model?** Default `claude-opus-5-5`. I19 runs the same statements through Opus 5.5 and
-   Haiku 5.5 and reports accuracy and cost per statement; George picks, and it's one env value.
+5. **Which provider and model?** OpenAI first, since that's where the credits are. I19 runs the same
+   statements through a small and a larger OpenAI model (picked from OpenAI's current list when I15
+   runs) and reports accuracy and cost per statement; George picks, and it's one env value. Adding
+   another provider later and running the same eval is what the interface is for.
 6. **Budgets.** Default: global **$15 a month**, per user **$2 a day and $5 a month**; also set a
-   monthly spend limit in the Anthropic console as the last line of defence. Needed before I14's
+   monthly spend limit in the provider's own console (OpenAI's usage limits) as the last line of defence. Needed before I14's
    checkpoint.
 7. **Totals that don't add up.** Default: a warning on the review screen with the difference, and the
    rows as read. Alternative: refuse the statement.
@@ -303,8 +381,8 @@ In this order, and the review screen shows which one it was:
 The workflow is the same as phases 1–6: one task, one branch (`family/<id>-<slug>` from `main`),
 one PR, one fresh agent per task, run one at a time. All import SQL was in I1; the revision's SQL is
 all in I14, applied at its checkpoint. Read the relevant guide in `node_modules/next/dist/docs/`
-before writing route or page code, as `AGENTS.md` asks. Tasks that call the Claude API read the
-`claude-api` skill first and never guess SDK names.
+before writing route or page code, as `AGENTS.md` asks. Tasks that write a provider adapter read
+that provider's official SDK documentation first and never guess API names.
 
 | Task | What | Depends on | Status |
 | --- | --- | --- | --- |
@@ -321,12 +399,12 @@ before writing route or page code, as `AGENTS.md` asks. Tasks that call the Clau
 | ~~I10, I13~~ | ~~One CSV or PDF parser per bank~~ | — | Dropped by the revision |
 | I14 | AI gate, part 1 (roadmap 8.1): migration for `app_flags`, `ai_usage`, `profiles.ai_enabled`, the `ai` module permission, and categories passed into `create_import_batch`; the budget gate and kill switch with a fake model | — | |
 | — | **Checkpoint:** George applies the I14 migration and confirms the budgets (question 6) | I14 | |
-| I15 | AI gate, part 2 (roadmap 8.2): the Claude API client behind the gate, pricing table, token pre-count, usage recording | I14 | |
+| I15 | AI gate, part 2 (roadmap 8.2): the `AiProvider` interface, its contract tests, the OpenAI adapter, the entry point behind the gate, pricing table, usage recording | I14 | |
 | I16 | Settings → AI: the opt-in switch, the kid permission, the privacy text | I14 | |
 | I17 | The statement reader: numbered text, prompt, schema, the call, verification, category order, the pipeline switch | I15 | |
 | I18 | Review screen for read statements: category sources, warnings, the AI-off hint; preview fixtures | I17 | |
 | I19 | Eval: synthetic statements and a hand-run live eval comparing models | I17 | |
-| — | **Checkpoint:** George adds `ANTHROPIC_API_KEY` and the AI env to production (vps-apps), sets the console spend limit, and picks the model (question 5) | I15, I19 | |
+| — | **Checkpoint:** George adds `OPENAI_API_KEY` and the AI env to production (vps-apps), sets the provider's spend limit, and picks the model (question 5) | I15, I19 | |
 | I11 | The Import button on the Expenses page | I18 | |
 | — | **Checkpoint:** smoke test | I11, the checkpoint above | |
 
@@ -737,8 +815,8 @@ Migration `create_ai_gate`, all the revision's SQL:
 - `app_flags (key text primary key, value jsonb, updated_at, updated_by)` with one row,
   `ai_enabled = true`. Readable by `authenticated`; written by `service_role` and a security-definer
   function for admins (8.3 adds the admin page; until then George flips it with SQL).
-- `ai_usage (id, user_id, feature text, model text, input_tokens, output_tokens,
-  cache_read_tokens, cache_write_tokens, cost_micros bigint, outcome text, created_at)`: the
+- `ai_usage (id, user_id, feature text, provider text, model text, input_tokens, output_tokens,
+  cached_input_tokens, cost_micros bigint, outcome text, created_at)`: the
   ledger, one row per call, inserted by the server after the call. Owner can read their own rows;
   nobody updates or deletes them. `feature` is a short key (`statements` first).
 - `profiles.ai_enabled boolean not null default false`, the per-user switch, with the same guard
@@ -780,41 +858,47 @@ off at the global budget, and a failed call still being recorded.
 George applies `create_ai_gate` to the live project and confirms the budgets (question 6). Nothing
 calls a model yet.
 
-### I15: The AI gate, part 2: the Claude API client (roadmap 8.2)
+### I15: The AI gate, part 2: the provider interface and OpenAI (roadmap 8.2)
 
-- Add `@anthropic-ai/sdk`, pinned to an exact version **at least two weeks old** when the task runs
-  (check `npm view @anthropic-ai/sdk time --json`), and confirm that its Zod helper
-  (`@anthropic-ai/sdk/helpers/zod`) works with the repo's `zod` 4. Licence and size in the PR. Read
-  the `claude-api` skill's TypeScript guide before writing any call.
-- `src/lib/ai/client.ts`, `import "server-only"`, the only file that imports the SDK. One function
-  per call shape, starting with `structuredCall({ feature, userId, model, system, input, schema,
-  maxTokens, maxInputTokens })`:
-  1. count the input tokens (`messages.countTokens`) and refuse over `maxInputTokens`;
-  2. `checkBudget` with the estimate (input at full price, output at `maxTokens`, the worst case);
-  3. a streaming `messages.parse`-style call with `output_config.format` from the Zod schema, the
-     fixed system prompt marked for prompt caching, a timeout, the SDK's retries;
-  4. handle `stop_reason`: `max_tokens` and `refusal` are typed failures, never parsed as a result;
-  5. `recordUsage` with `usage` from the response (input, output, cache reads and writes), priced
-     from `src/lib/ai/pricing.ts`.
-- `src/lib/ai/pricing.ts`: a table of model id → price per million tokens for input, output, cache
-  writes and cache reads, copied from Anthropic's pricing page on the day of the task, with the date
-  in a comment. An unknown model id refuses the call rather than pricing it at zero.
-- Env: `ANTHROPIC_API_KEY` (server only, never `NEXT_PUBLIC_`), `AI_MODEL_STATEMENTS` (default
-  `claude-opus-5-5`). Check `npm run build`'s client bundles contain no SDK code and no key.
-- The worker bundle (`build:worker`) must not import the SDK.
-- Logging: one line per call with feature, model, tokens, cost and outcome; never the prompt, the
-  input or the output.
+- `src/lib/ai/provider.ts`: the interface from "The provider interface", exactly.
+- `src/lib/ai/providers/fake.ts`: the fake from I14 moved behind the interface, scriptable per test
+  (a value, each failure reason, chosen usage).
+- `src/lib/ai/providers/openai.ts`: the first adapter, the only file that imports the `openai`
+  package.
+  - Add `openai`, pinned to an exact version **at least two weeks old** when the task runs (check
+    `npm view openai time --json`); licence and size in the PR. Read OpenAI's official docs for the
+    Node SDK's structured outputs (JSON Schema from Zod, refusals, truncation, usage fields,
+    including cached input tokens) before writing the adapter, and check that its Zod helper works
+    with the repo's `zod` 4; if it doesn't, convert with Zod 4's own JSON Schema export.
+  - `countInputTokens` returns null unless the SDK offers an exact count; the gate then estimates.
+  - Maps OpenAI's finish and refusal signals and errors onto the interface's reasons.
+- `src/lib/ai/contract.test.ts`: the contract suite from "The provider interface", run against the
+  fake and the OpenAI adapter with a recorded transport (no network).
+- `src/lib/ai/index.ts`: `structured({ feature, userId, … })`, the only entry point features use. It
+  picks the provider from `AI_PROVIDER` and the model from the feature's env value, counts or
+  estimates the input and refuses over the feature's input cap, calls `checkBudget` with the worst
+  case (input plus `maxOutputTokens` at output price), calls the provider, and `recordUsage`s the
+  result, success or not.
+- `src/lib/ai/pricing.ts`: provider + model → price per million input, cached input and output
+  tokens, copied from the provider's pricing page on the day of the task, with the date in a
+  comment. An unknown provider or model refuses the call rather than pricing it at zero.
+- Env: `AI_PROVIDER` (`openai`), `OPENAI_API_KEY` (server only, never `NEXT_PUBLIC_`),
+  `AI_MODEL_STATEMENTS`. The PR lists OpenAI's current models that support structured outputs, as
+  candidates for I19.
+- Check that `npm run build`'s client bundles and `build:worker`'s bundle contain no SDK code and
+  no key.
 
-**Done when** tests with a fake transport show a call recorded with its exact token counts and cost,
-refusals over each cap, an unknown model refused, `max_tokens` and refusal stops handled, and no
-SDK code in client bundles.
+**Done when** the contract suite passes for both adapters, a call through `structured` is recorded
+with its exact tokens and cost, calls are refused over each cap and for an unknown model, and no
+SDK code is in the client or worker bundles.
 
 ### I16: Settings → AI
 
 - A section in Settings, next to AI assistants (MCP): one switch, **"Read statements with AI"**,
   off by default, with the privacy text: what is sent (the masked statement text), what isn't (the
-  file, your name, your history), that statements can still carry a name and address, and that API
-  data isn't used for training.
+  file, your name, your history), that statements can still carry a name and address, and **which provider
+  receives it and what that provider's API data policy says** (read from the provider's docs when
+  the task runs; the text names the provider from `AI_PROVIDER`).
 - For a kid, the switch is disabled until a parent turns the `ai` permission on in Family; the
   permission appears in the parent's member editor next to MCP.
 - Routes: `GET` and `PATCH /api/settings/ai` (or the existing settings route, whichever the MCP
@@ -875,16 +959,18 @@ upload with AI off still goes through the parsers unchanged.
   and reports per model: statements passed verification, rows exactly right, category accuracy,
   tokens and cost per statement. **It spends real money, so it runs only by hand**, never in CI,
   and asks for confirmation with the estimated cost before it starts.
-- The first run compares `claude-opus-5-5` and `claude-haiku-5-5`; the PR reports both, for
+- `--provider` defaults to `AI_PROVIDER`, so the same eval compares providers once a second adapter
+  exists.
+- The first run compares a small and a larger OpenAI model from I15's list; the PR reports both, for
   question 5.
 
 **Done when** the eval runs against both models and the PR has the table.
 
 ### Checkpoint: production AI settings
 
-George adds `ANTHROPIC_API_KEY`, `AI_MODEL_STATEMENTS` (question 5), the budget variables
+George adds `AI_PROVIDER`, `OPENAI_API_KEY`, `AI_MODEL_STATEMENTS` (question 5), the budget variables
 (question 6) and `APP_ADMIN_USER_IDS` to the production env in vps-apps, and sets a monthly spend
-limit in the Anthropic console.
+limit in OpenAI's usage settings.
 
 ### I11: The Import button
 
@@ -955,7 +1041,7 @@ With the app on your phone and a Mac, and real statements (not the anonymised on
 6. Undo the first import. Exactly its expenses go; expenses you added by hand are still there.
 7. Import a PDF statement of each bank that has one.
 8. Check the cost: one `ai_usage` row per upload, with tokens and cost, and spend that matches the
-   Anthropic console for the day.
+   provider's usage page for the day.
 9. Lower `AI_USER_DAILY_USD` to below one statement's cost: the next upload falls back to the
    parsers with a message saying the daily AI limit was reached. Put it back.
 10. Leave a draft for more than 24 hours: it can't be opened and is gone from the list; the next
@@ -985,7 +1071,9 @@ With the app on your phone and a Mac, and real statements (not the anonymised on
 - **Saving review edits as you go**, resuming with the edits intact after a reload, and splitting or
   merging rows.
 - **The admin usage page** (roadmap 8.3). Until it exists, spend is read from `ai_usage` and the
-  Anthropic console, and the flag is flipped with SQL.
+  provider's usage page, and the flag is flipped with SQL.
+- **A second provider** (for example Claude). It is one adapter file, its pricing rows and the
+  contract suite; I19's eval then compares it with OpenAI on the same statements.
 - **Editing the merchant rules** from the app.
 - **Recurring-payment detection** from imported rows (roadmap step 8.7).
 - **MCP tools** for imports (see above).
