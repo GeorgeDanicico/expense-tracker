@@ -18,7 +18,7 @@ const kidUserId = "10000000-0000-4000-8000-000000000152";
 const inviteId = "80000000-0000-4000-8000-000000000151";
 const otherInviteId = "80000000-0000-4000-8000-000000000152";
 
-const kidPermissions = { expenses: "edit", investments: "off", net_worth: "edit", family_finance: "view", mcp: "off" };
+const kidPermissions = { expenses: "edit", investments: "off", net_worth: "edit", family_finance: "view", mcp: "off", ai: "off" };
 
 const membershipRow = {
   member_id: kidMemberId,
@@ -88,6 +88,7 @@ describe("Supabase family repository", () => {
         net_worth: "off",
         family_finance: "off",
         mcp: "off",
+        ai: "off",
       });
     });
 
@@ -308,7 +309,7 @@ describe("Supabase family repository", () => {
   });
 
   describe("setMemberPermissions", () => {
-    const teen = { expenses: "edit", investments: "edit", net_worth: "edit", family_finance: "off", mcp: "off" } as const;
+    const teen = { expenses: "edit", investments: "edit", net_worth: "edit", family_finance: "off", mcp: "off", ai: "off" } as const;
 
     it("calls set_member_permissions with the member and every module", async () => {
       const { rpcs } = useRpc(() => ({ data: null, error: null }));
@@ -369,7 +370,7 @@ describe("Supabase family repository", () => {
   });
 
   describe("addManagedKid", () => {
-    const youngKid = { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off" } as const;
+    const youngKid = { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off", ai: "off" } as const;
 
     it("calls add_managed_kid with the account and every module as the request's caller", async () => {
       const { rpcs } = useRpc(() => ({ data: kidMemberId, error: null }));
@@ -652,6 +653,7 @@ describe("Supabase family repository", () => {
         net_worth: "off",
         family_finance: "off",
         mcp: "off",
+        ai: "off",
       });
     });
 
@@ -740,6 +742,7 @@ describe("Supabase family repository", () => {
         net_worth: "off",
         family_finance: "off",
         mcp: "off",
+        ai: "off",
       });
     });
 

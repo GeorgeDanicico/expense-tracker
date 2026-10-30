@@ -17,7 +17,7 @@ export type Heartbeat = {
 };
 
 /** The kinds of outbox row (`notifications.kind`). */
-export const NOTIFICATION_KINDS = ["reminder", "todo_assigned", "todo_due", "event", "event_added", "test"] as const;
+export const NOTIFICATION_KINDS = ["reminder", "todo_assigned", "todo_due", "event", "event_added", "ai_budget", "test"] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** An outbox row the worker has claimed (leased) for sending. */

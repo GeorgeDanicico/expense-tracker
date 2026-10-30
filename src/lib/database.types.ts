@@ -30,6 +30,54 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["account_notices"]["Insert"]>;
         Relationships: [];
       };
+      ai_usage: {
+        Row: {
+          cached_input_tokens: number;
+          cost_micros: number;
+          created_at: string;
+          family_id: string | null;
+          feature: string;
+          id: string;
+          input_tokens: number;
+          model: string;
+          outcome: string;
+          output_tokens: number;
+          provider: string;
+          user_id: string | null;
+        };
+        Insert: {
+          cached_input_tokens?: number;
+          cost_micros?: number;
+          created_at?: string;
+          family_id?: string | null;
+          feature: string;
+          id?: string;
+          input_tokens?: number;
+          model: string;
+          outcome: string;
+          output_tokens?: number;
+          provider: string;
+          user_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["ai_usage"]["Insert"]>;
+        Relationships: [];
+      };
+      app_flags: {
+        Row: {
+          key: string;
+          updated_at: string;
+          updated_by: string | null;
+          value: Json;
+        };
+        Insert: {
+          key: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          value: Json;
+        };
+        Update: Partial<Database["public"]["Tables"]["app_flags"]["Insert"]>;
+        Relationships: [];
+      };
       calendar_event_attendees: {
         Row: {
           event_id: string;
@@ -253,6 +301,7 @@ export type Database = {
           amount: number;
           batch_id: string;
           category: string;
+          category_source: string | null;
           currency: string;
           description: string;
           expense_date: string;
@@ -266,6 +315,7 @@ export type Database = {
           amount: number;
           batch_id: string;
           category?: string;
+          category_source?: string | null;
           currency: string;
           description: string;
           expense_date: string;
@@ -506,6 +556,7 @@ export type Database = {
       };
       profiles: {
         Row: {
+          ai_enabled: boolean;
           avatar_path: string | null;
           avatar_url: string | null;
           created_at: string;
@@ -521,6 +572,7 @@ export type Database = {
           username: string | null;
         };
         Insert: {
+          ai_enabled?: boolean;
           avatar_path?: string | null;
           avatar_url?: string | null;
           created_at?: string;
@@ -683,6 +735,14 @@ export type Database = {
           p_user_id: string;
         };
         Returns: string;
+      };
+      ai_family_spend: {
+        Args: { p_month_start: string };
+        Returns: number;
+      };
+      ai_global_spend: {
+        Args: { p_month_start: string };
+        Returns: number;
       };
       authenticate_mcp_token: {
         Args: { p_token_hash: string };
@@ -856,6 +916,10 @@ export type Database = {
           role: string;
         }[];
       };
+      my_ai_access: {
+        Args: never;
+        Returns: string;
+      };
       my_mcp_access: {
         Args: never;
         Returns: Json;
@@ -929,6 +993,14 @@ export type Database = {
       send_test_notification: {
         Args: never;
         Returns: boolean;
+      };
+      set_app_flag: {
+        Args: {
+          p_key: string;
+          p_user_id?: string;
+          p_value: Json;
+        };
+        Returns: undefined;
       };
       set_member_color: {
         Args: {

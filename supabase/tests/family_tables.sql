@@ -128,13 +128,14 @@ $$;
 select results_eq(
   $$
     select m, l
-    from unnest(array['expenses', 'investments', 'net_worth', 'family_finance', 'mcp', 'boats']) as m
+    from unnest(array['expenses', 'investments', 'net_worth', 'family_finance', 'mcp', 'ai', 'boats']) as m
     cross join unnest(array['off', 'view', 'edit', 'admin']) as l
     where pg_temp.accepts_permission(m, l)
     order by m, l
   $$,
   $$
     select m, l from (values
+      ('ai', 'edit'), ('ai', 'off'),
       ('expenses', 'edit'), ('expenses', 'off'),
       ('family_finance', 'off'), ('family_finance', 'view'),
       ('investments', 'edit'), ('investments', 'off'),

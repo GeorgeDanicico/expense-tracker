@@ -22,7 +22,7 @@ describe("permissionsSchema", () => {
   });
 
   it("accepts family finance at view", () => {
-    const permissions = { expenses: "off", investments: "off", net_worth: "off", family_finance: "view", mcp: "off" };
+    const permissions = { expenses: "off", investments: "off", net_worth: "off", family_finance: "view", mcp: "off", ai: "off" };
 
     expect(permissionsSchema.parse(permissions)).toEqual(permissions);
   });

@@ -39,7 +39,8 @@ const ROW_COLUMNS = "id, position, expense_date, description, amount, currency, 
 const LINK_PAGE_SIZE = 1000;
 
 type BatchRow = Omit<Database["public"]["Tables"]["import_batches"]["Row"], "user_id" | "content_hash">;
-type RowRow = Omit<Database["public"]["Tables"]["import_rows"]["Row"], "batch_id">;
+// `category_source` is the statement reader's (I17): the review screen doesn't read it yet.
+type RowRow = Omit<Database["public"]["Tables"]["import_rows"]["Row"], "batch_id" | "category_source">;
 type DatabaseError = { code?: string; message: string };
 
 /** PostgREST answers instants as `+00:00` strings; the API speaks `Z` ISO strings. */

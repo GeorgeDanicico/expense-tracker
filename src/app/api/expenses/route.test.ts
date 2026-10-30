@@ -75,13 +75,13 @@ describe("POST /api/expenses in a family", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("creates the expense for a kid with expenses on", async () => {
-    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off" } });
+    repositories.family.membership = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off", ai: "off" } });
 
     expect(await post(body)).toMatchObject({ status: 201, body: { expense: stored } });
   });
 
   it("refuses a kid with expenses off", async () => {
-    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "edit", family_finance: "view", mcp: "off" } });
+    repositories.family.membership = aKid({ permissions: { expenses: "off", investments: "edit", net_worth: "edit", family_finance: "view", mcp: "off", ai: "off" } });
 
     expect(await post(body)).toMatchObject({ status: 403, body: { error: "You don't have access to this." } });
     expect(repositories.expenses.create).not.toHaveBeenCalled();

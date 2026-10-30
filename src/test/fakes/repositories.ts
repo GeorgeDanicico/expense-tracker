@@ -1,6 +1,7 @@
 import type { Repositories } from "@/lib/repositories";
 
 import { FakeAccountRepository } from "./account";
+import { FakeAiGateRepository } from "./ai";
 import { FakeAvatarRepository } from "./avatars";
 import { FakeCalendarFeedRepository, FakeCalendarRepository } from "./calendar";
 import { FakeExpenseTabRepository } from "./expense-tabs";
@@ -26,6 +27,7 @@ import { FakeTodoRepository } from "./todos";
  */
 export type FakeRepositories = {
   account: FakeAccountRepository;
+  aiGate: FakeAiGateRepository;
   avatars: FakeAvatarRepository;
   calendar: FakeCalendarRepository;
   calendarFeeds: FakeCalendarFeedRepository;
@@ -49,6 +51,7 @@ export function resetFakeRepositories(): FakeRepositories {
   const expenses = new FakeExpenseRepository();
   current = {
     account: new FakeAccountRepository(),
+    aiGate: new FakeAiGateRepository(),
     avatars: new FakeAvatarRepository(),
     // Acts as the caller the family fake describes: seed `family.membership` and `family.family` first.
     calendar: new FakeCalendarRepository(family),

@@ -50,7 +50,7 @@ describe("getCurrentMember", () => {
   });
 
   it("returns a kid's membership, checked against their permissions", async () => {
-    const kid = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off" } });
+    const kid = aKid({ permissions: { expenses: "edit", investments: "off", net_worth: "off", family_finance: "off", mcp: "off", ai: "off" } });
     repositories.family.membership = kid;
 
     const member = await getCurrentMember();

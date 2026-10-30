@@ -149,7 +149,7 @@ select is(
 );
 select is(
   family_private.module_keys(),
-  array['expenses', 'investments', 'net_worth', 'family_finance', 'mcp'],
+  array['expenses', 'investments', 'net_worth', 'family_finance', 'mcp', 'ai'],
   'module_keys lists the catalogue in order'
 );
 -- Each key must appear in F03's check (family_tables.sql proves that check's
@@ -163,7 +163,7 @@ select is(
          and c.conrelid = 'public.member_permissions'::regclass
          and pg_get_constraintdef(c.oid) like '%''' || k || '''::text%'
      )),
-  array['expenses', 'family_finance', 'investments', 'mcp', 'net_worth'],
+  array['ai', 'expenses', 'family_finance', 'investments', 'mcp', 'net_worth'],
   'module_keys matches the modules in the member_permissions check'
 );
 
@@ -249,7 +249,7 @@ select results_eq(
     'Family A',
     'kid',
     false,
-    '{"expenses": "edit", "investments": "off", "net_worth": "off", "family_finance": "view", "mcp": "off"}'::jsonb
+    '{"expenses": "edit", "investments": "off", "net_worth": "off", "family_finance": "view", "mcp": "off", "ai": "off"}'::jsonb
   ) $$,
   'get_my_membership returns the kid''s row with every module filled in'
 );
@@ -267,7 +267,7 @@ select is(
       {"memberId": "f0600000-0000-4000-8000-0000000000a4", "userId": "f0600000-0000-4000-8000-000000000003",
        "role": "kid", "isCreator": false, "currency": "EUR", "color": null, "avatarPath": null, "displayName": "fam-a-kid", "username": null,
        "joinedAt": "2026-01-02T09:00:00+00:00", "lastActiveAt": "2026-10-02T08:00:00+00:00",
-       "permissions": {"expenses": "edit", "investments": "off", "net_worth": "off", "family_finance": "view", "mcp": "off"}},
+       "permissions": {"expenses": "edit", "investments": "off", "net_worth": "off", "family_finance": "view", "mcp": "off", "ai": "off"}},
       {"memberId": "f0600000-0000-4000-8000-0000000000a5", "userId": "f0600000-0000-4000-8000-000000000004",
        "role": "kid", "isCreator": false, "currency": "EUR", "color": null, "avatarPath": null, "displayName": "Kid Two", "username": "kid.two",
        "joinedAt": "2026-01-04T09:00:00+00:00"}
@@ -320,7 +320,7 @@ select is(
 select is(family_private.member_level('expenses'), 'off', 'member_level is off for a module the kid has no row for');
 select is(
   (select permissions from public.get_my_membership()),
-  '{"expenses": "off", "investments": "edit", "net_worth": "off", "family_finance": "off", "mcp": "off"}'::jsonb,
+  '{"expenses": "off", "investments": "edit", "net_worth": "off", "family_finance": "off", "mcp": "off", "ai": "off"}'::jsonb,
   'get_my_membership fills every missing module with off'
 );
 select is(
@@ -397,11 +397,11 @@ select is(
       {"memberId": "f0600000-0000-4000-8000-0000000000a4", "userId": "f0600000-0000-4000-8000-000000000003",
        "role": "kid", "isCreator": false, "currency": "EUR", "color": null, "avatarPath": null, "displayName": "fam-a-kid", "username": null,
        "joinedAt": "2026-01-02T09:00:00+00:00", "lastActiveAt": "2026-10-02T08:00:00+00:00",
-       "permissions": {"expenses": "edit", "investments": "off", "net_worth": "off", "family_finance": "view", "mcp": "off"}},
+       "permissions": {"expenses": "edit", "investments": "off", "net_worth": "off", "family_finance": "view", "mcp": "off", "ai": "off"}},
       {"memberId": "f0600000-0000-4000-8000-0000000000a5", "userId": "f0600000-0000-4000-8000-000000000004",
        "role": "kid", "isCreator": false, "currency": "EUR", "color": null, "avatarPath": null, "displayName": "Kid Two", "username": "kid.two",
        "joinedAt": "2026-01-04T09:00:00+00:00", "lastActiveAt": "2026-10-03T08:00:00+00:00",
-       "permissions": {"expenses": "off", "investments": "edit", "net_worth": "off", "family_finance": "off", "mcp": "off"}}
+       "permissions": {"expenses": "off", "investments": "edit", "net_worth": "off", "family_finance": "off", "mcp": "off", "ai": "off"}}
     ]
   }$json$::jsonb,
   'get_family shows a parent every member with lastActiveAt and permissions'
@@ -480,7 +480,7 @@ select is(
   (select e -> 'permissions'
    from jsonb_array_elements(public.get_family() -> 'members') as e
    where e ->> 'memberId' = 'f0600000-0000-4000-8000-0000000000b5'),
-  '{"expenses": "off", "investments": "off", "net_worth": "off", "family_finance": "off", "mcp": "off"}'::jsonb,
+  '{"expenses": "off", "investments": "off", "net_worth": "off", "family_finance": "off", "mcp": "off", "ai": "off"}'::jsonb,
   'a kid with no permission rows shows every module as off'
 );
 select is(

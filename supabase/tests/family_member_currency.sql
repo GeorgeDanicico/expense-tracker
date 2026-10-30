@@ -69,7 +69,7 @@ select is(
     "memberId": "f4900000-0000-4000-8000-0000000000a3", "userId": "f4900000-0000-4000-8000-000000000002",
     "role": "kid", "isCreator": false, "displayName": "Mihai", "username": null, "currency": "USD", "color": null, "avatarPath": null,
     "joinedAt": "2026-01-02T09:00:00+00:00", "lastActiveAt": null,
-    "permissions": {"expenses": "off", "investments": "off", "net_worth": "off", "family_finance": "off", "mcp": "off"}
+    "permissions": {"expenses": "off", "investments": "off", "net_worth": "off", "family_finance": "off", "mcp": "off", "ai": "off"}
   }$json$::jsonb,
   'a kid''s entry has nothing new but the currency'
 );
