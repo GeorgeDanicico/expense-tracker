@@ -3,3 +3,7 @@
 
 # Statement import fixtures: BOMs, CRLF and odd encodings are what they test, so git must not touch them.
 src/lib/imports/__fixtures__/** -text
+
+# The statement eval's fixtures (I19) are compared byte for byte with what the generator writes, and one of them is CRLF on purpose.
+src/lib/imports/ai/__eval__/fixtures/** -text
+src/lib/imports/ai/__eval__/samples/** -text
