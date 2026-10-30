@@ -173,57 +173,93 @@ model only replaces where the rows and their first category come from.
 
 ### How a statement is read
 
+**Target: at most $0.01 per statement** (George, 30 October 2026), on OpenAI's `gpt-5.6-luna`
+($0.20 per million input tokens, $0.02 cached input, $1.20 output, from OpenAI's model page on 30
+October 2026). Output tokens cost six times input, so the design keeps the model's output small:
+code reads whatever it can, and the model only writes what code can't work out.
+
+There are two modes, picked by code, both through the same provider interface:
+
 ```
 upload (I4 guard, unchanged) → CSV decoded / PDF text extracted (I3, I12, unchanged)
   → maskAccountNumbers on every line                     (no IBAN or card number leaves the server)
-  → numbered lines: "0001⇥…", with "--- page 2 ---" markers for PDFs
-  ─ AI on for this user, and the gate allows the call? ───────────────────────────────┐
-  │ yes                                                                                │ no
-  ▼                                                                                    ▼
-  count tokens → over the input cap: 422 statement_too_long                 parsers, as built
-  → one call through the AI gate (src/lib/ai/client.ts), structured output   (generic CSV parser;
-    with a Zod schema: rows + statement summary                               unrecognised_layout
-  → verify every row against the numbered text (below); any failure: 422      tells you AI can read
-    unverified_statement, nothing drafted, the cost still recorded            it, with a link)
-  → category: merchant rule > your history > the model's
-  → content hash of the masked text → create_import_batch (I1, unchanged)
+  → registry: does a parser read this layout?
+  │
+  ├─ yes (e.g. the generic CSV parser) ── rows come from code, as built
+  │    → merchants: merchant rule, then your history     (code, no call)
+  │    → AI on? the merchants still unknown, deduplicated → mode "categorise"
+  │         one small call: a category per distinct merchant          ≈ $0.001
+  │    → content hash of the rows (as built)
+  │
+  └─ no (most PDFs, unfamiliar CSVs)
+       AI on? no → 422 unrecognised_layout, with a hint pointing at Settings → AI
+       yes → numbered lines ("0001⇥…", "--- page 2 ---" markers) → mode "read"
+            count the lines that look like transactions (a date and an amount on one line)
+            worst-case cost over $0.01 (about 200 transactions) → 422 statement_too_long
+            one call: compact rows + one category per distinct merchant ≈ $0.004–0.009
+            verify every row against the numbered text (below), else 422 unverified_statement
+            merchants: merchant rule, then your history, then the model's category
+            content hash of the masked text
+  → create_import_batch (I1, with I14's category fields)
 ```
+
+With AI off, everything works as built: the parsers read what they can, and the rest is refused.
 
 ### What the model returns
 
-One JSON object. The reader asks the provider for **structured output** against the JSON Schema of
-a Zod schema (each provider adapter does that its own way, see "The provider interface"), and the
-result is **always parsed again with our Zod schema**, so a provider that ignores a constraint, such
-as a string length, can't slip a row through:
+The reader asks the provider for **structured output** against the JSON Schema of a Zod schema
+(each adapter does that its own way, see "The provider interface"), and the result is **always
+parsed again with our Zod schema**, so a provider that ignores a constraint can't slip a row
+through. Keys are one or two letters because every key is repeated on every row and output is
+what costs; the schema's descriptions say what each means.
 
-- `rows[]`, one per transaction, money in included (it is counted and skipped as before):
-  - `lines`: the 1 to 3 consecutive line numbers the transaction is written on;
-  - `dateText` and `amountText`: **copied exactly** as they appear on those lines;
-  - `currency`: a three-letter code, or null when the statement doesn't say;
-  - `direction`: `debit` or `credit`;
-  - `merchant`: a short, cleaned merchant name ("Lidl Cluj" for "POS 4411 LIDL CLUJ RO"), at most
-    120 characters;
-  - `category` and `subtype`: from the app's fixed lists (the enum the expense schema uses), with
-    `subtype` only for `car`.
-- `statement`: `currency`, `periodStart` and `periodEnd` as text if printed, and
-  `totalDebitsText` with its line, if the statement prints a total of money out.
+**Mode "categorise"** (input: the distinct merchant names still unknown, one per line):
+
+- `k[]`: one entry per input line, in order: `{ c: category, s: subtype | null }`, from the app's
+  fixed lists (the enum the expense schema uses), `s` only for `car`. About 8 output tokens per
+  merchant.
+
+**Mode "read"** (input: the numbered lines):
+
+- `r[]`, one per transaction, money in included (it is counted and skipped as before):
+  - `l`: the 1 to 3 consecutive line numbers it is written on;
+  - `d` and `a`: the date and the amount **copied exactly** as they appear on those lines;
+  - `c`: a three-letter currency code, or null when the line doesn't say;
+  - `t`: `d` for money out, `c` for money in;
+  - `m`: a short, cleaned merchant name ("Lidl Cluj" for "POS 4411 LIDL CLUJ RO"), at most 120
+    characters.
+- `k[]`: one entry per **distinct** `m`, `{ m, c: category, s: subtype | null }`, so a merchant
+  that appears twenty times is categorised once.
+- `s`: the statement's currency and its printed total of money out with that total's line, each
+  null when not printed.
+
+About 30 output tokens per transaction plus 8 per distinct merchant. A 150-transaction month comes
+to roughly 6,000 input tokens ($0.0012, less with the prompt cached) and 5,000 output tokens
+($0.006).
+
+**Reasoning effort `none`** for both modes (Luna supports `none` to `max`; reasoning tokens are
+billed as output). I19 checks accuracy at `none` and tries `low` only if `none` misses, and only if
+the result still stays under $0.01.
 
 The system prompt and the schema are fixed text and always come first, so a provider that caches a
-repeated prefix can reuse them across statements; only the numbered lines change. The prompt has
-a version (`statement-reader-v1`) that becomes the batch's `parser_id` (`ai:statement-reader-v1`),
-so a prompt change is visible on every batch it read.
+repeated prefix (OpenAI bills cached input at a tenth) reuses them across statements; only the
+lines change. Each prompt has a version (`statement-categorise-v1`, `statement-reader-v1`) that
+becomes part of the batch's `parser_id` (`generic-csv+ai:statement-categorise-v1`,
+`ai:statement-reader-v1`), so a prompt change is visible on every batch it touched.
 
 ### How code checks the model
 
-Nothing the model says is trusted until code has found it in the statement:
+These apply to mode "read"; in mode "categorise" the rows come from a parser and the model only
+returns categories, which are checked against the fixed lists. Nothing the model says is trusted
+until code has found it in the statement:
 
-1. **Every date and amount is in the text.** `dateText` and `amountText` must occur on the lines
+1. **Every date and amount is in the text.** The date `d` and amount `a` must occur on the lines
    the row cites. The amount is then parsed by code (`detectDecimalMark` over all amount texts, then
    `parseAmount`), and the date by `parseStatementDate`: the model never supplies a number.
-2. **Every merchant word is in the text.** Each word of `merchant` (case and accents folded) must
+2. **Every merchant word is in the text.** Each word of the merchant `m` (case and accents folded) must
    occur on the cited lines, so a cleaned name can drop noise but can't invent a shop.
 3. **No line is used twice** for two different transactions' amounts.
-4. **Totals, when printed.** If `totalDebitsText` is found on its line and parses, the sum of the
+4. **Totals, when printed.** If the printed total in `s` is found on its line and parses, the sum of the
    debit rows must equal it to the cent. A mismatch is shown on the review screen as a warning with
    the difference (question 7); it does not refuse the statement.
 5. **Lines that look like transactions but no row cites** (a date and an amount on the same line)
@@ -263,21 +299,21 @@ In this order, and the review screen shows which one it was:
   and imports fall back to the parsers with a message saying so; the family's parents are notified
   at 80% and 100%. A global monthly backstop (`AI_MONTHLY_BUDGET_USD`) turns
   `app_flags.ai_enabled`, the kill switch, off for everyone if it is ever reached.
-- **What $3 buys** depends on the model: I19 reports cost per statement, so its table also says how
-  many statements a family can read a month on each model. With $3, the worst-case estimate of a
-  large model can exceed what's left of the month before a single statement; small models are the
-  expected fit.
-- **Limits per statement:** input capped at 80,000 tokens (counted by the provider before the call
-  when it can, otherwise estimated conservatively; a month of a few hundred rows is well under),
-  output capped at 64,000 tokens, and a timeout long enough for that output (the adapter streams if
-  its SDK needs it to avoid HTTP timeouts). A response that stops at the output cap, is refused, or
-  fails the Zod parse is `unverified_statement`.
-- **Provider and model:** `AI_PROVIDER` and `AI_MODEL_STATEMENTS` in env. **OpenAI first**,
-  because that is where George has API credits; the reader never names a provider (see "The
-  provider interface"). No model id is fixed in this plan: I15 lists the provider's current models
-  that support structured outputs, and I19's eval runs the same statements through a small and a
-  larger one before George picks (question 5). Prices are copied from the provider's pricing page
-  into the pricing table when I15 runs, and every call is priced from that table.
+- **What $3 buys:** at most $0.01 per statement, so at least **300 statements a month per
+  family**; a statement that only needs categorising costs about a tenth of that.
+- **Limits per statement:** `AI_STATEMENT_MAX_USD` (default `0.01`) is a hard cap. Before the call
+  the reader sets the output cap from the input (about 35 tokens per line that looks like a
+  transaction plus 10 per possible merchant in mode "read", 10 per merchant in mode "categorise"),
+  and the gate prices the worst case (input, plus the whole output cap at the output price). Over
+  $0.01, the call isn't made: mode "read" refuses with `statement_too_long` ("upload a shorter
+  period"), and mode "categorise" sends only as many merchants as fit, leaving the rest as Other.
+  Input is counted by the provider when it can, otherwise estimated conservatively. A response that
+  stops at the output cap, is refused, or fails the Zod parse is `unverified_statement` in mode
+  "read"; in mode "categorise" it just leaves those merchants as Other.
+- **Provider and model:** `AI_PROVIDER=openai` and `AI_MODEL_STATEMENTS=gpt-5.6-luna` in env
+  (George, 30 October 2026); the reader never names a provider (see "The provider interface").
+  Prices are copied from OpenAI's model page into the pricing table when I15 runs, and every call
+  is priced from that table.
 
 ### The provider interface
 
@@ -312,6 +348,7 @@ export type StructuredRequest<T> = {
   schema: z.ZodType<T>;      // the adapter turns it into the provider's JSON Schema format
   schemaName: string;
   maxOutputTokens: number;
+  effort?: "none" | "low" | "medium" | "high"; // passed through where the provider has it
   timeoutMs: number;
   signal?: AbortSignal;
 };
@@ -349,20 +386,23 @@ with a recorded transport:
   the gate never retries a call that returned an answer.
 
 When the provider can't count tokens before a call, the gate estimates conservatively (characters ÷
-3, rounded up) and the 80,000-token input cap applies to that estimate. Tool calling for the phase 8
+3, rounded up), and the per-call cost cap applies to that estimate. Tool calling for the phase 8
 assistant (8.6) is a second method on the same interface, added with that step.
 
 ### Decisions added by the revision
 
 | Decision | Choice | Why |
 | --- | --- | --- |
-| Who reads the statement | The model, for users with AI on; the parsers otherwise | George. Removes one parser per bank. |
+| Who reads the statement | Code when a parser knows the layout (the model only categorises its unknown merchants); the model when no parser does | George asked for AI reading at most $0.01 a statement. Output is the expensive part, so the model writes only what code can't. Still removes one parser per bank. |
+| Cost per statement | **At most $0.01**, enforced before the call from the worst case | George, 30 October 2026. |
+| Model | OpenAI `gpt-5.6-luna`, reasoning effort `none` | George, 30 October 2026. Cheap enough for the target; I19 confirms accuracy. |
+| Output shape | One- or two-letter keys; a category per distinct merchant, not per row | Every key repeats on every row, and output costs six times input on Luna. |
 | What the model may decide | Which lines are transactions, debit or credit, a cleaned merchant name, a category | Everything else (amounts, dates, currency rules, masking, limits) stays in code. |
 | Verification | Dates, amounts and merchant words must be found on the cited lines; amounts and dates parsed by code | A model can misread or invent a row; a row that can't be found in the text is refused. |
 | A failed check | Refuses the statement, nothing drafted | A partial draft would look complete. |
 | Category order | Merchant rule, then your history, then the model | Rules are George's; history is personal and free; the model is the fallback. |
 | History sent to the model | No | Cheaper and more private; the override is applied after the call. |
-| Content hash for AI reads | SHA-256 of the masked, numbered text | Two readings of one file can differ; the text doesn't. A statement read once with AI and once without gets two hashes; the duplicate flags still catch the rows. |
+| Content hash for AI reads | Mode "read": SHA-256 of the masked, numbered text. Mode "categorise": the rows' hash, as built | Two readings of one file can differ; the text doesn't. Rows from a parser are deterministic already. |
 | The AI gate | Built in this phase (I14, I15) as roadmap 8.1 and 8.2 describe, used by statements first | Phase 8's later features reuse it unchanged. |
 | Provider | One `AiProvider` interface; **OpenAI first** (the official `openai` package), others added as one adapter file each | George has OpenAI credits now; the interface keeps every feature independent of the provider, so a second one can be added and compared by the same eval. |
 | SDK versions | Each provider's official SDK, pinned to an exact version at least two weeks old, imported only by its adapter | The repo pins every dependency; the key must never reach a client bundle. |
@@ -373,10 +413,10 @@ assistant (8.6) is a second method on the same interface, added with that step.
 
 ### Questions the revision adds
 
-5. **Which provider and model?** OpenAI first, since that's where the credits are. I19 runs the same
-   statements through a small and a larger OpenAI model (picked from OpenAI's current list when I15
-   runs) and reports accuracy and cost per statement; George picks, and it's one env value. Adding
-   another provider later and running the same eval is what the interface is for.
+5. **Which provider and model?** Decided by George on 30 October 2026: **OpenAI `gpt-5.6-luna`**,
+   at most **$0.01 per statement**. I19 measures accuracy and cost at reasoning effort `none` (and
+   `low` if needed); changing the model later is one env value, and another provider is one
+   adapter.
 6. **Budgets.** Decided by George on 30 October 2026: **$3 a month per family**, no separate
    per-member caps. Default for the global backstop: **$10 a month**, about three families' worth.
    Also set a monthly spend limit in the provider's own console (OpenAI's usage limits) as the last
@@ -414,7 +454,7 @@ that provider's official SDK documentation first and never guess API names.
 | I17 | The statement reader: numbered text, prompt, schema, the call, verification, category order, the pipeline switch | I15 | |
 | I18 | Review screen for read statements: category sources, warnings, the AI-off hint; preview fixtures | I17 | |
 | I19 | Eval: synthetic statements and a hand-run live eval comparing models | I17 | |
-| — | **Checkpoint:** George adds `OPENAI_API_KEY` and the AI env to production (vps-apps), sets the provider's spend limit, and picks the model (question 5) | I15, I19 | |
+| — | **Checkpoint:** George adds `OPENAI_API_KEY` and the AI env to production (vps-apps) and sets the provider's spend limit | I15, I19 | |
 | I11 | The Import button on the Expenses page | I18 | |
 | — | **Checkpoint:** smoke test | I11, the checkpoint above | |
 
@@ -901,8 +941,10 @@ calls a model yet.
   tokens, copied from the provider's pricing page on the day of the task, with the date in a
   comment. An unknown provider or model refuses the call rather than pricing it at zero.
 - Env: `AI_PROVIDER` (`openai`), `OPENAI_API_KEY` (server only, never `NEXT_PUBLIC_`),
-  `AI_MODEL_STATEMENTS`. The PR lists OpenAI's current models that support structured outputs, as
-  candidates for I19.
+  `AI_MODEL_STATEMENTS` (`gpt-5.6-luna`), `AI_STATEMENT_MAX_USD` (`0.01`). The adapter passes a
+  reasoning effort through the request (`StructuredRequest.effort`, ignored by providers without
+  one). Confirm `gpt-5.6-luna`'s prices and its structured-output support on OpenAI's model page
+  when the task runs.
 - Check that `npm run build`'s client bundles and `build:worker`'s bundle contain no SDK code and
   no key.
 
@@ -928,32 +970,43 @@ permission and turning the permission off turns the switch off.
 ### I17: The statement reader
 
 - `src/lib/imports/ai/numbered-text.ts`: the masked lines of a CSV or a PDF, numbered, with page
-  markers, and the SHA-256 of that text as the content hash.
-- `src/lib/imports/ai/prompt.ts`: the system prompt (`statement-reader-v1`) and the Zod schema of
-  "What the model returns". The prompt describes the task, the app's categories and subtypes with a
-  line each, the copy-exactly rule for `dateText` and `amountText`, and that money in is listed with
-  `direction: credit`. No examples taken from real statements.
+  markers; the count of lines that look like transactions; and the SHA-256 of the text as the
+  content hash for mode "read".
+- `src/lib/imports/ai/prompts.ts`: the two system prompts (`statement-categorise-v1`,
+  `statement-reader-v1`) and the Zod schemas of "What the model returns", with a `.describe()` on
+  every short key. The prompts list the app's categories and subtypes with a line each, the
+  copy-exactly rule for `d` and `a`, and that money in is listed with `t: "c"`. No examples taken
+  from real statements.
+- `src/lib/imports/ai/budget.ts`: the output cap from the input and the worst-case price check
+  against `AI_STATEMENT_MAX_USD` (default `0.01`), before any call; mode "categorise" trims the
+  merchant list to what fits.
 - `src/lib/imports/ai/verify.ts`: every check in "How code checks the model", returning either the
   parsed rows and warnings or the reason it failed (for the log, never quoting the text).
 - `src/lib/imports/ai/categories.ts`: the category order, with the history lookup through a new
   `ExpenseRepository.recentCategoriesByMerchant(userId, since)` (explicit `user_id` filter) and its
-  fake.
-- `pipeline.ts`: `buildDraft` takes the user's AI state; when it is on and the gate allows, the
-  reader runs instead of the parsers. A refusal by the gate (flag off, over a cap) falls back to the
-  parsers with a warning saying why; a failed check does not fall back (`unverified_statement`).
+  fake; the merchant rule and history are applied **before** mode "categorise", so known merchants
+  are never sent.
+- `pipeline.ts`: `buildDraft` takes the user's AI state. A parser that claims the file runs as
+  built, then mode "categorise" for its unknown merchants; no parser and AI on runs mode "read".
+  A gate refusal (flag off, family budget used up) leaves the parser's rows as Other, or, in mode
+  "read", refuses with a message saying why; a failed check in mode "read" is
+  `unverified_statement`.
 - The draft rows are created with the category and source from history or the model, through the
   optional row fields I14 added to `create_import_batch`; the merchant rule inside the function
   still wins. `StoredImportRow` and `DraftRow` gain `categorySource`.
 - New error codes: `statement_too_long`, `unverified_statement`; both 422.
 
-Tests use **recorded responses** for synthetic statements: a clean CSV, a PDF with columns, a
-multi-line transaction, money in and out, a foreign-currency row, and printed totals. Plus
-tampered responses: an amount not on its line, a date changed by a day, an invented merchant word,
-a line used twice, a missing row (the "lines not read" warning), totals that don't add up, a
-`max_tokens` stop and a refusal.
+Tests use **recorded responses** for synthetic statements: a clean CSV (mode "categorise", with a
+merchant known from history that must not be sent), a PDF with columns, a multi-line transaction,
+money in and out, a foreign-currency row, and printed totals. Plus tampered responses: an amount not
+on its line, a date changed by a day, an invented merchant word, a line used twice, a missing row
+(the "lines not read" warning), totals that don't add up, a merchant missing from `k`, an output-cap
+stop and a refusal. And the budget: a statement whose worst case is just over $0.01 is refused
+before any call, and one just under is sent.
 
-**Done when** each recorded response becomes the expected draft or the expected refusal, and an
-upload with AI off still goes through the parsers unchanged.
+**Done when** each recorded response becomes the expected draft or the expected refusal, no call
+is priced over `AI_STATEMENT_MAX_USD` in the worst case, and an upload with AI off still goes
+through the parsers unchanged.
 
 ### I18: The review screen for read statements
 
@@ -979,14 +1032,16 @@ upload with AI off still goes through the parsers unchanged.
   and asks for confirmation with the estimated cost before it starts.
 - `--provider` defaults to `AI_PROVIDER`, so the same eval compares providers once a second adapter
   exists.
-- The first run compares a small and a larger OpenAI model from I15's list; the PR reports both, for
-  question 5.
+- `--effort` (default `none`). The first run is `gpt-5.6-luna` at `none`, in both modes; if it
+  misses rows or categories, a second run at `low`. The PR reports both, with the **highest** cost
+  of any statement next to the $0.01 target.
 
-**Done when** the eval runs against both models and the PR has the table.
+**Done when** the eval runs on `gpt-5.6-luna`, every statement up to about 200 transactions costs at
+most $0.01, and the PR has the accuracy table.
 
 ### Checkpoint: production AI settings
 
-George adds `AI_PROVIDER`, `OPENAI_API_KEY`, `AI_MODEL_STATEMENTS` (question 5), the budget variables
+George adds `AI_PROVIDER=openai`, `OPENAI_API_KEY`, `AI_MODEL_STATEMENTS=gpt-5.6-luna`, `AI_STATEMENT_MAX_USD=0.01`, the budget variables
 (question 6) and `APP_ADMIN_USER_IDS` to the production env in vps-apps, and sets a monthly spend
 limit in OpenAI's usage settings.
 
