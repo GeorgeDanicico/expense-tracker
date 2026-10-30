@@ -81,6 +81,23 @@ describe("FakeImportRepository", () => {
     expect(draft?.rows[0]).not.toHaveProperty("batchId");
   });
 
+  it("keeps the category, subtype and source a row is given, except that the merchant rule wins and names itself", async () => {
+    const batch = await imports.createBatch(batchPayload(), [
+      rowPayload({ description: "Fresh Market", category: "groceries", category_source: "history" }),
+      rowPayload({ description: "Garage", category: "car", subtype: "car_repairs", category_source: "ai" }),
+      rowPayload({ description: "OMV 1642 Satu Mare", category: "shopping", category_source: "ai" }),
+      rowPayload({ description: "Nothing known" }),
+    ]);
+
+    const draft = await imports.getDraft(batch.id);
+    expect(draft?.rows.map((row) => [row.category, row.subtype, row.ruleMatched, row.categorySource])).toEqual([
+      ["groceries", null, false, "history"],
+      ["car", "car_repairs", false, "ai"],
+      ["car", "car_fuel", true, "rule"],
+      ["other", null, false, null],
+    ]);
+  });
+
   it("refuses a bad row, or none, and saves nothing", async () => {
     const refused = { status: 422, message: IMPORT_ROWS_REFUSED_MESSAGE };
 

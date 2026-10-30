@@ -57,6 +57,7 @@ function aRowRow(overrides: Record<string, unknown> = {}) {
     category: "other",
     subtype: null,
     rule_matched: false,
+    category_source: null,
     notes: null,
     ...overrides,
   };
@@ -207,7 +208,7 @@ describe("findLiveByHash", () => {
 describe("getDraft", () => {
   it("returns the batch with its rows in statement order, amounts as numbers", async () => {
     const batch = aBatchRow();
-    const second = aRowRow({ batch_id: batch.id, position: 2, description: "OMV", amount: "300.00", category: "car", subtype: "car_fuel", rule_matched: true, notes: "tail" });
+    const second = aRowRow({ batch_id: batch.id, position: 2, description: "OMV", amount: "300.00", category: "car", subtype: "car_fuel", rule_matched: true, category_source: "rule", notes: "tail" });
     const first = aRowRow({ batch_id: batch.id, position: 1 });
     const { queries } = useDatabase({ import_batches: [batch], import_rows: [second, first, aRowRow({ batch_id: "other" })] });
 
@@ -217,11 +218,11 @@ describe("getDraft", () => {
     expect(draft?.rows).toEqual([
       {
         id: first.id, position: 1, expenseDate: "2026-10-12", description: "Lidl", amount: 45.2, currency: "EUR",
-        category: "other", subtype: null, ruleMatched: false, notes: null,
+        category: "other", subtype: null, ruleMatched: false, categorySource: null, notes: null,
       },
       {
         id: second.id, position: 2, expenseDate: "2026-10-12", description: "OMV", amount: 300, currency: "EUR",
-        category: "car", subtype: "car_fuel", ruleMatched: true, notes: "tail",
+        category: "car", subtype: "car_fuel", ruleMatched: true, categorySource: "rule", notes: "tail",
       },
     ]);
     expect(queries.map((query) => [query.table, query.filters])).toEqual([
@@ -229,6 +230,20 @@ describe("getDraft", () => {
       ["import_rows", [["eq", "batch_id", batch.id]]],
     ]);
     expect(queries[1].orders).toEqual(["position"]);
+  });
+
+  it("carries where each category came from, and refuses a source it doesn't know", async () => {
+    const batch = aBatchRow();
+    const history = aRowRow({ batch_id: batch.id, position: 1, category: "groceries", category_source: "history" });
+    const ai = aRowRow({ batch_id: batch.id, position: 2, category: "health", category_source: "ai" });
+    useDatabase({ import_batches: [batch], import_rows: [history, ai] });
+
+    const draft = await imports.getDraft(batch.id);
+
+    expect(draft?.rows.map((row) => [row.category, row.categorySource])).toEqual([["groceries", "history"], ["health", "ai"]]);
+
+    useDatabase({ import_batches: [batch], import_rows: [aRowRow({ batch_id: batch.id, category_source: "guess" })] });
+    await expect(imports.getDraft(batch.id)).rejects.toThrow(new Error("Unable to load your imports."));
   });
 
   it("returns null for a missing batch, a confirmed or undone one and an expired draft", async () => {

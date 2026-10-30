@@ -15,8 +15,10 @@ import {
   type StoredImportRow,
 } from "@/lib/imports/repository";
 import {
+  CATEGORY_SOURCES,
   IMPORT_SOURCE_KINDS,
   IMPORT_STATUSES,
+  type CategorySource,
   type ImportBatch,
   type ImportSourceKind,
   type ImportStatus,
@@ -33,14 +35,14 @@ const DISCARD_ERROR = "Unable to discard the import.";
 // Never `user_id` or `content_hash`: the screen needs neither.
 const BATCH_COLUMNS =
   "id, status, source_kind, parser_id, currency, period_start, period_end, row_count, skipped_credits, created_at, expires_at, confirmed_at, confirmed_count, undone_at";
-const ROW_COLUMNS = "id, position, expense_date, description, amount, currency, category, subtype, rule_matched, notes";
+const ROW_COLUMNS =
+  "id, position, expense_date, description, amount, currency, category, subtype, rule_matched, category_source, notes";
 
 /** How many link rows one request reads, under PostgREST's usual `max-rows` of 1,000. */
 const LINK_PAGE_SIZE = 1000;
 
 type BatchRow = Omit<Database["public"]["Tables"]["import_batches"]["Row"], "user_id" | "content_hash">;
-// `category_source` is the statement reader's (I17): the review screen doesn't read it yet.
-type RowRow = Omit<Database["public"]["Tables"]["import_rows"]["Row"], "batch_id" | "category_source">;
+type RowRow = Omit<Database["public"]["Tables"]["import_rows"]["Row"], "batch_id">;
 type DatabaseError = { code?: string; message: string };
 
 /** PostgREST answers instants as `+00:00` strings; the API speaks `Z` ISO strings. */
@@ -57,6 +59,12 @@ function toStatus(value: string): ImportStatus {
 
 function toSourceKind(value: string): ImportSourceKind {
   if ((IMPORT_SOURCE_KINDS as readonly string[]).includes(value)) return value as ImportSourceKind;
+  throw new Error(LOAD_ERROR);
+}
+
+function toCategorySource(value: string | null): CategorySource | null {
+  if (value === null) return null;
+  if ((CATEGORY_SOURCES as readonly string[]).includes(value)) return value as CategorySource;
   throw new Error(LOAD_ERROR);
 }
 
@@ -91,6 +99,7 @@ function toStoredRow(row: RowRow): StoredImportRow {
     category: row.category as ExpenseCategory,
     subtype: row.subtype as ExpenseSubtype | null,
     ruleMatched: row.rule_matched,
+    categorySource: toCategorySource(row.category_source),
     notes: row.notes,
   };
 }

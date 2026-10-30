@@ -60,7 +60,7 @@ const batch: ImportBatch = {
 function aRow(overrides: Partial<DraftRow> = {}): DraftRow {
   return {
     id: "r1", position: 1, expenseDate: "2026-10-12", description: "Cafe", amount: 4.5, currency: "EUR",
-    category: "other", subtype: null, ruleMatched: false, notes: null, duplicateOf: null, importable: true,
+    category: "other", subtype: null, ruleMatched: false, categorySource: null, notes: null, duplicateOf: null, importable: true,
     ...overrides,
   };
 }

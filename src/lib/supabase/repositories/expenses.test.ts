@@ -293,6 +293,34 @@ describe("listRange", () => {
   });
 });
 
+describe("recentCategoriesByMerchant", () => {
+  it("returns the owner's categorised expenses since the date, newest first, without those left in Other", async () => {
+    const { queries } = useDatabase([
+      anExpenseRow({ id: "old", description: "Lidl", category: "groceries", expenseDate: "2025-10-29" }),
+      anExpenseRow({ id: "first", description: "Lidl", category: "groceries", expenseDate: "2025-10-30" }),
+      anExpenseRow({ id: "fuel", description: "Station", category: "car", subtype: "car_fuel", expenseDate: "2026-09-02" }),
+      anExpenseRow({ id: "uncategorised", description: "Cafe", category: "other", expenseDate: "2026-09-05" }),
+      anExpenseRow({ id: "foreign", description: "Zara", category: "shopping", expenseDate: "2026-09-05" }, "other"),
+    ]);
+
+    const history = await repository.recentCategoriesByMerchant("owner", "2025-10-30");
+
+    expect(history).toEqual([
+      { description: "Station", category: "car", subtype: "car_fuel", expenseDate: "2026-09-02" },
+      { description: "Lidl", category: "groceries", subtype: null, expenseDate: "2025-10-30" },
+    ]);
+    expect(queries[0].filters).toEqual([
+      ["eq", "user_id", "owner"], ["gte", "expense_date", "2025-10-30"], ["neq", "category", "other"],
+    ]);
+  });
+
+  it("fails with the load message", async () => {
+    useDatabase([], { fail: () => true });
+
+    await expect(repository.recentCategoriesByMerchant("owner", "2025-10-30")).rejects.toThrow(new Error("Unable to load expenses."));
+  });
+});
+
 describe("getDashboard", () => {
   const summary = {
     currentTotal: "12.50", currentCount: 1, currentLargest: "12.50", analyticsTotal: "40.00", analyticsCount: 2,
@@ -392,6 +420,7 @@ describe("owner filters", () => {
   it.each([
     ["listMonth", () => repository.listMonth("owner", "2026-09")],
     ["listRange", () => repository.listRange("owner", { start: "2026-09-01", endExclusive: "2026-10-01" })],
+    ["recentCategoriesByMerchant", () => repository.recentCategoriesByMerchant("owner", "2025-09-01")],
     ["listForTab", () => repository.listForTab("owner", aTab(), DEFAULT_EXPENSE_TAB_FILTERS)],
     ["getDashboard", () => repository.getDashboard("owner", dashboardRanges)],
     ["update", () => repository.update("owner", "owned", { amount: 2 })],

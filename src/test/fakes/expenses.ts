@@ -36,6 +36,12 @@ export class FakeExpenseRepository implements ExpenseRepository {
     return this.newestFirst(userId).filter((expense) => inRange(expense, range));
   }
 
+  async recentCategoriesByMerchant(userId: string, since: string) {
+    return this.newestFirst(userId)
+      .filter((expense) => expense.expenseDate >= since && expense.category !== "other")
+      .map(({ description, category, subtype, expenseDate }) => ({ description, category, subtype, expenseDate }));
+  }
+
   async listForTab(userId: string, tab: ExpenseTab, filters: ExpenseTabFilters) {
     const search = filters.search.toLowerCase();
     return this.newestFirst(userId).filter((expense) =>

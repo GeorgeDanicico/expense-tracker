@@ -1,8 +1,11 @@
 import "server-only";
 
-import { addDays, APPLICATION_TIMEZONE } from "@/lib/calendar";
+import { structured, type StructuredDependencies } from "@/lib/ai";
+import { addDays, APPLICATION_TIMEZONE, getBucharestToday } from "@/lib/calendar";
 import { DomainError } from "@/lib/errors";
 import type { Expense } from "@/lib/expenses/types";
+import { buildHistory, historySince } from "@/lib/imports/ai/categories";
+import type { StatementAi } from "@/lib/imports/ai/reader";
 import { flagDuplicates } from "@/lib/imports/duplicates";
 import { buildDraft } from "@/lib/imports/pipeline";
 import {
@@ -56,22 +59,54 @@ function importDay(iso: string, now: Date): string {
   return value(then, "year") === value(parts(now), "year") ? day : `${day} ${value(then, "year")}`;
 }
 
+/** What `createDraft` can be given in place of the real model: tests pass a fake provider and a price list. */
+export type CreateDraftDependencies = {
+  /** Passed to `structured` (`@/lib/ai`) for every model call of this upload. */
+  ai?: StructuredDependencies;
+  /** Where the pipeline's one-line notes about model steps go. */
+  log?: (line: Record<string, unknown>) => void;
+};
+
+/**
+ * The statement reader's side of the AI for this user: present only when they have turned AI on
+ * (and, for a kid, have the permission), so everything else about an upload is as it was without
+ * AI. The kill switch and the budgets are the gate's, checked by `structured` before each call.
+ */
+async function statementAi(userId: string, dependencies: StructuredDependencies | undefined): Promise<StatementAi | null> {
+  const { aiGate, expenses } = getRepositories();
+  let access: Awaited<ReturnType<typeof aiGate.access>>;
+  try {
+    access = await aiGate.access(userId);
+  } catch {
+    // Without knowing, the safe answer is the one without a model.
+    return null;
+  }
+  if (access !== "ok") return null;
+
+  return {
+    call: (request) => structured({ ...request, feature: "statements", userId }, dependencies),
+    // The history is the caller's own expenses, from the repository's explicit owner filter, and stays on the server.
+    loadHistory: async () => buildHistory(await expenses.recentCategoriesByMerchant(userId, historySince(getBucharestToday()))),
+  };
+}
+
 /**
  * Parses an upload into a draft and saves it. The same statement (by the hash of its rows) that is
  * still a draft is returned as it is (`reopened`); one that was confirmed is an `ImportError`
  * (`already_imported`, 409) naming the day, until that import is undone. `buildDraft`'s errors
  * (`unrecognised_layout`, `no_debits`, `too_many_rows`, ...) pass through.
  *
- * `userId` is the caller, as in the other use cases; the repository acts as the signed-in caller, so
+ * `userId` is the caller: it decides whether the model may read or categorise the statement (see
+ * `statementAi`) and whose history is used. The import repository acts as the signed-in caller, so
  * it isn't needed to save.
  */
 export async function createDraft(
   userId: string,
   upload: StatementUpload,
   now: Date = new Date(),
+  dependencies: CreateDraftDependencies = {},
 ): Promise<CreatedDraft> {
-  void userId;
-  const draft = await buildDraft(upload);
+  const draft = await buildDraft(upload, { ai: await statementAi(userId, dependencies.ai), log: dependencies.log });
   const { imports } = getRepositories();
 
   const existing = await imports.findLiveByHash(draft.batch.content_hash);

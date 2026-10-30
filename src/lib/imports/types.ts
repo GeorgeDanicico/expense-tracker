@@ -52,6 +52,10 @@ export type ImportSourceKind = (typeof IMPORT_SOURCE_KINDS)[number];
 export const IMPORT_STATUSES = ["draft", "confirmed", "undone"] as const;
 export type ImportStatus = (typeof IMPORT_STATUSES)[number];
 
+/** Where a draft row's category came from, stored in `import_rows.category_source`; null for a row a parser read and nothing categorised. */
+export const CATEGORY_SOURCES = ["rule", "history", "ai"] as const;
+export type CategorySource = (typeof CATEGORY_SOURCES)[number];
+
 /** Money out is imported; money in is counted and skipped. */
 export const ROW_DIRECTIONS = ["debit", "credit"] as const;
 export type RowDirection = (typeof ROW_DIRECTIONS)[number];
@@ -122,6 +126,8 @@ export type DraftRow = {
   category: ExpenseCategory;
   subtype: ExpenseSubtype | null;
   ruleMatched: boolean;
+  /** Which of the merchant rule, the user's history or the model chose `category`; null when none did (Other). */
+  categorySource: CategorySource | null;
   notes: string | null;
   duplicateOf: DuplicateOf | null;
   importable: boolean;
@@ -150,6 +156,14 @@ export type CreateImportRowPayload = {
   amount: number;
   currency: string;
   notes?: string | null;
+  /**
+   * A first category for the row, from the user's history or the model (I17). The merchant rule
+   * inside `create_import_batch` still wins when it recognises the row. Without `category` the row
+   * is Other; `subtype` must belong to `category`, and `category_source` is `history` or `ai`.
+   */
+  category?: ExpenseCategory;
+  subtype?: ExpenseSubtype | null;
+  category_source?: Exclude<CategorySource, "rule">;
 };
 
 /** One element of the `p_rows` array of `confirm_import_batch`: a row's final values. */
@@ -179,6 +193,7 @@ export const IMPORT_ERROR_CODES = [
   "too_many_pages",
   "too_many_rows",
   "no_debits",
+  "unverified_statement",
   "already_imported",
   "rate_limited",
 ] as const;
@@ -198,6 +213,7 @@ export const IMPORT_ERROR_STATUS: Record<ImportErrorCode, 409 | 413 | 415 | 422 
   too_many_pages: 422,
   too_many_rows: 422,
   no_debits: 422,
+  unverified_statement: 422,
   already_imported: 409,
   rate_limited: 429,
 };
@@ -215,6 +231,7 @@ export const IMPORT_ERROR_MESSAGES: Record<ImportErrorCode, string> = {
   too_many_pages: `This PDF has more than ${IMPORT_MAX_PDF_PAGES} pages.`,
   too_many_rows: `This statement has more than ${IMPORT_MAX_ROWS} transactions.`,
   no_debits: "This statement has no payments to import.",
+  unverified_statement: "The statement couldn't be read reliably.",
   already_imported: "You already imported this statement.",
   rate_limited: "Too many uploads. Try again later.",
 };
