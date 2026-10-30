@@ -34,7 +34,7 @@ export function AddExpenseDialog({
           variant="solid"
           colorPalette="brand"
           size={{ base: "md", sm: "sm" }}
-          flex={{ base: "1", sm: "initial" }}
+          flex={{ base: "1 0 auto", sm: "initial" }}
         >
           <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add expense
         </Button>

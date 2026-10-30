@@ -21,6 +21,7 @@ import { ViewingControls } from "@/components/family/viewing-picker";
 import { WriteOnly } from "@/components/family/write-only";
 import { ExpenseTabDialog } from "@/components/expenses/expense-tab-dialog";
 import { ExpenseTabs, MAIN_EXPENSE_TAB } from "@/components/expenses/expense-tabs";
+import { ImportStatementButton } from "@/components/expenses/import-statement-button";
 import { MainExpensesPanel } from "@/components/expenses/main-expenses-panel";
 import { PermissionGate } from "@/components/layout/permission-gate";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
@@ -74,6 +75,7 @@ function ExpensesContent() {
           <>
             <WriteOnly>
               <AddExpenseDialog selectedMonth={month} currency={currency} />
+              <ImportStatementButton />
             </WriteOnly>
             {viewing.family ? null : (
               <Button asChild variant="ghost" size={{ base: "md", sm: "sm" }}>
