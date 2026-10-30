@@ -173,7 +173,8 @@ model only replaces where the rows and their first category come from.
 
 ### How a statement is read
 
-**Target: at most $0.01 per statement** (George, 30 October 2026), on OpenAI's `gpt-5.6-luna`
+**Aim: about $0.01 per statement or less** (George, 30 October 2026; **measured, not enforced** for
+now, see "Limits per statement"), on OpenAI's `gpt-5.6-luna`
 ($0.20 per million input tokens, $0.02 cached input, $1.20 output, from OpenAI's model page on 30
 October 2026). Output tokens cost six times input, so the design keeps the model's output small:
 code reads whatever it can, and the model only writes what code can't work out.
@@ -194,8 +195,7 @@ upload (I4 guard, unchanged) → CSV decoded / PDF text extracted (I3, I12, unch
   └─ no (most PDFs, unfamiliar CSVs)
        AI on? no → 422 unrecognised_layout, with a hint pointing at Settings → AI
        yes → numbered lines ("0001⇥…", "--- page 2 ---" markers) → mode "read"
-            count the lines that look like transactions (a date and an amount on one line)
-            worst-case cost over $0.01 (about 200 transactions) → 422 statement_too_long
+            count the lines that look like transactions (sets the output cap)
             one call: compact rows + one category per distinct merchant ≈ $0.004–0.009
             verify every row against the numbered text (below), else 422 unverified_statement
             merchants: merchant rule, then your history, then the model's category
@@ -238,8 +238,8 @@ to roughly 6,000 input tokens ($0.0012, less with the prompt cached) and 5,000 o
 ($0.006).
 
 **Reasoning effort `none`** for both modes (Luna supports `none` to `max`; reasoning tokens are
-billed as output). I19 checks accuracy at `none` and tries `low` only if `none` misses, and only if
-the result still stays under $0.01.
+billed as output). I19 checks accuracy at `none` and tries `low` only if `none` misses, and
+reports what that does to the cost.
 
 The system prompt and the schema are fixed text and always come first, so a provider that caches a
 repeated prefix (OpenAI bills cached input at a tenth) reuses them across statements; only the
@@ -299,17 +299,18 @@ In this order, and the review screen shows which one it was:
   and imports fall back to the parsers with a message saying so; the family's parents are notified
   at 80% and 100%. A global monthly backstop (`AI_MONTHLY_BUDGET_USD`) turns
   `app_flags.ai_enabled`, the kill switch, off for everyone if it is ever reached.
-- **What $3 buys:** at most $0.01 per statement, so at least **300 statements a month per
-  family**; a statement that only needs categorising costs about a tenth of that.
-- **Limits per statement:** `AI_STATEMENT_MAX_USD` (default `0.01`) is a hard cap. Before the call
-  the reader sets the output cap from the input (about 35 tokens per line that looks like a
-  transaction plus 10 per possible merchant in mode "read", 10 per merchant in mode "categorise"),
-  and the gate prices the worst case (input, plus the whole output cap at the output price). Over
-  $0.01, the call isn't made: mode "read" refuses with `statement_too_long` ("upload a shorter
-  period"), and mode "categorise" sends only as many merchants as fit, leaving the rest as Other.
-  Input is counted by the provider when it can, otherwise estimated conservatively. A response that
-  stops at the output cap, is refused, or fails the Zod parse is `unverified_statement` in mode
-  "read"; in mode "categorise" it just leaves those merchants as Other.
+- **What $3 buys:** at the estimated $0.01 or less per statement, around **300 statements a month
+  per family**; a statement that only needs categorising costs about a tenth of that.
+- **Limits per statement:** **no per-statement price cap for now** (George, 30 October 2026): the
+  only money limit is the family's month. I19 and the ledger show what statements really cost, and
+  a per-statement cap can be added later if that turns out to be needed. The reader still sets the
+  output cap from the input (about 35 tokens per line that looks like a transaction plus 10 per
+  possible merchant in mode "read", 10 per merchant in mode "categorise"), so a runaway answer
+  can't happen, and the gate prices that worst case against what's left of the family's month.
+  Input is counted by the provider when it can, otherwise estimated conservatively. The 500-row
+  limit from I4 still applies. A response that stops at the output cap, is refused, or fails the
+  Zod parse is `unverified_statement` in mode "read"; in mode "categorise" it just leaves those
+  merchants as Other.
 - **Provider and model:** `AI_PROVIDER=openai` and `AI_MODEL_STATEMENTS=gpt-5.6-luna` in env
   (George, 30 October 2026); the reader never names a provider (see "The provider interface").
   Prices are copied from OpenAI's model page into the pricing table when I15 runs, and every call
@@ -393,8 +394,8 @@ assistant (8.6) is a second method on the same interface, added with that step.
 
 | Decision | Choice | Why |
 | --- | --- | --- |
-| Who reads the statement | Code when a parser knows the layout (the model only categorises its unknown merchants); the model when no parser does | George asked for AI reading at most $0.01 a statement. Output is the expensive part, so the model writes only what code can't. Still removes one parser per bank. |
-| Cost per statement | **At most $0.01**, enforced before the call from the worst case | George, 30 October 2026. |
+| Who reads the statement | Code when a parser knows the layout (the model only categorises its unknown merchants); the model when no parser does | George wants AI reading to stay around $0.01 a statement. Output is the expensive part, so the model writes only what code can't. Still removes one parser per bank. |
+| Cost per statement | **Aim about $0.01; not enforced.** The family's $3 month is the only money limit | George, 30 October 2026: see what statements really cost first. |
 | Model | OpenAI `gpt-5.6-luna`, reasoning effort `none` | George, 30 October 2026. Cheap enough for the target; I19 confirms accuracy. |
 | Output shape | One- or two-letter keys; a category per distinct merchant, not per row | Every key repeats on every row, and output costs six times input on Luna. |
 | What the model may decide | Which lines are transactions, debit or credit, a cleaned merchant name, a category | Everything else (amounts, dates, currency rules, masking, limits) stays in code. |
@@ -414,7 +415,7 @@ assistant (8.6) is a second method on the same interface, added with that step.
 ### Questions the revision adds
 
 5. **Which provider and model?** Decided by George on 30 October 2026: **OpenAI `gpt-5.6-luna`**,
-   at most **$0.01 per statement**. I19 measures accuracy and cost at reasoning effort `none` (and
+   aiming at about **$0.01 per statement** without enforcing it yet. I19 measures accuracy and cost at reasoning effort `none` (and
    `low` if needed); changing the model later is one env value, and another provider is one
    adapter.
 6. **Budgets.** Decided by George on 30 October 2026: **$3 a month per family**, no separate
@@ -941,7 +942,7 @@ calls a model yet.
   tokens, copied from the provider's pricing page on the day of the task, with the date in a
   comment. An unknown provider or model refuses the call rather than pricing it at zero.
 - Env: `AI_PROVIDER` (`openai`), `OPENAI_API_KEY` (server only, never `NEXT_PUBLIC_`),
-  `AI_MODEL_STATEMENTS` (`gpt-5.6-luna`), `AI_STATEMENT_MAX_USD` (`0.01`). The adapter passes a
+  `AI_MODEL_STATEMENTS` (`gpt-5.6-luna`). The adapter passes a
   reasoning effort through the request (`StructuredRequest.effort`, ignored by providers without
   one). Confirm `gpt-5.6-luna`'s prices and its structured-output support on OpenAI's model page
   when the task runs.
@@ -977,9 +978,7 @@ permission and turning the permission off turns the switch off.
   every short key. The prompts list the app's categories and subtypes with a line each, the
   copy-exactly rule for `d` and `a`, and that money in is listed with `t: "c"`. No examples taken
   from real statements.
-- `src/lib/imports/ai/budget.ts`: the output cap from the input and the worst-case price check
-  against `AI_STATEMENT_MAX_USD` (default `0.01`), before any call; mode "categorise" trims the
-  merchant list to what fits.
+- `src/lib/imports/ai/output-cap.ts`: the output cap from the input, for both modes.
 - `src/lib/imports/ai/verify.ts`: every check in "How code checks the model", returning either the
   parsed rows and warnings or the reason it failed (for the log, never quoting the text).
 - `src/lib/imports/ai/categories.ts`: the category order, with the history lookup through a new
@@ -994,19 +993,17 @@ permission and turning the permission off turns the switch off.
 - The draft rows are created with the category and source from history or the model, through the
   optional row fields I14 added to `create_import_batch`; the merchant rule inside the function
   still wins. `StoredImportRow` and `DraftRow` gain `categorySource`.
-- New error codes: `statement_too_long`, `unverified_statement`; both 422.
+- New error code: `unverified_statement`, 422.
 
 Tests use **recorded responses** for synthetic statements: a clean CSV (mode "categorise", with a
 merchant known from history that must not be sent), a PDF with columns, a multi-line transaction,
 money in and out, a foreign-currency row, and printed totals. Plus tampered responses: an amount not
 on its line, a date changed by a day, an invented merchant word, a line used twice, a missing row
 (the "lines not read" warning), totals that don't add up, a merchant missing from `k`, an output-cap
-stop and a refusal. And the budget: a statement whose worst case is just over $0.01 is refused
-before any call, and one just under is sent.
+stop and a refusal.
 
-**Done when** each recorded response becomes the expected draft or the expected refusal, no call
-is priced over `AI_STATEMENT_MAX_USD` in the worst case, and an upload with AI off still goes
-through the parsers unchanged.
+**Done when** each recorded response becomes the expected draft or the expected refusal, and an
+upload with AI off still goes through the parsers unchanged.
 
 ### I18: The review screen for read statements
 
@@ -1033,15 +1030,14 @@ through the parsers unchanged.
 - `--provider` defaults to `AI_PROVIDER`, so the same eval compares providers once a second adapter
   exists.
 - `--effort` (default `none`). The first run is `gpt-5.6-luna` at `none`, in both modes; if it
-  misses rows or categories, a second run at `low`. The PR reports both, with the **highest** cost
-  of any statement next to the $0.01 target.
+  misses rows or categories, a second run at `low`. The PR reports both, with the average and the **highest**
+  cost of any statement, next to the $0.01 aim, so George can decide whether a cap is needed.
 
-**Done when** the eval runs on `gpt-5.6-luna`, every statement up to about 200 transactions costs at
-most $0.01, and the PR has the accuracy table.
+**Done when** the eval runs on `gpt-5.6-luna` and the PR has the accuracy and cost table.
 
 ### Checkpoint: production AI settings
 
-George adds `AI_PROVIDER=openai`, `OPENAI_API_KEY`, `AI_MODEL_STATEMENTS=gpt-5.6-luna`, `AI_STATEMENT_MAX_USD=0.01`, the budget variables
+George adds `AI_PROVIDER=openai`, `OPENAI_API_KEY`, `AI_MODEL_STATEMENTS=gpt-5.6-luna`, the budget variables
 (question 6) and `APP_ADMIN_USER_IDS` to the production env in vps-apps, and sets a monthly spend
 limit in OpenAI's usage settings.
 
@@ -1146,6 +1142,8 @@ With the app on your phone and a Mac, and real statements (not the anonymised on
   merging rows.
 - **The admin usage page** (roadmap 8.3). Until it exists, spend is read from `ai_usage` and the
   provider's usage page, and the flag is flipped with SQL.
+- **A price cap per statement.** The aim is about $0.01; I19 and the ledger show the real cost, and
+  a cap (a worst-case check before the call) can be added if it's needed.
 - **A second provider** (for example Claude). It is one adapter file, its pricing rows and the
   contract suite; I19's eval then compares it with OpenAI on the same statements.
 - **Editing the merchant rules** from the app.
