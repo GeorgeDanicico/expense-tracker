@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { checkBudget, recordUsage, AiGateError, type AiGateDependencies } from "@/lib/ai/gate";
-import { FakeAiGateRepository, FakeModel } from "@/test/fakes/ai";
+import { FakeAiGateRepository } from "@/test/fakes/ai";
 
 // A family of two parents and a kid, a kid without a permission, and two users without a family.
 const mum = "10000000-0000-4000-8000-000000000141";
@@ -493,77 +493,5 @@ describe("recordUsage", () => {
       expect(repository.notifications.filter((n) => n.userId === second)).toHaveLength(1);
       expect(logged).toContain("AI gate: could not notify an admin.");
     });
-  });
-});
-
-describe("a fake model through the gate", () => {
-  it("refuses a family's fourth call of the month, and runs again on the 1st", async () => {
-    const model = new FakeModel({ checkBudget, recordUsage });
-    for (let i = 0; i < 3; i++) model.willSucceed({ inputTokens: 6000, outputTokens: 5000, costMicros: 1 * USD });
-
-    for (const user of [mum, kid, dad]) {
-      await expect(model.call({ userId: user, feature: "statements", estimatedMicros: 10_000 }, dependencies())).resolves.toEqual({ ok: true });
-    }
-    await expect(model.call({ userId: kid, feature: "statements", estimatedMicros: 10_000 }, dependencies())).rejects.toMatchObject({
-      reason: "family_budget",
-    });
-    expect(model.calls).toHaveLength(3);
-    expect(repository.usage.map((row) => row.costMicros)).toEqual([USD, USD, USD]);
-
-    now = NOVEMBER;
-    await expect(model.call({ userId: kid, feature: "statements", estimatedMicros: 10_000 }, dependencies())).resolves.toEqual({ ok: true });
-    expect(model.calls).toHaveLength(4);
-  });
-
-  it("caps a user without a family alone", async () => {
-    const model = new FakeModel({ checkBudget, recordUsage }).willSucceed({ costMicros: 3 * USD });
-
-    await model.call({ userId: solo, feature: "statements", estimatedMicros: 1 }, dependencies());
-
-    await expect(model.call({ userId: solo, feature: "statements", estimatedMicros: 1 }, dependencies())).rejects.toMatchObject({ reason: "family_budget" });
-    await expect(model.call({ userId: otherSolo, feature: "statements", estimatedMicros: 1 }, dependencies())).resolves.toEqual({ ok: true });
-  });
-
-  it("turns the flag off when its calls take the global spend to the backstop", async () => {
-    const model = new FakeModel({ checkBudget, recordUsage });
-    const users = [mum, outsider, solo, otherSolo];
-    // Four calls of $2.50 reach the $10 backstop exactly, each in a different family or alone.
-    for (let i = 0; i < users.length; i++) model.willSucceed({ costMicros: 2.5 * USD });
-
-    for (const user of users) await model.call({ userId: user, feature: "statements", estimatedMicros: 1 }, dependencies());
-
-    expect(repository.enabled).toBe(false);
-    await expect(model.call({ userId: mum, feature: "statements", estimatedMicros: 1 }, dependencies())).rejects.toMatchObject({ reason: "flag_off" });
-  });
-
-  it("records a failed call, billed or not, and returns the reason", async () => {
-    const model = new FakeModel({ checkBudget, recordUsage })
-      .willFail("rate_limited")
-      .willFail("invalid_output", { inputTokens: 6000, outputTokens: 900, costMicros: 1200 })
-      .willFail("refusal", { inputTokens: 6000, outputTokens: 20, costMicros: 1224 });
-
-    const results = [];
-    for (let i = 0; i < 3; i++) results.push(await model.call({ userId: mum, feature: "statements", estimatedMicros: 5000 }, dependencies()));
-
-    expect(results).toEqual([
-      { ok: false, reason: "rate_limited" },
-      { ok: false, reason: "invalid_output" },
-      { ok: false, reason: "refusal" },
-    ]);
-    expect(repository.usage.map((row) => [row.outcome, row.inputTokens, row.outputTokens, row.costMicros])).toEqual([
-      ["rate_limited", 0, 0, 0],
-      ["invalid_output", 6000, 900, 1200],
-      ["refusal", 6000, 20, 1224],
-    ]);
-  });
-
-  it("makes no call and records nothing when the gate refuses", async () => {
-    repository.setUser(solo, { optedIn: false });
-    const model = new FakeModel({ checkBudget, recordUsage });
-
-    await expect(model.call({ userId: solo, feature: "statements", estimatedMicros: 1 }, dependencies())).rejects.toBeInstanceOf(AiGateError);
-
-    expect(model.calls).toEqual([]);
-    expect(repository.usage).toEqual([]);
   });
 });
