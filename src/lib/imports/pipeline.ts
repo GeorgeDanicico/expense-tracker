@@ -176,7 +176,7 @@ async function readWithModel(
   }
 
   if (result.status === "refused") {
-    log({ mode: "read", outcome: "refused" });
+    log({ mode: "read", outcome: "refused", reason: result.reason });
     throw new ReaderUnavailableError(
       "unrecognised_layout",
       `This statement's layout isn't supported yet, and the AI reader can't be used right now. ${result.message}`,
@@ -270,7 +270,7 @@ async function chooseCategories(
       } else {
         warnings.push(result.message);
       }
-      log({ mode: "categorise", outcome: result.status });
+      log({ mode: "categorise", outcome: result.status, ...(result.status === "unavailable" ? { reason: result.reason } : {}) });
     } catch {
       log({ mode: "categorise", outcome: "error" });
       warnings.push("Categories couldn't be suggested this time, so the payments are left as Other.");

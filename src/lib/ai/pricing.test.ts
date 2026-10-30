@@ -13,6 +13,28 @@ describe("PRICING", () => {
       standardInputTokens: 272_000,
     });
   });
+
+  it("holds every OpenAI model at its standard prices of 30 October 2026, exact in micros", () => {
+    const perMillion = Object.fromEntries(
+      Object.entries(PRICING.openai).map(([model, price]) => [
+        model,
+        [price.inputPerMillionMicros, price.cachedInputPerMillionMicros, price.outputPerMillionMicros, price.standardInputTokens],
+      ]),
+    );
+    expect(perMillion).toEqual({
+      "gpt-6.1-terra": [1_000_000, 50_000, 5_000_000, 272_000],
+      "gpt-6-sol": [2_000_000, 200_000, 10_000_000, 272_000],
+      "gpt-6-luna": [100_000, 10_000, 500_000, 272_000],
+      "gpt-5.6-sol": [4_000_000, 400_000, 20_000_000, 272_000],
+      "gpt-5.6-terra": [2_000_000, 200_000, 12_000_000, 272_000],
+      "gpt-5.6-luna": [200_000, 20_000, 1_200_000, 272_000],
+    });
+  });
+
+  it("leaves out the models that reject reasoning effort none", () => {
+    expect(findPrice("openai", "gpt-6-astra")).toBeNull();
+    expect(findPrice("openai", "gpt-6.1-sol")).toBeNull();
+  });
 });
 
 describe("findPrice", () => {
