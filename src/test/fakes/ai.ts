@@ -1,7 +1,7 @@
-// Types only: `@/lib/ai/gate` imports `@/lib/repositories`, which route tests replace with
-// `./repositories`, which imports this file. A value import here would be a cycle that never loads.
-import type { AiGateDependencies, BudgetCheck, CheckBudgetInput, RecordUsageInput, UsageRecorded } from "@/lib/ai/gate";
-import type { AiAccess, AiGateRepository, AiOutcome, AiUsageRecord, BudgetRecipients } from "@/lib/ai/repository";
+// Types only, and nothing from `@/lib/ai/gate`: it imports `@/lib/repositories`, which route tests
+// replace with `./repositories`, which imports this file. A value import of the gate here would be a
+// cycle that never loads. The fake model moved to `src/lib/ai/providers/fake.ts` (I15).
+import type { AiAccess, AiGateRepository, AiUsageRecord, BudgetRecipients } from "@/lib/ai/repository";
 import type { NewNotification } from "@/lib/notifications/worker-store";
 
 /** What the fake knows about a user. */
@@ -120,78 +120,5 @@ export class FakeAiGateRepository implements AiGateRepository {
     if (this.notifications.some((queued) => queued.dedupeKey === notification.dedupeKey)) return "duplicate" as const;
     this.notifications.push({ ...notification, createdAt: this.now() });
     return "queued" as const;
-  }
-}
-
-/** The tokens and cost a scripted fake call reports. */
-export type FakeModelUsage = {
-  inputTokens?: number;
-  outputTokens?: number;
-  cachedInputTokens?: number;
-  /** Millionths of a dollar. */
-  costMicros: number;
-};
-
-type FakeModelStep = { outcome: AiOutcome; usage: FakeModelUsage | null };
-
-/** The two gate functions a fake model runs around its "call": `checkBudget` and `recordUsage` from `@/lib/ai/gate`. */
-export type FakeModelGate = {
-  checkBudget(input: CheckBudgetInput, dependencies: AiGateDependencies): Promise<BudgetCheck>;
-  recordUsage(input: RecordUsageInput, dependencies: AiGateDependencies): Promise<UsageRecorded>;
-};
-
-export type FakeModelResult = { ok: true } | { ok: false; reason: Exclude<AiOutcome, "ok"> };
-
-/**
- * A model that makes no call: it takes the next scripted result and reports its usage, so tests can
- * run the whole gate sequence the real entry point will run (`checkBudget`, the call, `recordUsage`)
- * with chosen costs and failures. With nothing scripted a call succeeds at no cost. `calls` lists the
- * calls that got past the gate. It is given the gate's functions rather than importing them, so this
- * file stays free of the production repositories (see the note at the top).
- */
-export class FakeModel {
-  readonly provider = "fake";
-  readonly model = "fake-model";
-  readonly calls: { userId: string; feature: string }[] = [];
-  private script: FakeModelStep[] = [];
-
-  constructor(private readonly gate: FakeModelGate) {}
-
-  /** The next call succeeds and costs this much. */
-  willSucceed(usage: FakeModelUsage) {
-    this.script.push({ outcome: "ok", usage });
-    return this;
-  }
-
-  /** The next call fails with `reason`; the provider billed `usage` for it, or nothing (null). */
-  willFail(reason: Exclude<AiOutcome, "ok">, usage: FakeModelUsage | null = null) {
-    this.script.push({ outcome: reason, usage });
-    return this;
-  }
-
-  /**
-   * Checks the budget (throwing the gate's `AiGateError` when refused, before any call), "calls" the
-   * model, and records the usage whatever the outcome.
-   */
-  async call(input: CheckBudgetInput, dependencies: AiGateDependencies): Promise<FakeModelResult> {
-    await this.gate.checkBudget(input, dependencies);
-    this.calls.push({ userId: input.userId, feature: input.feature });
-
-    const step = this.script.shift() ?? { outcome: "ok" as const, usage: null };
-    await this.gate.recordUsage(
-      {
-        userId: input.userId,
-        feature: input.feature,
-        provider: this.provider,
-        model: this.model,
-        outcome: step.outcome,
-        inputTokens: step.usage?.inputTokens,
-        outputTokens: step.usage?.outputTokens,
-        cachedInputTokens: step.usage?.cachedInputTokens,
-        costMicros: step.usage?.costMicros ?? 0,
-      },
-      dependencies,
-    );
-    return step.outcome === "ok" ? { ok: true } : { ok: false, reason: step.outcome };
   }
 }
