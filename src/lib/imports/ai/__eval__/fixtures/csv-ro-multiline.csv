@@ -1,0 +1,24 @@
+Extras de cont lunar;Moneda: RON;;;
+Titular cont;Ion Exemplu;;;
+IBAN;RO00FAKE0000000000000001;;;
+Perioada;01.09.2026 - 30.09.2026;;;
+Data;Detalii tranzacție;Debit;Credit;Sold
+02.09.2026;"Plata POS Lidl Cluj
+Card 4411 Terminal 0042";45,20;;4.454,80
+03.09.2026;"Plata POS Cafeneaua Exemplu
+Cluj-Napoca RO";18,50;;4.436,30
+05.09.2026;"Incasare salariu Exemplu SRL
+Referinta 20260905";;5.200,00;9.636,30
+07.09.2026;"Plata factura Enel Energie
+Contract 1234567
+Factura septembrie";312,75;;9.323,55
+09.09.2026;"Plata POS Rompetrol
+Statia 0412 Cluj";255,00;;9.068,55
+12.09.2026;Plata chirie apartament;1.500,00;;7.568,55
+13.09.2026;Transfer catre Maria Test;120,00;;7.448,55
+15.09.2026;Rambursare Lidl Cluj;;45,20;7.493,75
+18.09.2026;Plata POS Farmacia Catena 331;76,40;;7.417,35
+22.09.2026;Comision administrare cont;15,00;;7.402,35
+26.09.2026;"Plata POS Kaufland Cluj
+Card 4411 Terminal 0107";289,90;;7.112,45
+Total rulaje;;2.632,75;5.245,20;

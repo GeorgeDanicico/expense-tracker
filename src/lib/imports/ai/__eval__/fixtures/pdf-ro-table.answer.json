@@ -1,0 +1,34 @@
+{
+  "r": [
+    {"l":[8],"d":"01.09.2026","a":"-45,20","c":"RON","t":"d","m":"Lidl Cluj"},
+    {"l":[9],"d":"02.09.2026","a":"-1.500,00","c":"RON","t":"d","m":"Chirie"},
+    {"l":[10,11],"d":"05.09.2026","a":"+5.200,00","c":"RON","t":"c","m":"Salariu"},
+    {"l":[12],"d":"07.09.2026","a":"-312,75","c":"RON","t":"d","m":"Enel Energie"},
+    {"l":[13],"d":"09.09.2026","a":"-255,00","c":"RON","t":"d","m":"Rompetrol"},
+    {"l":[14],"d":"10.09.2026","a":"-28,00","c":"RON","t":"d","m":"Bistro Test"},
+    {"l":[15],"d":"13.09.2026","a":"-76,40","c":"RON","t":"d","m":"Dr Max"},
+    {"l":[16],"d":"15.09.2026","a":"+45,20","c":"RON","t":"c","m":"Lidl Cluj"},
+    {"l":[17],"d":"17.09.2026","a":"-2.480,00","c":"RON","t":"d","m":"Wizz Air"},
+    {"l":[18],"d":"20.09.2026","a":"-199,00","c":"RON","t":"d","m":"Decathlon"},
+    {"l":[19],"d":"23.09.2026","a":"-35,00","c":"RON","t":"d","m":"Parcare Centru"},
+    {"l":[20],"d":"27.09.2026","a":"-15,00","c":"RON","t":"d","m":"Comision Cont"}
+  ],
+  "k": [
+    {"m":"Lidl Cluj","c":"groceries","s":null},
+    {"m":"Chirie","c":"housing","s":null},
+    {"m":"Salariu","c":"other","s":null},
+    {"m":"Enel Energie","c":"utilities","s":null},
+    {"m":"Rompetrol","c":"car","s":"car_fuel"},
+    {"m":"Bistro Test","c":"entertainment","s":null},
+    {"m":"Dr Max","c":"health","s":null},
+    {"m":"Wizz Air","c":"travel","s":null},
+    {"m":"Decathlon","c":"shopping","s":null},
+    {"m":"Parcare Centru","c":"car","s":"car_maintenance"},
+    {"m":"Comision Cont","c":"other","s":null}
+  ],
+  "s": {
+    "c": "RON",
+    "t": "4.946,35",
+    "l": 22
+  }
+}

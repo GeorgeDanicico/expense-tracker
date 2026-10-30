@@ -1,0 +1,17 @@
+{
+  "description": "English headers a parser recognises, a preamble with a fake holder and IBAN, the currency stated only above the table, a printed total of money out. The parser claims it and then refuses it.",
+  "currency": "RON",
+  "parser": "refused",
+  "knownGap": null,
+  "rows": [
+    {"date":"2026-09-02","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-09-04","amount":"210.30","currency":"RON","direction":"debit","merchant":"Engie Gaz","category":"utilities","subtype":null},
+    {"date":"2026-09-05","amount":"56.00","currency":"RON","direction":"debit","merchant":"Cinema City","category":"entertainment","subtype":null},
+    {"date":"2026-09-07","amount":"3200.00","currency":"RON","direction":"credit","merchant":"Salary Exemplu","category":"other","subtype":null},
+    {"date":"2026-09-11","amount":"89.00","currency":"RON","direction":"debit","merchant":"CFR Calatori","category":"transport","subtype":null},
+    {"date":"2026-09-13","amount":"330.00","currency":"RON","direction":"debit","merchant":"Autodoc","category":"car","subtype":"car_repairs"},
+    {"date":"2026-09-17","amount":"40.00","currency":"RON","direction":"debit","merchant":"Spalatorie Aqua","category":"car","subtype":"car_maintenance"},
+    {"date":"2026-09-19","amount":"118.40","currency":"RON","direction":"debit","merchant":"Mega Image","category":"groceries","subtype":null},
+    {"date":"2026-09-24","amount":"95.00","currency":"RON","direction":"debit","merchant":"World Class","category":"health","subtype":null}
+  ]
+}

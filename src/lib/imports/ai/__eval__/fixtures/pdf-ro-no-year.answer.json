@@ -1,0 +1,27 @@
+{
+  "r": [
+    {"l":[5],"d":"02.10","a":"-45,20","c":null,"t":"d","m":"Lidl Cluj"},
+    {"l":[6],"d":"05.10","a":"-312,75","c":null,"t":"d","m":"Enel Energie"},
+    {"l":[7],"d":"07.10","a":"+5.200,00","c":null,"t":"c","m":"Salariu Exemplu"},
+    {"l":[8],"d":"09.10","a":"-255,00","c":null,"t":"d","m":"Rompetrol"},
+    {"l":[9],"d":"12.10","a":"-28,00","c":null,"t":"d","m":"Bistro Test"},
+    {"l":[10],"d":"15.10","a":"-76,40","c":null,"t":"d","m":"Dr Max"},
+    {"l":[11],"d":"19.10","a":"-59,00","c":null,"t":"d","m":"Digi"},
+    {"l":[12],"d":"28.10","a":"-199,00","c":null,"t":"d","m":"Decathlon"}
+  ],
+  "k": [
+    {"m":"Lidl Cluj","c":"groceries","s":null},
+    {"m":"Enel Energie","c":"utilities","s":null},
+    {"m":"Salariu Exemplu","c":"other","s":null},
+    {"m":"Rompetrol","c":"car","s":"car_fuel"},
+    {"m":"Bistro Test","c":"entertainment","s":null},
+    {"m":"Dr Max","c":"health","s":null},
+    {"m":"Digi","c":"utilities","s":null},
+    {"m":"Decathlon","c":"shopping","s":null}
+  ],
+  "s": {
+    "c": "RON",
+    "t": null,
+    "l": null
+  }
+}

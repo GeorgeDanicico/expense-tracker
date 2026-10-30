@@ -1,0 +1,17 @@
+{
+  "description": "Romanian headers, a currency column per row, signed amounts, dot thousands, rows in EUR and USD in a RON statement, a refund in EUR.",
+  "currency": "RON",
+  "parser": "none",
+  "knownGap": null,
+  "rows": [
+    {"date":"2026-09-01","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-09-03","amount":"540.00","currency":"EUR","direction":"debit","merchant":"Booking.com","category":"travel","subtype":null},
+    {"date":"2026-09-04","amount":"19.99","currency":"USD","direction":"debit","merchant":"Udemy","category":"education","subtype":null},
+    {"date":"2026-09-06","amount":"5200.00","currency":"RON","direction":"credit","merchant":"Salariu Exemplu","category":"other","subtype":null},
+    {"date":"2026-09-10","amount":"1432.10","currency":"RON","direction":"debit","merchant":"Wizz Air","category":"travel","subtype":null},
+    {"date":"2026-09-14","amount":"87.45","currency":"EUR","direction":"debit","merchant":"Amazon EU Exemplu","category":"shopping","subtype":null},
+    {"date":"2026-09-19","amount":"120.00","currency":"EUR","direction":"credit","merchant":"Booking.com","category":"travel","subtype":null},
+    {"date":"2026-09-21","amount":"3.50","currency":"RON","direction":"debit","merchant":"Comision Conversie Valutara","category":"other","subtype":null},
+    {"date":"2026-09-28","amount":"59.00","currency":"RON","direction":"debit","merchant":"Digi","category":"utilities","subtype":null}
+  ]
+}

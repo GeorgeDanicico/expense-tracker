@@ -1,0 +1,19 @@
+{
+  "description": "Romanian headers, comma-separated, descriptions not quoted, separate debit and credit columns with dot decimals; one description ends in a store number that runs into the amount (Mega Image 118,118.40).",
+  "currency": "RON",
+  "parser": "none",
+  "knownGap": {
+    "reason": "amount_not_found",
+    "note": "verify.ts reads '118,118.40' as one number with a thousands group, so the amount 118.40 isn't found on its line and the statement is refused. The model's reading is right. Not fixed by the eval."
+  },
+  "rows": [
+    {"date":"2026-09-02","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-09-03","amount":"118.40","currency":"RON","direction":"debit","merchant":"Mega Image","category":"groceries","subtype":null},
+    {"date":"2026-09-05","amount":"5200.00","currency":"RON","direction":"credit","merchant":"Salariu Exemplu","category":"other","subtype":null},
+    {"date":"2026-09-08","amount":"255.00","currency":"RON","direction":"debit","merchant":"Rompetrol","category":"car","subtype":"car_fuel"},
+    {"date":"2026-09-12","amount":"76.40","currency":"RON","direction":"debit","merchant":"Farmacia Catena","category":"health","subtype":null},
+    {"date":"2026-09-15","amount":"59.00","currency":"RON","direction":"debit","merchant":"Digi","category":"utilities","subtype":null},
+    {"date":"2026-09-20","amount":"33.40","currency":"RON","direction":"debit","merchant":"Bolt","category":"transport","subtype":null},
+    {"date":"2026-09-25","amount":"39.99","currency":"RON","direction":"debit","merchant":"Netflix","category":"entertainment","subtype":null}
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "description": "Romanian headers and descriptions with diacritics, CRLF, descriptions in quoted cells over two or three lines, a refund, a salary, and printed totals of debit and credit.",
+  "currency": "RON",
+  "parser": "none",
+  "knownGap": null,
+  "rows": [
+    {"date":"2026-09-02","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-09-03","amount":"18.50","currency":"RON","direction":"debit","merchant":"Cafeneaua Exemplu","category":"entertainment","subtype":null},
+    {"date":"2026-09-05","amount":"5200.00","currency":"RON","direction":"credit","merchant":"Salariu Exemplu","category":"other","subtype":null},
+    {"date":"2026-09-07","amount":"312.75","currency":"RON","direction":"debit","merchant":"Enel Energie","category":"utilities","subtype":null},
+    {"date":"2026-09-09","amount":"255.00","currency":"RON","direction":"debit","merchant":"Rompetrol","category":"car","subtype":"car_fuel"},
+    {"date":"2026-09-12","amount":"1500.00","currency":"RON","direction":"debit","merchant":"Chirie Apartament","category":"housing","subtype":null},
+    {"date":"2026-09-13","amount":"120.00","currency":"RON","direction":"debit","merchant":"Maria Test","category":"other","subtype":null},
+    {"date":"2026-09-15","amount":"45.20","currency":"RON","direction":"credit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-09-18","amount":"76.40","currency":"RON","direction":"debit","merchant":"Farmacia Catena","category":"health","subtype":null},
+    {"date":"2026-09-22","amount":"15.00","currency":"RON","direction":"debit","merchant":"Comision Administrare","category":"other","subtype":null},
+    {"date":"2026-09-26","amount":"289.90","currency":"RON","direction":"debit","merchant":"Kaufland Cluj","category":"groceries","subtype":null}
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "r": [
+    {"l":[3],"d":"2026-09-02","a":"45.20","c":null,"t":"d","m":"Lidl Cluj"},
+    {"l":[4],"d":"2026-09-03","a":"118.40","c":null,"t":"d","m":"Mega Image"},
+    {"l":[5],"d":"2026-09-05","a":"5200.00","c":null,"t":"c","m":"Salariu Exemplu"},
+    {"l":[6],"d":"2026-09-08","a":"255.00","c":null,"t":"d","m":"Rompetrol"},
+    {"l":[7],"d":"2026-09-12","a":"76.40","c":null,"t":"d","m":"Farmacia Catena"},
+    {"l":[8],"d":"2026-09-15","a":"59.00","c":null,"t":"d","m":"Digi"},
+    {"l":[9],"d":"2026-09-20","a":"33.40","c":null,"t":"d","m":"Bolt"},
+    {"l":[10],"d":"2026-09-25","a":"39.99","c":null,"t":"d","m":"Netflix"}
+  ],
+  "k": [
+    {"m":"Lidl Cluj","c":"groceries","s":null},
+    {"m":"Mega Image","c":"groceries","s":null},
+    {"m":"Salariu Exemplu","c":"other","s":null},
+    {"m":"Rompetrol","c":"car","s":"car_fuel"},
+    {"m":"Farmacia Catena","c":"health","s":null},
+    {"m":"Digi","c":"utilities","s":null},
+    {"m":"Bolt","c":"transport","s":null},
+    {"m":"Netflix","c":"entertainment","s":null}
+  ],
+  "s": {
+    "c": "RON",
+    "t": null,
+    "l": null
+  }
+}

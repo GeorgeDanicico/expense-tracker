@@ -1,0 +1,22 @@
+{
+  "description": "English headers, ISO dates, dot decimals, one signed amount column, a currency column, a refund and a salary.",
+  "currency": "RON",
+  "parser": "ok",
+  "knownGap": null,
+  "rows": [
+    {"date":"2026-09-01","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-09-02","amount":"12.50","currency":"RON","direction":"debit","merchant":"Starbucks","category":"entertainment","subtype":null},
+    {"date":"2026-09-03","amount":"189.99","currency":"RON","direction":"debit","merchant":"eMAG","category":"shopping","subtype":null},
+    {"date":"2026-09-04","amount":"250.00","currency":"RON","direction":"debit","merchant":"OMV 1642 Satu Mare","category":"car","subtype":"car_fuel"},
+    {"date":"2026-09-05","amount":"4500.00","currency":"RON","direction":"credit","merchant":"Salariu Exemplu","category":"other","subtype":null},
+    {"date":"2026-09-08","amount":"89.90","currency":"RON","direction":"debit","merchant":"Farmacia Catena","category":"health","subtype":null},
+    {"date":"2026-09-09","amount":"39.99","currency":"RON","direction":"debit","merchant":"Netflix","category":"entertainment","subtype":null},
+    {"date":"2026-09-10","amount":"310.45","currency":"RON","direction":"debit","merchant":"Enel Energie","category":"utilities","subtype":null},
+    {"date":"2026-09-12","amount":"45.20","currency":"RON","direction":"credit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-09-15","amount":"75.00","currency":"RON","direction":"debit","merchant":"Bolt","category":"transport","subtype":null},
+    {"date":"2026-09-20","amount":"540.00","currency":"RON","direction":"debit","merchant":"Booking.com","category":"travel","subtype":null},
+    {"date":"2026-09-22","amount":"15.00","currency":"RON","direction":"debit","merchant":"Comision Administrare","category":"other","subtype":null},
+    {"date":"2026-09-25","amount":"300.00","currency":"RON","direction":"debit","merchant":"Retragere Numerar ATM","category":"other","subtype":null},
+    {"date":"2026-09-28","amount":"64.30","currency":"RON","direction":"debit","merchant":"Vulcanizare Fast Tyres","category":"car","subtype":"car_maintenance"}
+  ]
+}

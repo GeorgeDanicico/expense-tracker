@@ -1,0 +1,133 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Filter /Standard /V 1 /R 2 /P -4 /O <abababababababababababababababababababababababababababababababab> /U <cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd> >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 1995 >>
+stream
+BT /F1 10 Tf 50 792 Td (Example Bank - Account statement) Tj ET
+BT /F1 10 Tf 50 776 Td (Account holder: Ion Exemplu) Tj ET
+BT /F1 10 Tf 50 760 Td (IBAN RO00FAKE0000000000000003) Tj ET
+BT /F1 10 Tf 50 744 Td (Statement period 2026-09-01 to 2026-09-30) Tj ET
+BT /F1 10 Tf 50 728 Td (Currency: RON) Tj ET
+BT /F1 10 Tf 50 712 Td (Date) Tj ET
+BT /F1 10 Tf 185 712 Td (Description) Tj ET
+BT /F1 10 Tf 320 712 Td (Amount) Tj ET
+BT /F1 10 Tf 455 712 Td (Balance) Tj ET
+BT /F1 10 Tf 50 696 Td (Opening balance) Tj ET
+BT /F1 10 Tf 185 696 Td (5,000.00) Tj ET
+BT /F1 10 Tf 50 680 Td (2026-09-01) Tj ET
+BT /F1 10 Tf 185 680 Td (POS LIDL CLUJ) Tj ET
+BT /F1 10 Tf 320 680 Td (-45.20) Tj ET
+BT /F1 10 Tf 455 680 Td (4,954.80) Tj ET
+BT /F1 10 Tf 50 664 Td (2026-09-02) Tj ET
+BT /F1 10 Tf 185 664 Td (STARBUCKS CLUJ) Tj ET
+BT /F1 10 Tf 320 664 Td (-12.50) Tj ET
+BT /F1 10 Tf 455 664 Td (4,942.30) Tj ET
+BT /F1 10 Tf 50 648 Td (2026-09-03) Tj ET
+BT /F1 10 Tf 185 648 Td (CHIRIE APARTAMENT) Tj ET
+BT /F1 10 Tf 320 648 Td (-1,500.00) Tj ET
+BT /F1 10 Tf 455 648 Td (3,442.30) Tj ET
+BT /F1 10 Tf 50 632 Td (2026-09-05) Tj ET
+BT /F1 10 Tf 185 632 Td (SALARY EXEMPLU SRL) Tj ET
+BT /F1 10 Tf 320 632 Td (+4,500.00) Tj ET
+BT /F1 10 Tf 455 632 Td (7,942.30) Tj ET
+BT /F1 10 Tf 50 616 Td (2026-09-06) Tj ET
+BT /F1 10 Tf 185 616 Td (DIGI ROMANIA SA) Tj ET
+BT /F1 10 Tf 320 616 Td (-59.00) Tj ET
+BT /F1 10 Tf 455 616 Td (7,883.30) Tj ET
+BT /F1 10 Tf 50 600 Td (2026-09-08) Tj ET
+BT /F1 10 Tf 185 600 Td (TRANSFER CATRE) Tj ET
+BT /F1 10 Tf 320 600 Td (-120.00) Tj ET
+BT /F1 10 Tf 455 600 Td (7,763.30) Tj ET
+BT /F1 10 Tf 50 584 Td (MARIA TEST) Tj ET
+BT /F1 10 Tf 50 568 Td (2026-09-09) Tj ET
+BT /F1 10 Tf 185 568 Td (EMAG.RO 8812) Tj ET
+BT /F1 10 Tf 320 568 Td (-319.90) Tj ET
+BT /F1 10 Tf 455 568 Td (7,443.40) Tj ET
+BT /F1 10 Tf 50 552 Td (2026-09-11) Tj ET
+BT /F1 10 Tf 185 552 Td (UBER *TRIP) Tj ET
+BT /F1 10 Tf 320 552 Td (-33.40) Tj ET
+BT /F1 10 Tf 455 552 Td (7,410.00) Tj ET
+BT /F1 10 Tf 50 536 Td (Page 1 of 2) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 1825 >>
+stream
+BT /F1 10 Tf 50 792 Td (Date) Tj ET
+BT /F1 10 Tf 185 792 Td (Description) Tj ET
+BT /F1 10 Tf 320 792 Td (Amount) Tj ET
+BT /F1 10 Tf 455 792 Td (Balance) Tj ET
+BT /F1 10 Tf 50 776 Td (2026-09-12) Tj ET
+BT /F1 10 Tf 185 776 Td (ZARA RO 0123) Tj ET
+BT /F1 10 Tf 320 776 Td (-1,234.56) Tj ET
+BT /F1 10 Tf 455 776 Td (6,175.44) Tj ET
+BT /F1 10 Tf 50 760 Td (2026-09-14) Tj ET
+BT /F1 10 Tf 185 760 Td (REFUND FARMACIA) Tj ET
+BT /F1 10 Tf 320 760 Td (+89.00) Tj ET
+BT /F1 10 Tf 455 760 Td (6,264.44) Tj ET
+BT /F1 10 Tf 50 744 Td (CATENA 331) Tj ET
+BT /F1 10 Tf 50 728 Td (2026-09-16) Tj ET
+BT /F1 10 Tf 185 728 Td (ROMPETROL 0412) Tj ET
+BT /F1 10 Tf 320 728 Td (-245.00) Tj ET
+BT /F1 10 Tf 455 728 Td (6,019.44) Tj ET
+BT /F1 10 Tf 50 712 Td (2026-09-18) Tj ET
+BT /F1 10 Tf 185 712 Td (NETFLIX.COM) Tj ET
+BT /F1 10 Tf 320 712 Td (-39.99) Tj ET
+BT /F1 10 Tf 455 712 Td (5,979.45) Tj ET
+BT /F1 10 Tf 50 696 Td (2026-09-21) Tj ET
+BT /F1 10 Tf 185 696 Td (KAUFLAND ARENA 2210) Tj ET
+BT /F1 10 Tf 320 696 Td (-86.30) Tj ET
+BT /F1 10 Tf 455 696 Td (5,893.15) Tj ET
+BT /F1 10 Tf 50 680 Td (2026-09-24) Tj ET
+BT /F1 10 Tf 185 680 Td (COMISION ADMINISTRARE) Tj ET
+BT /F1 10 Tf 320 680 Td (-15.00) Tj ET
+BT /F1 10 Tf 455 680 Td (5,878.15) Tj ET
+BT /F1 10 Tf 50 664 Td (2026-09-26) Tj ET
+BT /F1 10 Tf 185 664 Td (CLINICA EXEMPLU) Tj ET
+BT /F1 10 Tf 320 664 Td (-180.00) Tj ET
+BT /F1 10 Tf 455 664 Td (5,698.15) Tj ET
+BT /F1 10 Tf 50 648 Td (2026-09-29) Tj ET
+BT /F1 10 Tf 185 648 Td (VULCANIZARE FAST) Tj ET
+BT /F1 10 Tf 320 648 Td (-64.30) Tj ET
+BT /F1 10 Tf 455 648 Td (5,633.85) Tj ET
+BT /F1 10 Tf 50 632 Td (TYRES) Tj ET
+BT /F1 10 Tf 50 616 Td (Closing balance) Tj ET
+BT /F1 10 Tf 185 616 Td (5,633.85) Tj ET
+BT /F1 10 Tf 50 600 Td (Total money out) Tj ET
+BT /F1 10 Tf 185 600 Td (3,955.15) Tj ET
+BT /F1 10 Tf 50 584 Td (Page 2 of 2) Tj ET
+endstream
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000218 00000 n 
+0000000413 00000 n 
+0000000539 00000 n 
+0000002585 00000 n 
+0000002711 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R >>
+startxref
+4587
+%%EOF

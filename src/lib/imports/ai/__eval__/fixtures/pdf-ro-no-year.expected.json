@@ -1,0 +1,19 @@
+{
+  "description": "Romanian PDF whose rows print the date as day and month only (12.10); the period with its year is in the heading. Comma decimals.",
+  "currency": "RON",
+  "parser": "none",
+  "knownGap": {
+    "reason": "date_unreadable",
+    "note": "parseStatementDate reads only dates with a year, so verification refuses a statement that prints dates without one (found while building I17). Not fixed by the eval."
+  },
+  "rows": [
+    {"date":"2026-10-02","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-10-05","amount":"312.75","currency":"RON","direction":"debit","merchant":"Enel Energie","category":"utilities","subtype":null},
+    {"date":"2026-10-07","amount":"5200.00","currency":"RON","direction":"credit","merchant":"Salariu Exemplu","category":"other","subtype":null},
+    {"date":"2026-10-09","amount":"255.00","currency":"RON","direction":"debit","merchant":"Rompetrol","category":"car","subtype":"car_fuel"},
+    {"date":"2026-10-12","amount":"28.00","currency":"RON","direction":"debit","merchant":"Bistro Test","category":"entertainment","subtype":null},
+    {"date":"2026-10-15","amount":"76.40","currency":"RON","direction":"debit","merchant":"Dr Max","category":"health","subtype":null},
+    {"date":"2026-10-19","amount":"59.00","currency":"RON","direction":"debit","merchant":"Digi","category":"utilities","subtype":null},
+    {"date":"2026-10-28","amount":"199.00","currency":"RON","direction":"debit","merchant":"Decathlon","category":"shopping","subtype":null}
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "r": [
+    {"l":[7,8],"d":"03/09/2026","a":"45.20","c":null,"t":"d","m":"Lidl Cluj Napoca"},
+    {"l":[10,11],"d":"05/09/2026","a":"32.50","c":"EUR","t":"d","m":"Airbnb Exemplu"},
+    {"l":[13,14],"d":"07/09/2026","a":"18.90","c":null,"t":"d","m":"Cafeneaua Din Piata"},
+    {"l":[16,17],"d":"09/09/2026","a":"500.00","c":null,"t":"c","m":"Payment Received"},
+    {"l":[19,20],"d":"12/09/2026","a":"210.00","c":null,"t":"d","m":"Mol"},
+    {"l":[24,25],"d":"14/09/2026","a":"18.00","c":null,"t":"c","m":"Cafeneaua Din Piata"},
+    {"l":[27,28],"d":"18/09/2026","a":"14.99","c":null,"t":"d","m":"Spotify"},
+    {"l":[30,31],"d":"21/09/2026","a":"64.10","c":"EUR","t":"d","m":"Steam"},
+    {"l":[33,34],"d":"25/09/2026","a":"129.00","c":null,"t":"d","m":"Zara"}
+  ],
+  "k": [
+    {"m":"Lidl Cluj Napoca","c":"groceries","s":null},
+    {"m":"Airbnb Exemplu","c":"travel","s":null},
+    {"m":"Cafeneaua Din Piata","c":"entertainment","s":null},
+    {"m":"Payment Received","c":"other","s":null},
+    {"m":"Mol","c":"car","s":"car_fuel"},
+    {"m":"Spotify","c":"entertainment","s":null},
+    {"m":"Steam","c":"entertainment","s":null},
+    {"m":"Zara","c":"shopping","s":null}
+  ],
+  "s": {
+    "c": "RON",
+    "t": null,
+    "l": null
+  }
+}
