@@ -1,4 +1,4 @@
-import type { StructuredInput, StructuredOutcome } from "@/lib/ai";
+import type { AiRefusalReason, StructuredInput, StructuredOutcome } from "@/lib/ai";
 import type { Classification, MerchantHistory } from "@/lib/imports/ai/categories";
 import type { NumberedStatement } from "@/lib/imports/ai/numbered-text";
 import { categoriseOutputCap, readerOutputCap } from "@/lib/imports/ai/output-cap";
@@ -36,7 +36,7 @@ export type CategoriseResult =
   /** One classification per name, in order. */
   | { status: "ok"; classifications: Classification[] }
   /** Nothing usable came back; `message` is for the review screen. The rows stay Other. */
-  | { status: "unavailable"; message: string };
+  | { status: "unavailable"; message: string; reason: string };
 
 /**
  * Mode "categorise": the distinct merchants nobody knew, one per line, and the model answers with
@@ -56,13 +56,14 @@ export async function categoriseMerchants(ai: StatementAi, names: readonly strin
   if (!outcome.ok) {
     return {
       status: "unavailable",
+      reason: outcome.reason,
       message: outcome.called
         ? "Categories couldn't be suggested this time, so the payments are left as Other."
         : `Categories weren't suggested, so the payments are left as Other. ${outcome.message}`,
     };
   }
   if (outcome.value.k.length !== names.length) {
-    return { status: "unavailable", message: "Categories couldn't be suggested this time, so the payments are left as Other." };
+    return { status: "unavailable", reason: "count_mismatch", message: "Categories couldn't be suggested this time, so the payments are left as Other." };
   }
   return {
     status: "ok",
@@ -73,7 +74,7 @@ export async function categoriseMerchants(ai: StatementAi, names: readonly strin
 export type ReadResult =
   | { status: "ok"; answer: ReaderAnswer }
   /** The gate or the configuration refused before any call; `message` says why, in words for the user. */
-  | { status: "refused"; message: string }
+  | { status: "refused"; reason: AiRefusalReason; message: string }
   /** The model was called and gave nothing usable: cut off at the cap, declined, malformed, or the provider failed. */
   | { status: "failed"; reason: "max_tokens" | "refusal" | "invalid_output" | "timeout" | "rate_limited" | "provider_error" };
 
@@ -88,6 +89,6 @@ export async function readStatement(ai: StatementAi, statement: NumberedStatemen
     effort: "none",
   });
   if (outcome.ok) return { status: "ok", answer: outcome.value };
-  if (!outcome.called) return { status: "refused", message: outcome.message };
+  if (!outcome.called) return { status: "refused", reason: outcome.reason, message: outcome.message };
   return { status: "failed", reason: outcome.reason };
 }

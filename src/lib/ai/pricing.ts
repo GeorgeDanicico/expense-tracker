@@ -23,26 +23,50 @@ export type ModelPrice = {
 
 export type PricingTable = Record<string, Record<string, ModelPrice>>;
 
+/** A row of the table from dollars per million tokens, as the pricing page prints them. */
+function price(usd: { input: number; cachedInput: number; output: number }): ModelPrice {
+  return {
+    inputPerMillionMicros: Math.round(usd.input * 1_000_000),
+    cachedInputPerMillionMicros: Math.round(usd.cachedInput * 1_000_000),
+    outputPerMillionMicros: Math.round(usd.output * 1_000_000),
+    standardInputTokens: 272_000,
+  };
+}
+
 /**
- * Copied from OpenAI's model page (developers.openai.com/api/docs/models/gpt-5.6-luna) and pricing
- * page (developers.openai.com/api/docs/pricing) on 30 October 2026, standard processing tier:
- * $0.20 input, $0.02 cached input, $1.20 output, each per million tokens. Requests over 272K input
- * tokens are billed at higher rates, hence `standardInputTokens`. Reasoning tokens count as output.
+ * Copied from OpenAI's pricing page (developers.openai.com/api/docs/pricing) and each model's page
+ * (developers.openai.com/api/docs/models/<model>) on 30 October 2026, standard processing tier, in
+ * dollars per million tokens:
  *
- * Not modelled: GPT-5.6 bills tokens it writes to its prompt cache at 1.25x the input rate instead
+ *   model           input  cached  output
+ *   gpt-6.1-terra    1.00    0.05    5.00
+ *   gpt-6-sol        2.00    0.20   10.00
+ *   gpt-6-luna       0.10    0.01    0.50
+ *   gpt-5.6-sol      4.00    0.40   20.00
+ *   gpt-5.6-terra    2.00    0.20   12.00
+ *   gpt-5.6-luna     0.20    0.02    1.20
+ *
+ * Requests over 272K input tokens are billed at higher rates, hence `standardInputTokens`.
+ * Reasoning tokens count as output.
+ *
+ * Only models that support Structured Outputs on the Responses API and accept `reasoning.effort:
+ * "none"`, which the statement reader sends, are listed. `gpt-6-astra` and `gpt-6.1-sol` reject
+ * "none" with a 400, so they are left out until a feature asks for more effort.
+ *
+ * Not modelled: these models bill tokens written to the prompt cache at 1.25x the input rate instead
  * of 1x (the usage's `cache_write_tokens`, which the provider interface has no field for). Those
- * tokens are priced here as ordinary input, so a call's recorded cost can be up to $0.05 per million
- * cache-written tokens low, a few hundredths of a cent for a statement. OpenAI's own usage page is
- * the reference when the two differ.
+ * tokens are priced here as ordinary input, so a call's recorded cost can be a quarter of the input
+ * rate low on its cache-written tokens, a few hundredths of a cent for a statement on a Luna model.
+ * OpenAI's own usage page is the reference when the two differ.
  */
 export const PRICING: PricingTable = {
   openai: {
-    "gpt-5.6-luna": {
-      inputPerMillionMicros: 200_000,
-      cachedInputPerMillionMicros: 20_000,
-      outputPerMillionMicros: 1_200_000,
-      standardInputTokens: 272_000,
-    },
+    "gpt-6.1-terra": price({ input: 1, cachedInput: 0.05, output: 5 }),
+    "gpt-6-sol": price({ input: 2, cachedInput: 0.2, output: 10 }),
+    "gpt-6-luna": price({ input: 0.1, cachedInput: 0.01, output: 0.5 }),
+    "gpt-5.6-sol": price({ input: 4, cachedInput: 0.4, output: 20 }),
+    "gpt-5.6-terra": price({ input: 2, cachedInput: 0.2, output: 12 }),
+    "gpt-5.6-luna": price({ input: 0.2, cachedInput: 0.02, output: 1.2 }),
   },
 };
 
