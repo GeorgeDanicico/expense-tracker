@@ -7,7 +7,9 @@ import { describe, expect, it } from "vitest";
 /**
  * A statement is only ever read into memory, parsed and dropped (docs/statement-import-plan.md):
  * never written to disk or to Supabase Storage. This scans the sources of the import code for the
- * ways of doing that. Test files are skipped, because the fixtures test legitimately reads files.
+ * ways of doing that. Test files are skipped, because the fixtures test legitimately reads files, and so
+ * is `ai/__eval__`, the hand-run eval (I19): it reads its own invented statements from disk and writes
+ * its results to a git-ignored folder, and never sees an upload.
  */
 
 const SRC = fileURLToPath(new URL("../..", import.meta.url));
@@ -26,7 +28,7 @@ function sources(directory: string): string[] {
   if (!existsSync(directory)) return [];
   return readdirSync(directory).flatMap((entry) => {
     const path = join(directory, entry);
-    if (statSync(path).isDirectory()) return entry === "__fixtures__" ? [] : sources(path);
+    if (statSync(path).isDirectory()) return entry === "__fixtures__" || entry === "__eval__" ? [] : sources(path);
     return /\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry) ? [path] : [];
   });
 }

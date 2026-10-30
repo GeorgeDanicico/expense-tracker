@@ -1035,6 +1035,12 @@ upload with AI off still goes through the parsers unchanged.
 
 **Done when** the eval runs on `gpt-5.6-luna` and the PR has the accuracy and cost table.
 
+How to run it, what it reports, how a merchant match is defined and where George's anonymised samples
+go: `src/lib/imports/ai/__eval__/README.md`. The command is `npm run eval:statements -- --model
+gpt-5.6-luna`; `--dry-run` runs the harness offline with a stand-in model and is what the tests use.
+It calls the reader's code and the provider directly and skips the per-user budget gate and the
+ledger, since a hand-run eval has no signed-in user.
+
 ### Checkpoint: production AI settings
 
 George adds `AI_PROVIDER=openai`, `OPENAI_API_KEY`, `AI_MODEL_STATEMENTS=gpt-5.6-luna`, the budget variables

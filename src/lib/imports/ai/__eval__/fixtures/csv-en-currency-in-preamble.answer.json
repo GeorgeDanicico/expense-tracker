@@ -1,0 +1,29 @@
+{
+  "r": [
+    {"l":[7],"d":"2026-09-02","a":"45.20","c":null,"t":"d","m":"Lidl Cluj"},
+    {"l":[8],"d":"2026-09-04","a":"210.30","c":null,"t":"d","m":"Engie Gaz"},
+    {"l":[9],"d":"2026-09-05","a":"56.00","c":null,"t":"d","m":"Cinema City"},
+    {"l":[10],"d":"2026-09-07","a":"3200.00","c":null,"t":"c","m":"Salary Exemplu"},
+    {"l":[11],"d":"2026-09-11","a":"89.00","c":null,"t":"d","m":"CFR Calatori"},
+    {"l":[12],"d":"2026-09-13","a":"330.00","c":null,"t":"d","m":"Autodoc"},
+    {"l":[13],"d":"2026-09-17","a":"40.00","c":null,"t":"d","m":"Spalatorie Aqua"},
+    {"l":[14],"d":"2026-09-19","a":"118.40","c":null,"t":"d","m":"Mega Image"},
+    {"l":[15],"d":"2026-09-24","a":"95.00","c":null,"t":"d","m":"World Class"}
+  ],
+  "k": [
+    {"m":"Lidl Cluj","c":"groceries","s":null},
+    {"m":"Engie Gaz","c":"utilities","s":null},
+    {"m":"Cinema City","c":"entertainment","s":null},
+    {"m":"Salary Exemplu","c":"other","s":null},
+    {"m":"CFR Calatori","c":"transport","s":null},
+    {"m":"Autodoc","c":"car","s":"car_repairs"},
+    {"m":"Spalatorie Aqua","c":"car","s":"car_maintenance"},
+    {"m":"Mega Image","c":"groceries","s":null},
+    {"m":"World Class","c":"health","s":null}
+  ],
+  "s": {
+    "c": "RON",
+    "t": "983.90",
+    "l": 16
+  }
+}

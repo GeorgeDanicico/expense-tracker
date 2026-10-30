@@ -1,0 +1,24 @@
+{
+  "description": "English PDF table over two pages: ISO dates, dot decimals with comma thousands, signed amounts, a running balance, descriptions that continue on a second line, page footers, a printed total of money out.",
+  "currency": "RON",
+  "parser": "none",
+  "knownGap": null,
+  "rows": [
+    {"date":"2026-09-01","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
+    {"date":"2026-09-02","amount":"12.50","currency":"RON","direction":"debit","merchant":"Starbucks","category":"entertainment","subtype":null},
+    {"date":"2026-09-03","amount":"1500.00","currency":"RON","direction":"debit","merchant":"Chirie Apartament","category":"housing","subtype":null},
+    {"date":"2026-09-05","amount":"4500.00","currency":"RON","direction":"credit","merchant":"Salary Exemplu","category":"other","subtype":null},
+    {"date":"2026-09-06","amount":"59.00","currency":"RON","direction":"debit","merchant":"Digi","category":"utilities","subtype":null},
+    {"date":"2026-09-08","amount":"120.00","currency":"RON","direction":"debit","merchant":"Maria Test","category":"other","subtype":null},
+    {"date":"2026-09-09","amount":"319.90","currency":"RON","direction":"debit","merchant":"eMAG","category":"shopping","subtype":null},
+    {"date":"2026-09-11","amount":"33.40","currency":"RON","direction":"debit","merchant":"Uber","category":"transport","subtype":null},
+    {"date":"2026-09-12","amount":"1234.56","currency":"RON","direction":"debit","merchant":"Zara","category":"shopping","subtype":null},
+    {"date":"2026-09-14","amount":"89.00","currency":"RON","direction":"credit","merchant":"Farmacia Catena","category":"health","subtype":null},
+    {"date":"2026-09-16","amount":"245.00","currency":"RON","direction":"debit","merchant":"Rompetrol","category":"car","subtype":"car_fuel"},
+    {"date":"2026-09-18","amount":"39.99","currency":"RON","direction":"debit","merchant":"Netflix","category":"entertainment","subtype":null},
+    {"date":"2026-09-21","amount":"86.30","currency":"RON","direction":"debit","merchant":"Kaufland","category":"groceries","subtype":null},
+    {"date":"2026-09-24","amount":"15.00","currency":"RON","direction":"debit","merchant":"Comision Administrare","category":"other","subtype":null},
+    {"date":"2026-09-26","amount":"180.00","currency":"RON","direction":"debit","merchant":"Clinica Exemplu","category":"health","subtype":null},
+    {"date":"2026-09-29","amount":"64.30","currency":"RON","direction":"debit","merchant":"Vulcanizare Fast Tyres","category":"car","subtype":"car_maintenance"}
+  ]
+}

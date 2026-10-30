@@ -1,0 +1,17 @@
+{
+  "description": "English card statement PDF: each transaction on two or three lines (date and amount, merchant, reference), purchases positive, money in marked CR, two EUR rows, DD/MM/YYYY dates, dot decimals.",
+  "currency": "RON",
+  "parser": "none",
+  "knownGap": null,
+  "rows": [
+    {"date":"2026-09-03","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj Napoca","category":"groceries","subtype":null},
+    {"date":"2026-09-05","amount":"32.50","currency":"EUR","direction":"debit","merchant":"Airbnb Exemplu","category":"travel","subtype":null},
+    {"date":"2026-09-07","amount":"18.90","currency":"RON","direction":"debit","merchant":"Cafeneaua Din Piata","category":"entertainment","subtype":null},
+    {"date":"2026-09-09","amount":"500.00","currency":"RON","direction":"credit","merchant":"Payment Received","category":"other","subtype":null},
+    {"date":"2026-09-12","amount":"210.00","currency":"RON","direction":"debit","merchant":"Mol","category":"car","subtype":"car_fuel"},
+    {"date":"2026-09-14","amount":"18.00","currency":"RON","direction":"credit","merchant":"Cafeneaua Din Piata","category":"entertainment","subtype":null},
+    {"date":"2026-09-18","amount":"14.99","currency":"RON","direction":"debit","merchant":"Spotify","category":"entertainment","subtype":null},
+    {"date":"2026-09-21","amount":"64.10","currency":"EUR","direction":"debit","merchant":"Steam","category":"entertainment","subtype":null},
+    {"date":"2026-09-25","amount":"129.00","currency":"RON","direction":"debit","merchant":"Zara","category":"shopping","subtype":null}
+  ]
+}

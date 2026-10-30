@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run build",
-    "test:db": "bash scripts/test-database.sh"
+    "test:db": "bash scripts/test-database.sh",
+    "eval:statements": "esbuild src/lib/imports/ai/__eval__/run.ts --bundle --platform=node --format=esm --target=node24 --conditions=react-server --log-level=warning --outfile=dist/eval-statements.mjs && node dist/eval-statements.mjs",
+    "eval:statements:generate": "esbuild src/lib/imports/ai/__eval__/generate.ts --bundle --platform=node --format=esm --target=node24 --conditions=react-server --log-level=warning --outfile=dist/eval-generate.mjs && node dist/eval-generate.mjs"
   },
   "dependencies": {
     "@chakra-ui/react": "3.36.1",

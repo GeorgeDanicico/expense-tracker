@@ -1,0 +1,91 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Filter /Standard /V 1 /R 2 /P -4 /O <abababababababababababababababababababababababababababababababab> /U <cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd> >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 1382 >>
+stream
+BT /F1 10 Tf 50 792 Td (Example Card Services) Tj ET
+BT /F1 10 Tf 50 776 Td (Card statement for Ion Exemplu) Tj ET
+BT /F1 10 Tf 50 760 Td (Card number 4111 1111 1111 1111) Tj ET
+BT /F1 10 Tf 50 744 Td (Statement date 30/09/2026) Tj ET
+BT /F1 10 Tf 50 728 Td (Account currency RON) Tj ET
+BT /F1 10 Tf 50 712 Td (Date) Tj ET
+BT /F1 10 Tf 185 712 Td (Amount) Tj ET
+BT /F1 10 Tf 50 696 Td (03/09/2026) Tj ET
+BT /F1 10 Tf 185 696 Td (45.20) Tj ET
+BT /F1 10 Tf 50 680 Td (LIDL CLUJ NAPOCA RO) Tj ET
+BT /F1 10 Tf 50 664 Td (Ref 884200 Card ending 1111) Tj ET
+BT /F1 10 Tf 50 648 Td (05/09/2026) Tj ET
+BT /F1 10 Tf 185 648 Td (EUR 32.50) Tj ET
+BT /F1 10 Tf 50 632 Td (AIRBNB EXEMPLU) Tj ET
+BT /F1 10 Tf 50 616 Td (Foreign transaction ref 884201) Tj ET
+BT /F1 10 Tf 50 600 Td (07/09/2026) Tj ET
+BT /F1 10 Tf 185 600 Td (18.90) Tj ET
+BT /F1 10 Tf 50 584 Td (CAFENEAUA DIN PIATA) Tj ET
+BT /F1 10 Tf 50 568 Td (Ref 884202 Card ending 1111) Tj ET
+BT /F1 10 Tf 50 552 Td (09/09/2026) Tj ET
+BT /F1 10 Tf 185 552 Td (500.00 CR) Tj ET
+BT /F1 10 Tf 50 536 Td (PAYMENT RECEIVED - THANK YOU) Tj ET
+BT /F1 10 Tf 50 520 Td (Ref 884203 Card ending 1111) Tj ET
+BT /F1 10 Tf 50 504 Td (12/09/2026) Tj ET
+BT /F1 10 Tf 185 504 Td (210.00) Tj ET
+BT /F1 10 Tf 50 488 Td (MOL STATIA 0877) Tj ET
+BT /F1 10 Tf 50 472 Td (Ref 884204 Card ending 1111) Tj ET
+BT /F1 10 Tf 50 456 Td (Continued on the next page) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 844 >>
+stream
+BT /F1 10 Tf 50 792 Td (Date) Tj ET
+BT /F1 10 Tf 185 792 Td (Amount) Tj ET
+BT /F1 10 Tf 50 776 Td (14/09/2026) Tj ET
+BT /F1 10 Tf 185 776 Td (18.00 CR) Tj ET
+BT /F1 10 Tf 50 760 Td (REFUND CAFENEAUA DIN PIATA) Tj ET
+BT /F1 10 Tf 50 744 Td (Ref 884205 Card ending 1111) Tj ET
+BT /F1 10 Tf 50 728 Td (18/09/2026) Tj ET
+BT /F1 10 Tf 185 728 Td (14.99) Tj ET
+BT /F1 10 Tf 50 712 Td (SPOTIFY P12345) Tj ET
+BT /F1 10 Tf 50 696 Td (Ref 884206 Card ending 1111) Tj ET
+BT /F1 10 Tf 50 680 Td (21/09/2026) Tj ET
+BT /F1 10 Tf 185 680 Td (EUR 64.10) Tj ET
+BT /F1 10 Tf 50 664 Td (STEAM PURCHASE EXEMPLU) Tj ET
+BT /F1 10 Tf 50 648 Td (Foreign transaction ref 884207) Tj ET
+BT /F1 10 Tf 50 632 Td (25/09/2026) Tj ET
+BT /F1 10 Tf 185 632 Td (129.00) Tj ET
+BT /F1 10 Tf 50 616 Td (ZARA RO 0123) Tj ET
+BT /F1 10 Tf 50 600 Td (Ref 884208 Card ending 1111) Tj ET
+endstream
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000218 00000 n 
+0000000413 00000 n 
+0000000539 00000 n 
+0000001972 00000 n 
+0000002098 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R >>
+startxref
+2992
+%%EOF

@@ -1,0 +1,32 @@
+{
+  "r": [
+    {"l":[6,7],"d":"02.09.2026","a":"45,20","c":null,"t":"d","m":"Lidl Cluj"},
+    {"l":[8,9],"d":"03.09.2026","a":"18,50","c":null,"t":"d","m":"Cafeneaua Exemplu"},
+    {"l":[10,11],"d":"05.09.2026","a":"5.200,00","c":null,"t":"c","m":"Salariu Exemplu"},
+    {"l":[12,13,14],"d":"07.09.2026","a":"312,75","c":null,"t":"d","m":"Enel Energie"},
+    {"l":[15,16],"d":"09.09.2026","a":"255,00","c":null,"t":"d","m":"Rompetrol"},
+    {"l":[17],"d":"12.09.2026","a":"1.500,00","c":null,"t":"d","m":"Chirie Apartament"},
+    {"l":[18],"d":"13.09.2026","a":"120,00","c":null,"t":"d","m":"Maria Test"},
+    {"l":[19],"d":"15.09.2026","a":"45,20","c":null,"t":"c","m":"Lidl Cluj"},
+    {"l":[20],"d":"18.09.2026","a":"76,40","c":null,"t":"d","m":"Farmacia Catena"},
+    {"l":[21],"d":"22.09.2026","a":"15,00","c":null,"t":"d","m":"Comision Administrare"},
+    {"l":[22,23],"d":"26.09.2026","a":"289,90","c":null,"t":"d","m":"Kaufland Cluj"}
+  ],
+  "k": [
+    {"m":"Lidl Cluj","c":"groceries","s":null},
+    {"m":"Cafeneaua Exemplu","c":"entertainment","s":null},
+    {"m":"Salariu Exemplu","c":"other","s":null},
+    {"m":"Enel Energie","c":"utilities","s":null},
+    {"m":"Rompetrol","c":"car","s":"car_fuel"},
+    {"m":"Chirie Apartament","c":"housing","s":null},
+    {"m":"Maria Test","c":"other","s":null},
+    {"m":"Farmacia Catena","c":"health","s":null},
+    {"m":"Comision Administrare","c":"other","s":null},
+    {"m":"Kaufland Cluj","c":"groceries","s":null}
+  ],
+  "s": {
+    "c": "RON",
+    "t": "2.632,75",
+    "l": 24
+  }
+}

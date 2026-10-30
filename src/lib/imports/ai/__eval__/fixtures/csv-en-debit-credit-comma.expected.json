@@ -1,0 +1,20 @@
+{
+  "description": "English headers, semicolons, DD.MM.YYYY dates, comma decimals with dot thousands, separate debit and credit columns, a running balance.",
+  "currency": "RON",
+  "parser": "ok",
+  "knownGap": null,
+  "rows": [
+    {"date":"2026-09-01","amount":"234.56","currency":"RON","direction":"debit","merchant":"Kaufland","category":"groceries","subtype":null},
+    {"date":"2026-09-02","amount":"14.90","currency":"RON","direction":"debit","merchant":"McDonalds","category":"entertainment","subtype":null},
+    {"date":"2026-09-03","amount":"1500.00","currency":"RON","direction":"debit","merchant":"Chirie Apartament","category":"housing","subtype":null},
+    {"date":"2026-09-05","amount":"4800.00","currency":"RON","direction":"credit","merchant":"Salary Exemplu","category":"other","subtype":null},
+    {"date":"2026-09-06","amount":"59.00","currency":"RON","direction":"debit","merchant":"Digi","category":"utilities","subtype":null},
+    {"date":"2026-09-08","amount":"120.00","currency":"RON","direction":"debit","merchant":"Dr Max","category":"health","subtype":null},
+    {"date":"2026-09-10","amount":"33.40","currency":"RON","direction":"debit","merchant":"Uber","category":"transport","subtype":null},
+    {"date":"2026-09-11","amount":"120.00","currency":"RON","direction":"credit","merchant":"Dr Max","category":"health","subtype":null},
+    {"date":"2026-09-14","amount":"450.00","currency":"RON","direction":"debit","merchant":"Zara","category":"shopping","subtype":null},
+    {"date":"2026-09-18","amount":"25.00","currency":"RON","direction":"debit","merchant":"Parcare Centru","category":"car","subtype":"car_maintenance"},
+    {"date":"2026-09-21","amount":"89.99","currency":"RON","direction":"debit","merchant":"Decathlon","category":"shopping","subtype":null},
+    {"date":"2026-09-27","amount":"399.00","currency":"RON","direction":"debit","merchant":"Udemy","category":"education","subtype":null}
+  ]
+}
