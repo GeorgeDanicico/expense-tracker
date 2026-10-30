@@ -24,7 +24,7 @@ import { TodoApiProvider } from "@/components/todos/todo-api";
 
 import { previewCalendarApi } from "../calendar-fixtures";
 import { fixtureFor } from "../fixtures";
-import { previewImportApi, previewSampleStatement } from "../import-fixtures";
+import { PREVIEW_READ_STATEMENT_FILE, previewImportApi, previewSampleStatement } from "../import-fixtures";
 import { previewReminderApi } from "../reminder-fixtures";
 import { previewTodoApi } from "../todo-fixtures";
 import type { PreviewScreen } from "./screens";
@@ -52,7 +52,9 @@ function ImportPreview() {
   return (
     <ImportApiProvider api={previewImportApi}>
       <Text textStyle="caption" mb="3">
-        Preview: nothing is saved. <a href={sample} download="sample-statement.csv" data-testid="sample-statement">Download a sample statement</a> to upload.
+        Preview: nothing is saved. <a href={sample} download="sample-statement.csv" data-testid="sample-statement">Download a sample statement</a> to upload,
+        or <a href={sample} download={PREVIEW_READ_STATEMENT_FILE} data-testid="sample-read-statement">a statement the AI read</a> (its category sources and warnings).
+        {" "}<code>?ai=on</code> turns the AI switch on.
       </Text>
       <ImportPage />
     </ImportApiProvider>

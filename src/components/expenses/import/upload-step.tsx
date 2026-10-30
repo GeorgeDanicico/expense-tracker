@@ -1,7 +1,8 @@
 "use client";
 
-import { Box, Button, Stack, Text } from "@chakra-ui/react";
+import { Box, Button, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
 import { FileUp } from "lucide-react";
+import Link from "next/link";
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
 import { Card } from "@/components/ui/card";
@@ -23,6 +24,26 @@ export const EMPTY_STATEMENT_FILE = "That file is empty.";
 
 /** The line under the picker: what happens to the file. */
 export const DISCARD_NOTE = `The file is read and discarded. Only the rows below are kept, for ${IMPORT_DRAFT_HOURS} hours.`;
+
+/** The refusal code of a statement no parser reads while AI reading is off. */
+const UNRECOGNISED_LAYOUT = "unrecognised_layout";
+
+/**
+ * The line that says AI reading would import any bank's statement, linking to Settings → AI. It is
+ * on the upload step while the user's AI switch is off, and with the refusal of a layout no parser
+ * reads.
+ */
+export function AiReadingHint() {
+  return (
+    <Text textStyle="caption" data-testid="ai-reading-hint">
+      Turn on AI reading in{" "}
+      <ChakraLink asChild color="fg.accent">
+        <Link href="/settings/ai">Settings</Link>
+      </ChakraLink>{" "}
+      to import any bank&apos;s statement.
+    </Text>
+  );
+}
 
 type FileFacts = Pick<File, "name" | "size">;
 
@@ -66,11 +87,22 @@ export function uploadErrorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : "Unable to read the statement. Please try again.";
 }
 
-/** The first step: pick or drop a statement. It only reports the chosen file; the screen uploads it. */
+/** The refusal code the server sent with a refused upload (`unrecognised_layout`, say), when it sent one. */
+export function uploadErrorCode(caught: unknown): string | undefined {
+  return caught instanceof ApiError ? caught.code : undefined;
+}
+
+/**
+ * The first step: pick or drop a statement. It only reports the chosen file; the screen uploads it.
+ * With `aiEnabled === false` it adds the line pointing at Settings → AI; while that is not known yet
+ * (still loading, or the request failed) it says nothing about AI.
+ */
 export function UploadStep({
   onFile,
   pending,
   error,
+  errorCode,
+  aiEnabled,
   notice,
   noticeTone = "info",
 }: {
@@ -78,6 +110,10 @@ export function UploadStep({
   pending: boolean;
   /** Why the last file was refused. */
   error?: string;
+  /** The server's code for that refusal. */
+  errorCode?: string;
+  /** The user's Settings → AI switch, or `undefined` while it is not known. */
+  aiEnabled?: boolean;
   /** Something to say before the picker (an import was just discarded, say). */
   notice?: string;
   /** `warning` for a draft that is gone (expired, or confirmed elsewhere); `info` for a plain note. */
@@ -108,11 +144,19 @@ export function UploadStep({
   }
 
   const shownError = refused || error;
+  const aiOff = aiEnabled === false;
+  // A layout nobody reads gets the hint inside its refusal; the standing line would repeat it.
+  const hintInError = aiOff && !refused && errorCode === UNRECOGNISED_LAYOUT;
 
   return (
     <Stack gap="3">
       {notice ? <InlineAlert status={noticeTone}>{notice}</InlineAlert> : null}
-      {shownError ? <InlineAlert status="error">{shownError}</InlineAlert> : null}
+      {shownError ? (
+        <InlineAlert status="error">
+          {shownError}
+          {hintInError ? <Box mt="1"><AiReadingHint /></Box> : null}
+        </InlineAlert>
+      ) : null}
       <Card>
         <Card.Body>
           <Box
@@ -168,6 +212,7 @@ export function UploadStep({
           </Box>
         </Card.Body>
       </Card>
+      {aiOff && !hintInError ? <AiReadingHint /> : null}
       <Text textStyle="caption">{DISCARD_NOTE}</Text>
     </Stack>
   );

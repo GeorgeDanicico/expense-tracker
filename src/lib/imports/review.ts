@@ -3,6 +3,7 @@ import type { Expense } from "@/lib/expenses/types";
 import { STATEMENT_PARSERS } from "@/lib/imports/parser";
 import {
   IMPORT_DESCRIPTION_MAX_LENGTH,
+  type CategorySource,
   type DraftRow,
   type DuplicateOf,
   type ImportBatch,
@@ -21,6 +22,12 @@ export type ReviewRow = {
   description: string;
   category: ExpenseCategory;
   subtype: ExpenseSubtype | null;
+  /**
+   * Where `category` came from, for the label under it. It is the draft's source until the user
+   * changes the category or the subtype, and `null` from then on: the choice is theirs now, so the
+   * row no longer claims to be the merchant rule's, the history's or the model's.
+   */
+  categorySource: CategorySource | null;
 };
 
 export type ReviewAction =
@@ -50,6 +57,8 @@ export function initialReview(rows: readonly DraftRow[]): ReviewRow[] {
     description: row.description,
     category: row.category,
     subtype: row.subtype,
+    // A row the merchant rule set says so even when an older row has no source stored.
+    categorySource: row.ruleMatched ? "rule" : row.categorySource,
   }));
 }
 
@@ -66,11 +75,16 @@ export function reviewReducer(state: ReviewRow[], action: ReviewAction): ReviewR
       // A row set by a merchant rule keeps its category: the database applies the same rule on save.
       return change(action.id, (item) => item.row.ruleMatched
         ? item
-        : { ...item, category: action.category, subtype: subtypeForCategory(action.category, item.subtype) });
+        : {
+            ...item,
+            category: action.category,
+            subtype: subtypeForCategory(action.category, item.subtype),
+            categorySource: null,
+          });
     case "subtype":
       return change(action.id, (item) => item.row.ruleMatched
         ? item
-        : { ...item, subtype: subtypeForCategory(item.category, action.subtype) });
+        : { ...item, subtype: subtypeForCategory(item.category, action.subtype), categorySource: null });
     case "selectAll":
       return state.map((item) => ({ ...item, ticked: isTickable(item.row) }));
     case "selectNone":
@@ -152,10 +166,23 @@ export function addLabel(count: number): string {
   return count === 0 ? "Add expenses" : `Add ${pluralize(count, "expense")}`;
 }
 
-/** How the parser that read the statement is named on the review screen. */
+/**
+ * How the parser that read the statement is named on the review screen. A parser id can carry a
+ * suffix for the model's categories (`generic-csv+ai:statement-categorise-v1`, still the generic CSV
+ * parser's rows), and `ai:statement-reader-v1` is a statement the model read.
+ */
 export function parserLabel(parserId: string): string {
-  return STATEMENT_PARSERS.find((parser) => parser.id === parserId)?.label ?? "Statement";
+  const [base] = parserId.split("+");
+  if (base.startsWith("ai:")) return "AI-read statement";
+  return STATEMENT_PARSERS.find((parser) => parser.id === base)?.label ?? "Statement";
 }
+
+/** The label under a row's category: "Merchant rule", "Like last time" (your history) or "AI suggestion". */
+export const CATEGORY_SOURCE_LABELS: Record<CategorySource, string> = {
+  rule: "Merchant rule",
+  history: "Like last time",
+  ai: "AI suggestion",
+};
 
 function dayParts(date: string) {
   return new Date(`${date}T12:00:00Z`);
