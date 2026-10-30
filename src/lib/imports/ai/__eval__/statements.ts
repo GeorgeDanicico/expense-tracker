@@ -324,10 +324,9 @@ function csvRoForeign(): SyntheticStatement {
 /**
  * A comma-separated file whose descriptions are not quoted, where a store number of up to three
  * digits sits right before an amount that starts with three digits ("Mega Image 118,118.40").
- * Verification reads "118,118.40" as one number with a thousands group, so it can't find the amount
- * "118.40" as a number of its own and refuses the statement (`amount_not_found`). The model's
- * answer is right; the check is too strict for this shape. A known gap of `verify.ts`, found while
- * building these fixtures, not fixed by the eval.
+ * Read as text, "118,118.40" is one number with a thousands group; verification matches amounts in
+ * a CSV field by field (the comma is the delimiter, so the store number and the amount are two
+ * fields) and accepts the model's right answer. Once a known gap of `verify.ts`; fixed in I20.
  */
 function csvRoCommaDigitsBeforeAmount(): SyntheticStatement {
   const txns = [
@@ -346,10 +345,6 @@ function csvRoCommaDigitsBeforeAmount(): SyntheticStatement {
       "Romanian headers, comma-separated, descriptions not quoted, separate debit and credit columns with dot decimals; one description ends in a store number that runs into the amount (Mega Image 118,118.40).",
     kind: "csv",
     parser: "none",
-    knownGap: {
-      reason: "amount_not_found",
-      note: "verify.ts reads '118,118.40' as one number with a thousands group, so the amount 118.40 isn't found on its line and the statement is refused. The model's reading is right. Not fixed by the eval.",
-    },
     txns,
     build(rows) {
       const style: Style = { date: "iso", decimal: ".", thousands: "" };
@@ -369,8 +364,8 @@ function csvRoCommaDigitsBeforeAmount(): SyntheticStatement {
 
 /**
  * English headers a parser recognises, but the currency is stated only above the table. The
- * generic parser claims the file and then refuses it (no currency on the rows); the reader never
- * gets the chance, because a claimed layout isn't handed to the model. The model reads it fine.
+ * generic parser claims the file and then refuses it (no currency on the rows); with AI on, the
+ * pipeline hands such a file to the model (I20), which reads it fine.
  */
 function csvEnCurrencyInPreamble(): SyntheticStatement {
   const txns = [
@@ -572,7 +567,7 @@ function pdfCardMultiline(): SyntheticStatement {
   };
 }
 
-/** A Romanian PDF whose rows print the day and month but no year ("12.10"). The year is only in the heading. `parseStatementDate` can't read these, so the reader refuses the statement. */
+/** A Romanian PDF whose rows print the day and month but no year ("12.10"). The year is only in the heading, and code takes it from there (I20). */
 function pdfRoNoYear(): SyntheticStatement {
   const txns = [
     debit("2026-10-02", "45.20", "PLATA POS LIDL CLUJ", "Lidl Cluj", "groceries"),
@@ -589,10 +584,6 @@ function pdfRoNoYear(): SyntheticStatement {
     description: "Romanian PDF whose rows print the date as day and month only (12.10); the period with its year is in the heading. Comma decimals.",
     kind: "pdf",
     parser: "none",
-    knownGap: {
-      reason: "date_unreadable",
-      note: "parseStatementDate reads only dates with a year, so verification refuses a statement that prints dates without one (found while building I17). Not fixed by the eval.",
-    },
     txns,
     build(rows) {
       const style: Style = { date: "dm-dot", decimal: ",", thousands: "." };

@@ -23,6 +23,7 @@ import {
   ImportError,
   type CreateImportBatchPayload,
   type CreateImportRowPayload,
+  type ImportErrorCode,
   type ImportSourceKind,
   type ParsedRow,
   type ParsedStatement,
@@ -42,6 +43,10 @@ import {
  * - No parser claims it and AI is on: the model reads the numbered text (mode "read") and code
  *   verifies every row against that text before anything becomes a draft.
  * - No parser claims it and AI is off: `unrecognised_layout`, as before.
+ * - A parser claims it and then can't read its rows (`PARSER_ERRORS_READ_BY_MODEL`) and AI is on:
+ *   the model reads it as if no parser had claimed it. If the AI gate then refuses to make the call
+ *   (the flag is off, the month's budget is used up, the user hasn't opted in) the parser's own
+ *   error is what the user gets, exactly as with AI off.
  */
 
 /** What `buildDraft` returns: the `create_import_batch` arguments, plus what the screen shows. */
@@ -113,6 +118,20 @@ function statementCurrency(parsed: ParsedStatement, debits: readonly ParsedRow[]
 /** The parser id of a batch the model read (mode "read"). */
 export const READER_PARSER_ID = `ai:${STATEMENT_READER_PROMPT_ID}`;
 
+/**
+ * The errors of a claiming parser that mean "I recognised the layout but couldn't read its rows",
+ * which the model may still be able to read: `unreadable_statement` (a row that isn't a date, a
+ * description and an amount, no currency on the rows, a quote that is never closed). Everything
+ * else stays the parser's refusal, with no call: `ambiguous_amounts` (the model would face the same
+ * decimal mark that nothing settles, and is never allowed to guess it) and the limits, which are
+ * not parser errors at all: the size and signature checks come before any parsing, and `no_debits`
+ * and `too_many_rows` are decided after a successful read, whoever read it.
+ */
+const PARSER_ERRORS_READ_BY_MODEL: ReadonlySet<ImportErrorCode> = new Set(["unreadable_statement"]);
+
+/** The gate or the configuration refused the call, so no model was asked. Kept apart so a parser's own error can stand in for it. */
+class ReaderUnavailableError extends ImportError {}
+
 const AI_UNREACHABLE = "The AI reader couldn't be reached. Try again in a few minutes.";
 const AI_BUSY = "The AI reader is busy. Try again in a minute.";
 const NO_CURRENCY = "This statement doesn't say which currency its amounts are in.";
@@ -158,7 +177,7 @@ async function readWithModel(
 
   if (result.status === "refused") {
     log({ mode: "read", outcome: "refused" });
-    throw new ImportError(
+    throw new ReaderUnavailableError(
       "unrecognised_layout",
       `This statement's layout isn't supported yet, and the AI reader can't be used right now. ${result.message}`,
     );
@@ -264,7 +283,9 @@ async function chooseCategories(
 /**
  * Parses an upload into a draft: decodes the text (a PDF's text is read by `extractPdfText`, which
  * refuses a protected, scanned or over-long PDF), finds a parser, or with AI on has the model read
- * the text and verifies its rows (`unrecognised_layout` when no parser claims it and AI is off),
+ * the text and verifies its rows (`unrecognised_layout` when no parser claims it and AI is off; a
+ * parser that claims a file and then can't read its rows hands it to the model too, see
+ * `PARSER_ERRORS_READ_BY_MODEL`),
  * keeps the debits and counts the credits, masks IBAN- and card-number-shaped text in each
  * description and moves anything past 120 characters to the row's notes, then refuses a statement
  * with no debits (`no_debits`) or more than 500 of them (`too_many_rows`) and hashes it. With AI on,
@@ -292,20 +313,33 @@ export async function buildDraft(
 
   let parsed: ParsedCandidates;
   let numbered: NumberedStatement | null = null;
+  const readByModel = async (model: StatementAi) => {
+    try {
+      return await readWithModel(model, source, log);
+    } catch (error) {
+      if (error instanceof ImportError) throw error;
+      throw new ImportError("unreadable_statement");
+    }
+  };
+
   if (findParser(source)) {
     try {
       parsed = parseStatement(source);
     } catch (error) {
-      if (error instanceof ImportError) throw error;
-      throw new ImportError("unreadable_statement");
+      const refusal = error instanceof ImportError ? error : new ImportError("unreadable_statement");
+      if (!ai || !PARSER_ERRORS_READ_BY_MODEL.has(refusal.code)) throw refusal;
+
+      // A parser claimed the layout and couldn't read its rows: the model reads the text instead.
+      log({ mode: "read", fallbackFrom: refusal.code });
+      try {
+        ({ parsed, numbered } = await readByModel(ai));
+      } catch (readError) {
+        // The model was never asked: the parser's own error, as with AI off.
+        throw readError instanceof ReaderUnavailableError ? refusal : readError;
+      }
     }
   } else if (ai) {
-    try {
-      ({ parsed, numbered } = await readWithModel(ai, source, log));
-    } catch (error) {
-      if (error instanceof ImportError) throw error;
-      throw new ImportError("unreadable_statement");
-    }
+    ({ parsed, numbered } = await readByModel(ai));
   } else {
     throw new UnrecognisedLayoutError();
   }

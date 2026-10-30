@@ -2,10 +2,7 @@
   "description": "Romanian PDF whose rows print the date as day and month only (12.10); the period with its year is in the heading. Comma decimals.",
   "currency": "RON",
   "parser": "none",
-  "knownGap": {
-    "reason": "date_unreadable",
-    "note": "parseStatementDate reads only dates with a year, so verification refuses a statement that prints dates without one (found while building I17). Not fixed by the eval."
-  },
+  "knownGap": null,
   "rows": [
     {"date":"2026-10-02","amount":"45.20","currency":"RON","direction":"debit","merchant":"Lidl Cluj","category":"groceries","subtype":null},
     {"date":"2026-10-05","amount":"312.75","currency":"RON","direction":"debit","merchant":"Enel Energie","category":"utilities","subtype":null},

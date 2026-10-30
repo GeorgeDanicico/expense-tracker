@@ -82,6 +82,48 @@ export function parseCsv(
 }
 
 /**
+ * Splits the physical lines of a CSV into fields the way `parseCsv` does (a quote opens a quoted
+ * field only at the start of a field, `""` is a quote inside one, the delimiter is not special
+ * inside quotes), but one line at a time and without ever throwing, so a statement already cut
+ * into numbered lines can be looked at field by field. The quoting state carries over from one line
+ * to the next, so a quoted field that runs over several lines is not split at its line breaks; the
+ * pieces of such a field are returned as separate fields of the lines they are on. A quote that is
+ * never closed just stays open to the end.
+ */
+export function splitCsvLines(lines: readonly string[], delimiter: CsvDelimiter): string[][] {
+  let inQuotes = false;
+  let atFieldStart = true;
+
+  return lines.map((line) => {
+    const fields: string[] = [];
+    let field = "";
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      if (inQuotes) {
+        if (char !== '"') field += char;
+        else if (line[i + 1] === '"') {
+          field += '"';
+          i += 1;
+        } else inQuotes = false;
+      } else if (char === '"' && atFieldStart) {
+        inQuotes = true;
+        atFieldStart = false;
+      } else if (char === delimiter) {
+        fields.push(field);
+        field = "";
+        atFieldStart = true;
+      } else {
+        field += char;
+        atFieldStart = false;
+      }
+    }
+    fields.push(field);
+    if (!inQuotes) atFieldStart = true;
+    return fields;
+  });
+}
+
+/**
  * The delimiter that splits the first records most consistently: the one under which the most
  * records have the same number of fields (more than one), then the one with more fields, then the
  * earlier of comma, semicolon and tab. A file with no delimiter at all gets a comma.

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { blankDates, looksLikeTransaction, numberStatement } from "@/lib/imports/ai/numbered-text";
+import { blankDates, fullDatesIn, looksLikeTransaction, numberStatement } from "@/lib/imports/ai/numbered-text";
 import { extractPdfText } from "@/lib/imports/pdf-text";
 import { buildTextPdf } from "@/test/pdf";
 
@@ -96,5 +96,47 @@ describe("blankDates", () => {
   it("replaces dates with spaces of the same length and leaves the rest", () => {
     expect(blankDates("a 2026-10-02 b 02.10.2026 c")).toBe("a            b            c");
     expect(blankDates("ref 12.10.20268 end")).toBe("ref 12.10.20268 end");
+  });
+});
+
+describe("what the numbering keeps for the checks", () => {
+  it("cuts a CSV's lines into fields with the delimiter and quoting the CSV reader uses", () => {
+    const statement = numberStatement({
+      kind: "csv",
+      text: 'Data;Detalii;Suma\n02.10.2026;"POS; MEGA IMAGE 118";"1.118,40"\n03.10.2026;Cafe 118,12;5,00\n',
+    });
+
+    expect(statement.csv).toEqual({
+      delimiter: ";",
+      fields: [["Data", "Detalii", "Suma"], ["02.10.2026", "POS; MEGA IMAGE 118", "1.118,40"], ["03.10.2026", "Cafe 118,12", "5,00"]],
+    });
+  });
+
+  it("detects a comma and a tab, and ignores a byte order mark", () => {
+    expect(numberStatement({ kind: "csv", text: "\uFEFFDate,Details,Amount\n2026-10-02,Cafe 118,118.40\n" }).csv?.delimiter).toBe(",");
+    expect(numberStatement({ kind: "csv", text: "Date\tDetails\tAmount\n2026-10-02\tCafe\t4,50\n" }).csv?.delimiter).toBe("\t");
+  });
+
+  it("has no fields for a PDF, whose columns are not delimited", () => {
+    expect(numberStatement({ kind: "pdf", text: "a", pages: [["02.10.2026\tCafe\t-4,50"]] }).csv).toBeNull();
+  });
+
+  it("collects every date with a year from any line, and leaves out one that is no date", () => {
+    const statement = numberStatement({
+      kind: "csv",
+      text: ["Period;01.10.2026 - 31.10.2026", "Issued;2026-11-02", "Bad;31.02.2026", "12.10;Cafe;-4,50"].join("\n"),
+    });
+
+    expect(statement.fullDates).toEqual(["2026-10-01", "2026-10-31", "2026-11-02"]);
+    expect(fullDatesIn("ref 12.10.20268 and 3/4/2026")).toEqual(["2026-04-03"]);
+  });
+
+  it("sends nothing new to the model: the text and the hash are what they were", () => {
+    const text = "Data;Detalii;Suma\n02.10.2026;MEGA 118;118,40\n";
+    const statement = numberStatement({ kind: "csv", text });
+
+    expect(statement.text).toBe("0001\tData;Detalii;Suma\n0002\t02.10.2026;MEGA 118;118,40");
+    expect(statement.text).not.toContain("delimiter");
+    expect(statement.hash).toBe(createHash("sha256").update(statement.text).digest("hex"));
   });
 });

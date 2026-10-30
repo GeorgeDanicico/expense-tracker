@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { detectDelimiter, splitCsvLines, type CsvDelimiter } from "@/lib/imports/csv";
+import { parseStatementDate } from "@/lib/imports/date";
 import type { StatementSource } from "@/lib/imports/parser";
 import { maskAccountNumbers } from "@/lib/imports/redact";
 
@@ -23,6 +25,18 @@ export type NumberedStatement = {
   transactionLines: number[];
   /** SHA-256 of `text`, as 64 lowercase hexadecimal characters. */
   hash: string;
+  /**
+   * Every date with a year that the statement prints, as `YYYY-MM-DD`, from any line: the context
+   * that gives a date printed without a year its year. Computed from `lines`; never sent.
+   */
+  fullDates: string[];
+  /**
+   * For a CSV: the delimiter the CSV reader detects and each numbered line cut into fields with the
+   * reader's own quoting rules (`fields[n - 1]` is line n), so `verify.ts` can match an amount as a
+   * field and not as a stretch of text. Null for a PDF, whose columns are not delimited. Computed
+   * from `lines`; never sent, and it is not part of `text` or `hash`.
+   */
+  csv: { delimiter: CsvDelimiter; fields: string[][] } | null;
 };
 
 /** A date as `parseStatementDate` reads one: `YYYY-MM-DD` or day first with `.`, `/` or `-`, a time after it allowed. */
@@ -40,6 +54,16 @@ export function looksLikeTransaction(line: string): boolean {
 /** The line with every date replaced by spaces of the same length, so offsets are kept and a date's digits are never read as an amount. */
 export function blankDates(line: string): string {
   return line.replace(DATE_IN_TEXT, (date) => " ".repeat(date.length));
+}
+
+/** The dates with a year written in a line, as `YYYY-MM-DD`; one `parseStatementDate` cannot read (31.02.2026) is left out. */
+export function fullDatesIn(line: string): string[] {
+  const found: string[] = [];
+  for (const match of line.matchAll(DATE_IN_TEXT)) {
+    const date = parseStatementDate(match[0]);
+    if (date) found.push(date);
+  }
+  return found;
 }
 
 function pad(number: number): string {
@@ -71,5 +95,13 @@ export function numberStatement(source: StatementSource): NumberedStatement {
   });
 
   const text = out.join("\n");
-  return { text, lines, transactionLines, hash: createHash("sha256").update(text).digest("hex") };
+  const delimiter = source.kind === "csv" ? detectDelimiter(source.text.replace(/^\uFEFF/, "")) : null;
+  return {
+    text,
+    lines,
+    transactionLines,
+    hash: createHash("sha256").update(text).digest("hex"),
+    fullDates: lines.flatMap(fullDatesIn),
+    csv: delimiter === null ? null : { delimiter, fields: splitCsvLines(lines, delimiter) },
+  };
 }

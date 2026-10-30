@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectDelimiter, parseCsv, readCsv } from "@/lib/imports/csv";
+import { detectDelimiter, parseCsv, readCsv, splitCsvLines } from "@/lib/imports/csv";
 import { ImportError } from "@/lib/imports/types";
 
 describe("parseCsv", () => {
@@ -103,5 +103,40 @@ describe("readCsv", () => {
 
   it("can stop early", () => {
     expect(readCsv("a,b\n1,2\n3,4\n", { maxRecords: 1 }).records).toEqual([["a", "b"]]);
+  });
+});
+
+describe("splitCsvLines", () => {
+  it("splits each line into fields with the delimiter it is given", () => {
+    expect(splitCsvLines(["a,b,c", "1,,3"], ",")).toEqual([["a", "b", "c"], ["1", "", "3"]]);
+    expect(splitCsvLines(["a;b,c"], ";")).toEqual([["a", "b,c"]]);
+    expect(splitCsvLines(["a\tb"], "\t")).toEqual([["a", "b"]]);
+  });
+
+  it("reads quotes as parseCsv does: a quote opens a field only at its start, \"\" is a quote, the delimiter is plain inside quotes", () => {
+    expect(splitCsvLines(['x,"1,118.40",y', 'say "hi",a"b', '"say ""hi""",z'], ",")).toEqual([
+      ["x", "1,118.40", "y"],
+      ['say "hi"', 'a"b'],
+      ['say "hi"', "z"],
+    ]);
+  });
+
+  it("agrees with parseCsv on every single-line record", () => {
+    const text = ['Date,Description,Amount', '2026-10-03,"POS, MEGA IMAGE 118",118.40', '2026-10-04,Plata POS Mega Image 118,118.40', '2026-10-05,"a ""quoted"" shop","1,118.40"', ',,'].join("\n");
+    const lines = text.split("\n");
+
+    expect(splitCsvLines(lines, ",")).toEqual(parseCsv(text, ","));
+  });
+
+  it("carries a quoted field over line breaks, so its pieces are fields of their own lines", () => {
+    expect(splitCsvLines(['2026-10-03,"CARD PAYMENT;', 'MEGA, IMAGE",-118.40', "2026-10-04,Shop,-5.00"], ",")).toEqual([
+      ["2026-10-03", "CARD PAYMENT;"],
+      ["MEGA, IMAGE", "-118.40"],
+      ["2026-10-04", "Shop", "-5.00"],
+    ]);
+  });
+
+  it("never throws on a quote that is never closed", () => {
+    expect(splitCsvLines(['a,"open', "b,c"], ",")).toEqual([["a", "open"], ["b,c"]]);
   });
 });

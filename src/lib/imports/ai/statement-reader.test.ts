@@ -662,7 +662,7 @@ describe("a tampered reading", () => {
   });
 
   it("refuses more than 500 debits", async () => {
-    const lines = Array.from({ length: 501 }, (_, index) => `02.10.2026 SHOP ${index + 1} -1,00`);
+    const lines = Array.from({ length: 501 }, (_, index) => `02.10.2026;SHOP ${index + 1};-1,00`);
     const rows: Row[] = lines.map((_, index) => ({ l: [index + 2], d: "02.10.2026", a: "-1,00", c: null, t: "d", m: `Shop ${index + 1}` }));
     provider.willReturn({ r: rows, k: [], s: { c: "RON", t: null, l: null } });
 
@@ -727,5 +727,163 @@ describe("a PDF that needs the model when it can't be used", () => {
     expect(error).toMatchObject({ code: "unrecognised_layout" });
     expect(error.message).toContain("too long for the AI to read in one go");
     expect(provider.requests).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// A parser claims the file and then refuses it: the model reads it instead (I20).
+// ---------------------------------------------------------------------------------------------
+
+describe("a CSV a parser claims and then can't read", () => {
+  const NO_CURRENCY = "This statement doesn't say which currency its amounts are in.";
+
+  /** English headers the generic parser recognises, with the currency only above the table, so the parser refuses it. */
+  const preamble = (...rows: string[]) => ({
+    kind: "csv" as const,
+    bytes: new TextEncoder().encode(
+      ["Account statement", "Holder,Synthetic Holder", "Currency,RON", "Date,Description,Money out,Money in", ...rows, "Total money out,,300.00,"].join("\n"),
+    ),
+  });
+  const rows = () => ["2026-10-02,LIDL CLUJ,45.20,", "2026-10-04,OMV 1642 SATU MARE,254.80,", "2026-10-05,SALARY SYNTHETIC,,3200.00"];
+  // Lines: 1 title, 2 holder, 3 currency, 4 header, 5 to 7 the rows, 8 the total.
+  const answerFor = (): ReaderAnswer => ({
+    r: [
+      { l: [5], d: "2026-10-02", a: "45.20", c: null, t: "d", m: "Lidl Cluj" },
+      { l: [6], d: "2026-10-04", a: "254.80", c: null, t: "d", m: "OMV 1642 Satu Mare" },
+      { l: [7], d: "2026-10-05", a: "3200.00", c: null, t: "c", m: "Salary Synthetic" },
+    ],
+    k: [
+      { m: "Lidl Cluj", c: "groceries", s: null },
+      { m: "OMV 1642 Satu Mare", c: "car", s: "car_fuel" },
+      { m: "Salary Synthetic", c: "other", s: null },
+    ],
+    s: { c: "RON", t: "300.00", l: 8 },
+  });
+
+  it("is read by the model when the user's AI is on, as if no parser had claimed it", async () => {
+    provider.willReturn(answerFor());
+
+    const { batch, warnings } = await createDraft(userId, preamble(...rows()), now, dependencies());
+
+    expect(provider.requests).toHaveLength(1);
+    expect(provider.requests[0].system).toContain("statement-reader-v1");
+    expect(provider.requests[0].input.split("\n")[0]).toBe("0001\tAccount statement");
+    expect(batch).toMatchObject({ parserId: "ai:statement-reader-v1", currency: "RON", rowCount: 2, skippedCredits: 1, periodStart: "2026-10-02", periodEnd: "2026-10-05" });
+    expect(warnings).toEqual([]);
+    expect(storedRows()).toEqual([
+      ["Lidl Cluj", "groceries", null, "ai"],
+      ["OMV 1642 Satu Mare", "car", "car_fuel", "rule"],
+    ]);
+    expect(logged).toContainEqual({ mode: "read", fallbackFrom: "unreadable_statement" });
+    expect(logged).toContainEqual({ mode: "read", outcome: "ok", rows: 3, warnings: 0 });
+    // The prompt carries the numbered lines only: no word about the parser or its refusal.
+    expect(provider.requests[0].input).not.toMatch(/parser|couldn't be read|fallback/i);
+  });
+
+  it("is read by the model when a parser can't read one of its rows too", async () => {
+    // "not-a-date" makes the generic parser refuse the file ("Row 2 ... couldn't be read").
+    provider.willReturn({
+      r: [{ l: [2], d: "2026-10-02", a: "-4.50", c: null, t: "d", m: "Corner Cafe" }, { l: [3], d: "2026-10-03", a: "-6.00", c: null, t: "d", m: "Fresh Market" }],
+      k: [{ m: "Corner Cafe", c: "entertainment", s: null }, { m: "Fresh Market", c: "groceries", s: null }],
+      s: { c: "RON", t: null, l: null },
+    });
+
+    const { batch } = await createDraft(userId, csv("2026-10-02,Corner Cafe,-4.50,RON", "2026-10-03,Fresh Market,-6.00,RON", "not-a-date,Mystery,-1.00,RON"), now, dependencies());
+
+    expect(provider.requests).toHaveLength(1);
+    expect(batch.parserId).toBe("ai:statement-reader-v1");
+    expect(batch.rowCount).toBe(2);
+  });
+
+  it("still has every check of mode read: a tampered answer refuses it as unverified, not with the parser's error", async () => {
+    const tampered = answerFor();
+    tampered.r[0].a = "45.21";
+    provider.willReturn(tampered);
+
+    const error = await refusal(createDraft(userId, preamble(...rows()), now, dependencies()));
+
+    expect(error).toMatchObject({ code: "unverified_statement", status: 422 });
+    expect(repositories.imports.batches).toHaveLength(0);
+  });
+
+  it("answers with the reader's error, not the parser's, when the model was asked and failed", async () => {
+    provider.willFail("provider_error", null);
+
+    expect(await refusal(createDraft(userId, preamble(...rows()), now, dependencies()))).toMatchObject({
+      code: "unverified_statement",
+      message: "The AI reader couldn't be reached. Try again in a few minutes.",
+    });
+  });
+
+  describe("gives the parser's own error, and asks no model", () => {
+    const parserError = { code: "unreadable_statement", status: 422, message: NO_CURRENCY };
+
+    it.each([
+      ["the user never opted in", () => repositories.aiGate.users.delete(userId)],
+      ["the user switched it off", () => repositories.aiGate.setUser(userId, { optedIn: false })],
+      ["a kid has no permission", () => repositories.aiGate.setUser(userId, { familyId: "f", role: "kid", optedIn: true, kidAiPermission: false })],
+    ])("with AI off: %s", async (_name, turnOff) => {
+      turnOff();
+
+      const error = await refusal(createDraft(userId, preamble(...rows()), now, dependencies()));
+
+      expect(error).toMatchObject(parserError);
+      expect(provider.requests).toHaveLength(0);
+      expect(logged).toEqual([]);
+      expect(repositories.aiGate.usage).toHaveLength(0);
+    });
+
+    it.each([
+      ["the family's month is used up", () => repositories.aiGate.seedUsage(userId, 3_000_000, new Date())],
+      ["the kill switch is off", () => { repositories.aiGate.enabled = false; }],
+    ])("when the gate refuses the call: %s", async (_name, setUp) => {
+      setUp();
+
+      const error = await refusal(createDraft(userId, preamble(...rows()), now, dependencies()));
+
+      expect(error).toMatchObject(parserError);
+      expect(provider.requests).toHaveLength(0);
+      expect(repositories.imports.batches).toHaveLength(0);
+    });
+
+    it("when the server has no model set up", async () => {
+      const error = await refusal(createDraft(userId, preamble(...rows()), now, { ...dependencies(), ai: { provider, pricing: PRICING, env: {}, log: () => undefined } }));
+
+      expect(error).toMatchObject(parserError);
+      expect(provider.requests).toHaveLength(0);
+    });
+
+    it("with the row number when that was the parser's complaint", async () => {
+      repositories.aiGate.enabled = false;
+
+      const error = await refusal(createDraft(userId, csv("2026-10-02,Corner Cafe,-4.50,RON", "not-a-date,Mystery,-1.00,RON"), now, dependencies()));
+
+      expect(error).toMatchObject({ code: "unreadable_statement", message: "Row 2 of this statement couldn't be read." });
+    });
+  });
+
+  describe("does not ask the model for the refusals that are not about reading rows", () => {
+    it("amounts that can't be read without guessing", async () => {
+      const error = await refusal(createDraft(userId, csv("2026-10-02,Corner Cafe,-1.234,RON", "2026-10-03,Fresh Market,-2.345,RON"), now, dependencies()));
+
+      expect(error).toMatchObject({ code: "ambiguous_amounts" });
+      expect(provider.requests).toHaveLength(0);
+    });
+
+    it("a statement of money in only, once the parser has read it", async () => {
+      const error = await refusal(createDraft(userId, csv("2026-10-02,Salary,2500.00,RON"), now, dependencies()));
+
+      expect(error).toMatchObject({ code: "no_debits" });
+      expect(provider.requests).toHaveLength(0);
+    });
+
+    it("more than 500 transactions, once the parser has read them", async () => {
+      const many = Array.from({ length: 501 }, (_, index) => `2026-10-02,Shop ${index + 1},-1.00,RON`);
+
+      const error = await refusal(createDraft(userId, csv(...many), now, dependencies()));
+
+      expect(error).toMatchObject({ code: "too_many_rows" });
+      expect(provider.requests).toHaveLength(0);
+    });
   });
 });
