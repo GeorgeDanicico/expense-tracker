@@ -9,10 +9,11 @@ import type { AccountData } from "@/lib/account/types";
 export type SettingsTab = { href: string; label: string };
 
 const AI_ASSISTANTS_TAB: SettingsTab = { href: "/settings/mcp", label: "AI assistants" };
+const AI_FEATURES_TAB: SettingsTab = { href: "/settings/ai", label: "AI features" };
 const NOTIFICATIONS_TAB: SettingsTab = { href: "/settings/notifications", label: "Notifications" };
 
 /**
- * The settings tabs for this account. Account, AI assistants and Notifications are always there
+ * The settings tabs for this account. Account, AI assistants, AI features and Notifications are always there
  * (reminders don't need a family); the family tabs only when the family module is on, and Manage
  * family only for parents.
  */
@@ -22,7 +23,7 @@ export function settingsTabs(account: Pick<AccountData, "features" | "membership
     tabs.push({ href: "/settings/family", label: "Family" }, { href: "/settings/permissions", label: "My permissions" });
     if (account.membership?.role === "parent") tabs.push({ href: "/settings/family/manage", label: "Manage family" });
   }
-  tabs.push(AI_ASSISTANTS_TAB, NOTIFICATIONS_TAB);
+  tabs.push(AI_ASSISTANTS_TAB, AI_FEATURES_TAB, NOTIFICATIONS_TAB);
   return tabs;
 }
 

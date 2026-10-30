@@ -29,6 +29,7 @@ const PROTECTED_ROUTES: Record<string, string[]> = {
   account: ["GET", "PATCH"],
   "account/avatar": ["DELETE", "PUT"],
   "account/email": ["PATCH"],
+  "account/ai": ["GET", "PATCH"],
   "account/mcp": ["GET", "PATCH"],
   "account/mcp/apps": ["GET"],
   "account/mcp/apps/[clientId]": ["DELETE"],

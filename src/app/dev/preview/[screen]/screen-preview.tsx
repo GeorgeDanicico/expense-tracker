@@ -11,6 +11,7 @@ import ImportPage from "@/app/(app)/expenses/import/page";
 import InvestmentsPage from "@/app/(app)/investments/page";
 import NetWorthPage from "@/app/(app)/net-worth/page";
 import RemindersPage from "@/app/(app)/reminders/page";
+import AiFeaturesSettingsPage from "@/app/(app)/settings/ai/page";
 import SettingsLayout from "@/app/(app)/settings/layout";
 import NotificationsSettingsPage from "@/app/(app)/settings/notifications/page";
 import SettingsPage from "@/app/(app)/settings/page";
@@ -38,6 +39,7 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   reminders: RemindersPreview,
   calendar: CalendarPreview,
   notifications: NotificationsPreview,
+  "ai-settings": AiSettingsPreview,
   import: ImportPreview,
 };
 
@@ -62,6 +64,15 @@ function NotificationsPreview() {
   return (
     <SettingsLayout>
       <NotificationsSettingsPage />
+    </SettingsLayout>
+  );
+}
+
+/** Settings → AI features with its tabs. `?ai=on` and `?ai=kid` preview the other states (see `fixtures.ts`). */
+function AiSettingsPreview() {
+  return (
+    <SettingsLayout>
+      <AiFeaturesSettingsPage />
     </SettingsLayout>
   );
 }

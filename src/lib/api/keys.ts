@@ -9,6 +9,7 @@ import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
 import type { RecentImport } from "@/lib/imports/repository";
 import type { ImportBatch, ImportDraft } from "@/lib/imports/types";
 import { MEMBER_PARAM } from "@/lib/family/viewing";
+import type { AiProviderId } from "@/lib/ai/provider";
 import type { McpAccess, McpToken } from "@/lib/mcp/token-repository";
 import type { NotificationSettings } from "@/lib/notifications/settings-repository";
 import type { ReminderCompletion, ReminderSummary } from "@/lib/reminders/repository";
@@ -238,6 +239,22 @@ export type McpSettingsResponse = {
 export type McpAppsResponse = { apps: ConnectedApp[] };
 /** The only response that ever carries a token's secret: shown once, never stored or listed again. */
 export type CreatedMcpToken = { token: McpToken; secret: string };
+
+/**
+ * GET → {@link AiSettingsResponse}: the "Read statements with AI" switch and whether the caller can
+ * turn it on. PATCH `{ enabled }` → the same shape; 403 with the reason for a kid whose parent hasn't
+ * turned the `ai` permission on.
+ */
+export const AI_SETTINGS_API_KEY = "/api/account/ai";
+
+export type AiSettingsResponse = {
+  /** The caller's switch (`profiles.ai_enabled`), false for a kid whose permission is off. */
+  enabled: boolean;
+  /** Set for a kid whose parent hasn't turned the `ai` permission on: they can't turn the switch on. */
+  blockReason: "not_permitted" | null;
+  /** The provider that would receive a statement's text (`AI_PROVIDER`), or null when none is set up. */
+  provider: AiProviderId | null;
+};
 
 /**
  * GET → {@link TodosResponse}: the family board, To do and In progress whole and Done completed at

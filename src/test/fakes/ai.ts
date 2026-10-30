@@ -1,8 +1,12 @@
 // Types only, and nothing from `@/lib/ai/gate`: it imports `@/lib/repositories`, which route tests
 // replace with `./repositories`, which imports this file. A value import of the gate here would be a
 // cycle that never loads. The fake model moved to `src/lib/ai/providers/fake.ts` (I15).
+import { DomainError } from "@/lib/errors";
 import type { AiAccess, AiGateRepository, AiUsageRecord, BudgetRecipients } from "@/lib/ai/repository";
 import type { NewNotification } from "@/lib/notifications/worker-store";
+
+// The SQL's message (supabase/migrations/20261030000100_create_ai_gate.sql).
+const NOT_PERMITTED = "A parent needs to turn on AI features for you.";
 
 /** What the fake knows about a user. */
 export type FakeAiUser = {
@@ -81,6 +85,25 @@ export class FakeAiGateRepository implements AiGateRepository {
     const user = this.users.get(userId);
     if (user?.role === "kid" && user.familyId && !user.kidAiPermission) return "not_permitted";
     return user?.optedIn ? "ok" : "ai_off";
+  }
+
+  /** Like the switch guard: a kid without the `ai` permission can't turn it on; turning it off always works. */
+  async setOptIn(userId: string, enabled: boolean) {
+    this.call("setOptIn");
+    const user = this.users.get(userId) ?? this.setUser(userId);
+    if (enabled && !user.optedIn && user.role === "kid" && user.familyId && !user.kidAiPermission) {
+      throw new DomainError(NOT_PERMITTED, 403);
+    }
+    user.optedIn = enabled;
+  }
+
+  /**
+   * Like the permission sync trigger: a kid whose `ai` permission goes off has the switch turned off
+   * too. Tests call it where the family editor would save the permission.
+   */
+  setKidAiPermission(userId: string, permitted: boolean) {
+    const user = this.setUser(userId, { kidAiPermission: permitted });
+    if (!permitted && user.role === "kid") user.optedIn = false;
   }
 
   async familySpendMicros(userId: string, monthStart: Date) {
