@@ -131,14 +131,21 @@ export function ReviewStep({
   return (
     <Stack gap="4">
       {reopened ? <InlineAlert status="info">{REOPENED_NOTE}</InlineAlert> : null}
-      {warnings.map((warning) => <InlineAlert key={warning} status="warning">{warning}</InlineAlert>)}
 
-      <Stack gap="1">
-        <Text textStyle="sectionTitle">
-          {parserLabel(batch.parserId)}{period ? ` · ${period}` : ""}
-        </Text>
-        <Text textStyle="bodySm">{summaryParts(batch, rows).join(", ")}</Text>
-        <Text textStyle="caption">{REVIEW_NOTE}</Text>
+      <Stack gap="3">
+        <Stack gap="1">
+          <Text textStyle="sectionTitle">
+            {parserLabel(batch.parserId)}{period ? ` · ${period}` : ""}
+          </Text>
+          <Text textStyle="bodySm">{summaryParts(batch, rows).join(", ")}</Text>
+          <Text textStyle="caption">{REVIEW_NOTE}</Text>
+        </Stack>
+        {/* What the reading found wrong (totals that differ, lines left unread), above the rows it concerns. */}
+        {warnings.length > 0 ? (
+          <Stack gap="2" role="group" aria-label="Warnings about this statement">
+            {warnings.map((warning) => <InlineAlert key={warning} status="warning">{warning}</InlineAlert>)}
+          </Stack>
+        ) : null}
       </Stack>
 
       <Toolbar aria-label="Choose rows">

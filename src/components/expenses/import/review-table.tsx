@@ -14,6 +14,7 @@ import {
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
 import {
+  CATEGORY_SOURCE_LABELS,
   describeDuplicate,
   descriptionProblem,
   foreignCurrencyReason,
@@ -21,14 +22,22 @@ import {
   type ReviewAction,
   type ReviewRow,
 } from "@/lib/imports/review";
-import { IMPORT_DESCRIPTION_MAX_LENGTH } from "@/lib/imports/types";
-
-/** The merchant rule's note under a car row whose category the database sets. */
-export const RULE_NOTE = "Set by a merchant rule";
+import { IMPORT_DESCRIPTION_MAX_LENGTH, type CategorySource } from "@/lib/imports/types";
 
 /**
- * A row's category (and subtype) selects, or its fixed car category when a merchant rule set it.
- * They stack in the table's narrow column and sit side by side in a phone card.
+ * The small label under a row's category saying where it came from: "Merchant rule", "Like last
+ * time" or "AI suggestion". A row with no source (nothing categorised it, or the user changed it)
+ * shows nothing.
+ */
+export function CategorySourceLabel({ source }: { source: CategorySource | null }) {
+  if (!source) return null;
+  return <Text textStyle="caption" data-category-source={source}>{CATEGORY_SOURCE_LABELS[source]}</Text>;
+}
+
+/**
+ * A row's category (and subtype) selects, or its fixed car category when a merchant rule set it,
+ * with the label of where the category came from under them. They stack in the table's narrow
+ * column and sit side by side in a phone card.
  */
 export function CategorySelects({
   item,
@@ -41,48 +50,52 @@ export function CategorySelects({
   dispatch: Dispatch<ReviewAction>;
   layout?: "stacked" | "inline";
 }) {
-  const { row, category, subtype } = item;
+  const { row, category, subtype, categorySource } = item;
   if (row.ruleMatched) {
+    // The selects are gone: the database applies the rule again on save, so the category is fixed.
     return (
       <Stack gap="0.5" align="flex-start">
         <CategoryBadge category={category} subtype={subtype} tone="color" />
-        <Text textStyle="caption">{RULE_NOTE}</Text>
+        <CategorySourceLabel source={categorySource} />
       </Stack>
     );
   }
   const subtypes = subtypesForCategory(category);
   return (
-    <Flex direction={layout === "inline" ? "row" : "column"} gap={layout === "inline" ? "2" : "1"}>
-      <NativeSelect.Root size="sm" disabled={disabled}>
-        <NativeSelect.Field
-          aria-label={`Category for ${row.description}`}
-          value={category}
-          onChange={(event) => dispatch({ type: "categorise", id: row.id, category: event.target.value as ExpenseCategory })}
-        >
-          {EXPENSE_CATEGORIES.map((option) => (
-            <option key={option} value={option}>{CATEGORY_LABELS[option]}</option>
-          ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
-      {subtypes.length > 0 ? (
+    <Stack gap="1">
+      <Flex direction={layout === "inline" ? "row" : "column"} gap={layout === "inline" ? "2" : "1"}>
         <NativeSelect.Root size="sm" disabled={disabled}>
           <NativeSelect.Field
-            aria-label={`Subtype for ${row.description}`}
-            value={subtype ?? ""}
-            onChange={(event) => dispatch({
-              type: "subtype",
-              id: row.id,
-              subtype: event.target.value ? event.target.value as ExpenseSubtype : null,
-            })}
+            aria-label={`Category for ${row.description}`}
+            value={category}
+            onChange={(event) => dispatch({ type: "categorise", id: row.id, category: event.target.value as ExpenseCategory })}
           >
-            <option value="">No subtype</option>
-            {subtypes.map((option) => <option key={option} value={option}>{SUBTYPE_LABELS[option]}</option>)}
+            {EXPENSE_CATEGORIES.map((option) => (
+              <option key={option} value={option}>{CATEGORY_LABELS[option]}</option>
+            ))}
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>
-      ) : null}
-    </Flex>
+        {subtypes.length > 0 ? (
+          <NativeSelect.Root size="sm" disabled={disabled}>
+            <NativeSelect.Field
+              aria-label={`Subtype for ${row.description}`}
+              value={subtype ?? ""}
+              onChange={(event) => dispatch({
+                type: "subtype",
+                id: row.id,
+                subtype: event.target.value ? event.target.value as ExpenseSubtype : null,
+              })}
+            >
+              <option value="">No subtype</option>
+              {subtypes.map((option) => <option key={option} value={option}>{SUBTYPE_LABELS[option]}</option>)}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        ) : null}
+      </Flex>
+      <CategorySourceLabel source={categorySource} />
+    </Stack>
   );
 }
 

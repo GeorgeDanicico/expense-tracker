@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   addLabel,
+  CATEGORY_SOURCE_LABELS,
   confirmRows,
   describeDuplicate,
   descriptionProblem,
@@ -66,7 +67,7 @@ const rows = [
   aRow({ id: "a", description: "Cafe", amount: 4.5 }),
   aRow({ id: "b", description: "Lidl", duplicateOf: duplicate }),
   aRow({ id: "c", description: "Foreign shop", currency: "RON", importable: false }),
-  aRow({ id: "d", description: "OMV", amount: 300, category: "car", subtype: "car_fuel", ruleMatched: true }),
+  aRow({ id: "d", description: "OMV", amount: 300, category: "car", subtype: "car_fuel", ruleMatched: true, categorySource: "rule" }),
 ];
 
 const ids = (state: ReviewRow[]) => tickedRows(state).map((item) => item.row.id);
@@ -80,6 +81,47 @@ describe("initialReview", () => {
     const [cafe, , , omv] = initialReview(rows);
     expect(cafe).toMatchObject({ description: "Cafe", category: "other", subtype: null });
     expect(omv).toMatchObject({ category: "car", subtype: "car_fuel" });
+  });
+});
+
+describe("a row's category source", () => {
+  const sourced = [
+    aRow({ id: "h", description: "Lidl", category: "groceries", categorySource: "history" }),
+    aRow({ id: "m", description: "Netflix", category: "entertainment", categorySource: "ai" }),
+    aRow({ id: "n", description: "Cafe" }),
+    // A rule row whose source was never stored still says it was the rule.
+    aRow({ id: "r", description: "OMV", category: "car", subtype: "car_fuel", ruleMatched: true, categorySource: null }),
+  ];
+  const sourceOf = (state: ReviewRow[], id: string) => state.find((item) => item.row.id === id)?.categorySource;
+
+  it("starts as the draft's source, and as the rule for a rule-matched row", () => {
+    const state = initialReview(sourced);
+    expect(["h", "m", "n", "r"].map((id) => sourceOf(state, id))).toEqual(["history", "ai", null, "rule"]);
+  });
+
+  it("is dropped when the category or the subtype is changed, so the row stops claiming it", () => {
+    const state = initialReview(sourced);
+    expect(sourceOf(reviewReducer(state, { type: "categorise", id: "m", category: "shopping" }), "m")).toBeNull();
+    expect(sourceOf(reviewReducer(state, { type: "categorise", id: "h", category: "car" }), "h")).toBeNull();
+    // Only the row that was changed loses its source.
+    expect(sourceOf(reviewReducer(state, { type: "categorise", id: "m", category: "shopping" }), "h")).toBe("history");
+
+    const car = initialReview([aRow({ id: "x", category: "car", categorySource: "ai" })]);
+    expect(reviewReducer(car, { type: "subtype", id: "x", subtype: "car_repairs" })[0].categorySource).toBeNull();
+  });
+
+  it("is kept by an edit that is not a category, by a rejected subtype and by a row a merchant rule set", () => {
+    let state = initialReview(sourced);
+    state = reviewReducer(state, { type: "describe", id: "m", description: "Netflix.com" });
+    state = reviewReducer(state, { type: "toggle", id: "m" });
+    state = reviewReducer(state, { type: "categorise", id: "r", category: "groceries" });
+    state = reviewReducer(state, { type: "subtype", id: "r", subtype: "car_repairs" });
+    expect(sourceOf(state, "m")).toBe("ai");
+    expect(sourceOf(state, "r")).toBe("rule");
+  });
+
+  it("has the plan's wording", () => {
+    expect(CATEGORY_SOURCE_LABELS).toEqual({ rule: "Merchant rule", history: "Like last time", ai: "AI suggestion" });
   });
 });
 
@@ -201,6 +243,9 @@ describe("wording", () => {
   it("names the parser, falling back for an unknown id", () => {
     expect(parserLabel("generic-csv")).toBe("Generic CSV");
     expect(parserLabel("nobody")).toBe("Statement");
+    // The suffix for the model's categories keeps the parser that read the rows; a read statement has no parser.
+    expect(parserLabel("generic-csv+ai:statement-categorise-v1")).toBe("Generic CSV");
+    expect(parserLabel("ai:statement-reader-v1")).toBe("AI-read statement");
   });
 
   it("formats days and periods", () => {

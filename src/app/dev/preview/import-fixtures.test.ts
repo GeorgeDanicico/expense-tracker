@@ -114,6 +114,33 @@ describe("the import preview API", () => {
     await expect(api.getDraft(batch.id)).rejects.toMatchObject({ status: 404 });
   });
 
+  it("reads the made-up AI statement: every category source, both warnings, and none on a second look", async () => {
+    const api = await freshApi();
+    const { PREVIEW_READ_STATEMENT_FILE } = await import("./import-fixtures");
+    const read = () => new File(["x"], PREVIEW_READ_STATEMENT_FILE, { type: "text/csv" });
+
+    const { batch, warnings, reopened } = await api.upload(read(), "text/csv");
+    expect(reopened).toBe(false);
+    expect(batch).toMatchObject({ parserId: "ai:statement-reader-v1", skippedCredits: 1, rowCount: 8 });
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toMatch(/^The rows read add up to 267\.88, but the statement's printed total of money out is 280\.28 \(a difference of 12\.40\)\.$/);
+    expect(warnings[1]).toBe("3 lines with an amount weren't read as transactions.");
+
+    const draft = await api.getDraft(batch.id);
+    expect([...new Set(draft.rows.map((row) => row.categorySource))].toSorted()).toEqual(["ai", "history", "rule"]);
+    expect(draft.rows.find((row) => row.categorySource === "rule")).toMatchObject({ category: "car", ruleMatched: true });
+    expect(draft.rows.filter((row) => row.duplicateOf).map((row) => row.description)).toEqual(["Lidl Cluj", "Kaufland Marasti", "Farmacia Dona"]);
+
+    // A resumed draft has no warnings: they are only in the upload's response.
+    await expect(api.upload(read(), "text/csv")).resolves.toMatchObject({ reopened: true, warnings: [] });
+  });
+
+  it("refuses a layout nobody reads with the code the screen shows its hint for", async () => {
+    const api = await freshApi();
+    await expect(api.upload(new File(["hello,world\n1,2\n"], "x.csv"), "text/csv"))
+      .rejects.toMatchObject({ status: 422, code: "unrecognised_layout" });
+  });
+
   it("exports an API for the page", () => {
     expect(Object.keys(previewImportApi).toSorted()).toEqual(["confirm", "discard", "getDraft", "undo", "upload"]);
   });

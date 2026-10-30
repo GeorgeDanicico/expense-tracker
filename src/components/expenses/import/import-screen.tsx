@@ -11,11 +11,12 @@ import { useImportApi } from "@/components/expenses/import/import-api";
 import { RecentImports } from "@/components/expenses/import/recent-imports";
 import { ResultView } from "@/components/expenses/import/result-view";
 import { ReviewStep } from "@/components/expenses/import/review-step";
-import { statementContentType, statementKind, UploadStep, uploadErrorMessage } from "@/components/expenses/import/upload-step";
+import { statementContentType, statementKind, UploadStep, uploadErrorCode, uploadErrorMessage } from "@/components/expenses/import/upload-step";
 import { DataLoading } from "@/components/ui/data-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAccount } from "@/hooks/use-account";
+import { useAiSettings } from "@/hooks/use-ai-settings";
 import { ApiError } from "@/lib/api/client";
 import { afterImportDraftChange } from "@/lib/api/invalidate";
 import type { ImportConfirmResponse } from "@/lib/api/keys";
@@ -59,12 +60,16 @@ export function ImportScreen() {
   const [step, setStep] = useState<Step>(requested ? { kind: "opening" } : { kind: "upload" });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState<string | undefined>();
+  // Whether the user's AI switch is on, once known; the upload step points at Settings → AI while it is off.
+  const { settings: aiSettings } = useAiSettings();
 
   async function upload(file: File) {
     const kind = statementKind(file);
     if (!kind || pending) return;
     setPending(true);
     setError("");
+    setErrorCode(undefined);
     try {
       const { batch, reopened, warnings } = await api.upload(file, statementContentType(kind));
       const draft = await api.getDraft(batch.id);
@@ -73,6 +78,7 @@ export function ImportScreen() {
       setStep({ kind: "review", draft, reopened, warnings });
     } catch (caught) {
       setError(uploadErrorMessage(caught));
+      setErrorCode(uploadErrorCode(caught));
     } finally {
       setPending(false);
     }
@@ -81,6 +87,7 @@ export function ImportScreen() {
   /** Back to the upload step, with the list refreshed: what was just done changes it. */
   function startOver(notice?: string, tone: "info" | "warning" = "info") {
     setError("");
+    setErrorCode(undefined);
     setDraftInUrl(null);
     afterImportDraftChange(mutate);
     setStep({ kind: "upload", notice, tone });
@@ -139,6 +146,8 @@ export function ImportScreen() {
             onFile={(file) => void upload(file)}
             pending={pending}
             error={error}
+            errorCode={errorCode}
+            aiEnabled={aiSettings ? aiSettings.enabled : undefined}
             notice={step.notice}
             noticeTone={step.tone}
           />

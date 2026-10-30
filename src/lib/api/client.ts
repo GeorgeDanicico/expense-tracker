@@ -1,16 +1,19 @@
 export class ApiError extends Error {
   status: number;
   fieldErrors?: Record<string, string[]>;
+  /** A machine-readable reason, for the few refusals a screen tells apart (an import's `unrecognised_layout`). */
+  code?: string;
 
-  constructor(message: string, status: number, fieldErrors?: Record<string, string[]>) {
+  constructor(message: string, status: number, fieldErrors?: Record<string, string[]>, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.fieldErrors = fieldErrors;
+    this.code = code;
   }
 }
 
-type ErrorPayload = { error?: string; fieldErrors?: Record<string, string[]> };
+type ErrorPayload = { error?: string; fieldErrors?: Record<string, string[]>; code?: string };
 const REQUEST_TIMEOUT_MS = 15_000;
 
 async function fetchWithTimeout(url: string, init: RequestInit) {
@@ -36,6 +39,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
       payload.error || "Something went wrong. Please try again.",
       response.status,
       payload.fieldErrors,
+      typeof payload.code === "string" ? payload.code : undefined,
     );
   }
   return payload;

@@ -1,7 +1,7 @@
 import type { ConfirmRows, ImportApi } from "@/components/expenses/import/import-api";
 import { ApiError } from "@/lib/api/client";
 import { addDays, getBucharestToday } from "@/lib/calendar";
-import { subtypeForCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
+import { subtypeForCategory, type ExpenseCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
 import type { Expense } from "@/lib/expenses/types";
 import type { ImportsResponse } from "@/lib/api/keys";
 import { decodeStatementText } from "@/lib/imports/decode";
@@ -11,6 +11,7 @@ import { maskAccountNumbers } from "@/lib/imports/redact";
 import type { RecentImport } from "@/lib/imports/repository";
 import {
   ImportError,
+  type CategorySource,
   type DraftRow,
   type ImportBatch,
   type ImportDraft,
@@ -36,6 +37,12 @@ import { confirmImportSchema } from "@/lib/validation/import";
 // resume, discard and undo can be tried without uploading anything first. Their expenses aren't in
 // the sample expenses below: undoing one reports its count and changes nothing. `?draft=<id>` opens
 // a draft directly; an id the preview doesn't know is a 404, which is what an expired draft is.
+//
+// A statement the model read (task I18) can't be read here, so a file named `ai-read-*` gets a made-up
+// one: rows whose categories came from the merchant rule, your history and the model, and both
+// verification warnings. Like the real upload, the warnings come with the upload response only; a
+// draft opened again (a reload with `?draft=`, or Resume) has none. The AI switch the upload step reads
+// is the preview's (`?ai=on` in the address bar turns it on, see `fixtures.ts`).
 
 /** The preview account's currency (see `fixtures.ts`). */
 const ACCOUNT_CURRENCY = "EUR";
@@ -69,6 +76,62 @@ export function previewSampleStatement(today = getBucharestToday()): string {
   const lines = SAMPLE_ROWS.map(([daysAgo, description, amount, currency]) =>
     `${addDays(today, -daysAgo)},${description},${amount.toFixed(2)},${currency}`);
   return ["Date,Description,Amount,Currency", ...lines].join("\n");
+}
+
+/** The file name the preview answers with a made-up statement the model read. */
+export const PREVIEW_READ_STATEMENT_FILE = "ai-read-statement.csv";
+
+type ReadSampleRow = [daysAgo: number, description: string, amount: number, category: ExpenseCategory, subtype: ExpenseSubtype | null, source: CategorySource];
+
+const READ_SAMPLE_ROWS: ReadSampleRow[] = [
+  [1, "Lidl Cluj", 45.2, "groceries", null, "history"],
+  [2, "OMV 1642 Satu Mare", 61.2, "car", "car_fuel", "rule"],
+  [2, "Netflix", 12.99, "entertainment", null, "ai"],
+  [3, "Kaufland Marasti", 86.4, "groceries", null, "history"],
+  [4, "Farmacia Dona", 18.9, "health", null, "ai"],
+  [7, "Bolt", 7.8, "transport", null, "ai"],
+  [8, "Starbucks Unirii", 5.4, "other", null, "ai"],
+  [12, "Digi internet", 29.99, "utilities", null, "history"],
+];
+
+/** The made-up read statement, dated back from today, with the warnings the reader would give it. */
+function previewReadDraft(today = getBucharestToday()) {
+  const rows = READ_SAMPLE_ROWS.map(([daysAgo, description, amount]) => ({
+    expense_date: addDays(today, -daysAgo),
+    description,
+    amount,
+    currency: ACCOUNT_CURRENCY,
+    notes: null as string | null,
+  }));
+  const stored: StoredRow[] = READ_SAMPLE_ROWS.map(([daysAgo, description, amount, category, subtype, source], index) => ({
+    id: crypto.randomUUID(),
+    position: index + 1,
+    expenseDate: addDays(today, -daysAgo),
+    description,
+    amount,
+    currency: ACCOUNT_CURRENCY,
+    category,
+    subtype,
+    ruleMatched: source === "rule",
+    categorySource: source,
+    notes: null,
+  }));
+  const cents = READ_SAMPLE_ROWS.reduce((sum, [, , amount]) => sum + Math.round(amount * 100), 0);
+  const money = (value: number) => (value / 100).toFixed(2);
+  return {
+    parserId: "ai:statement-reader-v1",
+    currency: ACCOUNT_CURRENCY as string | null,
+    periodStart: addDays(today, -30),
+    periodEnd: addDays(today, -1),
+    skippedCredits: 1,
+    hash: "preview-ai-read-statement",
+    rows,
+    stored,
+    warnings: [
+      `The rows read add up to ${money(cents)}, but the statement's printed total of money out is ${money(cents + 1240)} (a difference of 12.40).`,
+      "3 lines with an amount weren't read as transactions.",
+    ],
+  };
 }
 
 /** The expenses already saved, which the sample statement's duplicates match. */
@@ -229,6 +292,7 @@ function previewDraft(bytes: Uint8Array) {
     skippedCredits: parsed.rows.length - debits.length,
     hash: String(hash),
     rows,
+    stored: undefined,
     warnings: parsed.warnings ?? [],
   };
 }
@@ -307,9 +371,9 @@ export const previewImportApi: ImportApi = {
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (file.name.toLowerCase().endsWith(".pdf") || isPdf(bytes)) throw new ApiError(PREVIEW_PDF_MESSAGE, 415);
-      draft = previewDraft(bytes);
+      draft = file.name === PREVIEW_READ_STATEMENT_FILE ? previewReadDraft() : previewDraft(bytes);
     } catch (caught) {
-      if (caught instanceof ImportError) throw new ApiError(caught.message, caught.status);
+      if (caught instanceof ImportError) throw new ApiError(caught.message, caught.status, undefined, caught.code);
       throw caught;
     }
 
@@ -329,7 +393,7 @@ export const previewImportApi: ImportApi = {
     const batch: ImportBatch = {
       id,
       status: "draft",
-      sourceKind: "csv",
+      sourceKind: draft.stored ? "pdf" : "csv",
       parserId: draft.parserId,
       currency: draft.currency,
       periodStart: draft.periodStart,
@@ -342,7 +406,7 @@ export const previewImportApi: ImportApi = {
       confirmedCount: null,
       undoneAt: null,
     };
-    const rows = draftRows(draft.rows);
+    const rows = draft.stored ?? draftRows(draft.rows);
     imports().set(id, { batch, rows, hash: draft.hash, created: [] });
     return { batch, reopened: false, warnings: draft.warnings };
   },

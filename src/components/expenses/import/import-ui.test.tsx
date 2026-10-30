@@ -10,14 +10,16 @@ import { ReviewCards } from "@/components/expenses/import/review-cards";
 import { addedHeading, ResultView, undoneDescription } from "@/components/expenses/import/result-view";
 import { undoDescription } from "@/components/expenses/import/undo-dialog";
 import { ReviewStep, REOPENED_NOTE, REVIEW_NOTE } from "@/components/expenses/import/review-step";
-import { ReviewTable, RULE_NOTE } from "@/components/expenses/import/review-table";
+import { ReviewTable } from "@/components/expenses/import/review-table";
 import {
+  AiReadingHint,
   DISCARD_NOTE,
   EMPTY_STATEMENT_FILE,
   NOT_A_STATEMENT_FILE,
   statementContentType,
   statementKind,
   UploadStep,
+  uploadErrorCode,
   uploadErrorMessage,
   validateStatementFile,
 } from "@/components/expenses/import/upload-step";
@@ -71,9 +73,23 @@ const draft: ImportDraft = {
     aRow({ id: "a", description: "Cafe" }),
     aRow({ id: "b", description: "Lidl Cluj", amount: 45.2, duplicateOf: { id: "e1", description: "Lidl", expenseDate: "2026-10-12", amount: 45.2 } }),
     aRow({ id: "c", description: "Foreign shop", amount: 399, currency: "RON", importable: false }),
-    aRow({ id: "d", description: "OMV 1642", amount: 300, category: "car", subtype: "car_fuel", ruleMatched: true }),
+    aRow({ id: "d", description: "OMV 1642", amount: 300, category: "car", subtype: "car_fuel", ruleMatched: true, categorySource: "rule" }),
   ],
 };
+
+/** A statement the model read: a category from each source, and one nobody categorised. */
+const readDraft: ImportDraft = {
+  batch: { ...batch, sourceKind: "pdf", parserId: "ai:statement-reader-v1", skippedCredits: 1, rowCount: 5 },
+  rows: [
+    aRow({ id: "h", description: "Lidl Cluj", category: "groceries", categorySource: "history" }),
+    aRow({ id: "m", description: "Netflix", category: "entertainment", categorySource: "ai" }),
+    aRow({ id: "r", description: "OMV 1642", category: "car", subtype: "car_fuel", ruleMatched: true, categorySource: "rule" }),
+    aRow({ id: "n", description: "Corner shop" }),
+  ],
+};
+
+/** The text of some markup: tags removed, so a sentence with a link in the middle reads as one. */
+const textOf = (html: string) => html.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]*>/g, "").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -179,6 +195,13 @@ describe("restImportApi", () => {
     await expect(restImportApi.getDraft("b1")).rejects.toMatchObject({ status: 404 });
   });
 
+  it("carries a refused upload's code on the ApiError, so the screen can tell refusals apart", async () => {
+    stubFetch(new Response(JSON.stringify({ error: "This statement's layout isn't supported yet.", code: "unrecognised_layout" }), { status: 422 }));
+    const caught = await restImportApi.upload(new File(["a"], "x.csv"), "text/csv").catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(ApiError);
+    expect(caught).toMatchObject({ status: 422, code: "unrecognised_layout" });
+  });
+
   it("carries a confirm's field errors on the ApiError", async () => {
     stubFetch(new Response(JSON.stringify({ error: "Check the rows and try again.", fieldErrors: { "rows.1.amount": ["Too small."] } }), { status: 422 }));
     const caught = await restImportApi.confirm("b1", []).catch((error: unknown) => error);
@@ -203,6 +226,63 @@ describe("UploadStep", () => {
     const html = render(<UploadStep onFile={noop} pending={false} error="This statement's layout isn't supported yet." notice="The import was discarded." />);
     expect(html).toContain("This statement&#x27;s layout isn&#x27;t supported yet.");
     expect(html).toContain("The import was discarded.");
+  });
+});
+
+describe("the AI reading hint", () => {
+  const sentence = "Turn on AI reading in Settings to import any bank's statement.";
+
+  it("is the plan's sentence, linking to Settings → AI", () => {
+    const html = render(<AiReadingHint />);
+    expect(textOf(html)).toBe(sentence);
+    expect(html).toMatch(/<a [^>]*href="\/settings\/ai"[^>]*>Settings<\/a>/);
+  });
+
+  it("shows on the upload step while AI is off", () => {
+    const html = render(<UploadStep onFile={noop} pending={false} aiEnabled={false} />);
+    expect(textOf(html)).toContain(sentence);
+    expect(html).toContain('href="/settings/ai"');
+    expect(html.match(/ai-reading-hint/g)).toHaveLength(1);
+  });
+
+  it("is absent when AI is on, and while it is not known yet", () => {
+    for (const aiEnabled of [true, undefined]) {
+      expect(render(<UploadStep onFile={noop} pending={false} aiEnabled={aiEnabled} />)).not.toContain("ai-reading-hint");
+    }
+  });
+
+  it("follows an unrecognised_layout refusal, once, inside the refusal", () => {
+    const html = render(
+      <UploadStep onFile={noop} pending={false} aiEnabled={false} error="This statement's layout isn't supported yet." errorCode="unrecognised_layout" />,
+    );
+    const text = textOf(html);
+    // Two blocks, the message and then the hint, so no space between them in the text.
+    expect(text).toContain("This statement's layout isn't supported yet." + sentence);
+    expect(html.match(/ai-reading-hint/g)).toHaveLength(1);
+    expect(html.indexOf("ai-reading-hint")).toBeLessThan(html.indexOf("Drop a statement here"));
+  });
+
+  it("is the standing line, not part of the error, for any other refusal", () => {
+    const html = render(
+      <UploadStep onFile={noop} pending={false} aiEnabled={false} error="That file is empty." errorCode="empty_file" />,
+    );
+    expect(html.match(/ai-reading-hint/g)).toHaveLength(1);
+    expect(html.indexOf("ai-reading-hint")).toBeGreaterThan(html.indexOf("Drop a statement here"));
+  });
+
+  it("is not added to a refusal when AI is on or unknown, whose layout message already says why", () => {
+    for (const aiEnabled of [true, undefined]) {
+      const html = render(
+        <UploadStep onFile={noop} pending={false} aiEnabled={aiEnabled} error="AI reading is paused this month." errorCode="unrecognised_layout" />,
+      );
+      expect(html).not.toContain("ai-reading-hint");
+    }
+  });
+
+  it("reads the refusal's code off an ApiError", () => {
+    expect(uploadErrorCode(new ApiError("x", 422, undefined, "unrecognised_layout"))).toBe("unrecognised_layout");
+    expect(uploadErrorCode(new ApiError("x", 422))).toBeUndefined();
+    expect(uploadErrorCode(new Error("x"))).toBeUndefined();
   });
 });
 
@@ -236,10 +316,31 @@ describe("ReviewTable", () => {
   });
 
   it("shows a merchant-rule row's car category as fixed, without selects", () => {
-    expect(html).toContain(RULE_NOTE);
     expect(html).toContain("Car / Car Fuel");
     expect(html).not.toContain('aria-label="Category for OMV 1642"');
     expect(html).toContain('aria-label="Category for Cafe"');
+  });
+
+  it("labels each row's category with where it came from, and leaves a row with no source bare", () => {
+    const read = render(<ReviewTable items={initialReview(readDraft.rows)} accountCurrency="EUR" rowErrors={{}} dispatch={noop} />);
+    expect([...read.matchAll(/data-category-source="(\w+)"[^>]*>([^<]+)</g)].map((match) => [match[1], match[2]])).toEqual([
+      ["history", "Like last time"],
+      ["ai", "AI suggestion"],
+      ["rule", "Merchant rule"],
+    ]);
+    // The label sits under the category's select, not in place of it.
+    expect(read.indexOf('aria-label="Category for Netflix"')).toBeLessThan(read.indexOf("AI suggestion"));
+    // No source: no label. The classic CSV draft has only the rule row's.
+    expect(html.match(/data-category-source/g)).toHaveLength(1);
+    expect(html).toContain("Merchant rule");
+    expect(html).not.toContain("AI suggestion");
+  });
+
+  it("drops the label once the user changes the category", () => {
+    const items = initialReview(readDraft.rows).map((item) => (item.row.id === "m" ? { ...item, category: "shopping" as const, categorySource: null } : item));
+    const changed = render(<ReviewTable items={items} accountCurrency="EUR" rowErrors={{}} dispatch={noop} />);
+    expect(changed).not.toContain("AI suggestion");
+    expect(changed).toContain("Like last time");
   });
 
   it("offers the subtype select only for a category that has subtypes", () => {
@@ -290,6 +391,36 @@ describe("ReviewStep", () => {
       .toContain("1 description was too long");
   });
 
+  describe("for a statement the model read", () => {
+    const totals = "The rows read add up to 267.88, but the statement's printed total of money out is 280.28 (a difference of 12.40).";
+    const lines = "3 lines with an amount weren't read as transactions.";
+    const read = { ...props, draft: readDraft, warnings: [totals, lines] };
+
+    it("shows both verification warnings in the summary area, above the rows", () => {
+      const html = render(<ReviewStep {...read} />);
+      const text = textOf(html);
+      expect(text).toContain(totals);
+      expect(text).toContain(lines);
+      expect(text).toContain("AI-read statement");
+      // After the summary line and before the first row (the table or the cards).
+      expect(text.indexOf("5 rows")).toBeLessThan(text.indexOf(totals));
+      expect(text.indexOf(totals)).toBeLessThan(text.indexOf(lines));
+      expect(html.indexOf(lines)).toBeLessThan(html.indexOf("Transactions found in the statement"));
+      expect(html).toMatch(/aria-label="Warnings about this statement"/);
+    });
+
+    it("labels the rows by source", () => {
+      const html = render(<ReviewStep {...read} />);
+      for (const label of ["Like last time", "AI suggestion", "Merchant rule"]) expect(html).toContain(label);
+    });
+
+    it("shows no warnings group when there are none, as for a draft that is resumed", () => {
+      const html = render(<ReviewStep {...props} draft={readDraft} />);
+      expect(html).not.toContain("Warnings about this statement");
+      expect(html).not.toContain("weren't read as transactions");
+    });
+  });
+
   it("disables Add while nothing is ticked", () => {
     const none = { ...draft, rows: draft.rows.map((row) => ({ ...row, importable: false })) };
     expect(render(<ReviewStep {...props} draft={none} />)).toMatch(/<button[^>]*disabled[^>]*>Add expenses<\/button>/);
@@ -336,8 +467,14 @@ describe("ReviewCards", () => {
     expect(html).toContain("Possible duplicate");
     expect(html).toMatch(/Looks like [\s\S]*?<em[^>]*>Lidl, 12 Oct, 45\.20<\/em>/);
     expect(html).toContain("In RON. Your account is in EUR, so this can&#x27;t be imported.");
-    expect(html).toContain(RULE_NOTE);
+    expect(html).toContain("Merchant rule");
     expect(html).not.toContain('aria-label="Category for OMV 1642"');
+  });
+
+  it("labels where each category came from on a phone too", () => {
+    const read = render(<ReviewCards items={initialReview(readDraft.rows)} accountCurrency="EUR" rowErrors={{}} dispatch={noop} />);
+    for (const label of ["Like last time", "AI suggestion", "Merchant rule"]) expect(read).toContain(label);
+    expect(read.match(/data-category-source/g)).toHaveLength(3);
   });
 
   it("shows a server message under its row, and a blank description on a ticked row", () => {
