@@ -34,6 +34,7 @@ function aRow(overrides: Partial<DraftRow> = {}): DraftRow {
     category: "other",
     subtype: null,
     ruleMatched: false,
+    categorySource: null,
     notes: null,
     duplicateOf: null,
     importable: true,

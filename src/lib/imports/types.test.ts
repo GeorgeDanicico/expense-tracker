@@ -57,6 +57,11 @@ describe("import errors", () => {
     expect(new ImportError("already_imported").status).toBe(409);
     expect(new ImportError("rate_limited").status).toBe(429);
     expect(new ImportError("no_debits").status).toBe(422);
+    expect(new ImportError("unverified_statement").status).toBe(422);
+  });
+
+  it("say that a statement the model read couldn't be verified, without quoting it", () => {
+    expect(new ImportError("unverified_statement").message).toBe("The statement couldn't be read reliably.");
   });
 
   it("accept a message of their own", () => {

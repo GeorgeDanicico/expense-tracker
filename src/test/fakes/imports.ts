@@ -111,6 +111,7 @@ export class FakeImportRepository implements ImportRepository {
         category: "other",
         subtype: null,
         ruleMatched: false,
+        categorySource: null,
         notes: null,
         ...row,
       });
@@ -157,7 +158,9 @@ export class FakeImportRepository implements ImportRepository {
     };
     this.batches.push(stored);
     rows.forEach((row, index) => {
-      const subtype = fakeMerchantSubtype(row.description);
+      // Like the function: the merchant rule wins; otherwise the row keeps the category it was given.
+      const ruleSubtype = fakeMerchantSubtype(row.description);
+      const given = row.category !== undefined;
       this.rows.push({
         id: randomUUID(),
         batchId: stored.id,
@@ -166,9 +169,10 @@ export class FakeImportRepository implements ImportRepository {
         description: row.description,
         amount: row.amount,
         currency: row.currency,
-        category: subtype ? "car" : "other",
-        subtype,
-        ruleMatched: subtype !== null,
+        category: ruleSubtype ? "car" : (row.category ?? "other"),
+        subtype: ruleSubtype ?? row.subtype ?? null,
+        ruleMatched: ruleSubtype !== null,
+        categorySource: ruleSubtype ? "rule" : given ? (row.category_source ?? null) : null,
         notes: row.notes ?? null,
       });
     });

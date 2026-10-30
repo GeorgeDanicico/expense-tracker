@@ -247,6 +247,7 @@ function draftRows(rows: ReturnType<typeof previewDraft>["rows"]): StoredRow[] {
       category: subtype ? "car" : "other",
       subtype,
       ruleMatched: subtype !== null,
+      categorySource: subtype !== null ? "rule" : null,
       notes: row.notes ?? null,
     };
   });

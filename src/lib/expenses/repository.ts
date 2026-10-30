@@ -1,4 +1,5 @@
 import type { DashboardSummary } from "@/lib/expenses/analytics";
+import type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
 import type { ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { Expense } from "@/lib/expenses/types";
@@ -6,6 +7,14 @@ import type { ExpenseInput, ExpensePatch } from "@/lib/validation/expense";
 
 /** Calendar dates as `YYYY-MM-DD`: `start` is included, `endExclusive` is not. */
 export type DateRange = { start: string; endExclusive: string };
+
+/** What the statement reader learns from an expense the user categorised: its description and the classification they gave it. */
+export type MerchantCategory = {
+  description: string;
+  category: ExpenseCategory;
+  subtype: ExpenseSubtype | null;
+  expenseDate: string;
+};
 
 /** What the dashboard reads from storage; `src/lib/expenses/service.ts` turns it into `DashboardData`. */
 export type ExpenseDashboardSnapshot = {
@@ -25,6 +34,13 @@ export interface ExpenseRepository {
   listMonth(userId: string, month: string): Promise<Expense[]>;
   /** The user's expenses dated from `range.start` up to, not including, `range.endExclusive`. */
   listRange(userId: string, range: DateRange): Promise<Expense[]>;
+  /**
+   * The user's expenses dated from `since` (`YYYY-MM-DD`) on, newest first, as description plus the
+   * category and subtype they have. Expenses left in Other are left out: Other says nothing about a
+   * merchant, and everything imported before the statement reader arrived is in it. The statement
+   * reader groups these by normalised merchant to reuse the user's own choices.
+   */
+  recentCategoriesByMerchant(userId: string, since: string): Promise<MerchantCategory[]>;
   /**
    * The user's expenses in the tab's categories or subtypes, narrowed by the filters.
    * The caller resolves the tab with the user's ownership first. A tab with no selections lists nothing.

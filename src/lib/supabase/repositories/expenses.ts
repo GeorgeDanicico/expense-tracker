@@ -129,6 +129,25 @@ export const supabaseExpenseRepository: ExpenseRepository = {
     return queryExpensesForUser(userId, { start, endExclusive });
   },
 
+  async recentCategoriesByMerchant(userId, since) {
+    const supabase = await createClient();
+    // The explicit owner filter is this repository's, as in every query here: parents' RLS reads are wider.
+    const rows = await fetchAllPages((from, to) =>
+      selectOwnedExpensePage(supabase, userId)
+        .gte("expense_date", since)
+        .neq("category", "other")
+        .order("expense_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to));
+    return rows.map((row) => ({
+      description: row.description,
+      category: row.category as ExpenseCategory,
+      subtype: row.subtype as ExpenseSubtype | null,
+      expenseDate: row.expense_date,
+    }));
+  },
+
   async listForTab(userId, tab, filters) {
     return queryExpensesForUser(userId, { tab, filters, ...expenseTabDateBounds(filters) });
   },
