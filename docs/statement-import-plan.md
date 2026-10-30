@@ -192,16 +192,24 @@ upload (I4 guard, unchanged) → CSV decoded / PDF text extracted (I3, I12, unch
   │         one small call: a category per distinct merchant          ≈ $0.001
   │    → content hash of the rows (as built)
   │
-  └─ no (most PDFs, unfamiliar CSVs)
+  └─ no (unfamiliar CSVs; and every PDF, since I21)
        AI on? no → 422 unrecognised_layout, with a hint pointing at Settings → AI
        yes → numbered lines ("0001⇥…", "--- page 2 ---" markers) → mode "read"
             count the lines that look like transactions (sets the output cap)
             one call: compact rows + one category per distinct merchant ≈ $0.004–0.009
-            verify every row against the numbered text (below), else 422 unverified_statement
+            spot-check every row against the numbered text (below); a row that fails is left out,
+            and the statement is refused (422 unverified_statement) only when most rows fail
             merchants: merchant rule, then your history, then the model's category
             content hash of the masked text
   → create_import_batch (I1, with I14's category fields)
 ```
+
+**Since I21 a PDF skips the parsers when AI is on:** it goes straight to mode "read", whether or not
+a parser would claim it. If the AI can't be used for that call (not configured, kill switch off, user
+not opted in, budget used up, input too large) or the model's answer doesn't hold up, a parser that
+claims the file reads it instead, as with AI off; with no parser either, the user gets the current
+`unrecognised_layout` message (with the gate's reason) or `unverified_statement`. CSVs are unchanged:
+parser first, the model as the fallback.
 
 With AI off, everything works as built: the parsers read what they can, and the rest is refused.
 
@@ -223,15 +231,18 @@ what costs; the schema's descriptions say what each means.
 
 - `r[]`, one per transaction, money in included (it is counted and skipped as before):
   - `l`: the 1 to 3 consecutive line numbers it is written on;
-  - `d` and `a`: the date and the amount **copied exactly** as they appear on those lines;
+  - `d` and `a`: the date **normalised** as `YYYY-MM-DD` (whatever format the lines print it in; the
+    best full date when they print no year) and the amount as a **plain positive decimal** in the row's
+    currency (`1234.56`: a dot, no thousands separator, no sign). Direction stays in `t`. (Until I21
+    they were copied exactly as printed and code parsed them.);
   - `c`: a three-letter currency code, or null when the line doesn't say;
   - `t`: `d` for money out, `c` for money in;
   - `m`: a short, cleaned merchant name ("Lidl Cluj" for "POS 4411 LIDL CLUJ RO"), at most 120
-    characters.
+    characters, made of words from the statement.
 - `k[]`: one entry per **distinct** `m`, `{ m, c: category, s: subtype | null }`, so a merchant
   that appears twenty times is categorised once.
-- `s`: the statement's currency and its printed total of money out with that total's line, each
-  null when not printed.
+- `s`: the statement's currency and its printed total of money out (a plain decimal like `a`) with
+  that total's line, each null when not printed.
 
 About 30 output tokens per transaction plus 8 per distinct merchant. A 150-transaction month comes
 to roughly 6,000 input tokens ($0.0012, less with the prompt cached) and 5,000 output tokens
@@ -243,33 +254,51 @@ reports what that does to the cost.
 
 The system prompt and the schema are fixed text and always come first, so a provider that caches a
 repeated prefix (OpenAI bills cached input at a tenth) reuses them across statements; only the
-lines change. Each prompt has a version (`statement-categorise-v1`, `statement-reader-v1`) that
+lines change. Each prompt has a version (`statement-categorise-v1`, `statement-reader-v2` since I21) that
 becomes part of the batch's `parser_id` (`generic-csv+ai:statement-categorise-v1`,
-`ai:statement-reader-v1`), so a prompt change is visible on every batch it touched.
+`ai:statement-reader-v2`), so a prompt change is visible on every batch it touched.
 
 ### How code checks the model
 
 These apply to mode "read"; in mode "categorise" the rows come from a parser and the model only
-returns categories, which are checked against the fixed lists. Nothing the model says is trusted
-until code has found it in the statement:
+returns categories, which are checked against the fixed lists. Since I21 the model normalises each
+date and amount and **code spot-checks every row against the lines it cites** (`verify.ts`); nothing
+the model says is trusted until code has found it in the statement:
 
-1. **Every date and amount is in the text.** The date `d` and amount `a` must occur on the lines
-   the row cites. The amount is then parsed by code (`detectDecimalMark` over all amount texts, then
-   `parseAmount`), and the date by `parseStatementDate`: the model never supplies a number.
-2. **Every merchant word is in the text.** Each word of the merchant `m` (case and accents folded) must
-   occur on the cited lines, so a cleaned name can drop noise but can't invent a shop.
-3. **No line is used twice** for two different transactions' amounts.
-4. **Totals, when printed.** If the printed total in `s` is found on its line and parses, the sum of the
-   debit rows must equal it to the cent. A mismatch is shown on the review screen as a warning with
-   the difference (question 7); it does not refuse the statement.
-5. **Lines that look like transactions but no row cites** (a date and an amount on the same line)
-   are counted and shown as a warning ("3 lines with an amount weren't read as transactions").
-6. The checks of I4 still apply: 1 to 500 debits, descriptions masked and cut at 120, a currency
-   per row (the statement's, when the row has none; refused when neither has one).
+1. **The lines** cited are 1 to 3 consecutive lines that exist.
+2. **The amount is on a cited line, to the cent.** Code scans the line's whole numbers (dates blanked
+   first; in a CSV, field by field with the CSV reader's own delimiter and quoting), reads each one
+   with both decimal marks where it could be either, and the row passes when one reading equals the
+   model's amount. So `1234.56` is found in `1.234,56`, `1,234.56` and `"1 234,56"`, but `45.20` is not found in `145.20`. A line whose amount another row already claimed can't be used again.
+3. **The date's day and month are printed on a cited line.** `findPrintedDates` finds every date a line
+   prints (ISO; day-first numeric with `.`, `/` or `-`, with or without a year; a day and a month name,
+   English or Romanian, with or without a year; a month name first, `Oct 12, 2026`). Numeric dates are
+   always day first. A printed date with the row's day and month must exist.
+4. **The year.** When that date prints its year, the model's year must equal it. When it prints none
+   (`12.10`, `12 oct.`), code gives it a year with `resolveYearlessDate` (from the statement's other
+   full dates, else the most recent past date) and ignores the model's, with a "printed without a
+   year" warning.
+5. **The merchant** is not empty. The model may clean a name, so its words are not looked for.
+6. **The currency** is the row's or the statement's, which the text must bear out; with none the
+   statement is refused (`no_currency`).
 
-A row that fails 1–3 refuses the whole statement (`unverified_statement`, 422, "The statement
-couldn't be read reliably."). The call's cost is recorded either way. No retry is made
-automatically: the user can upload again, which is a new, counted call.
+A row that fails 1–5 is **dropped, not fatal**: the review screen says "2 rows the AI read couldn't be
+matched to the statement and were left out" (never quoting the text) and the log has the reason and
+the row's position. The statement is refused (`unverified_statement`, 422, "The statement couldn't be
+read reliably.") when the model returned rows and none survived or more than half were dropped, and
+when it found nothing in a statement full of transaction-looking lines (`no_rows`). The call's cost is
+recorded either way. No retry is made automatically: the user can upload again, which is a new,
+counted call. `ambiguous_amounts` is no longer raised in mode "read" (the model settles the decimal
+mark and code checks it to the cent); a parser's own refusal still uses it.
+
+Kept as warnings, never refusals:
+
+- **Totals, when printed.** If the printed total in `s` is found on its line, the debit rows must add
+  up to it to the cent. A mismatch is shown with the difference (question 7).
+- **Lines that look like transactions but no row cites** (a date with a year and an amount on the same
+  line) are counted ("3 lines with an amount weren't read as transactions").
+
+The checks of I4 still apply: 1 to 500 debits, descriptions masked and cut at 120, a currency per row.
 
 ### Where a row's category comes from
 
@@ -456,6 +485,7 @@ that provider's official SDK documentation first and never guess API names.
 | I18 | Review screen for read statements: category sources, warnings, the AI-off hint; preview fixtures | I17 | |
 | I19 | Eval: synthetic statements and a hand-run live eval comparing models | I17 | |
 | I20 | Reader fixes the eval found: dates printed without a year, a store number before the amount in a comma CSV, a CSV a parser claims and refuses | I19 | |
+| I21 | AI-first PDF reader: the model normalises dates and amounts, code spot-checks each row and drops the ones that fail; a PDF goes to the model before the parsers | I20 | |
 | — | **Checkpoint:** George adds `OPENAI_API_KEY` and the AI env to production (vps-apps) and sets the provider's spend limit | I15, I19 | |
 | I11 | The Import button on the Expenses page | I18 | |
 | — | **Checkpoint:** smoke test | I11, the checkpoint above | |
@@ -1069,7 +1099,57 @@ a number or a date that code hasn't found in the statement.
   who read the rows.
 
 No prompt changed (the reader prompt already says to copy dates as printed and never add a year), so
-the prompt id stays `statement-reader-v1`.
+the prompt id stays `statement-reader-v1`. (I21 replaces this copy-as-printed contract: the model now
+normalises dates and amounts, and code ignores its year for a date printed without one. The
+year-from-the-statement rule above still decides that year.)
+
+### I21: AI-first PDF reader
+
+A real PDF failed with `unverified`, `date_unreadable`, row 0: the model copied a date that was on the
+line in a format `parseStatementDate` doesn't read (a month name with a year, such as "12 Oct 2026").
+Any other unusual format would have done the same, and one bad row refused the whole statement.
+George decided (30 October 2026) to stop making code read the printed formats:
+
+- **A. The AI normalises, code spot-checks.** Prompt `statement-reader-v2` (the batches record it).
+  The model returns each date as `YYYY-MM-DD` (its best full date when the line prints no year) and
+  each amount, and the printed total, as a plain positive decimal in the row's currency (`1234.56`);
+  direction stays in `t`. It keeps the cited lines `l`, the merchant `m` (now free to clean the
+  name), the currency `c`, the categories `k` and the summary `s`.
+- **B. Always the AI for PDFs.** In `buildDraft`, a PDF goes straight to mode "read" whenever AI is
+  available for the user, skipping the parsers; its rows get categories in the usual order (merchant
+  rule, history, model). If the AI can't be used for that call, or the model's answer fails
+  verification, a parser that claims the file reads it as before; only when none does, the user gets
+  `unrecognised_layout` (with the gate's reason) or the AI's `unverified_statement`. CSVs are
+  unchanged: parser first, the model as the fallback (I20).
+
+The spot checks in `verify.ts`, per row, against the row's cited lines:
+
+1. The lines are 1 to 3 consecutive lines that exist.
+2. The amount appears on a cited line to the cent: each whole number of the line (dates blanked, a
+   CSV field by field) is read with both decimal marks where ambiguous, and one reading must equal
+   the model's amount. A line another row claimed can't be reused.
+3. The date: `findPrintedDates` (in `date.ts`) finds every date a line prints, in ISO, day-first
+   numeric (`.`, `/`, `-`, with or without a year), day and month name (English and Romanian, with or
+   without a year: `12 Oct 2026`, `12 oct.`, `12 octombrie 2026`, `12-Oct-2026`) and month-name-first
+   (`Oct 12, 2026`) forms. Numeric dates stay day first, so `10/12` is never the twelfth of October.
+   One must have the row's day and month.
+4. The year: if that date prints a year the model's must equal it; if not, `resolveYearlessDate`
+   decides it, ignoring the model's year, and the row counts in the "printed without a year"
+   warning. `statement.fullDates` now also collects the month-name dates with a year.
+5. The merchant is non-empty (its words are no longer looked for on the lines).
+6. The currency is as before: the row's or the statement's, borne out by the text, else `no_currency`.
+
+A row that fails a check is dropped, not fatal, with a review-screen warning that never quotes the
+text and a log of the reasons and row numbers only. The statement is refused (`unverified_statement`,
+logging the first reason) when the model returned rows and none survived or more than half were
+dropped; `no_rows` and `no_currency` stay. The printed-total comparison (now in cents from the
+normalised value) and the "lines with an amount weren't read" count stay warnings.
+`looksLikeTransaction` recognises the month-name dates that print a year. `ambiguous_amounts` is no
+longer a reason in mode "read"; the error code stays for a parser's own refusal.
+
+The eval's fixtures now carry normalised answers and gain `pdf-en-month-names` ("12 Oct 2026");
+`npm run eval:statements -- --dry-run` passes for every statement. A live run is still George's, by
+hand.
 
 ### Checkpoint: production AI settings
 

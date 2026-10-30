@@ -13,11 +13,12 @@ import { buildTextPdf, type PdfLine } from "@/test/pdf";
  *
  * Each statement is one shape the reader must cope with: English and Romanian headers, comma and
  * dot decimals, CSV and PDF text, a transaction over several lines, foreign-currency rows, refunds
- * and incoming payments, printed totals, and dates printed without a year. Renderers record, for
- * every transaction, the line numbers it is written on and the date and amount exactly as printed,
- * which is what the model is asked for, so that "the answer a perfect model gives" is built, never
- * typed. A wrong line number would make the statement fail verification, and the test that runs
- * every synthetic statement through the real checks catches it.
+ * and incoming payments, printed totals, dates printed without a year and dates with a month name.
+ * Renderers record, for every transaction, the line numbers it is written on. The model normalises
+ * the rest, so what a perfect model answers is the transaction's own date as `YYYY-MM-DD` and its
+ * amount as a plain decimal ("1234.56"), whatever the statement prints: "the answer a perfect model
+ * gives" is built, never typed. A wrong line number would make the rows fail verification, and the
+ * test that runs every synthetic statement through the real checks catches it.
  *
  * PDFs are limited to Latin-1 (`src/test/pdf.ts`), so no ă, ș or ț in them; the CSVs are UTF-8.
  * Descriptions in a four-column PDF stay under about 24 characters, so a column never runs into
@@ -60,14 +61,17 @@ const cents = (amount: string) => Math.round(Number(amount) * 100);
 // Printing
 
 type Style = {
-  date: "iso" | "dmy-dot" | "dmy-slash" | "dm-dot";
+  date: "iso" | "dmy-dot" | "dmy-slash" | "dm-dot" | "d-mon-y";
   decimal: "." | ",";
   thousands: "" | "," | ".";
 };
 
+const MONTH_ABBREVIATIONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function printDate(iso: string, style: Style["date"]): string {
   const [year, month, day] = iso.split("-");
   if (style === "iso") return iso;
+  if (style === "d-mon-y") return `${Number(day)} ${MONTH_ABBREVIATIONS[Number(month) - 1]} ${year}`;
   if (style === "dmy-dot") return `${day}.${month}.${year}`;
   if (style === "dmy-slash") return `${day}/${month}/${year}`;
   return `${day}.${month}`;
@@ -111,15 +115,15 @@ class Lines {
   }
 }
 
-/** Where one transaction is written: the lines it spans and its date and amount exactly as printed. */
-type Cite = { lines: number[]; d: string; a: string; c: string | null };
+/** Where one transaction is written: the lines it spans, and the currency when the lines print one. */
+type Cite = { lines: number[]; c: string | null };
 
 type Built = {
   lines: Lines;
   /** One per transaction, in order. */
   cites: Cite[];
-  /** The printed total of money out, and the line it is on. */
-  total: { text: string; line: number } | null;
+  /** The line the printed total of money out is on. Its value is the sum of the debits. */
+  total: { line: number } | null;
   /** The currency the statement states, as the model should report it. */
   currency: string | null;
   /** Distance between a PDF table's columns, in points. */
@@ -187,7 +191,7 @@ function csvEnIsoSigned(): SyntheticStatement {
         const d = printDate(t.date, style.date);
         const a = `${t.direction === "debit" ? "-" : "+"}${printMoney(cents(t.amount), style)}`;
         const line = lines.push(`${d},${quote(t.raw, ",")},${a},${t.currency}`);
-        return { lines: [line], d, a, c: t.currency };
+        return { lines: [line], c: t.currency };
       });
       return { lines, cites, total: null, currency: "RON" };
     },
@@ -226,7 +230,7 @@ function csvEnDebitCredit(): SyntheticStatement {
         const a = printMoney(cents(t.amount), style);
         const money = `${a} RON`;
         const line = lines.push(`${d};${t.raw};${t.direction === "debit" ? money : ""};${t.direction === "credit" ? money : ""};${printMoney(after[index], style)}`);
-        return { lines: [line], d, a, c: "RON" };
+        return { lines: [line], c: "RON" };
       });
       return { lines, cites, total: null, currency: "RON" };
     },
@@ -270,18 +274,18 @@ function csvRoMultiline(): SyntheticStatement {
         const parts = [t.raw, ...(t.more ?? [])];
         if (parts.length === 1) {
           const line = lines.push(`${d};${t.raw};${tail}`);
-          return { lines: [line], d, a, c: null };
+          return { lines: [line], c: null };
         }
         // A quoted cell over several lines: the date is on the first, the amounts after the closing quote on the last.
         const numbers = [lines.push(`${d};"${parts[0]}`)];
         parts.slice(1, -1).forEach((part) => numbers.push(lines.push(part)));
         numbers.push(lines.push(`${parts[parts.length - 1]}";${tail}`));
-        return { lines: numbers, d, a, c: null };
+        return { lines: numbers, c: null };
       });
       const debits = printMoney(sumOfDebits(rows), style);
       const credits = printMoney(rows.filter((t) => t.direction === "credit").reduce((sum, t) => sum + cents(t.amount), 0), style);
       const totalLine = lines.push(`Total rulaje;;${debits};${credits};`);
-      return { lines, cites, total: { text: debits, line: totalLine }, currency: "RON", eol: "\r\n" };
+      return { lines, cites, total: { line: totalLine }, currency: "RON", eol: "\r\n" };
     },
   };
 }
@@ -314,7 +318,7 @@ function csvRoForeign(): SyntheticStatement {
         const d = printDate(t.date, style.date);
         const a = `${t.direction === "debit" ? "-" : "+"}${printMoney(cents(t.amount), style)}`;
         const line = lines.push(`${d};${t.raw};${a};${t.currency}`);
-        return { lines: [line], d, a, c: t.currency };
+        return { lines: [line], c: t.currency };
       });
       return { lines, cites, total: null, currency: "RON" };
     },
@@ -355,7 +359,7 @@ function csvRoCommaDigitsBeforeAmount(): SyntheticStatement {
         const d = printDate(t.date, style.date);
         const a = printMoney(cents(t.amount), style);
         const line = lines.push(`${d},${t.raw},${t.direction === "debit" ? a : ""},${t.direction === "credit" ? a : ""}`);
-        return { lines: [line], d, a, c: null };
+        return { lines: [line], c: null };
       });
       return { lines, cites, total: null, currency: "RON" };
     },
@@ -399,11 +403,11 @@ function csvEnCurrencyInPreamble(): SyntheticStatement {
         const d = printDate(t.date, style.date);
         const a = printMoney(cents(t.amount), style);
         const line = lines.push(`${d},${t.raw},${t.direction === "debit" ? a : ""},${t.direction === "credit" ? a : ""}`);
-        return { lines: [line], d, a, c: null };
+        return { lines: [line], c: null };
       });
       const total = printMoney(sumOfDebits(rows), style);
       const totalLine = lines.push(`Total money out,,${total},`);
-      return { lines, cites, total: { text: total, line: totalLine }, currency: "RON" };
+      return { lines, cites, total: { line: totalLine }, currency: "RON" };
     },
   };
 }
@@ -456,13 +460,13 @@ function pdfEnTwoPages(): SyntheticStatement {
         const a = `${t.direction === "debit" ? "-" : "+"}${printMoney(cents(t.amount), style)}`;
         const numbers = [lines.push(`${d}\t${t.raw}\t${a}\t${printMoney(after[index], style)}`)];
         (t.more ?? []).forEach((part) => numbers.push(lines.push(part)));
-        return { lines: numbers, d, a, c: null };
+        return { lines: numbers, c: null };
       });
       lines.push(`Closing balance\t${printMoney(after[after.length - 1], style)}`);
       const total = printMoney(sumOfDebits(rows), style);
       const totalLine = lines.push(`Total money out\t${total}`);
       lines.push("Page 2 of 2");
-      return { lines, cites, total: { text: total, line: totalLine }, currency: "RON", columnWidth: 135 };
+      return { lines, cites, total: { line: totalLine }, currency: "RON", columnWidth: 135 };
     },
   };
 }
@@ -505,12 +509,12 @@ function pdfRoTable(): SyntheticStatement {
         const a = `${t.direction === "debit" ? "-" : "+"}${printMoney(cents(t.amount), style)}`;
         const numbers = [lines.push(`${d}\t${t.raw}\t${a} RON\t${printMoney(after[index], style)} RON`)];
         (t.more ?? []).forEach((part) => numbers.push(lines.push(part)));
-        return { lines: numbers, d, a, c: "RON" };
+        return { lines: numbers, c: "RON" };
       });
       lines.push(`Sold final\t${printMoney(after[after.length - 1], style)} RON`);
       const total = printMoney(sumOfDebits(rows), style);
       const totalLine = lines.push(`Total debite\t${total} RON`);
-      return { lines, cites, total: { text: total, line: totalLine }, currency: "RON", columnWidth: 135 };
+      return { lines, cites, total: { line: totalLine }, currency: "RON", columnWidth: 135 };
     },
   };
 }
@@ -560,7 +564,7 @@ function pdfCardMultiline(): SyntheticStatement {
         const first = lines.push(`${d}\t${printed}${t.direction === "credit" ? " CR" : ""}`);
         const second = lines.push(t.raw);
         lines.push(t.currency === "RON" ? `Ref ${884200 + index} Card ending 1111` : `Foreign transaction ref ${884200 + index}`);
-        return { lines: [first, second], d, a, c: t.currency === "RON" ? null : t.currency };
+        return { lines: [first, second], c: t.currency === "RON" ? null : t.currency };
       });
       return { lines, cites, total: null, currency: "RON", columnWidth: 135 };
     },
@@ -596,9 +600,53 @@ function pdfRoNoYear(): SyntheticStatement {
         const d = printDate(t.date, style.date);
         const a = `${t.direction === "debit" ? "-" : "+"}${printMoney(cents(t.amount), style)}`;
         const line = lines.push(`${d}\t${t.raw}\t${a}`);
-        return { lines: [line], d, a, c: null };
+        return { lines: [line], c: null };
       });
       return { lines, cites, total: null, currency: "RON", columnWidth: 180 };
+    },
+  };
+}
+
+/** An English PDF table whose dates carry a month name ("12 Oct 2026"), signed amounts with comma thousands, a running balance and a printed total. */
+function pdfEnMonthNames(): SyntheticStatement {
+  const txns = [
+    debit("2026-10-01", "1500.00", "RENT OCTOBER", "Rent", "housing"),
+    debit("2026-10-02", "45.20", "POS LIDL CLUJ", "Lidl Cluj", "groceries"),
+    debit("2026-10-05", "12.50", "STARBUCKS CLUJ", "Starbucks", "entertainment"),
+    credit("2026-10-07", "4500.00", "SALARY EXEMPLU SRL", "Salary Exemplu", "other"),
+    debit("2026-10-09", "245.00", "ROMPETROL 0412", "Rompetrol", "car", { subtype: "car_fuel" }),
+    debit("2026-10-12", "1234.56", "ZARA RO 0123", "Zara", "shopping"),
+    debit("2026-10-15", "59.00", "DIGI ROMANIA SA", "Digi", "utilities"),
+    credit("2026-10-18", "89.00", "REFUND FARMACIA", "Farmacia Catena", "health", { more: ["CATENA 331"] }),
+    debit("2026-10-21", "76.40", "DR MAX 1045", "Dr Max", "health"),
+    debit("2026-10-27", "399.00", "UDEMY U1234", "Udemy", "education"),
+  ];
+  return {
+    id: "pdf-en-month-names",
+    description:
+      "English PDF table whose dates are printed with a month name and a year (12 Oct 2026), dot decimals with comma thousands, signed amounts, a running balance, a refund over two lines, a printed total of money out.",
+    kind: "pdf",
+    parser: "none",
+    txns,
+    build(rows) {
+      const style: Style = { date: "d-mon-y", decimal: ".", thousands: "," };
+      const lines = new Lines();
+      lines.push("Example Bank - Account statement");
+      lines.push("Statement period 1 Oct 2026 to 31 Oct 2026");
+      lines.push("Currency: RON");
+      lines.push("Date\tDescription\tAmount\tBalance");
+      lines.push(`Opening balance\t${printMoney(900000, style)}`);
+      const after = balances(rows, 900000);
+      const cites = rows.map((t, index): Cite => {
+        const d = printDate(t.date, style.date);
+        const a = `${t.direction === "debit" ? "-" : "+"}${printMoney(cents(t.amount), style)}`;
+        const numbers = [lines.push(`${d}\t${t.raw}\t${a}\t${printMoney(after[index], style)}`)];
+        (t.more ?? []).forEach((part) => numbers.push(lines.push(part)));
+        return { lines: numbers, c: null };
+      });
+      lines.push(`Closing balance\t${printMoney(after[after.length - 1], style)}`);
+      const totalLine = lines.push(`Total money out\t${printMoney(sumOfDebits(rows), style)}`);
+      return { lines, cites, total: { line: totalLine }, currency: "RON", columnWidth: 135 };
     },
   };
 }
@@ -711,12 +759,12 @@ function pdfRoLargeMonth(): SyntheticStatement {
         const d = printDate(t.date, style.date);
         const a = `${t.direction === "debit" ? "-" : "+"}${printMoney(cents(t.amount), style)}`;
         const line = lines.push(`${d}\t${t.raw}\t${a}\t${printMoney(after[index], style)}`);
-        return { lines: [line], d, a, c: null };
+        return { lines: [line], c: null };
       });
       const total = printMoney(sumOfDebits(rows), style);
       const totalLine = lines.push(`Total debite\t${total}`);
       lines.push(`Pagina ${pages} din ${pages}`);
-      return { lines, cites, total: { text: total, line: totalLine }, currency: "RON", columnWidth: 135 };
+      return { lines, cites, total: { line: totalLine }, currency: "RON", columnWidth: 135 };
     },
   };
 }
@@ -737,7 +785,7 @@ function csvEnMonth(): SyntheticStatement {
         const d = printDate(t.date, style.date);
         const a = `${t.direction === "debit" ? "-" : "+"}${printMoney(cents(t.amount), style)}`;
         const line = lines.push(`${d},${t.raw},${a},${t.currency}`);
-        return { lines: [line], d, a, c: t.currency };
+        return { lines: [line], c: t.currency };
       });
       return { lines, cites, total: null, currency: "RON" };
     },
@@ -755,6 +803,7 @@ export const SYNTHETIC_STATEMENTS: SyntheticStatement[] = [
   pdfRoTable(),
   pdfCardMultiline(),
   pdfRoNoYear(),
+  pdfEnMonthNames(),
   pdfRoLargeMonth(),
   csvEnMonth(),
 ];
@@ -781,21 +830,21 @@ const expectedRow = (t: Txn): ExpectedRow => ({
   subtype: t.subtype,
 });
 
-/** What a perfect model answers in mode "read" for the statement: every field copied from what the renderer printed. */
+/** What a perfect model answers in mode "read" for the statement: the transactions' own values, normalised, and the lines the renderer put them on. */
 function perfectAnswer(txns: readonly Txn[], built: Built): ReaderAnswer {
   const merchants = new Map<string, Txn>();
   for (const t of txns) if (!merchants.has(t.merchant)) merchants.set(t.merchant, t);
   return {
     r: txns.map((t, index) => ({
       l: built.cites[index].lines,
-      d: built.cites[index].d,
-      a: built.cites[index].a,
+      d: t.date,
+      a: Number(t.amount).toFixed(2),
       c: built.cites[index].c,
       t: t.direction === "debit" ? "d" : "c",
       m: t.merchant,
     })),
     k: [...merchants.values()].map((t) => ({ m: t.merchant, c: t.category, s: t.subtype })),
-    s: { c: built.currency, t: built.total?.text ?? null, l: built.total?.line ?? null },
+    s: { c: built.currency, t: built.total ? (sumOfDebits(txns) / 100).toFixed(2) : null, l: built.total?.line ?? null },
   };
 }
 

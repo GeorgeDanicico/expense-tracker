@@ -231,6 +231,8 @@ export type StatementResult = {
   perfect: boolean;
   /** Verification warnings (mode read), by count; their text never quotes the statement. */
   warnings: number;
+  /** Rows the model read that code left out because they didn't match the statement (mode read). */
+  dropped: number;
   usage: AiUsage | null;
   costMicros: number;
   ms: number;
@@ -301,6 +303,7 @@ function blank(job: Job, call: CallInfo | null): StatementResult {
     categorySubtypeCorrect: 0,
     perfect: false,
     warnings: 0,
+    dropped: 0,
     usage: call?.usage ?? null,
     costMicros: call?.costMicros ?? 0,
     ms: call?.ms ?? 0,
@@ -331,6 +334,7 @@ async function runRead(job: Job, ai: StatementAi, take: () => CallInfo | null): 
     ...out,
     outcome: "ok",
     warnings: verified.warnings.length,
+    dropped: verified.dropped.length,
     matchedRows: score.matchedRows,
     extraRows: score.extraRows,
     categoryScored: score.categoryScored,

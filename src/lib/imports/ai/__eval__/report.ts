@@ -139,7 +139,9 @@ export function renderMarkdown(report: Report): string {
   out.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const result of results) {
     const label =
-      result.outcome === "ok" ? (result.perfect ? "ok, perfect" : "ok") : `${result.outcome}: ${result.detail ?? "no detail"}${result.knownGap ? " (known gap)" : ""}`;
+      result.outcome === "ok"
+        ? `${result.perfect ? "ok, perfect" : "ok"}${result.dropped > 0 ? `, ${result.dropped} dropped` : ""}`
+        : `${result.outcome}: ${result.detail ?? "no detail"}${result.knownGap ? " (known gap)" : ""}`;
     out.push(
       `| ${result.id} | ${result.mode} | ${label} | ${result.mode === "read" ? `${result.matchedRows}/${result.expectedRows}` : "n/a"} | ${
         result.mode === "read" && result.outcome === "ok" ? result.extraRows : "n/a"
@@ -152,6 +154,9 @@ export function renderMarkdown(report: Report): string {
   out.push("");
   out.push(
     "- **Statements OK**: in mode read, the statement passed code's verification against its text; in mode categorise, the model's answer had one category for each merchant. A statement that fails verification is refused in production, and its rows count as not right here.",
+  );
+  out.push(
+    "- **Result**: \"ok\" is a statement that passed verification. A row that fails one of code's spot checks (its amount or date isn't on the lines it cites) is left out, not fatal, and counted as \"dropped\"; a statement is refused when none survive or more than half are dropped.",
   );
   out.push(
     "- **Rows exactly right**: expected rows (money in included) that were read with the same date, amount, currency and direction and a matching merchant, out of all expected rows. Merchant matching is defined in `score.ts`.",

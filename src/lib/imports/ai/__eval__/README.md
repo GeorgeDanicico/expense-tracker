@@ -1,9 +1,16 @@
-# Statement reader eval (I19)
+# Statement reader eval (I19, I21)
 
 A hand-run check of how well a model reads bank statements, and what it costs. It runs the statement
 reader's own code (the numbering, the prompts, the schemas, the output caps and `verifyReading`)
 against synthetic statements whose right answers are known. See `docs/statement-import-plan.md`,
-"Revision: the AI reads the statement" and task I19.
+"Revision: the AI reads the statement" and tasks I19 and I21.
+
+Since I21 the model normalises what it reads (each date as `YYYY-MM-DD`, each amount as a plain decimal
+such as `1234.56`) and code only spot-checks each row against the lines it cites. So the answers a
+perfect model gives here (`<id>.answer.json`, played back by `--dry-run`) carry the normalised values,
+whatever the statement prints, and a year-less date is given as the best full date (code ignores the
+model's year for it). In production a PDF goes to the model first; the eval reads every statement in
+mode `read` regardless, so it measures the reader on CSVs and PDFs alike.
 
 **The live run spends real money. It runs only by hand, never in CI, and `npm test` does not call it.**
 
@@ -49,17 +56,17 @@ Per mode (the two modes are separate calls in production, so they are separate r
 
 | Column | Meaning |
 | --- | --- |
-| Statements OK | Mode `read`: passed code's verification. Mode `categorise`: the answer had one category per merchant. |
-| Rows exactly right | Mode `read`: expected rows (money in included) read with the same date, amount to the cent, currency and direction, and a matching merchant, out of all expected rows. A statement that fails verification is refused in production, so its rows count as not right. |
+| Statements OK | Mode `read`: passed code's verification (a row that fails a spot check is dropped, which does not fail the statement; the statement fails when none survive or more than half are dropped). Mode `categorise`: the answer had one category per merchant. |
+| Rows exactly right | Mode `read`: expected rows (money in included) read with the same date, amount to the cent, currency and direction, and a matching merchant, out of all expected rows. A row code dropped is a row not right; a statement that fails verification is refused in production, so all its rows count as not right. |
 | Category / and subtype | Of the money-out rows read exactly right (mode `categorise`: of the merchants sent), how many got the expected category, and the expected subtype too. Merchants the database's merchant rule knows are left out, since the rule overrides the model. |
 | Tokens per statement | Input, cached input and output, averaged. Reasoning tokens are in the output. |
 | Average and highest cost | Priced from `src/lib/ai/pricing.ts`, next to the $0.01 aim. The highest names the statement. |
 
 **A merchant matches** when every word of the expected name is among the model's words (case and accents
 folded) and the model added at most three more (`score.ts`). "Lidl Cluj" matches "Lidl Cluj" and "Lidl
-Cluj Napoca"; it does not match "Lidl" or "POS 4411 LIDL CLUJ RO". Verification has already shown that
-every word is written on the cited lines, so an extra word is noise that was not cleaned, never an
-invention.
+Cluj Napoca"; it does not match "Lidl" or "POS 4411 LIDL CLUJ RO". Verification no longer looks for the
+merchant's words on the cited lines (the model may clean a name), so this rule is the only check on the
+name: an extra word is noise that was not cleaned, a missing one is a name that was changed.
 
 **Mode `categorise`** only runs for statements a parser reads (today the generic CSV parser, English
 headers). It sends the parser's debit descriptions, minus the merchants the merchant rule knows, with
@@ -95,6 +102,7 @@ back).
 | `pdf-ro-table` | A Romanian PDF table, the currency after every amount, a printed total |
 | `pdf-card-multiline` | A card statement, three lines per transaction, `CR` for money in, two EUR rows |
 | `pdf-ro-no-year` | Dates printed as "12.10"; the year is only in the period heading, and code takes it from there |
+| `pdf-en-month-names` | An English PDF table whose dates carry a month name and a year ("12 Oct 2026"), comma thousands, a refund over two lines, a printed total |
 | `pdf-ro-large-month` | About 110 transactions over three pages, for realistic size and cost |
 | `csv-en-month` | About 50 rows a parser reads, for a realistic mode `categorise` |
 

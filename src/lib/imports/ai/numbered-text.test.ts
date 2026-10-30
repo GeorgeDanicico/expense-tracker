@@ -76,6 +76,10 @@ describe("looksLikeTransaction", () => {
     "02/10/2026 Fuel 45,20 RON",
     "2026-10-02;Shop;(12.50)",
     "02.10.2026,45.20",
+    "2 Oct 2026\tPOS LIDL CLUJ\t-45,20",
+    "12 octombrie 2026\tPlata POS\t-45,20",
+    "Oct 12, 2026 Fuel 45.20 RON",
+    "12-Oct-2026;Shop;(12.50)",
   ])("is true for %s", (line) => {
     expect(looksLikeTransaction(line)).toBe(true);
   });
@@ -85,6 +89,9 @@ describe("looksLikeTransaction", () => {
     "Statement period 01.10.2026 - 31.10.2026 Currency RON",
     "Total payments\t357,70",
     "02.10.2026\tCARD PAYMENT",
+    "2 Oct 2026\tCARD PAYMENT",
+    "Statement period 1 Oct 2026 - 31 Oct 2026",
+    "12.10\tCORNER CAFE\t-4,50",
     "Opening balance 1,000.00",
     "",
   ])("is false for %s", (line) => {
@@ -96,6 +103,13 @@ describe("blankDates", () => {
   it("replaces dates with spaces of the same length and leaves the rest", () => {
     expect(blankDates("a 2026-10-02 b 02.10.2026 c")).toBe("a            b            c");
     expect(blankDates("ref 12.10.20268 end")).toBe("ref 12.10.20268 end");
+  });
+
+  it("blanks a date with a month name, and one that doesn't exist, but not a date without a year", () => {
+    expect(blankDates("a 12 Oct 2026 b Oct 12, 2026 c")).toBe("a             b              c");
+    expect(blankDates("31.02.2026 x")).toBe(`${" ".repeat(11)}x`);
+    expect(blankDates("12 Oct 45,20")).toBe("12 Oct 45,20");
+    expect(blankDates("12.10 -4,50")).toBe("12.10 -4,50");
   });
 });
 
@@ -129,6 +143,17 @@ describe("what the numbering keeps for the checks", () => {
 
     expect(statement.fullDates).toEqual(["2026-10-01", "2026-10-31", "2026-11-02"]);
     expect(fullDatesIn("ref 12.10.20268 and 3/4/2026")).toEqual(["2026-04-03"]);
+  });
+
+  it("collects the dates a month name gives, in English and Romanian, and not the ones without a year", () => {
+    const statement = numberStatement({
+      kind: "pdf",
+      text: "x",
+      pages: [["Statement period 1 Oct 2026 to 31 octombrie 2026", "Issued Nov 2, 2026", "12 Oct\tCORNER CAFE\t-4,50"]],
+    });
+
+    expect(statement.fullDates).toEqual(["2026-10-01", "2026-10-31", "2026-11-02"]);
+    expect(fullDatesIn("30 Feb 2026 and 12 oct. 2026")).toEqual(["2026-10-12"]);
   });
 
   it("sends nothing new to the model: the text and the hash are what they were", () => {

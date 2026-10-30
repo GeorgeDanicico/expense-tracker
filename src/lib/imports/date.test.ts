@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseStatementDate, parseYearlessStatementDate, resolveYearlessDate } from "@/lib/imports/date";
+import { findPrintedDates, parseStatementDate, parseYearlessStatementDate, resolveYearlessDate } from "@/lib/imports/date";
 
 describe("parseStatementDate", () => {
   it.each([
@@ -87,6 +87,7 @@ describe("parseYearlessStatementDate", () => {
     ["5 May", { day: 5, month: 5 }],
     ["1 Sept.", { day: 1, month: 9 }],
     ["14 Februarie", { day: 14, month: 2 }],
+    ["5 septembrie", { day: 5, month: 9 }],
     ["7 Iun", { day: 7, month: 6 }],
     ["29.02", { day: 29, month: 2 }],
     ["31.12", { day: 31, month: 12 }],
@@ -172,5 +173,128 @@ describe("resolveYearlessDate", () => {
     it("ignores dates in the context that are not real dates", () => {
       expect(resolve(12, 10, ["2026-02-31"])).toBe("2026-10-12");
     });
+  });
+});
+
+describe("findPrintedDates", () => {
+  /** The dates of a line as day, month and year ("12/10/2026", with "-" for no year), in the order printed. */
+  const dates = (text: string, options?: { impossible?: boolean }) =>
+    findPrintedDates(text, options).map(({ day, month, year }) => `${day}/${month}/${year ?? "-"}`);
+
+  it.each([
+    ["2026-10-12", ["12/10/2026"]],
+    ["2026-1-5", ["5/1/2026"]],
+    ["12.10.2026", ["12/10/2026"]],
+    ["12/10/2026", ["12/10/2026"]],
+    ["12-10-2026", ["12/10/2026"]],
+    ["3.1.2026", ["3/1/2026"]],
+    ["2026-10-12T14:05:09Z", ["12/10/2026"]],
+    ["12.10.2026 14:05", ["12/10/2026"]],
+  ])("finds the numeric date %j", (text, expected) => {
+    expect(dates(text)).toEqual(expected);
+  });
+
+  it.each([
+    ["12.10", ["12/10/-"]],
+    ["12/10", ["12/10/-"]],
+    ["12-10", ["12/10/-"]],
+    ["12.10.", ["12/10/-"]],
+    ["POS 12.10 CORNER CAFE", ["12/10/-"]],
+  ])("finds the numeric date without a year %j", (text, expected) => {
+    expect(dates(text)).toEqual(expected);
+  });
+
+  it.each([
+    ["12 Oct 2026", ["12/10/2026"]],
+    ["12 oct. 2026", ["12/10/2026"]],
+    ["12 October 2026", ["12/10/2026"]],
+    ["12 octombrie 2026", ["12/10/2026"]],
+    ["12-Oct-2026", ["12/10/2026"]],
+    ["12 Oct, 2026", ["12/10/2026"]],
+    ["2 ian 2026", ["2/1/2026"]],
+    ["5 septembrie 2026", ["5/9/2026"]],
+    ["30 Noiembrie 2026", ["30/11/2026"]],
+    ["1 mai 2026", ["1/5/2026"]],
+    ["1 Mar 2026", ["1/3/2026"]],
+    ["12\u00a0Oct\u00a02026", ["12/10/2026"]],
+  ])("finds the day-first date with a month name %j", (text, expected) => {
+    expect(dates(text)).toEqual(expected);
+  });
+
+  it.each([
+    ["12 Oct", ["12/10/-"]],
+    ["12 oct.", ["12/10/-"]],
+    ["12 octombrie", ["12/10/-"]],
+    ["12 Oct\tCORNER CAFE", ["12/10/-"]],
+  ])("finds the day and month name without a year %j", (text, expected) => {
+    expect(dates(text)).toEqual(expected);
+  });
+
+  it.each([
+    ["Oct 12, 2026", ["12/10/2026"]],
+    ["October 12 2026", ["12/10/2026"]],
+    ["Oct. 12, 2026", ["12/10/2026"]],
+    ["Oct 12", ["12/10/-"]],
+    ["Sept 5, 2026", ["5/9/2026"]],
+  ])("finds the date with the month name first %j", (text, expected) => {
+    expect(dates(text)).toEqual(expected);
+  });
+
+  it("reads numeric dates day first, never month first", () => {
+    expect(dates("10/12")).toEqual(["10/12/-"]);
+    expect(dates("10/12/2026")).toEqual(["10/12/2026"]);
+    expect(dates("10/25/2026")).toEqual([]);
+  });
+
+  it("does not take the year from a date's neighbour, or from an amount after a date without one", () => {
+    expect(dates("12 Oct\t2026")).toEqual(["12/10/-"]);
+    expect(dates("12 Oct 1500,00")).toEqual(["12/10/-"]);
+    expect(dates("12 Oct 2000.50")).toEqual(["12/10/-"]);
+  });
+
+  it("finds each of several dates on a line, in the order they are printed, with their place", () => {
+    const line = "Statement 01.10.2026 - 31 Oct 2026 / issued Nov 2, 2026";
+
+    expect(findPrintedDates(line).map(({ day, month, year }) => [day, month, year])).toEqual([[1, 10, 2026], [31, 10, 2026], [2, 11, 2026]]);
+    const [first] = findPrintedDates(line);
+    expect(line.slice(first.start, first.end)).toBe("01.10.2026");
+  });
+
+  it.each([
+    "31.02.2026",
+    "30.02",
+    "12.50",
+    "12.13.2026",
+    "112.10",
+    "12.10.20268",
+    "12.10.26",
+    "1.234,56",
+    "45.20",
+    "-4,50",
+    "12 Foo 2026",
+    "Foo 12",
+    "Oct 2026",
+    "12 Octomb",
+    "30 Feb 2026",
+    "Feb 30, 2026",
+    "2026-02-30",
+  ])("finds no date in %j", (text) => {
+    expect(dates(text)).toEqual([]);
+  });
+
+  it("leaves a name that only starts like a month alone", () => {
+    expect(dates("12 octombrieX")).toEqual([]);
+    expect(dates("Marketplace 12")).toEqual([]);
+    expect(dates("12 Marketplace")).toEqual([]);
+  });
+
+  it("returns a date that doesn't exist only when asked, so its characters can be blanked", () => {
+    expect(dates("31.02.2026", { impossible: true })).toEqual(["31/2/2026"]);
+  });
+
+  it("gives a place to a form once: one date never reads as two", () => {
+    expect(dates("12 Oct 2026")).toHaveLength(1);
+    expect(dates("2026-10-12")).toHaveLength(1);
+    expect(dates("12.10.2026")).toHaveLength(1);
   });
 });

@@ -169,7 +169,7 @@ export function addLabel(count: number): string {
 /**
  * How the parser that read the statement is named on the review screen. A parser id can carry a
  * suffix for the model's categories (`generic-csv+ai:statement-categorise-v1`, still the generic CSV
- * parser's rows), and `ai:statement-reader-v1` is a statement the model read.
+ * parser's rows), and `ai:statement-reader-v2` (and v1 before it) is a statement the model read.
  */
 export function parserLabel(parserId: string): string {
   const [base] = parserId.split("+");
