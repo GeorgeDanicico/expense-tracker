@@ -11,8 +11,8 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 /**
  * Statement import (docs/statement-import-plan.md): upload a CSV (or resume a recent draft), review
  * the draft rows, confirm, and undo an import from the list of recent ones.
- * Part of Expenses, so it follows that page's permission; nothing links here yet (task I11 adds the
- * Import button). It never reads `?member=`: an import only ever creates the caller's own expenses.
+ * Part of Expenses, so it follows that page's permission; the Import statement button in the Expenses
+ * header links here. It never reads `?member=`: an import only ever creates the caller's own expenses.
  */
 export default function ImportPage() {
   useDocumentTitle("Import a statement");
