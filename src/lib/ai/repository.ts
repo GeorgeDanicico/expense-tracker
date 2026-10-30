@@ -42,6 +42,12 @@ export interface AiGateRepository {
   /** Whether the user has opted in, and for a kid has the `ai` permission. */
   access(userId: string): Promise<AiAccess>;
   /**
+   * Turns the user's opt-in switch (`profiles.ai_enabled`) on or off, as the signed-in caller (the
+   * Settings → AI switch). Turning it off always works; a `DomainError` 403 with the database's
+   * message for a kid without the `ai` permission who turns it on.
+   */
+  setOptIn(userId: string, enabled: boolean): Promise<void>;
+  /**
    * The spend, in micros, of the user's family since `monthStart` (their own when they have no
    * family). Every member's calls count, whoever asks.
    */

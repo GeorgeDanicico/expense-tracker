@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AiAccess, AiGateRepository } from "@/lib/ai/repository";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createAdminClient } from "@/lib/supabase/admin-client";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,6 +11,7 @@ const ACCESS_ERROR = "Unable to check your AI settings.";
 const SPEND_ERROR = "Unable to check this month's AI spend.";
 const RECORD_ERROR = "Unable to record the AI usage.";
 const SWITCH_ERROR = "Unable to turn AI off.";
+const OPT_IN_ERROR = "Unable to save your AI setting. Please try again.";
 const RECIPIENTS_ERROR = "Unable to find who to tell about the AI budget.";
 const NOTIFY_ERROR = "Unable to queue the AI budget notification.";
 
@@ -53,6 +55,19 @@ export const supabaseAiGateRepository: AiGateRepository = {
     const { data, error } = await supabase.rpc("my_ai_access");
     if (error || typeof data !== "string" || !ACCESS_STATUSES.includes(data)) throw new Error(ACCESS_ERROR);
     return data as AiAccess;
+  },
+
+  /**
+   * On the caller's own profile row, under RLS; the switch guard trigger refuses a kid without the
+   * `ai` permission (42501, a 403 here).
+   */
+  async setOptIn(userId, enabled) {
+    await assertCaller(userId);
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("profiles").update({ ai_enabled: enabled }).eq("id", userId).select("id");
+    if (error) throw translateDatabaseError(error, OPT_IN_ERROR);
+    // Every user has a profile row (handle_new_user); no row updated means something is wrong.
+    if (!data?.length) throw new Error(OPT_IN_ERROR);
   },
 
   async familySpendMicros(userId, monthStart) {

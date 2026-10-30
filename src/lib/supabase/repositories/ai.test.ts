@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DomainError } from "@/lib/errors";
 import { fakeSupabase, type FakeSupabaseOptions } from "@/test/fake-supabase";
 
 const mocks = vi.hoisted(() => ({ createClient: vi.fn(), createAdminClient: vi.fn(), getAuthenticatedUser: vi.fn() }));
@@ -98,6 +99,47 @@ describe("Supabase AI gate repository", () => {
 
       mocks.getAuthenticatedUser.mockResolvedValue(null);
       await expect(ai.access(user)).rejects.toThrow("The AI gate can only act for the signed-in user.");
+    });
+  });
+
+  describe("setOptIn", () => {
+    const SAVE_ERROR = "Unable to save your AI setting. Please try again.";
+
+    it("updates only the caller's own profile row, as the caller", async () => {
+      const { queries, tables } = useRequestClient({ profiles: [{ id: kid, ai_enabled: false }, { id: user, ai_enabled: false }] });
+
+      await expect(ai.setOptIn(user, true)).resolves.toBeUndefined();
+      expect(queries).toEqual([
+        expect.objectContaining({ table: "profiles", operation: "update", values: { ai_enabled: true }, filters: [["eq", "id", user]] }),
+      ]);
+      expect(tables.profiles).toEqual([{ id: kid, ai_enabled: false }, { id: user, ai_enabled: true }]);
+      expect(mocks.createAdminClient).not.toHaveBeenCalled();
+    });
+
+    it("keeps the switch guard's message in a 403", async () => {
+      const message = "A parent needs to turn on AI features for you.";
+      useRequestClient({ profiles: [{ id: user, ai_enabled: false }] }, { fail: () => ({ code: "42501", message }) });
+
+      await expect(ai.setOptIn(user, true)).rejects.toThrow(new DomainError(message, 403));
+    });
+
+    it("fails when no profile row was updated", async () => {
+      useRequestClient({ profiles: [{ id: kid, ai_enabled: false }] });
+
+      await expect(ai.setOptIn(user, false)).rejects.toThrow(new Error(SAVE_ERROR));
+    });
+
+    it("hides any other database error behind a generic message", async () => {
+      useRequestClient({ profiles: [{ id: user, ai_enabled: false }] }, { fail: () => true });
+
+      await expect(ai.setOptIn(user, true)).rejects.toThrow(new Error(SAVE_ERROR));
+    });
+
+    it("acts only for the signed-in user, before querying", async () => {
+      const { queries } = useRequestClient({ profiles: [{ id: kid, ai_enabled: false }] });
+
+      await expect(ai.setOptIn(kid, true)).rejects.toThrow("The AI gate can only act for the signed-in user.");
+      expect(queries).toEqual([]);
     });
   });
 

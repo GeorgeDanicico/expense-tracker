@@ -14,7 +14,7 @@ import type {
   FamilyDashboardData,
   FamilyExpensesData,
 } from "@/lib/expenses/types";
-import type { FamilyResponse } from "@/lib/api/keys";
+import type { AiSettingsResponse, FamilyResponse } from "@/lib/api/keys";
 import { groupByCurrency } from "@/lib/expenses/family";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
 import { ALL_MEMBERS, type Viewing } from "@/lib/family/viewing";
@@ -377,6 +377,12 @@ function previewsNoDevices() {
   return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("devices") === "0";
 }
 
+/** `?ai=on` previews the switch on; `?ai=kid` a kid whose parent hasn't turned the permission on. */
+function previewAiSettings(): AiSettingsResponse {
+  const state = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("ai");
+  return { enabled: state === "on", blockReason: state === "kid" ? "not_permitted" : null, provider: "openai" };
+}
+
 // 65 bytes (an uncompressed P-256 point's length), base64url; not a real key.
 const PREVIEW_PUSH_KEY = `B${"A".repeat(86)}`;
 
@@ -404,6 +410,7 @@ export function fixtureFor(key: string): unknown {
   if (path === "/api/calendar/events") return previewCalendarEvents(params);
   if (path === "/api/reminders") return previewReminders();
   if (path === "/api/reminders/summary") return previewReminderSummary();
+  if (path === "/api/account/ai") return previewAiSettings();
   // `?devices=0` previews the "Reminders won't notify you" warning.
   if (path === "/api/notifications/settings") {
     return { pushEnabled: true, remindersEnabled: true, todosEnabled: true, calendarEnabled: true, deviceCount: previewsNoDevices() ? 0 : 2 };

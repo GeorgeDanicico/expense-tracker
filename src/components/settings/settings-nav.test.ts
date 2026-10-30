@@ -18,6 +18,7 @@ describe("settingsTabs", () => {
     expect(settingsTabs({ features: { family: false }, membership: null }).map((tab) => tab.label)).toEqual([
       "Account",
       "AI assistants",
+      "AI features",
       "Notifications",
     ]);
   });
@@ -33,6 +34,16 @@ describe("settingsTabs", () => {
     }
   });
 
+  it("shows AI features to everyone, at /settings/ai", () => {
+    for (const account of [
+      { features: { family: false }, membership: null },
+      { features: { family: true }, membership: membership("kid") },
+      { features: { family: true }, membership: membership("parent") },
+    ]) {
+      expect(settingsTabs(account)).toContainEqual({ href: "/settings/ai", label: "AI features" });
+    }
+  });
+
   it("shows Notifications to everyone, right after AI assistants, at /settings/notifications", () => {
     for (const account of [
       { features: { family: false }, membership: null },
@@ -42,7 +53,8 @@ describe("settingsTabs", () => {
     ]) {
       const tabs = settingsTabs(account);
       expect(tabs.at(-1)).toEqual({ href: "/settings/notifications", label: "Notifications" });
-      expect(tabs.at(-2)?.label).toBe("AI assistants");
+      expect(tabs.at(-2)?.label).toBe("AI features");
+      expect(tabs.at(-3)?.label).toBe("AI assistants");
     }
   });
 
@@ -52,6 +64,7 @@ describe("settingsTabs", () => {
       "Family",
       "My permissions",
       "AI assistants",
+      "AI features",
       "Notifications",
     ]);
   });
@@ -63,7 +76,7 @@ describe("settingsTabs", () => {
 
   it("shows Manage family to a parent", () => {
     const labels = settingsTabs({ features: { family: true }, membership: membership("parent") }).map((tab) => tab.label);
-    expect(labels).toEqual(["Account", "Family", "My permissions", "Manage family", "AI assistants", "Notifications"]);
+    expect(labels).toEqual(["Account", "Family", "My permissions", "Manage family", "AI assistants", "AI features", "Notifications"]);
   });
 });
 
@@ -75,6 +88,7 @@ describe("activeSettingsTab", () => {
     expect(activeSettingsTab(tabs, "/settings/family")?.label).toBe("Family");
     expect(activeSettingsTab(tabs, "/settings")?.label).toBe("Account");
     expect(activeSettingsTab(tabs, "/settings/mcp")?.label).toBe("AI assistants");
+    expect(activeSettingsTab(tabs, "/settings/ai")?.label).toBe("AI features");
     expect(activeSettingsTab(tabs, "/settings/notifications")?.label).toBe("Notifications");
   });
 });

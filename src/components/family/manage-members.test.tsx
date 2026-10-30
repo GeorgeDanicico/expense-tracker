@@ -73,6 +73,13 @@ describe("PermissionsEditor", () => {
     expect(html).not.toContain(">View<");
   });
 
+  it("shows the AI features permission right after AI assistants", () => {
+    const html = render(<PermissionsEditor value={DEFAULT_KID_PERMISSIONS} onChange={() => {}} />);
+    expect(html).toContain("AI assistants access");
+    expect(html).toContain("AI features access");
+    expect(html.indexOf("AI features access")).toBeGreaterThan(html.indexOf("AI assistants access"));
+  });
+
   it("finds the preset that matches, or none for a custom mix", () => {
     expect(matchingPreset(PERMISSION_PRESETS.teen)).toBe("teen");
     expect(matchingPreset({ ...PERMISSION_PRESETS.teen, net_worth: "off" })).toBeNull();
