@@ -1,0 +1,2 @@
+# Raw inventory and vitest list output, rebuilt on every run.
+.cache/

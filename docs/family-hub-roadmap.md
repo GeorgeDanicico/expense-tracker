@@ -1,6 +1,6 @@
 # Family hub roadmap
 
-Prepared 15 October 2026, updated 28 October 2026. This plan grows Simple Ledger from a single-user expense tracker into a family app: families and roles, profile pictures, safer MCP access, a to-do board, private reminders with browser notifications, a shared calendar with a calendar feed for other calendar apps, statement import, AI assistance with a hard cost limit, production hardening, logging, performance and a simpler UI, cars, houses, smart-home devices, and native iOS/Android apps built with Expo. Everything up to and including AI ships on the web before the native apps start (see "Order before the native apps").
+Prepared 15 October 2026, updated 31 October 2026. This plan grows Simple Ledger from a single-user expense tracker into a family app: families and roles, profile pictures, safer MCP access, a to-do board, private reminders with browser notifications, a shared calendar with a calendar feed for other calendar apps, statement import, AI assistance with a hard cost limit, production hardening, logging, performance and a simpler UI, and native iOS/Android apps built with Expo. Everything up to and including the improvement phases ships on the web before the native apps start; AI assistance comes last (see "Order before the native apps").
 
 Every numbered step below is meant to be **one pull request** that can be reviewed on its own, merged, and deployed without breaking what already works. Unfinished modules stay hidden behind a flag, so `main` is always shippable.
 
@@ -19,10 +19,10 @@ These facts shape the plan:
 ## Architecture decisions (recommended)
 
 1. **Keep Next.js as the web app and the backend. Add Expo as a second client for iOS and Android.** Don't rewrite the web app in Expo or React Native Web. The Chakra UI, the dashboards and the PWA keep working, and both clients call the same API with the same validation. The two apps share code through a workspace package, not through UI components.
-2. **One family per user.** A user creates a family or joins one with an invite code or link. Nobody belongs to more than one family, so there is no family switcher and no "active family" to pass around: the caller's family follows from their membership. Data for the new modules (to-dos, calendar, cars, houses, devices) belongs to the family and is checked by RLS through a few SQL helpers.
+2. **One family per user.** A user creates a family or joins one with an invite code or link. Nobody belongs to more than one family, so there is no family switcher and no "active family" to pass around: the caller's family follows from their membership. Data for the new modules (to-dos, calendar) belongs to the family and is checked by RLS through a few SQL helpers.
 3. **Parents see the whole family's finance, read-only.** Parents see every member's expenses, investments and net worth, including each other's. They can't change data that isn't theirs: only the read policies widen, and insert, update and delete stay owner-only. Kids see only their own finance, plus the rest of the family's if a parent turns on the "Family finance" permission for them. MCP keeps working on the caller's own data only.
-4. **Two roles, `parent` and `kid`, plus a creator flag.** The member who created the family is its creator, and only the creator can remove members or delete the family. Parents have every permission. Each kid has their own permission set, chosen by a parent and changeable at any time, so two kids in one family can see different things. Kids can't leave the family on their own, and they're never promoted to parent. Grandparents and other relatives are out of scope for now (step 13.1).
-5. **Smart devices go through Home Assistant, not each vendor.** Roborock has no official public API, and air purifiers each use a different cloud. Home Assistant already supports Roborock, Xiaomi, Philips, Dyson and most others. The app stores one Home Assistant URL and token per family, reads entity states, and calls services.
+4. **Two roles, `parent` and `kid`, plus a creator flag.** The member who created the family is its creator, and only the creator can remove members or delete the family. Parents have every permission. Each kid has their own permission set, chosen by a parent and changeable at any time, so two kids in one family can see different things. Kids can't leave the family on their own, and they're never promoted to parent. Grandparents and other relatives are out of scope for now.
+5. **(On hold with the smart-home phase, removed 31 October 2026.) Smart devices go through Home Assistant, not each vendor.** Roborock has no official public API, and air purifiers each use a different cloud. Home Assistant already supports Roborock, Xiaomi, Philips, Dyson and most others. The app stores one Home Assistant URL and token per family, reads entity states, and calls services.
 6. **Scheduled and background work runs in a worker, not in a request handler.** It's a small Node process in the same Docker image (`node dist/worker.js`), built in phase 5. It delivers reminders, to-do and calendar notifications.
 7. **Feature flags.** An env flag hides each unfinished module's navigation and API until it's ready. This is separate from kid permissions, which decide what a finished module shows to each kid.
 8. **Supabase sits behind interfaces.** Routes, MCP tools and use cases talk to storage through repository interfaces (`ExpenseRepository`, `FamilyRepository`, …) and to auth through `AuthService` / `AuthAdmin`. Supabase is one implementation, chosen in two composition roots, and a lint rule stops Supabase imports from leaking elsewhere. New SQL identifies the caller through `app_private.current_user_id()` instead of `auth.uid()`. Moving to another Postgres host or auth provider then means writing new implementations, not touching the app. The frontend already only talks to `/api`.
@@ -67,7 +67,7 @@ The step-by-step task breakdown is in [family-phase-1-tasks.md](family-phase-1-t
 | Family finance (the other members' data) | off / view | off |
 | Calendar (phase 6) | off / view / edit | edit |
 | MCP (phase 3) | off / on | off |
-| Cars, Houses, Devices (phases 10 and 11) | off / view / edit | view |
+| Cars, Houses, Devices (removed for now) | off / view / edit | view |
 
 Parents always have every permission, and no one can restrict a parent. A module that's off is hidden from the navigation **and** refused by the API with 403. Hiding the navigation alone isn't enough. Reminders (phase 5) and the to-do board (phase 4) aren't modules here: every member has them. Statement import (phase 7) follows Expenses.
 
@@ -83,7 +83,7 @@ Parents always have every permission, and no one can restrict a parent. A module
 | **1.6** | **Family settings for parents**: each member's role, permissions and last active time. To keep `last_active_at` accurate, `withUser` updates it at most every 5 minutes; `last_sign_in_at` misses sessions that refresh silently. Add a per-kid permission editor, and a list of pending invites with revoke. **Creator only:** remove a member, and delete the family. Deleting requires typing the family name. It deletes the family, its members, invites, permissions and, later, all family-owned module data. Personal finance is never touched. `account_notices (user_id, kind, family_name, created_at, seen_at)` shows a one-time popup on the next sign-in: "The family X was deleted" or "You were removed from X". A removed kid keeps a normal standalone account, with their own data and no restrictions. | Permission changes take effect on the kid's next request. A non-creator parent gets 403 on remove and delete. After deletion, every former member sees the popup once, keeps their own finance, and sees no family pages. |
 | **1.7** | **Family finance view**: widen only the **select** policies on `expenses`, `expense_tabs`, `investment_*` and `net_worth_*` to "the owner, or a parent in the owner's family, or a kid in that family with Family finance on". Insert, update and delete stay owner-only. Before widening, add an explicit owner filter to every finance read in `src/lib/data`; today only about 15 of 27 queries filter by `user_id`, and the rest rely on RLS. Without this, a parent's own lists would silently start including everyone's rows, and so would MCP. Give `get_expense_dashboard` an optional `p_user_id` (still `security invoker`). Add a "Viewing: Me / <member> / Family" picker to the finance pages. Members can use different currencies (`profiles.currency`), so "Family" totals are grouped by currency; there is no FX conversion yet. | A parent sees a kid's and the spouse's expenses but gets 404 or 403 trying to edit them. A kid with Family finance off sees only their own data. A user's own pages and MCP show exactly what they showed before. SQL tests cover every widened table. |
 
-> Kids are real accounts with a username, created by a parent or joined with a code. Grandparents and other relatives (step 13.1) are out of scope for now.
+> Kids are real accounts with a username, created by a parent or joined with a code. Grandparents and other relatives are out of scope for now.
 
 ## Phase 2: Profiles and avatars
 
@@ -97,23 +97,26 @@ Parents always have every permission, and no one can restrict a parent. A module
 
 ## Order before the native apps
 
-Everything in phases 3–8 ships on the web before the Expo work in phase 9 starts. The order:
+Everything in phases 3–7 ships on the web before the Expo work in phase 9 starts. The order:
 
 1. **Phase 3, MCP access tokens.** Small, independent, and it stops MCP clients from holding your real password.
 2. **Phase 4, the to-do board.** Already planned, now as a kanban board.
 3. **Phase 5, the worker, push notifications and reminders.** The background worker and the notification layer are built once here, then reused by the calendar, to-dos and later the phone. Email notifications come in a later step.
 4. **Phase 6, the calendar.** The app's own family calendar, event notifications on the phase 5 worker, and a private feed per member for other calendar apps. Google sync is dropped.
 5. **Phase 7, statement import.** CSV first, then PDF, then the AI reader, which brings the AI cost gate and client (8.1 and 8.2) forward.
-6. **Phase 8, AI assistance**, on the gate built in phase 7.
 
-**Features first, improvements after (decided 26 October 2026).** All the planned functionality ships before the improvement phases. That means phases 6–8 here, then the native apps (9), cars and houses (10), smart home (11), polish (12) and the later items (13). After that come the improvements, in this order:
+**Improvements next, then the native apps, then AI (decided 31 October 2026).** Phases 10–13 are removed for now (see "Removed for now"). The improvement phases come next, in this order:
 - **Phase 14, production hardening and security.**
 - **Phase 15, logging and tracing,** which also measures phase 16.
 - **Phase 16, performance and loading.**
 - **Phase 17, the simpler UI, mobile first.** This includes swipe-to-delete on phones.
-- **Phase 18, clean-up and fewer tests** (optional).
+- **Phase 18, clean-up and fewer, better tests.**
 
-So the full order is 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18. Phase 14 already has a task breakdown, `docs/security-plan.md`, in [#137](https://github.com/GeorgeDanicico/expense-tracker/pull/137). It's kept unmerged until its turn comes.
+Then the **native apps (phase 9)**, and **AI assistance (phase 8)** last. Phase 8 keeps its number; the gate, ledger, client and opt-in it builds on (8.1 and 8.2) already shipped in phase 7, and nothing else depends on the rest of it. This replaces "features first, improvements after" (26 October 2026).
+
+Before phase 14 starts, a codebase audit ([codebase-audit.md](codebase-audit.md)) lists duplicated patterns, bad practices and likely bugs, mapped to phases 14–18.
+
+So the full order is 6 → 7 → 14 → 15 → 16 → 17 → 18 → 9 → 8. Phase 14 already has a task breakdown, `docs/security-plan.md`, in [#137](https://github.com/GeorgeDanicico/expense-tracker/pull/137). It's kept unmerged until its turn comes.
 
 Display-name editing (the rest of 2.1) is small and can slot in anywhere.
 
@@ -229,7 +232,7 @@ Upload a bank statement and turn it into expenses inside the app. Whatever the f
 
 ## Phase 8: AI assistance, with a hard cost limit
 
-**Status (30 October 2026):** steps 8.1 and 8.2 are being built in phase 7 (statement import tasks I14 and I15), with statements as the first feature to use the gate; step 7.5 (statement extraction) is part of phase 7 now. The rest of phase 8 reuses them.
+**Status (31 October 2026): moved to the end**, after the improvement phases and the native apps (see "Order before the native apps"). Steps 8.1 and 8.2 were built in phase 7 (statement import tasks I14 and I15), with statements as the first feature to use the gate; step 7.5 (statement extraction) is part of phase 7 now. The rest of phase 8 reuses them.
 
 AI helps where it saves typing or thinking. It's built so the spend can't run away: every call goes through one gate that checks a budget, records the cost, and is switched off by a feature flag when usage gets high.
 
@@ -275,38 +278,16 @@ The idea is to ship one small, useful native feature end to end before adding an
 | **9.8** | **Mobile calendar**: agenda plus a month view. | Parity with the web for viewing and creating events. |
 | **9.9** | **Distribution**: an EAS development build for your devices, then TestFlight and Play internal testing. | A family member installs from TestFlight. |
 
-After 9.9, every later feature step gets a "web + mobile" pair (for example 10.2a web, 10.2b mobile) instead of a single step.
+After 9.9, every later feature step gets a "web + mobile" pair (for example 8.4a web, 8.4b mobile) instead of a single step.
 
-## Phase 10: Cars and houses
+## Removed for now (31 October 2026)
 
-| Step | What | Done when |
-| --- | --- | --- |
-| **10.1** | **Vehicles**: `vehicles (family_id, name, make, model, year, plate, VIN, fuel type, photo)` and an optional `expenses.vehicle_id` so the existing `car_fuel`, `car_maintenance` and `car_repairs` subtypes link to a car. | A car's detail page shows its expenses. Linked expenses follow the finance rules from 1.7: parents see every member's, kids only their own unless Family finance is on. |
-| **10.2** | **Vehicle documents and reminders**: ITP, RCA, CASCO, rovinietă and service intervals (date or km), plus odometer logs. Expiry dates become reminders from phase 5. | A reminder fires N days before expiry. |
-| **10.3** | **Houses**: `properties (family_id, name, address, area, rooms, year built, photo)`, an optional link to a `net_worth_items` property, utility providers and contract numbers, and documents in Storage. | The house detail page shows linked net-worth value history if you can see that item under the finance rules from 1.7. |
-| **10.4** | **Maintenance log and recurring tasks** for houses (boiler check, filter changes) that create cards on the to-do board from phase 4. | A recurring task creates a card on schedule. |
+These phases are taken out of the plan because they aren't needed at the moment. They can come back as new phases later.
 
-## Phase 11: Smart home through Home Assistant
-
-| Step | What | Done when |
-| --- | --- | --- |
-| **11.1** | **Connection**: a family setting (parents only) for the Home Assistant base URL plus a long-lived access token (encrypted with AES-GCM and a server key in env). A server-side client for the HA REST API. "Test connection" button. | Status shows as connected, and the token is never sent to the client. |
-| **11.2** | **Device registry**: pick which HA entities appear in the app (vacuum, air purifier, sensors). Each one gets a friendly name, a room, and whether kids with Devices at edit may control it. | Only chosen devices are listed. |
-| **11.3** | **Read-only dashboard**: vacuum state and battery, air-quality readings, purifier mode. | Live state on web and mobile. |
-| **11.4** | **Controls**: start, stop or dock the vacuum, clean a room (Roborock segment cleaning through HA), set the purifier mode or fan speed. Every action is checked against the role and kid permissions, and written to an audit log. | A kid with Devices at view can't control anything; at edit, only the devices marked for kids. |
-| **11.5** | (Optional) **Automations and alerts**: notify when the vacuum is stuck or a filter needs replacing, and make "clean the kitchen" a to-do card action. | |
-
-## Phase 12: Polish that cuts across modules
-
-- **12.1** (Folded into 17.4.) A home dashboard per role: today's to-dos, upcoming reminders, today's events, car reminders, device alerts. Parents see family finance widgets; kids see only the modules their permissions allow.
-- **12.2** MCP tools for cars and devices.
-- **12.3** Offline-first reads on mobile (cache with TanStack Query persistence) and an audit log page for parents.
-
-## Phase 13: Later or optional
-
-- **13.1** Grandparents and other relatives: a third member type with kid-style module permissions, private finance, and the right to leave on their own.
-- **13.2** Account deletion moved to 14.9.
-- **13.3** Optional grace period for family deletion (soft-delete for 7 days before the purge), if an accidental delete ever happens.
+- **Cars and houses** (was phase 10): vehicles linked to expenses, document expiry reminders, properties and maintenance tasks.
+- **Smart home through Home Assistant** (was phase 11).
+- **Polish across modules** (was phase 12): MCP tools for cars and devices, offline reads on mobile, an audit log page for parents. The home dashboard (old 12.1) lives on as 17.4.
+- **Later or optional** (was phase 13): grandparents as a member type, and a grace period before a deleted family is purged. Account deletion (old 13.2) lives on as 14.9.
 
 ## Phase 14: Production hardening and security
 
@@ -326,7 +307,7 @@ The app is used every day and holds family finance data, so before more features
 | **14.6** | **Data exposure**: responses carry only the fields the client needs, and no other user's email unless it's needed. Errors never include database messages. Logs redact tokens, cookies and emails. Run the Supabase security and performance advisors and fix their findings. Review every `security definer` function's `search_path` and grants. | The advisors are clean. Snapshot tests of response shapes for the family and account routes. |
 | **14.7** | **Abuse limits**: extend rate limiting to every mutating route (per user) and to anonymous routes (per IP), with `429` and `Retry-After`. | A burst test gets `429` and the app stays responsive. |
 | **14.8** | **Operations**: validate env at startup and fail fast with a clear message. Confirm Supabase backups, and do a test restore into a branch. The containers run read-only with `no-new-privileges`. An uptime and worker-heartbeat alert through Obsy. A written incident checklist (rotate keys, restore, roll back an image tag). | A restore has been rehearsed once. The checklist is in `docs/`. |
-| **14.9** | **Privacy**: account deletion (moved here from 13.2), a data export for your own data, and a short privacy note. | A user can delete their account and download their data. |
+| **14.9** | **Privacy**: account deletion (moved here from the old 13.2), a data export for your own data, and a short privacy note. | A user can delete their account and download their data. |
 
 ## Phase 15: Logging, tracing and a log viewer on the VPS
 
@@ -373,12 +354,12 @@ The app has grown screen by screen and now shows too much at once, especially on
 | **17.1** | **Audit**: for each screen, list what it shows, the two or three things people actually do there, and what can be hidden, merged or moved. Includes the navigation (sidebar sections, the phone's bottom bar and More sheet) and the many Settings tabs. | A one-page audit per screen, reviewed with George. |
 | **17.2** | **Direction and mockups**: a short design direction (density, hierarchy, one primary action per screen, progressive disclosure), plus 390 px mockups of the main screens in `/dev/preview` before anything is built. | George signs off the mockups. |
 | **17.3** | **Navigation**: a bottom bar for the daily screens (for example Home, Expenses, Planning, More), fewer Settings tabs, and the same structure in the sidebar. | Screenshots at 390 and 1280 px. |
-| **17.4** | **Home as "today"**: what's due, recent spending and quick add, instead of every widget. Absorbs roadmap 12.1. | Screenshots, and Home fits one phone screen without scrolling for a typical day. |
+| **17.4** | **Home as "today"**: what's due, recent spending and quick add, instead of every widget. Absorbs the old 12.1 home dashboard. | Screenshots, and Home fits one phone screen without scrolling for a typical day. |
 | **17.5** | **Screen by screen**: Expenses, Investments, Net worth, To-dos, Reminders and Settings, one PR each, following the mockups. | Screenshots, with George's sign-off per screen. |
 | **17.6** | **Swipe actions on phones**: swipe a to-do card left to **delete** (with an undo toast), and later a reminder row for Done or Snooze. **Phone web: yes.** Pointer events tell a horizontal swipe from vertical scrolling and from the board's long-press drag (dnd-kit): moving 10 px sideways before the 200 ms long-press starts a swipe. **Desktop: no swipe.** Trackpad side-scrolling clashes with it, so cards get a delete icon on hover plus the `Delete` key on a focused card. **Native (9.5):** `react-native-gesture-handler`'s `Swipeable`, which is the natural place for it. | On a phone, swiping deletes with undo, and scrolling and long-press drag still work. On desktop, hover and keyboard delete work. |
 | **17.7** | **Accessibility pass**: contrast, focus order, screen-reader labels and 44 px touch targets on the new screens. | No axe violations on the main screens. |
 
-## Phase 18: Code clean-up and fewer, better tests (optional)
+## Phase 18: Code clean-up and fewer, better tests
 
 Low priority. **Starting point (26 October 2026):** about 26,000 lines of tests in 162 files for about 34,500 lines of code. Many features are tested at the repository, service and route levels with overlapping cases.
 
@@ -404,7 +385,7 @@ Each PR should include:
 | Decision | Recommendation | Why it matters |
 | --- | --- | --- |
 | **New product name** | Your call, needed by step 0.3 | It sets the app ID and bundle ID for the stores. Those are hard to change after TestFlight. |
-| **Public HTTPS or Tailscale only** | Stay on Tailscale through phase 8. Decide before 3.5 or the store releases. | Phones need the Tailscale app to reach the API. claude.ai MCP connectors (3.5), Google Calendar, new Outlook and Outlook.com subscribing to the calendar feed (C8 in calendar-plan.md) and some OAuth redirects need a public URL (Tailscale Funnel or a Cloudflare Tunnel both work). Web Push needs HTTPS but not a public URL. |
+| **Public HTTPS or Tailscale only** | Stay on Tailscale until the native apps. Decide before 3.5 or the store releases. | Phones need the Tailscale app to reach the API. claude.ai MCP connectors (3.5), Google Calendar, new Outlook and Outlook.com subscribing to the calendar feed (C8 in calendar-plan.md) and some OAuth redirects need a public URL (Tailscale Funnel or a Cloudflare Tunnel both work). Web Push needs HTTPS but not a public URL. |
 | **Email provider** | Decided (25 October 2026): Gmail SMTP from George's existing Gmail account with an app password, behind an `EmailSender` interface. Resend if a domain is ever bought | No domain, so providers that need SPF and DKIM on your own domain are out. Supabase Auth's email is only for sign-in emails. |
 | **One to-do board or several** | Decided: one board per family, filtered by member; no private cards. See [todo-board-plan.md](todo-board-plan.md) | Simpler for a family, and member chips cover "show me Ana's to-dos". |
 | **Banks and formats for statement import** | No longer blocking (30 October 2026): the AI reader replaces per-bank parsers. Anonymised samples still improve the eval (I19). | Kept for the eval. |
@@ -415,7 +396,6 @@ Each PR should include:
 | **UI direction** | Sign off the 17.2 mockups before any screen is rebuilt | Rebuilding screens without an agreed direction would mean doing it twice. |
 | **Mac calendar** | Decided (28 October 2026): a read-only feed per member with only the events they attend; no Google sync, no CalDAV. See [calendar-plan.md](calendar-plan.md) | Apple Calendar on a Mac or iPhone with Tailscale subscribes now; Google and Outlook.com subscribe once the app has a public URL. |
 | **Reminder rules** | Decided: reminders are strictly personal; to ask someone else, assign them a to-do (phase 5) | |
-| **Home Assistant** | Use it if you already run HA, or are willing to. It's a Docker container on the VPS or a Raspberry Pi at home. | The alternative is reverse-engineered vendor clouds (python-roborock, miio), which are fragile and may break the vendors' terms. |
 | **Finance visibility** | Decided: parents see every member's finance read-only, kids only with Family finance on (decision 3, step 1.7) | It widens the read policies on every finance table, so every finance read needs an explicit owner filter first. |
 | **Kids' sign-in** | Decided: a username account created by a parent (or a kid code or link). A real email can be added later (step 1.5) | Creating accounts on the server needs the Supabase secret key, which the app doesn't have yet. |
 | **Can a non-creator parent leave?** | Yes, on their own. Their finance stops being visible to the family | Otherwise only the creator can get them out. |
