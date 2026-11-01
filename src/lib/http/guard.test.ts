@@ -31,8 +31,14 @@ describe("refuseForeignRequest", () => {
     expect(refuseForeignRequest(request({ "sec-fetch-site": site }))).toBeNull();
   });
 
-  it("refuses a same-origin claim whose Origin is someone else's", () => {
-    expect(refuseForeignRequest(request({ "sec-fetch-site": "same-origin", origin: "https://evil.example" }))).not.toBeNull();
+  it("trusts Sec-Fetch-Site: same-origin even when SITE_URL differs from the address the app was opened at", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SITE_URL", `${TAILNET}/`);
+    const openedAt = "https://ifam.other-tailnet.ts.net";
+
+    expect(refuseForeignRequest(request({ "sec-fetch-site": "same-origin", origin: openedAt }))).toBeNull();
+    // Without the browser's header, the same Origin is compared with SITE_URL and refused.
+    expect(refuseForeignRequest(request({ origin: openedAt }))).not.toBeNull();
   });
 
   it("allows a request with neither header (curl, server-to-server); the session still decides", () => {

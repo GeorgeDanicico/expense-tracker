@@ -15,6 +15,12 @@ import { HttpError } from "@/lib/http/errors";
  *   cookies would otherwise reach.
  * - An `Origin` that isn't the app's (see {@link isAppOrigin}), including `Origin: null`.
  *
+ * `Sec-Fetch-Site: same-origin` is trusted on its own, before `Origin` is compared with `SITE_URL`.
+ * The browser sets it (a page can't set or change it) and every current browser sends it, so a
+ * `SITE_URL` that differs slightly from the address the app was opened at doesn't refuse the app's
+ * own writes. The `Origin` comparison is the fallback for browsers that don't send the header.
+ * A client that isn't a browser can claim `same-origin`, but it has no victim's cookie to send.
+ *
  * A request with neither header (curl, server-to-server, an old browser's same-origin request)
  * passes; it still needs a valid session. `GET`, `HEAD` and `OPTIONS` are never checked: they
  * change nothing (the calendar feed and health check are GETs).
@@ -101,6 +107,7 @@ export function refuseForeignRequest(request: Request | undefined): HttpError | 
 
   const fetchSite = request.headers.get("sec-fetch-site")?.trim().toLowerCase();
   if (fetchSite === "cross-site" || fetchSite === "same-site") return new HttpError(403, CROSS_SITE_REFUSED);
+  if (fetchSite === "same-origin") return null;
 
   const origin = request.headers.get("origin");
   if (origin !== null && !isAppOrigin(origin, request)) return new HttpError(403, CROSS_SITE_REFUSED);
