@@ -4,13 +4,16 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# A new push to a pull request cancels the older run. On main every commit's run finishes: the
+# image is only built after CI passes, so a cancelled run would leave that commit without one.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # gitleaks over the whole git history and the working tree, on every push and pull request.
@@ -24,7 +27,7 @@ jobs:
     env:
       GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -53,9 +56,9 @@ jobs:
       FAMILY_ENABLED: "false"
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -100,7 +103,118 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Replay migrations and run SQL tests
         run: npm run test:db
+
+  # npm audit over the production dependencies, failing on high and critical advisories. The
+  # script wraps `npm audit --omit=dev` so a known, unfixable advisory can be accepted for a
+  # limited time in audit-allowlist.json (id, reason, expiry date) without switching the check off.
+  # It reads the lockfile only, so it needs no install.
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      - name: Check the audit script
+        run: node scripts/audit-check.mjs --self-test
+
+      - name: Audit production dependencies
+        run: node scripts/audit-check.mjs
+
+  # The image: built, scanned (secrets, then known vulnerabilities) and, on main only, pushed to
+  # GHCR so the VPS just pulls it (scripts/deploy.sh with IMAGE_SOURCE=pull). It needs every other
+  # job, so a red main never becomes :latest. Pull requests run the same build and scans without
+  # pushing, which proves the Dockerfile and the scans before merge. "Run workflow" on main
+  # rebuilds and pushes the branch head, after CI has passed again.
+  # Tags: the full commit SHA and latest.
+  image:
+    name: Build, scan and push the image
+    needs: [secrets, app, database, audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/georgedanicico/expense-tracker
+      # Push and manual runs only; and only on main, never from a pull request or another branch.
+      PUBLISH: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        if: env.PUBLISH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build into the local Docker first, so a secret in the image is caught before anything is pushed.
+      - name: Build the image (not pushed yet)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: expense-tracker:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Copy the app out of the image and search it: the browser files for secret patterns and
+      # server-only variable names, the whole tree for patterns, key files and .env files.
+      - name: Scan the image for secrets
+        run: |
+          set -euo pipefail
+          id=$(docker create expense-tracker:scan)
+          mkdir "$RUNNER_TEMP/image-fs"
+          docker cp "$id:/app" "$RUNNER_TEMP/image-fs/app"
+          docker rm "$id" > /dev/null
+          bash scripts/scan-build-secrets.sh --self-test
+          bash scripts/scan-build-secrets.sh "$RUNNER_TEMP/image-fs/app/.next/static" "$RUNNER_TEMP/image-fs/app/public"
+          bash scripts/scan-build-secrets.sh --server "$RUNNER_TEMP/image-fs/app"
+
+      # Known vulnerabilities in the OS packages and in the app's dependencies. Fails on HIGH and
+      # CRITICAL findings that have a fixed version; `ignore-unfixed` skips the ones nobody can
+      # fix yet, which a rebuild can't help. A finding that must wait goes in a .trivyignore file at
+      # the repo root (Trivy reads it by itself): one `CVE-... exp:YYYY-MM-DD` line, with a comment
+      # saying why. The expiry makes it fail again on that date.
+      - name: Scan the image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: expense-tracker:scan
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      # Same inputs as the build above, so every layer comes from the cache.
+      - name: Push the image
+        if: env.PUBLISH == 'true'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

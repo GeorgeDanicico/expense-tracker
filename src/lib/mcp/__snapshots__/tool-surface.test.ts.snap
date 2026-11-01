@@ -1097,15 +1097,11 @@ exports[`MCP tool surface > lists the same tools, schemas and annotations 1`] = 
           "description": "A member's name or "me"; null to unassign",
         },
         "dueDate": {
-          "anyOf": [
-            {
-              "type": "string",
-            },
-            {
-              "type": "null",
-            },
-          ],
           "description": "YYYY-MM-DD; null to clear",
+          "type": [
+            "string",
+            "null",
+          ],
         },
         "id": {
           "format": "uuid",

@@ -25,7 +25,7 @@ PREVIOUS_WORKER_CONTAINER="${WORKER_CONTAINER_NAME}-previous"
 WORKER_STARTUP_SECONDS="${WORKER_STARTUP_SECONDS:-5}"
 GIT_SHA="${GIT_SHA:-${GITHUB_SHA:-}}"
 # build: build the image here from the Dockerfile. pull: pull ${IMAGE_NAME}:${IMAGE_TAG}, which the
-# "Build image" workflow pushes to GHCR, so the host never runs the memory-hungry build.
+# "image" job of the CI workflow pushes to GHCR, so the host never runs the memory-hungry build.
 IMAGE_SOURCE="${IMAGE_SOURCE:-build}"
 PULL_ATTEMPTS="${PULL_ATTEMPTS:-40}"
 PULL_INTERVAL_SECONDS="${PULL_INTERVAL_SECONDS:-15}"
@@ -80,7 +80,7 @@ rollback() {
   exit "$exit_code"
 }
 
-# Pulls the image, retrying while the "Build image" workflow may still be pushing it.
+# Pulls the image, retrying while the CI "image" job may still be pushing it.
 pull_image() {
   local attempt
 
@@ -209,7 +209,7 @@ require_positive_integer PULL_INTERVAL_SECONDS "$PULL_INTERVAL_SECONDS"
 
 if [[ "$IMAGE_SOURCE" == pull ]]; then
   echo "Pulling ${IMAGE_NAME}:${IMAGE_TAG}."
-  pull_image || die "Image ${IMAGE_NAME}:${IMAGE_TAG} could not be pulled; check the Build image workflow and the registry login"
+  pull_image || die "Image ${IMAGE_NAME}:${IMAGE_TAG} could not be pulled; check the CI image job and the registry login"
 else
   echo "Building ${IMAGE_NAME}:${IMAGE_TAG} from ${DOCKERFILE_PATH}."
   docker build \

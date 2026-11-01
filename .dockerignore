@@ -16,6 +16,20 @@ out
 build
 dist
 docs
+# Not used by the build. .claude holds a stale full copy of the repo (worktrees), tmp and
+# eval-results are local scratch and model eval output.
+.claude
+tmp
+eval-results
+.github
+supabase
+scripts
+.gitleaks.toml
+AGENTS.md
+CLAUDE.md
+README.md
+audit-allowlist.json
+vitest.config.ts
 Dockerfile*
 compose*.yml
 compose*.yaml
