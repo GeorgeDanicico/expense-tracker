@@ -156,7 +156,7 @@ export type TickResult =
       /** Null on every tick but the one that ran the day's "Due today" notifications. */
       todosDue: TodoDueCounts | null;
     }
-  | { pushConfigured: false; due: DueCounts }
+  | { pushConfigured: false; due: DueCounts; cleaned: number | null; importsPurged: number | null }
   | null;
 
 /** An error's message, without its stack or any attached request details. */
@@ -485,7 +485,8 @@ async function purgeImportDrafts({ store, clock, log, state }: TickDependencies)
  * (from 09:00 Bucharest), up to {@link REMINDER_BATCH} due
  * reminders queued as outbox rows, up to {@link EVENT_BATCH} due calendar events queued as one
  * outbox row per attendee, then up to {@link NOTIFICATION_BATCH} outbox rows sent to every
- * device of their recipient. Without VAPID keys (`push` null) it only logs `push_not_configured`
+ * device of their recipient. Without VAPID keys (`push` null) it still runs the clean-up and the
+ * draft purge (neither needs push), then only logs `push_not_configured`
  * with how many rows are waiting, and leaves them pending; reminders and events aren't claimed
  * either, and once the keys are set each reminder sends only its latest missed notify time (an
  * event whose end passed meanwhile sends nothing).
@@ -497,6 +498,11 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
   try {
     await store.writeHeartbeat({ name: WORKER_NAME, beatAt: startedAt, version });
 
+    // The clean-up needs no push, so it runs whether or not the VAPID keys are set: expired
+    // statement-import drafts must go either way (B2).
+    const cleaned = await cleanUpNotifications(deps);
+    const importsPurged = await purgeImportDrafts(deps);
+
     if (!push) {
       const due = await store.countDue(startedAt);
       log.error("push_not_configured", {
@@ -504,11 +510,9 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
         dueNotifications: due.notifications,
         dueReminders: due.reminders,
       });
-      return { pushConfigured: false, due };
+      return { pushConfigured: false, due, cleaned, importsPurged };
     }
 
-    const cleaned = await cleanUpNotifications(deps);
-    const importsPurged = await purgeImportDrafts(deps);
     const todosDue = await queueDueTodos(deps);
     const reminders = await queueDueReminders(deps);
     const events = await queueDueEvents(deps);

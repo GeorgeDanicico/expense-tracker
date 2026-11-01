@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getOAuthIssuer } from "@/lib/auth";
+import { getEnv } from "@/lib/env";
 
 /** Where the protected-resource file for `/api/mcp` is served, under the app's origin (RFC 9728). */
 const RESOURCE_METADATA_PATH = "/.well-known/oauth-protected-resource/api/mcp";
@@ -15,7 +16,7 @@ export function getMcpAuthorizationServer(): { issuer: string } {
  * Tailscale name in production), else the request's own origin, as in local development.
  */
 export function mcpResourceOrigin(request: Request): string {
-  const siteUrl = process.env.SITE_URL;
+  const siteUrl = getEnv().SITE_URL;
   if (siteUrl) {
     try {
       return new URL(siteUrl).origin;

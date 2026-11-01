@@ -137,11 +137,10 @@ describe("tick", () => {
 
       const result = await tick({ ...deps, push: null });
 
-      expect(result).toEqual({ pushConfigured: false, due: { notifications: 1, reminders: 0 } });
+      expect(result).toEqual({ pushConfigured: false, due: { notifications: 1, reminders: 0 }, cleaned: 0, importsPurged: 0 });
       expect(store.heartbeats.get("worker")).toBeDefined();
       expect(row).toMatchObject({ status: "pending", attempts: 0, lockedUntil: null });
-      expect(store.cleanups).toEqual([]);
-      expect(lines).toEqual([
+      expect(lines.filter((line) => line.level === "error")).toEqual([
         {
           level: "error",
           event: "push_not_configured",
@@ -152,6 +151,37 @@ describe("tick", () => {
           },
         },
       ]);
+    });
+
+    it("still purges an expired import draft and cleans up old outbox rows (B2)", async () => {
+      const { clock, store, deps, lines } = setup();
+      store.addDevice(ANA);
+      store.expiredImportDrafts = 2;
+      const old = store.queue({ userId: ANA, status: "sent", createdAt: new Date(clock.now().getTime() - 31 * 24 * 60 * MINUTE) });
+      const waiting = store.queue({ userId: ANA });
+
+      const result = await tick({ ...deps, push: null });
+
+      expect(result).toMatchObject({ pushConfigured: false, cleaned: 1, importsPurged: 2 });
+      expect(store.importPurges).toBe(1);
+      expect(store.expiredImportDrafts).toBe(0);
+      expect(store.notifications).not.toContain(old);
+      expect(waiting).toMatchObject({ status: "pending", attempts: 0 });
+      expect(lines.map((line) => line.event)).toEqual(["cleanup", "import_drafts_purged", "push_not_configured"]);
+    });
+
+    it("purges once a day without push, as it does with push", async () => {
+      const { clock, store, deps } = setup();
+      store.expiredImportDrafts = 1;
+
+      expect(await tick({ ...deps, push: null })).toMatchObject({ importsPurged: 1 });
+
+      store.expiredImportDrafts = 1;
+      clock.advance(CLEANUP_INTERVAL_MS - 1);
+      expect(await tick({ ...deps, push: null })).toMatchObject({ importsPurged: null });
+      clock.advance(1);
+      expect(await tick({ ...deps, push: null })).toMatchObject({ importsPurged: 1 });
+      expect(store.importPurges).toBe(2);
     });
 
     it("sends the waiting rows once the keys are there", async () => {
@@ -489,15 +519,6 @@ describe("tick", () => {
       const [line] = purgeLines(lines);
       expect(Object.keys(line.fields ?? {})).toEqual(["purged"]);
       expect(typeof line.fields?.purged).toBe("number");
-    });
-
-    it("isn't run without VAPID keys, as the rest of the clean-up isn't", async () => {
-      const { store, deps } = setup();
-      store.expiredImportDrafts = 1;
-
-      await tick({ ...deps, push: null });
-
-      expect(store.importPurges).toBe(0);
     });
   });
 });
