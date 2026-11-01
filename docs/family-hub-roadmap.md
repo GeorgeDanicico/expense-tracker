@@ -291,9 +291,11 @@ These phases are taken out of the plan because they aren't needed at the moment.
 
 ## Phase 14: Production hardening and security
 
+**Status (1 November 2026): planned** in [security-plan.md](security-plan.md) (tasks S1–S14, revised with the [codebase audit](codebase-audit.md)), which supersedes the steps below.
+
 The app is used every day and holds family finance data, so before more features it gets the review a real production app needs. **Starting point (26 October 2026):**
 - RLS on every table, Zod on every route, and Supabase calls through supabase-js and RPCs with parameters, with no raw SQL.
-- An in-memory rate limiter on sign-in, joining a family, password changes and MCP tokens.
+- An in-memory rate limiter on joining a family, avatars, imports and MCP tokens. (Corrected 1 November 2026: sign-in, sign-up and password and email changes have none of their own; their 429s come from Supabase. See audit finding P1.)
 - Security headers without a Content-Security-Policy or HSTS.
 - 302 commits of history that have never been scanned for secrets.
 
