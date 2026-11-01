@@ -50,7 +50,7 @@
     "esbuild": "0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
-    "typescript": "^5",
+    "typescript": "^7",
     "vitest": "3.2.7"
   }
 }
