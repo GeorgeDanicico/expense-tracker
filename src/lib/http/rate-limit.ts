@@ -219,6 +219,23 @@ export const emailChangeAttempts = createFailureLimiter({
 /** What the email change answers, with status 429, past `EMAIL_CHANGE_MAX_ATTEMPTS`. */
 export const TOO_MANY_EMAIL_CHANGES = "You've tried to change your email a lot recently. Try again in an hour.";
 
+/** CSP violation report requests allowed per client IP in `CSP_REPORT_WINDOW_MS`, counting every one. */
+export const CSP_REPORT_MAX_ATTEMPTS = 60;
+export const CSP_REPORT_WINDOW_MS = 60 * 1000;
+
+/**
+ * `POST /api/csp-report` per client IP (`clientIp`). Records every request (through
+ * `recordAttempt`): anyone can send one, and each is a log line. One page load breaking the policy
+ * sends one report per violation, so the limit leaves room for a badly broken page.
+ */
+export const cspReportAttempts = createFailureLimiter({
+  maxFailures: CSP_REPORT_MAX_ATTEMPTS,
+  windowMs: CSP_REPORT_WINDOW_MS,
+});
+
+/** What the report endpoint answers, with status 429, past `CSP_REPORT_MAX_ATTEMPTS`. */
+export const TOO_MANY_CSP_REPORTS = "Too many reports. Try again in a minute.";
+
 /** What a route answers, with status 429, to a key over its limit. */
 export const TOO_MANY_ATTEMPTS_MESSAGE = "Too many codes that didn't work. Try again in a few minutes.";
 
