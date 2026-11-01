@@ -508,3 +508,59 @@ describe("DELETE /api/auth", () => {
     expect(response.body).toEqual({ error: "Unable to sign out. Please try again." });
   });
 });
+
+// The request guard (security plan S5): /api/auth doesn't use withUser, so it runs the guard itself.
+describe("the request guard on /api/auth", () => {
+  const login = { mode: "login", email, password };
+  const refused = { status: 403, body: { error: "This request didn't come from the app, so it was refused." } };
+
+  beforeEach(() => {
+    auth = new FakeAuth();
+    admin = new FakeAuthAdmin(auth);
+    mocks.getAuthAdmin.mockImplementation(() => admin);
+    resetRateLimits();
+    auth.addUser(email, password);
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each([
+    ["Sec-Fetch-Site: cross-site", { "Sec-Fetch-Site": "cross-site" }],
+    ["a foreign Origin", { Origin: "https://evil.example" }],
+  ])("refuses a sign-in with %s (login CSRF) before asking the provider", async (_name, headers) => {
+    const signIn = vi.spyOn(auth, "signInWithPassword");
+
+    expect(await callRoute(POST, { method: "POST", url: "/api/auth", body: login, headers })).toMatchObject(refused);
+    expect(signIn).not.toHaveBeenCalled();
+  });
+
+  it("refuses a sign-out from another site", async () => {
+    auth.currentUser = auth.addUser("other@example.test", password);
+
+    expect(await callRoute(DELETE, { method: "DELETE", url: "/api/auth", headers: { "Sec-Fetch-Site": "cross-site" } })).toMatchObject(refused);
+    expect(auth.currentUser).not.toBeNull();
+  });
+
+  it("refuses a text/plain body with 415", async () => {
+    const response = await callRoute(POST, {
+      method: "POST", url: "/api/auth", body: login, headers: { "Content-Type": "text/plain" },
+    });
+
+    expect(response).toMatchObject({ status: 415, body: { error: "Send the request body as JSON (Content-Type: application/json)." } });
+  });
+
+  it("refuses a body over 64 KB with 413", async () => {
+    const response = await callRoute(POST, { method: "POST", url: "/api/auth", body: { ...login, padding: "x".repeat(65 * 1024) } });
+
+    expect(response).toMatchObject({ status: 413, body: { error: "The request is too large." } });
+  });
+
+  it("signs in from the app's own page", async () => {
+    const headers = { "Sec-Fetch-Site": "same-origin", Origin: "http://localhost" };
+
+    expect(await callRoute(POST, { method: "POST", url: "/api/auth", body: login, headers })).toMatchObject({
+      status: 200,
+      body: { authenticated: true },
+    });
+  });
+});

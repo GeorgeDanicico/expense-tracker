@@ -129,6 +129,7 @@ A kid can use AI assistants only when all three hold: a parent has turned on the
 - After 5 bad tokens within 15 minutes from one IP or with one token prefix, requests return 429 until the window passes.
 - A personal token's session is cached in server memory. A restart or redeploy only means a fresh session on the next request.
 - Browser requests with an `Origin` other than `SITE_URL` are rejected with 403 (DNS-rebinding guard). Without `SITE_URL`, only localhost origins are accepted; Claude Code sends no `Origin`.
+- The REST API (and sign-in) refuses writes from other sites the same way: a `POST`, `PUT`, `PATCH` or `DELETE` with `Sec-Fetch-Site: cross-site` or `same-site`, or with an `Origin` other than `SITE_URL`, gets 403, and JSON bodies must be `application/json` and at most 64 KB. Browsers mark the app's own requests `Sec-Fetch-Site: same-origin`, which is trusted on its own; only a browser that doesn't send that header has its `Origin` compared with `SITE_URL`, so keep `SITE_URL` set to the address you open the app at. The rules and the one exemption (`/api/mcp`) are in `src/lib/http/guard.ts`.
 
 ## Docker on a VPS
 

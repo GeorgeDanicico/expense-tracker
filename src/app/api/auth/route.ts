@@ -12,7 +12,7 @@ import {
   TOO_MANY_SIGN_INS,
   TOO_MANY_SIGN_UPS,
 } from "@/lib/http/rate-limit";
-import { json, tooManyRequests } from "@/lib/http/route";
+import { json, readJson, tooManyRequests, withRequestGuard } from "@/lib/http/route";
 import { usernameSchema } from "@/lib/validation/family";
 
 const emailSchema = z.email("Enter a valid email address.");
@@ -77,8 +77,13 @@ async function emailForUsername(username: string): Promise<string | null> {
   }
 }
 
-export async function POST(request: NextRequest) {
-  const payload = await request.json().catch(() => null);
+/**
+ * Signs in (`mode: "login"`, with an email or a username) or signs up. Not behind `withUser`, but
+ * behind the same request guard: a sign-in posted from another site is a 403 (login CSRF), and the
+ * body must be `application/json` of at most 64 KB (415 / 413).
+ */
+export const POST = withRequestGuard(async (request: NextRequest) => {
+  const payload = await readJson(request);
   const ip = clientIp(request);
 
   if (loginRequest.safeParse(payload).success) {
@@ -134,12 +139,13 @@ export async function POST(request: NextRequest) {
       ? { authenticated: true }
       : { authenticated: false, message: "Check your inbox to confirm your email, then sign in." },
   );
-}
+});
 
-export async function DELETE() {
+/** Signs out. Behind the request guard, so another site can't sign the user out either. */
+export const DELETE = withRequestGuard(async () => {
   const signOut = await getAuth().signOut();
   if (!signOut.ok) {
     return json({ error: "Unable to sign out. Please try again." }, 500);
   }
   return json({ success: true });
-}
+});

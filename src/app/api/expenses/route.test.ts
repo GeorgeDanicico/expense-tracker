@@ -53,6 +53,32 @@ describe("POST /api/expenses", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  // The request guard (security plan S5), through withPermission.
+  it.each([
+    ["Sec-Fetch-Site: cross-site", { "Sec-Fetch-Site": "cross-site" }],
+    ["a foreign Origin", { Origin: "https://evil.example" }],
+    ["Origin: null", { Origin: "null" }],
+  ])("refuses a write with %s with 403", async (_name, headers) => {
+    const response = await callRoute(POST, { method: "POST", url: "/api/expenses", body, headers });
+
+    expect(response).toMatchObject({ status: 403, body: { error: "This request didn't come from the app, so it was refused." } });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a text/plain body with 415 and one over 64 KB with 413", async () => {
+    const plain = await callRoute(POST, { method: "POST", url: "/api/expenses", body, headers: { "Content-Type": "text/plain" } });
+    const huge = await post({ ...body, notes: "x".repeat(65 * 1024) });
+
+    expect(plain.status).toBe(415);
+    expect(huge.status).toBe(413);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("accepts a write from the app's own page with a JSON charset", async () => {
+    const headers = { "Sec-Fetch-Site": "same-origin", Origin: "http://localhost", "Content-Type": "application/json; charset=utf-8" };
+    expect((await callRoute(POST, { method: "POST", url: "/api/expenses", body, headers })).status).toBe(201);
+  });
+
   it("reports a storage failure with the route's own message", async () => {
     create.mockRejectedValue(new Error("private failure"));
 

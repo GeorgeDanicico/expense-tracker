@@ -18,9 +18,9 @@ type CallOptions<Params> = {
   method?: string;
   /** Path and query, resolved against http://localhost. */
   url?: string;
-  /** Sent as JSON; a string is sent as-is. */
+  /** Sent as JSON; a string is sent as-is. Either way it goes as `Content-Type: application/json`, like `apiRequest`. */
   body?: unknown;
-  /** Extra request headers, such as `X-Forwarded-For`. */
+  /** Extra request headers, such as `X-Forwarded-For`, or a `Content-Type` that replaces the JSON one. */
   headers?: Record<string, string>;
   params?: Params;
 };
@@ -30,9 +30,11 @@ export async function callRoute<Params = Record<string, string>>(
   handler: (request: NextRequest, context: { params: Promise<Params> }) => Promise<Response>,
   { method = "GET", url = "/api", body, headers, params }: CallOptions<Params> = {},
 ) {
+  const requestHeaders = new Headers(body === undefined ? {} : { "content-type": "application/json" });
+  for (const [name, value] of Object.entries(headers ?? {})) requestHeaders.set(name, value);
   const request = new NextRequest(new URL(url, "http://localhost"), {
     method,
-    headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers },
+    headers: requestHeaders,
     body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
   });
   const response = await handler(request, { params: Promise.resolve(params ?? ({} as Params)) });
