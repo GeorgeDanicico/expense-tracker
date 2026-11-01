@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
 
 import { PwaRegistration } from "@/components/pwa/pwa-registration";
 import { Provider } from "@/components/ui/provider";
 import { BRAND } from "@/lib/brand";
+import { NONCE_HEADER } from "@/lib/http/csp";
 
 import "./globals.css";
 
@@ -39,7 +41,13 @@ export const viewport = {
   colorScheme: "light",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+/**
+ * Reads the request's CSP nonce (set by `src/proxy.ts`) for next-themes' inline script; Next puts
+ * it on its own scripts by itself. Reading a request header renders every page per request, which
+ * a nonce needs anyway: a page rendered at build time can't carry the nonce of a later request.
+ */
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const nonce = (await headers()).get(NONCE_HEADER) ?? undefined;
   return (
     <html
       lang="en"
@@ -48,7 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body>
-        <Provider>{children}</Provider>
+        <Provider nonce={nonce}>{children}</Provider>
         <PwaRegistration />
       </body>
     </html>

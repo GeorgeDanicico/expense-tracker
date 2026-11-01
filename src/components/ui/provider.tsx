@@ -29,7 +29,8 @@ const swrConfig = {
     ),
 };
 
-export function Provider({ children }: { children: React.ReactNode }) {
+/** `nonce`: the request's CSP nonce, for next-themes' inline script (see `src/app/layout.tsx`). */
+export function Provider({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   return (
     <ChakraProvider value={ledgerSystem}>
       <SWRConfig value={swrConfig}>
@@ -37,6 +38,7 @@ export function Provider({ children }: { children: React.ReactNode }) {
           attribute="class"
           forcedTheme="light"
           disableTransitionOnChange
+          nonce={nonce}
         >
           <LucideProvider size={ICON.sm} strokeWidth={ICON_STROKE}>
             <PwaInstallProvider>{children}</PwaInstallProvider>

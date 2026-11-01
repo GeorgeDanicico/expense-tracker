@@ -46,6 +46,13 @@ export const REQUEST_GUARD_EXEMPTIONS: Readonly<Record<string, string>> = {
     "Authenticated only by a bearer token in the Authorization header, never by cookies, so a " +
     "forged cross-site request has no credential to ride on. MCP clients send no Origin; the " +
     "route keeps its own Origin check against SITE_URL (the MCP spec's DNS-rebinding guard).",
+  "/api/csp-report":
+    "Browsers post CSP violation reports here on their own, not the page: Reporting API uploads are " +
+    "queued and sent later, possibly with no Origin or Sec-Fetch-Site, and a report from a sandboxed " +
+    "document says Origin: null. The route never reads cookies or the session (the proxy skips it) " +
+    "and changes nothing but the logs, so a forged report has nothing to ride on. It keeps a per-IP " +
+    "limit, a 32 KB body limit and its own two content types instead (application/csp-report, " +
+    "application/reports+json; the JSON rule doesn't apply).",
 };
 
 export const CROSS_SITE_REFUSED = "This request didn't come from the app, so it was refused.";

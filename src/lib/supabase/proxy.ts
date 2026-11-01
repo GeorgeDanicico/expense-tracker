@@ -7,8 +7,14 @@ import type { Database } from "@/lib/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { authCookieOptions } from "@/lib/supabase/cookie-options";
 
-export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+/**
+ * Refreshes the Supabase session cookies, and passes the request on with `extraRequestHeaders`
+ * added (the proxy's CSP nonce). Each `NextResponse.next` copies the request's headers as they are
+ * at that moment, so a refreshed cookie written into the request is forwarded too.
+ */
+export async function updateSession(request: NextRequest, extraRequestHeaders: Readonly<Record<string, string>> = {}) {
+  const next = () => NextResponse.next({ request: { headers: withHeaders(request.headers, extraRequestHeaders) } });
+  let response = next();
   const { url, publishableKey } = getSupabaseConfig();
 
   const supabase = createServerClient<Database>(
@@ -25,7 +31,7 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value);
           }
 
-          response = NextResponse.next({ request });
+          response = next();
 
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
@@ -41,4 +47,11 @@ export async function updateSession(request: NextRequest) {
 
   await supabase.auth.getClaims();
   return response;
+}
+
+/** A copy of `headers` with `extra` set on top. */
+export function withHeaders(headers: Headers, extra: Readonly<Record<string, string>>): Headers {
+  const merged = new Headers(headers);
+  for (const [key, value] of Object.entries(extra)) merged.set(key, value);
+  return merged;
 }
