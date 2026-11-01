@@ -1,5 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 
+import { getEnv } from "@/lib/env";
 import { json, PRIVATE_HEADERS } from "@/lib/http/route";
 import { authenticateMcpRequest, readMcpAuthorization } from "@/lib/mcp/auth";
 import { mcpBearerChallenge, mcpResourceOrigin } from "@/lib/mcp/authorization-server";
@@ -18,7 +19,7 @@ function isAllowedOrigin(origin: string) {
     return false;
   }
 
-  const siteUrl = process.env.SITE_URL;
+  const siteUrl = getEnv().SITE_URL;
   if (siteUrl) {
     try {
       return parsed.origin === new URL(siteUrl).origin;

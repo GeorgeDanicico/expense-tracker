@@ -1,9 +1,9 @@
 import "server-only";
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+import { getEnv } from "@/lib/env";
 
 export function getSupabaseConfig() {
+  const { SUPABASE_URL: supabaseUrl, SUPABASE_PUBLISHABLE_KEY: supabasePublishableKey } = getEnv();
   if (!supabaseUrl || !supabasePublishableKey) {
     throw new Error(
       "Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY environment variable.",
@@ -24,7 +24,7 @@ export function getSupabaseConfig() {
  * features that need it (kid accounts, username sign-in, profile pictures, the notifications worker) fail. Never log it or pass it on.
  */
 export function getSupabaseAdminConfig() {
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  const { SUPABASE_URL: supabaseUrl, SUPABASE_SECRET_KEY: secretKey } = getEnv();
   if (!supabaseUrl || !secretKey) {
     throw new Error(
       "Missing SUPABASE_URL or SUPABASE_SECRET_KEY environment variable. Kid accounts, username sign-in and the notifications worker need the secret key.",

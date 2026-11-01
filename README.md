@@ -173,6 +173,13 @@ docker run -d --name expense-tracker-worker \
   expense-tracker:latest node worker.js
 ```
 
+Both containers check their environment when they start (`src/lib/env.ts`). The web app needs
+`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`; the worker needs `SUPABASE_URL` and
+`SUPABASE_SECRET_KEY`. Without one, the process prints which variable is missing or invalid (never
+its value) and exits with 1, so `docker logs` says why. Everything else is optional: the web app logs
+one line naming the features that are off, and the worker keeps running without the VAPID keys (it
+still runs its daily clean-up). `.env.example` lists every variable.
+
 `docker stop` lets the current tick finish before the worker exits.
 
 #### Web Push (VAPID) keys

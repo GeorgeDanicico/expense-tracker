@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getEnv } from "@/lib/env";
 import { isInvestmentCurrency } from "@/lib/investments/types";
 import { PRICE_SOURCES, type PriceSource, type Quote, type ThirdPartyQuoteAdapter } from "@/lib/investments/quotes/types";
 
@@ -80,7 +81,7 @@ export class PriceApiQuoteAdapter implements ThirdPartyQuoteAdapter {
   private readonly fetcher: PriceApiFetcher;
 
   constructor(options: { serviceUrl?: string; fetcher?: PriceApiFetcher } = {}) {
-    this.serviceUrl = normalizeServiceUrl(options.serviceUrl ?? process.env.PRICE_SERVICE_URL);
+    this.serviceUrl = normalizeServiceUrl(options.serviceUrl ?? getEnv().PRICE_SERVICE_URL);
     this.fetcher = options.fetcher ?? fetch;
   }
 

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { parseServerEnv } from "@/lib/env";
 import type { AiSettingsResponse } from "@/lib/api/keys";
 import type { AiProviderId } from "@/lib/ai/provider";
 import { AI_PROVIDER_POLICIES } from "@/lib/ai/provider-policy";
@@ -9,8 +10,8 @@ import { getRepositories } from "@/lib/repositories";
  * The provider named by `AI_PROVIDER`, or null when it is unset or isn't one this app has an
  * adapter for (then no call is made and the privacy text has no provider to name).
  */
-export function configuredProvider(env: Record<string, string | undefined> = process.env): AiProviderId | null {
-  const id = env.AI_PROVIDER?.trim();
+export function configuredProvider(env?: Record<string, string | undefined>): AiProviderId | null {
+  const id = parseServerEnv(env).AI_PROVIDER;
   return id && Object.hasOwn(AI_PROVIDER_POLICIES, id) ? (id as AiProviderId) : null;
 }
 

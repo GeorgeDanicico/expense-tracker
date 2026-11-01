@@ -2,6 +2,8 @@ import "server-only";
 
 import type { NextRequest } from "next/server";
 
+import { getEnv } from "@/lib/env";
+
 /** Where an unusable `next` value falls back to. */
 const DEFAULT_NEXT_PATH = "/dashboard";
 
@@ -18,7 +20,7 @@ export function safeNextPath(value: string | null | undefined) {
 
 /** Origin used in auth redirect links (email confirmation, OAuth callback). */
 export function siteOrigin(request: NextRequest) {
-  const configuredOrigin = process.env.SITE_URL;
+  const configuredOrigin = getEnv().SITE_URL;
   const candidate = process.env.NODE_ENV === "production"
     ? configuredOrigin || request.nextUrl.origin
     : request.nextUrl.origin || configuredOrigin;

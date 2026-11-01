@@ -5,6 +5,7 @@ import { z } from "zod";
 import { checkBudget, recordUsage, AiGateError, type AiGateDependencies, type AiGateReason } from "@/lib/ai/gate";
 import { findPrice, usageCostMicros, worstCaseMicros, PRICING, type PricingTable } from "@/lib/ai/pricing";
 import type { AiProvider, AiProviderId, AiUsage, StructuredRequest, StructuredResult } from "@/lib/ai/provider";
+import { getAiEnv } from "@/lib/env";
 
 /**
  * The only entry point features use to call a model (docs/statement-import-plan.md, I15; roadmap
@@ -135,7 +136,7 @@ export async function structured<T>(request: StructuredInput<T>, dependencies: S
   if (!SCHEMA_NAME.test(request.schemaName)) throw new TypeError("A schema name is letters, digits, dashes and underscores, 64 at most.");
   if (!Number.isSafeInteger(request.maxOutputTokens) || request.maxOutputTokens < 1) throw new TypeError("maxOutputTokens must be a positive whole number.");
 
-  const env = dependencies.env ?? process.env;
+  const env = dependencies.env ?? getAiEnv();
   const log = dependencies.log ?? ((line) => console.info("AI call", line));
 
   if (request.maxOutputTokens > feature.maxOutputTokens) {

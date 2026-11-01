@@ -3,6 +3,7 @@ import "server-only";
 import OpenAI, { APIConnectionTimeoutError, APIError, APIUserAbortError, OpenAIError, RateLimitError } from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 
+import { getEnv } from "@/lib/env";
 import type { AiProvider, AiUsage, StructuredRequest, StructuredResult } from "@/lib/ai/provider";
 
 /**
@@ -45,7 +46,7 @@ export function createOpenAiProvider(options: OpenAiProviderOptions = {}): AiPro
   let client: OpenAI | null = null;
   const getClient = () => {
     client ??= new OpenAI({
-      apiKey: options.apiKey ?? process.env.OPENAI_API_KEY,
+      apiKey: options.apiKey ?? getEnv().OPENAI_API_KEY,
       baseURL: options.baseURL ?? DEFAULT_BASE_URL,
       ...(options.fetch ? { fetch: options.fetch } : {}),
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
