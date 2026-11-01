@@ -405,4 +405,72 @@ describe("Supabase AuthAdmin", () => {
       expect(sessionAuth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
     });
   });
+  describe("signOutEverywhere", () => {
+    const PUBLISHABLE_KEY = "sb_publishable_test_key";
+
+    /** The admin client for the secret key, and a throwaway client for the publishable key. */
+    function useClients({
+      getUserById = ok() as unknown,
+      generateLink = linked() as unknown,
+      verifyOtp = { data: { user: kid, session: { access_token: "kid-access-token" } }, error: null } as unknown,
+      signOut = { data: null, error: null } as unknown,
+    } = {}) {
+      const admin = {
+        getUserById: vi.fn().mockResolvedValue(getUserById),
+        generateLink: vi.fn().mockResolvedValue(generateLink),
+        signOut: vi.fn().mockResolvedValue(signOut),
+        createUser: vi.fn(),
+        deleteUser: vi.fn(),
+        updateUserById: vi.fn(),
+      };
+      const throwawayAuth = { verifyOtp: vi.fn().mockResolvedValue(verifyOtp), signOut: vi.fn(), signInWithOtp: vi.fn() };
+      mocks.createSupabaseClient.mockImplementation((_url: string, key: string) =>
+        key === SECRET_KEY ? { auth: { admin } } : { auth: throwawayAuth },
+      );
+      return { admin, throwawayAuth };
+    }
+
+    it("opens a session with a one-time token and ends every session of the account through the admin API", async () => {
+      const { admin, throwawayAuth } = useClients();
+
+      await createSupabaseAuthAdmin().signOutEverywhere(kid.id);
+
+      expect(admin.getUserById).toHaveBeenCalledExactlyOnceWith(kid.id);
+      expect(admin.generateLink).toHaveBeenCalledExactlyOnceWith({ type: "magiclink", email: kid.email });
+      expect(throwawayAuth.verifyOtp).toHaveBeenCalledExactlyOnceWith({ token_hash: "hashed-token-1", type: "email" });
+      expect(admin.signOut).toHaveBeenCalledExactlyOnceWith("kid-access-token", "global");
+      // The token is redeemed on a client that keeps no session and never refreshes one.
+      expect(mocks.createSupabaseClient).toHaveBeenCalledWith("http://supabase.test", PUBLISHABLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      expect(throwawayAuth.signInWithOtp).not.toHaveBeenCalled();
+    });
+
+    it("reports an unknown account as not found", async () => {
+      useClients({ getUserById: fails("user_not_found") });
+
+      await expect(createSupabaseAuthAdmin().signOutEverywhere(kid.id)).rejects.toEqual(
+        new DomainError("That account doesn't exist.", 404),
+      );
+    });
+
+    it.each([
+      ["the account has no email", { getUserById: ok({ id: kid.id }) }],
+      ["no link can be made", { generateLink: { data: { properties: null, user: null }, error: { message: "no" } } }],
+      ["the link is for another account", { generateLink: linked({ id: "10000000-0000-4000-8000-000000002899", email: kid.email }) }],
+      ["the token can't be redeemed", { verifyOtp: { data: { user: null, session: null }, error: { message: "expired" } } }],
+      ["the session is another account's", { verifyOtp: { data: { user: { id: "someone-else" }, session: { access_token: "x" } }, error: null } }],
+    ])("throws a generic error, signing nobody out, when %s", async (_, responses) => {
+      const { admin } = useClients(responses);
+
+      await expect(createSupabaseAuthAdmin().signOutEverywhere(kid.id)).rejects.toThrow("Unable to sign the account out.");
+      expect(admin.signOut).not.toHaveBeenCalled();
+    });
+
+    it("throws a generic error when the admin sign-out fails", async () => {
+      useClients({ signOut: { data: null, error: { message: "private provider failure" } } });
+
+      await expect(createSupabaseAuthAdmin().signOutEverywhere(kid.id)).rejects.toThrow("Unable to sign the account out.");
+    });
+  });
 });

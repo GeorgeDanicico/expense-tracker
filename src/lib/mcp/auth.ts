@@ -1,5 +1,6 @@
 import "server-only";
 
+import { PASSWORD_CHANGE_REQUIRED } from "@/lib/account/password-change";
 import { type AuthSession, getAuth, getAuthAdmin } from "@/lib/auth";
 import { createFailureLimiter, resetRateLimits } from "@/lib/http/rate-limit";
 import { MCP_REFUSALS } from "@/lib/mcp/refusals";
@@ -17,7 +18,8 @@ export type McpAuthResult =
   | { status: "ok"; session: AuthSession }
   | { status: "unauthorized" }
   | { status: "throttled" }
-  | { status: "forbidden"; message: string }
+  /** `code` is set for the one refusal a client can tell apart: `password_change_required`. */
+  | { status: "forbidden"; message: string; code?: string }
   /** The token is valid but no session could be opened (or the secret key is missing): retry later. */
   | { status: "unavailable" };
 
@@ -52,6 +54,24 @@ export function readMcpAuthorization(request: Request): McpAuthorization {
   }
   return { kind: "none" };
 }
+
+/** What `/api/mcp` answers, with 403, to an account that must choose a new password first (audit P4). */
+export const MCP_PASSWORD_CHANGE_REQUIRED =
+  "Choose a new password in the app before using AI assistants: sign in there and you'll be asked for one.";
+
+/**
+ * Whether the session's account must choose a new password first, read as that account (one query).
+ * Such an account gets no MCP access, through a personal token or an app.
+ */
+async function mustChangePassword(session: AuthSession): Promise<boolean> {
+  return session.run(() => getRepositories().account.getMustChangePassword(session.userId));
+}
+
+const passwordChangeRefusal: McpAuthResult = {
+  status: "forbidden",
+  message: MCP_PASSWORD_CHANGE_REQUIRED,
+  code: PASSWORD_CHANGE_REQUIRED,
+};
 
 function failureKeys(key: string, clientIp: string | null) {
   return clientIp ? [key, `ip:${clientIp}`] : [key];
@@ -150,7 +170,15 @@ export async function getMcpTokenSession(value: string, clientIp: string | null)
       return null;
     }
   });
-  return session ? { status: "ok", session } : { status: "unavailable" };
+  if (!session) return { status: "unavailable" };
+
+  let flagged: boolean;
+  try {
+    flagged = await mustChangePassword(session);
+  } catch {
+    return { status: "unavailable" };
+  }
+  return flagged ? passwordChangeRefusal : { status: "ok", session };
 }
 
 /**
@@ -166,6 +194,7 @@ export async function getMcpAppSession(token: string): Promise<McpAuthResult> {
   const session = auth.sessionForAppToken(token);
   const access = await session.run(() => getRepositories().mcpTokens.access());
   if (access.status !== "ok") return { status: "forbidden", message: MCP_REFUSALS[access.status] };
+  if (await mustChangePassword(session)) return passwordChangeRefusal;
   return { status: "ok", session };
 }
 

@@ -12,10 +12,16 @@ export type AuthenticatedUser = {
 
 /**
  * Failures the routes answer differently from a plain refusal: the provider's rate limits (such as
- * its hourly cap on emails, which a free Supabase project reaches after a few sign-ups), and a
- * correct password for an account whose email isn't confirmed yet.
+ * its hourly cap on emails, which a free Supabase project reaches after a few sign-ups), a correct
+ * password for an account whose email isn't confirmed yet, and a wrong email or password.
  */
-export type AuthFailureKind = "rate_limited" | "email_not_confirmed";
+export type AuthFailureKind = "rate_limited" | "email_not_confirmed" | "invalid_credentials";
+
+/**
+ * Which sessions `signOut` ends: `local` this browser's only, `others` every other one of the user's
+ * sessions (this one stays signed in), `global` all of them, this one included.
+ */
+export type SignOutScope = "local" | "others" | "global";
 
 /** A failed auth call. `reason` is safe to show to the user. */
 export type AuthFailure = { ok: false; reason: string; kind?: AuthFailureKind };
@@ -67,12 +73,26 @@ export interface AuthService {
   signInWithPassword(email: string, password: string): Promise<AuthResult>;
   /** Creates the account; the confirmation email links to `confirmationUrl`. */
   signUp(email: string, password: string, confirmationUrl: string): Promise<SignUpResult>;
-  signOut(): Promise<AuthResult>;
+  /**
+   * Ends sessions of the signed-in user, by `scope`. `local` and `global` also clear this request's
+   * session cookies; `others` keeps this session signed in.
+   */
+  signOut(scope: SignOutScope): Promise<AuthResult>;
+  /**
+   * Whether `password` is the account's password right now, checked by signing in on a client of
+   * its own that keeps no session and writes no cookie, so the request's session is untouched and
+   * the check's session is ended at once. A wrong password is `kind: "invalid_credentials"`.
+   * For re-authentication before a password or email change (audit P5).
+   */
+  verifyPassword(email: string, password: string): Promise<AuthResult>;
   /** The provider page to send the browser to; it returns to `callbackUrl`. */
   oauthSignInUrl(provider: OAuthProvider, callbackUrl: string): Promise<OAuthUrlResult>;
   /** Verifies a link sent by email and stores the resulting session for this request. */
   completeEmailLink(link: EmailLink): Promise<AuthResult>;
-  /** Sets a new password for the signed-in user. The session stays signed in. */
+  /**
+   * Sets a new password for the signed-in user. The session stays signed in; end the others with
+   * `signOut("others")`. Check the current password with `verifyPassword` first.
+   */
   updatePassword(password: string): Promise<AuthResult>;
   /** Asks to change the signed-in user's email; the link sent to the new address goes to `confirmationUrl`. */
   updateEmail(email: string, confirmationUrl: string): Promise<AuthResult>;

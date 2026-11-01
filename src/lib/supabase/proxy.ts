@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import type { Database } from "@/lib/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
+import { authCookieOptions } from "@/lib/supabase/cookie-options";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -14,6 +15,7 @@ export async function updateSession(request: NextRequest) {
     url,
     publishableKey,
     {
+      cookieOptions: authCookieOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll();

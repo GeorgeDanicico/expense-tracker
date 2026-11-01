@@ -81,13 +81,84 @@ describe("POST /api/family/members/[id]/password", () => {
     expect(auth.accounts[0].password).toBe("old-password-1");
   });
 
-  it("sets the kid's password and makes them choose a new one", async () => {
+  it("sets the kid's password, makes them choose a new one and signs them out everywhere", async () => {
+    const kidSession = auth.openSession({ id: kidUserId, email: "kid@kids.ifam.invalid" });
+
     const response = await resetPassword(kidMemberId, { password: newPassword });
 
     expect(response).toMatchObject({ status: 200, body: { success: true } });
     expect(auth.accounts.find((account) => account.id === kidUserId)?.password).toBe(newPassword);
     expect(admin.profiles.get(kidUserId)?.mustChangePassword).toBe(true);
-    expect(repositories.family.calls).toEqual(["touchLastActive", "requirePasswordChange"]);
+    expect(admin.signedOutUserIds).toEqual([kidUserId]);
+    expect(kidSession.ended).toBe(true);
+  });
+
+  it("checks the parent first, then sets the password, then the flag, then signs the kid out (audit B12)", async () => {
+    const order: string[] = [];
+    vi.spyOn(repositories.family, "getMembership").mockImplementation(async () => {
+      order.push("check membership");
+      return repositories.family.membership;
+    });
+    const setPassword = admin.setPassword.bind(admin);
+    vi.spyOn(admin, "setPassword").mockImplementation(async (...args) => {
+      order.push("set password");
+      return setPassword(...args);
+    });
+    const requirePasswordChange = repositories.family.requirePasswordChange.bind(repositories.family);
+    vi.spyOn(repositories.family, "requirePasswordChange").mockImplementation(async (id) => {
+      order.push("set flag");
+      return requirePasswordChange(id);
+    });
+    const signOutEverywhere = admin.signOutEverywhere.bind(admin);
+    vi.spyOn(admin, "signOutEverywhere").mockImplementation(async (id) => {
+      order.push("sign out");
+      return signOutEverywhere(id);
+    });
+
+    await resetPassword(kidMemberId, { password: newPassword });
+
+    expect(order).toEqual(["check membership", "set password", "set flag", "sign out"]);
+  });
+
+  it("leaves the kid untouched when setting the password fails: no flag, old password, still signed in", async () => {
+    admin.fail("setPassword", new Error("private auth failure"));
+    const requirePasswordChange = vi.spyOn(repositories.family, "requirePasswordChange");
+
+    const response = await resetPassword(kidMemberId, { password: newPassword });
+
+    expect(response).toMatchObject({ status: 500, body: { error: "Unable to reset the password." } });
+    expect(requirePasswordChange).not.toHaveBeenCalled();
+    expect(admin.profiles.get(kidUserId)?.mustChangePassword).toBe(false);
+    expect(auth.accounts.find((account) => account.id === kidUserId)?.password).toBe("old-password-1");
+    expect(admin.calls).toEqual(["setPassword"]);
+  });
+
+  it("answers an error, and signs nobody out, when the flag fails after the password was set", async () => {
+    vi.spyOn(repositories.family, "requirePasswordChange").mockRejectedValue(new Error("private database failure"));
+
+    const response = await resetPassword(kidMemberId, { password: newPassword });
+
+    expect(response).toMatchObject({ status: 500, body: { error: "Unable to reset the password." } });
+    // The new password is set; the parent sees the error and resets again, which sets the flag.
+    expect(auth.accounts.find((account) => account.id === kidUserId)?.password).toBe(newPassword);
+    expect(admin.profiles.get(kidUserId)?.mustChangePassword).toBe(false);
+    expect(admin.calls).toEqual(["setPassword"]);
+
+    vi.mocked(repositories.family.requirePasswordChange).mockRestore();
+    expect((await resetPassword(kidMemberId, { password: newPassword })).status).toBe(200);
+    expect(admin.profiles.get(kidUserId)?.mustChangePassword).toBe(true);
+  });
+
+  it("still answers success when the kid can't be signed out, since the password and the flag are set", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    admin.fail("signOutEverywhere", new Error("private auth failure"));
+
+    const response = await resetPassword(kidMemberId, { password: newPassword });
+
+    expect(response).toMatchObject({ status: 200, body: { success: true } });
+    expect(admin.profiles.get(kidUserId)?.mustChangePassword).toBe(true);
+    expect(error).toHaveBeenCalledOnce();
+    expect(JSON.stringify(error.mock.calls)).not.toContain(newPassword);
   });
 
   it("never returns the password", async () => {
@@ -101,6 +172,7 @@ describe("POST /api/family/members/[id]/password", () => {
 
     expect(response).toMatchObject({ status: 403, body: { error: "Only a kid's password can be reset." } });
     expect(auth.accounts.every((account) => account.password !== newPassword)).toBe(true);
+    expect(admin.calls).toEqual([]);
   });
 
   it("answers 404 for a member outside the caller's family", async () => {

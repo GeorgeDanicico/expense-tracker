@@ -8,6 +8,7 @@ import { cookies, headers } from "next/headers";
 
 import type { Database } from "@/lib/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
+import { authCookieOptions } from "@/lib/supabase/cookie-options";
 
 const scopedClient = new AsyncLocalStorage<SupabaseClient<Database>>();
 
@@ -83,6 +84,7 @@ export async function createClient(): Promise<SupabaseClient<Database>> {
     url,
     publishableKey,
     {
+      cookieOptions: authCookieOptions(),
       cookies: {
         getAll() {
           return cookieStore.getAll();

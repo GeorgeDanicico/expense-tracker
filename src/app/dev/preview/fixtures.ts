@@ -372,6 +372,19 @@ function previewsNoFamily() {
   return typeof window !== "undefined" && new URLSearchParams(window.location.search).has("noFamily");
 }
 
+/**
+ * The account: `?noFamily=1` without a family, `?kidEmail=1` a kid's generated address (Settings then
+ * shows "Add an email address"), `?mustChange=1` an account that must choose a new password (the
+ * change-password screen then asks for the temporary one).
+ */
+function previewAccount(): AccountData {
+  const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
+  let account: AccountData = previewsNoFamily() ? { ...ACCOUNT, membership: null } : ACCOUNT;
+  if (params.has("kidEmail")) account = { ...account, email: "ana@kids.ifam.invalid" };
+  if (params.has("mustChange")) account = { ...account, mustChangePassword: true };
+  return account;
+}
+
 /** Whether the page was opened with `?devices=0`. */
 function previewsNoDevices() {
   return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("devices") === "0";
@@ -392,7 +405,7 @@ export function fixtureFor(key: string): unknown {
   const params = new URLSearchParams(query);
   const family = params.get("member") === "all";
   // `?noFamily=1` previews a user without a family: no To-dos nav item, and the board's "join a family".
-  if (path === "/api/account") return previewsNoFamily() ? { ...ACCOUNT, membership: null } : ACCOUNT;
+  if (path === "/api/account") return previewAccount();
   if (path === "/api/family") return FAMILY;
   if (path === "/api/dashboard") return family ? familyDashboard() : dashboard();
   if (path === "/api/expenses") {

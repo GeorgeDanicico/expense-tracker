@@ -11,7 +11,7 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
 import { useApiForm } from "@/hooks/use-api-form";
 import { forgetThisDeviceBeforeSignOut } from "@/hooks/use-notification-settings";
-import { apiRequest } from "@/lib/api/client";
+import { signOut as requestSignOut } from "@/lib/api/account-requests";
 import { afterSignOut } from "@/lib/api/invalidate";
 
 /**
@@ -27,7 +27,7 @@ function useSignOut() {
   function signOut() {
     void form.submit(async () => {
       await forgetThisDeviceBeforeSignOut();
-      await apiRequest<{ success: true }>("/api/auth", { method: "DELETE" });
+      await requestSignOut();
       await afterSignOut(mutate);
       router.replace("/login");
     }, { fallback: "Unable to sign out. Try again." });

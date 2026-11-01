@@ -210,3 +210,20 @@ forces its light theme, so there are no dark captures.
 | `import-review-390.jpg` | Resume at 390: one card per row (tick box, merchant, amount and date, then the category), a rule-matched row with its fixed car category, and the sticky footer above the tab bar |
 | `import-review-bottom-390.jpg` | The end of that review: a ticked row, a row in another currency (unticked, disabled, explained) and the footer |
 | `import-review-sample-390.jpg` | The sample statement's review at 390: unticked possible duplicates with "Looks like …", and a rule-matched row |
+
+## Passwords and sessions (security S6)
+
+Captured with the in-app browser from the development preview, at a 1280 × 800 viewport (saved at
+800 × 500, the pane's screenshot size) and at 390 × 844 (saved at 468 × 1012). No real sign-in is
+possible there, so the account is fixture data: `/dev/preview/settings?kidEmail=1` is a kid with a
+generated address (the only account Settings shows the email form to), and
+`/dev/preview/change-password?mustChange=1` an account a parent has just reset. The Next.js dev
+indicator is visible in the corner.
+
+| Image | Shows |
+|---|---|
+| `s6-settings-account-1280.jpg`, `s6-settings-account-390.jpg` | Settings → Account: the "Add an email address" card now asks for the **Current password** under the address; the card's description says why |
+| `s6-settings-account-bottom-1280.jpg`, `s6-settings-account-bottom-390.jpg` | The new **Sign out everywhere** card at the end of the page, with its outline button |
+| `s6-sign-out-everywhere-confirm-1280.jpg` | Its confirmation: "Every device signed in to your account is signed out, this one too, and has to sign in again. Connected AI apps may ask you to sign in again." |
+| `s6-change-password-temporary-1280.jpg`, `s6-change-password-temporary-390.jpg` | The change-password page for an account that must change its password: **Temporary password** first, then the new one twice, and below the form "Don't know the temporary password? Ask the parent who set it, or sign out." with a Sign out button |
+| `s6-change-password-current-390.jpg` | The same page for any other account: the first field is **Current password** ("The password you sign in with today."), with no sign-out row |

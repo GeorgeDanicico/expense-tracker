@@ -45,6 +45,13 @@ export interface AuthAdmin {
   deleteUser(userId: string): Promise<void>;
   /** Sets the account's password without asking for the old one. */
   setPassword(userId: string, password: string): Promise<void>;
+  /**
+   * Signs the account out everywhere: every session it has (browsers, and OAuth apps' sessions too)
+   * ends, so each must sign in again. Access tokens already handed out stay valid until they expire
+   * (an hour at most); the "must change password" check stops those for a reset kid. No email is
+   * sent. Throws like the other methods.
+   */
+  signOutEverywhere(userId: string): Promise<void>;
   /** The email of the account with this username, or null when there is none. */
   findEmailByUsername(username: string): Promise<string | null>;
   /**

@@ -39,8 +39,14 @@ async function accountData(user: AuthenticatedUser, knownCurrency?: string): Pro
   };
 }
 
+/**
+ * Answers an account that must choose a new password too (`allowPasswordChangeRequired`): the browser
+ * reads `mustChangePassword` here to send it to the change-password page. Every other account route
+ * refuses such an account with 403 `password_change_required`.
+ */
 export const GET = withUser(async (_request, user) => json(await accountData(user)), {
   failure: "Unable to load account settings.",
+  allowPasswordChangeRequired: true,
 });
 
 export const PATCH = withUser(async (request: NextRequest, user) => {

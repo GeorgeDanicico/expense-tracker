@@ -16,6 +16,7 @@ import SettingsLayout from "@/app/(app)/settings/layout";
 import NotificationsSettingsPage from "@/app/(app)/settings/notifications/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import TodosPage from "@/app/(app)/todos/page";
+import ChangePasswordPage from "@/app/change-password/page";
 import { ImportApiProvider } from "@/components/expenses/import/import-api";
 import { CalendarApiProvider } from "@/components/family-calendar/calendar-api";
 import { AppShell } from "@/components/layout/app-shell";
@@ -41,7 +42,11 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   notifications: NotificationsPreview,
   "ai-settings": AiSettingsPreview,
   import: ImportPreview,
+  "change-password": ChangePasswordPage,
 };
+
+/** Screens that are a page of their own, outside the app shell. */
+const WITHOUT_SHELL: ReadonlySet<PreviewScreen> = new Set(["change-password"]);
 
 /**
  * The import page with its drafts and expenses kept in memory (see `import-fixtures.ts`). The
@@ -114,13 +119,14 @@ const fixtures: Middleware = (useSWRNext) => (key, _fetcher, config) => {
 
 export function ScreenPreview({ screen }: { screen: PreviewScreen }) {
   const Screen = SCREENS[screen];
+  const content = (
+    <Suspense>
+      <Screen />
+    </Suspense>
+  );
   return (
     <SWRConfig value={{ use: [fixtures], dedupingInterval: 60_000, revalidateOnFocus: false }}>
-      <AppShell email="preview@example.com">
-        <Suspense>
-          <Screen />
-        </Suspense>
-      </AppShell>
+      {WITHOUT_SHELL.has(screen) ? content : <AppShell email="preview@example.com">{content}</AppShell>}
     </SWRConfig>
   );
 }

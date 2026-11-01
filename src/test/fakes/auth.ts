@@ -12,6 +12,7 @@ import type {
   EmailLink,
   OAuthProvider,
   OAuthUrlResult,
+  SignOutScope,
   SignUpResult,
 } from "@/lib/auth/service";
 import { DomainError } from "@/lib/errors";
@@ -59,6 +60,10 @@ export class FakeAuth implements AuthService {
   readonly sessions: FakeAuthSession[] = [];
   /** Live OAuth app tokens, by token. */
   readonly appTokens = new Map<string, AppTokenUser>();
+  /** The scope of every `signOut` call, oldest first. */
+  readonly signOutScopes: SignOutScope[] = [];
+  /** The email of every `verifyPassword` call, oldest first (never the password). */
+  readonly verifiedEmails: string[] = [];
 
   private readonly sessionUser = new AsyncLocalStorage<AuthenticatedUser>();
   private readonly failures = new Map<keyof AuthService, Omit<AuthFailure, "ok">>();
@@ -107,10 +112,24 @@ export class FakeAuth implements AuthService {
     return { ok: true, signedIn: true };
   }
 
-  async signOut(): Promise<AuthResult> {
+  /** Records `scope`; `local` and `global` sign the request's user out, `others` keeps them signed in. */
+  async signOut(scope: SignOutScope): Promise<AuthResult> {
+    this.signOutScopes.push(scope);
     const failure = this.takeFailure("signOut");
     if (failure) return failure;
-    this.currentUser = null;
+    if (scope !== "others") this.currentUser = null;
+    return { ok: true };
+  }
+
+  /** Checks the password like a sign-in would, without changing `currentUser`. */
+  async verifyPassword(email: string, password: string): Promise<AuthResult> {
+    this.verifiedEmails.push(email);
+    const failure = this.takeFailure("verifyPassword");
+    if (failure) return failure;
+    const account = this.accounts.find((candidate) => candidate.email === email);
+    if (!account || account.password !== password) {
+      return { ok: false, kind: "invalid_credentials", reason: "That isn't your current password." };
+    }
     return { ok: true };
   }
 
@@ -255,6 +274,10 @@ export class FakeAuthAdmin implements AuthAdmin {
   readonly profiles = new Map<string, FakeAdminProfile>();
   /** The user ids passed to `deleteUser`, oldest first. */
   readonly deletedUserIds: string[] = [];
+  /** The user ids passed to `signOutEverywhere`, oldest first. */
+  readonly signedOutUserIds: string[] = [];
+  /** Every call, by method name, oldest first: to check the order of a multi-step flow. */
+  readonly calls: (keyof AuthAdmin)[] = [];
 
   private readonly failures = new Map<keyof AuthAdmin, Error>();
 
@@ -288,10 +311,25 @@ export class FakeAuthAdmin implements AuthAdmin {
   }
 
   async setPassword(userId: string, password: string): Promise<void> {
+    this.calls.push("setPassword");
     this.throwFailure("setPassword");
     const account = this.auth.accounts.find((candidate) => candidate.id === userId);
     if (!account) throw new DomainError("That account doesn't exist.", 404);
     account.password = password;
+  }
+
+  /** Records the user and ends every session `auth.openSession` handed out for them. */
+  async signOutEverywhere(userId: string): Promise<void> {
+    this.calls.push("signOutEverywhere");
+    this.throwFailure("signOutEverywhere");
+    if (!this.auth.accounts.some((account) => account.id === userId)) throw new DomainError("That account doesn't exist.", 404);
+    this.signedOutUserIds.push(userId);
+    for (const session of this.auth.sessions) {
+      if (session.userId === userId) {
+        session.active = false;
+        session.ended = true;
+      }
+    }
   }
 
   async findEmailByUsername(username: string): Promise<string | null> {

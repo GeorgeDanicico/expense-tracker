@@ -12,6 +12,7 @@ import type {
   EmailLink,
   OAuthProvider,
   OAuthUrlResult,
+  SignOutScope,
   SignUpResult,
 } from "@/lib/auth/service";
 import type { Database } from "@/lib/database.types";
@@ -59,6 +60,14 @@ export function authFailure(error: ProviderError): AuthFailure {
   return { ok: false, reason: error.message };
 }
 
+/** What `verifyPassword` answers for a wrong password. */
+const WRONG_PASSWORD: AuthFailure = { ok: false, kind: "invalid_credentials", reason: "That isn't your current password." };
+
+/** Supabase Auth's answer to a wrong email or password: the `invalid_credentials` code, or its message on servers without codes. */
+function isInvalidCredentials(error: ProviderError) {
+  return error.code === "invalid_credentials" || (error.status === 400 && /invalid login credentials/i.test(error.message));
+}
+
 function result(error: ProviderError | null): AuthResult {
   return error ? authFailure(error) : { ok: true };
 }
@@ -81,6 +90,18 @@ export function createSessionClient(): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
   return createSupabaseClient<Database>(url, publishableKey, {
     auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
+  });
+}
+
+/**
+ * A client for one short check that must leave no trace: the publishable key, no stored session, no
+ * refresh timer and no cookies. `verifyPassword` signs in on one to check a password without touching
+ * the request's session; `AuthAdmin.signOutEverywhere` redeems a one-time token on one.
+ */
+export function createThrowawayClient(): SupabaseClient<Database> {
+  const { url, publishableKey } = getSupabaseConfig();
+  return createSupabaseClient<Database>(url, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
 
@@ -166,10 +187,30 @@ export const supabaseAuth: AuthService = {
     return { ok: true, signedIn: Boolean(data.session) };
   },
 
-  async signOut() {
+  /**
+   * On the request's client, so `local` and `global` also clear the session cookies. A request
+   * without a session (a bearer token, or already signed out) has nothing to end and succeeds.
+   */
+  async signOut(scope: SignOutScope) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope });
     return result(error);
+  },
+
+  async verifyPassword(email, password): Promise<AuthResult> {
+    if (!email || !password) return WRONG_PASSWORD;
+    try {
+      // Never the request's client: a sign-in there would replace the session cookies.
+      const client = createThrowawayClient();
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
+      if (error) return isInvalidCredentials(error) ? WRONG_PASSWORD : authFailure(error);
+      // The sign-in only proved the password: end its session at once, so it doesn't linger as one
+      // more signed-in device. Best effort; an unused session simply expires.
+      if (data.session) await client.auth.signOut({ scope: "local" }).catch(() => undefined);
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: "Unable to check your password. Please try again." };
+    }
   },
 
   async oauthSignInUrl(provider: OAuthProvider, callbackUrl): Promise<OAuthUrlResult> {

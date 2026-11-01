@@ -101,6 +101,48 @@ describe("FakeAuthAdmin", () => {
     expect(await admin.startSessionForUser(user)).toBeNull();
     expect(await admin.startSessionForUser(user)).not.toBeNull();
   });
+
+  it("signs an account out everywhere, ending only its sessions", async () => {
+    const user = auth.addUser("a@example.test", "a long password");
+    const other = auth.addUser("b@example.test", "a long password");
+    const mine = await admin.startSessionForUser(user);
+    const theirs = await admin.startSessionForUser(other);
+
+    await admin.signOutEverywhere(user.id);
+
+    expect(admin.signedOutUserIds).toEqual([user.id]);
+    expect(await mine?.isActive()).toBe(false);
+    expect(await theirs?.isActive()).toBe(true);
+    await expect(admin.signOutEverywhere("unknown")).rejects.toEqual(new DomainError("That account doesn't exist.", 404));
+  });
+});
+
+describe("FakeAuth sign-out and password checks", () => {
+  let auth: FakeAuth;
+
+  beforeEach(() => {
+    auth = new FakeAuth();
+  });
+
+  it("records each sign-out's scope; only others keeps the request signed in", async () => {
+    const user = auth.addUser("a@example.test", "a long password");
+    auth.currentUser = user;
+
+    await auth.signOut("others");
+    expect(auth.currentUser).toEqual(user);
+    await auth.signOut("global");
+    expect(auth.currentUser).toBeNull();
+    expect(auth.signOutScopes).toEqual(["others", "global"]);
+  });
+
+  it("checks a password without signing anyone in", async () => {
+    auth.addUser("a@example.test", "a long password");
+
+    expect(await auth.verifyPassword("a@example.test", "a long password")).toEqual({ ok: true });
+    expect(await auth.verifyPassword("a@example.test", "wrong")).toMatchObject({ ok: false, kind: "invalid_credentials" });
+    expect(auth.currentUser).toBeNull();
+    expect(auth.verifiedEmails).toEqual(["a@example.test", "a@example.test"]);
+  });
 });
 
 describe("FakeAuth app tokens", () => {

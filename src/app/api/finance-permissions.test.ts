@@ -97,8 +97,20 @@ describe("finance route permissions", () => {
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ error: "You don't have access to this." });
     expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
-    // The background last-activity touch, then the membership check; no finance repository.
-    expect(mocks.accessed).toEqual(["family", "family"]);
+    // The background last-activity touch, the must-change-password flag, then the membership check;
+    // no finance repository.
+    expect(mocks.accessed).toEqual(["family", "account", "family"]);
+  });
+
+  it.each(cases)("refuses %s /api/%s with 403 password_change_required to an account that must change its password", async (method, route) => {
+    repositories.family.membership = kidWith({ only: "expenses" });
+    repositories.account.mustChangePassword.add(signedInAs().id);
+
+    const response = await call(method, route);
+
+    expect(response).toMatchObject({ status: 403, body: { code: "password_change_required" } });
+    // Refused before the membership check and the handler.
+    expect(mocks.accessed).toEqual(["family", "account"]);
   });
 
   it.each(cases)("lets %s /api/%s through for a kid with only %s", async (method, route, module) => {

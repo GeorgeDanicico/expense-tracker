@@ -6,6 +6,7 @@ import { ThemeProvider } from "next-themes";
 import { SWRConfig } from "swr";
 
 import { ApiError, apiFetcher } from "@/lib/api/client";
+import { redirectIfPasswordChangeRequired } from "@/lib/api/password-change";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { ledgerSystem } from "@/components/ui/theme";
 import { PwaInstallProvider } from "@/components/pwa/install-instructions";
@@ -17,6 +18,10 @@ const swrConfig = {
   dedupingInterval: 15_000,
   errorRetryCount: 2,
   errorRetryInterval: 3_000,
+  // A 403 `password_change_required` sends the browser to choose a new password (audit P4).
+  onError: (error: unknown) => {
+    redirectIfPasswordChangeRequired(error);
+  },
   shouldRetryOnError: (error: unknown) =>
     !(
       error instanceof ApiError &&
