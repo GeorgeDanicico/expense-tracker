@@ -1,0 +1,61 @@
+# gitleaks configuration (scripts and CI: .github/workflows/ci.yml, "secrets" job).
+#
+# It extends gitleaks' default rules, adds two rules for this app's own secrets, and records every
+# triaged finding below with the reason it is not a real secret. Nothing here is allowed to hide a
+# real value: each allowlist names the rule and the file (or the exact shape) it covers.
+#
+# Run it locally with the same version as CI (see ci.yml):
+#   gitleaks git . --config .gitleaks.toml --redact      # the full history
+#   gitleaks dir . --config .gitleaks.toml --redact      # the working tree
+# Always pass --redact, so a finding never prints the value.
+
+title = "expense-tracker gitleaks config"
+
+[extend]
+useDefault = true
+
+# Rules for secrets only this app issues, which the default rules can't know.
+
+[[rules]]
+id = "supabase-secret-key"
+description = "Supabase secret API key (bypasses every row level security rule)"
+# The 20 character floor keeps the placeholders in .env.example and ci.yml (sb_secret_your_key,
+# sb_secret_ci_placeholder) from matching; real keys are far longer.
+regex = '''\bsb_secret_[A-Za-z0-9_-]{20,}'''
+keywords = ["sb_secret_"]
+
+[[rules]]
+id = "app-bearer-token"
+description = "An MCP access token (sl_mcp_) or a calendar feed token (sl_cal_): 43 base64url characters"
+regex = '''\bsl_(?:mcp|cal)_[A-Za-z0-9_-]{43}\b'''
+keywords = ["sl_mcp_", "sl_cal_"]
+
+# Folders that only exist on a developer machine. They never reach CI or the image (.gitignore and
+# .dockerignore), and .claude/worktrees is a stale full copy of the repository.
+[[allowlists]]
+description = "Local-only folders: stale worktrees, dependencies and build output"
+paths = [
+  '''^\.claude/worktrees/''',
+  '''(^|/)node_modules/''',
+  '''^\.next/''',
+  '''^dist/''',
+]
+
+# Triaged findings: a test value or a false positive, with the reason. Every entry is limited to
+# one rule, and to one file or one exact value shape.
+
+[[allowlists]]
+description = "Test value: a fake Web Push auth secret in the notifications route test (found in 3959852)"
+targetRules = ["generic-api-key"]
+paths = ['''^src/app/api/notifications/route\.test\.ts$''']
+
+[[allowlists]]
+description = "Test value: a made-up sample MCP token in the /dev/ui component gallery (found in 95b721e; the sample no longer has a real token's shape, the entry stays for history). The gallery is a dev-only page with sample data."
+targetRules = ["generic-api-key", "app-bearer-token"]
+paths = ['''^src/app/dev/ui/ui-gallery\.tsx$''']
+
+[[allowlists]]
+description = "False positive: TOKEN_ID in the MCP settings test is a token's database id, a random UUID, not a secret (found in 95b721e)"
+targetRules = ["generic-api-key"]
+paths = ['''^src/components/settings/mcp-settings\.test\.tsx$''']
+regexes = ['''^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$''']

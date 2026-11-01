@@ -35,7 +35,36 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      # Build into the local Docker first, so a secret in the image is caught before anything is pushed.
+      - name: Build the image (not pushed yet)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: expense-tracker:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Copy the app out of the image and search it: the browser files for secret patterns and
+      # server-only variable names, the whole tree for patterns, key files and .env files.
+      - name: Scan the image for secrets
+        run: |
+          set -euo pipefail
+          id=$(docker create expense-tracker:scan)
+          mkdir "$RUNNER_TEMP/image-fs"
+          docker cp "$id:/app" "$RUNNER_TEMP/image-fs/app"
+          docker rm "$id" > /dev/null
+          bash scripts/scan-build-secrets.sh --self-test
+          bash scripts/scan-build-secrets.sh "$RUNNER_TEMP/image-fs/app/.next/static" "$RUNNER_TEMP/image-fs/app/public"
+          bash scripts/scan-build-secrets.sh --server "$RUNNER_TEMP/image-fs/app"
+
+      # Same inputs as the build above, so every layer comes from the cache.
+      - name: Push the image
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64

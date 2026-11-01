@@ -13,6 +13,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # gitleaks over the whole git history and the working tree, on every push and pull request.
+  # .gitleaks.toml extends the default rules and records every triaged finding with its reason.
+  # --redact keeps a finding's value out of the log. The tree scan runs from the repo root so the
+  # paths in .gitleaks.toml (src/...) match. Pinned: gitleaks 8.30.1, by image digest.
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # GIT_CONFIG_* lets git inside the container read a checkout it doesn't own.
+      - name: Scan the history
+        run: >
+          docker run --rm -v "$PWD:/repo"
+          -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo
+          "$GITLEAKS_IMAGE" git /repo --config /repo/.gitleaks.toml --redact --verbose --no-banner --exit-code 1
+
+      - name: Scan the working tree
+        run: >
+          docker run --rm -v "$PWD:/repo" -w /repo
+          "$GITLEAKS_IMAGE" dir . --config .gitleaks.toml --redact --verbose --no-banner --exit-code 1
+
   app:
     name: Lint, types, tests and build
     runs-on: ubuntu-latest
@@ -48,8 +75,22 @@ jobs:
       - name: Unit and route tests
         run: npm test
 
+      # Placeholders for the server-only secrets, so the scan below can tell if a build inlined one.
       - name: Build
         run: npm run build
+        env:
+          VAPID_PRIVATE_KEY: ci-placeholder-vapid-private-key
+          OPENAI_API_KEY: ci-placeholder-openai-api-key
+
+      # Everything in .next/static is downloadable from the browser: it must hold no secret.
+      # The self-test proves the patterns still catch planted fakes before the real scan runs.
+      - name: Scan the build for secrets
+        env:
+          VAPID_PRIVATE_KEY: ci-placeholder-vapid-private-key
+          OPENAI_API_KEY: ci-placeholder-openai-api-key
+        run: |
+          bash scripts/scan-build-secrets.sh --self-test
+          bash scripts/scan-build-secrets.sh
 
       - name: Build the worker
         run: npm run build:worker

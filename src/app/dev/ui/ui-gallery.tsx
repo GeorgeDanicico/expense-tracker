@@ -70,7 +70,7 @@ const MCP_TOKENS: McpToken[] = [
   { id: "gallery-t3", name: "Old laptop", prefix: "sl_mcp_L0p_7t", createdAt: "2026-06-01T08:00:00Z", regeneratedAt: null, lastUsedAt: null, expiresAt: "2026-09-01T08:00:00Z" },
   { id: "gallery-t4", name: "NAS", prefix: "sl_mcp_n4s-Vv", createdAt: "2026-05-11T08:00:00Z", regeneratedAt: null, lastUsedAt: "2026-10-22T03:00:00Z", expiresAt: null },
 ];
-const MCP_SECRET = { token: MCP_TOKENS[0], secret: "sl_mcp_Ab3xQ9fGh2kLmN4pQrS6tUvW8xYz0aBcDeFgHiJkLmN" };
+const MCP_SECRET = { token: MCP_TOKENS[0], secret: "sl_mcp_Ab3xQ9.sample-not-a-real-token" };
 
 export function UiGallery() {
   const [view, setView] = useState<"summary" | "monthly" | "history">("summary");

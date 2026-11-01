@@ -261,3 +261,13 @@ npm audit --omit=dev
 ```
 
 The Excel endpoint and every Server Action independently re-check authentication. The browser service worker does not cache dashboard pages, API responses, or expense data.
+
+### Secret scans
+
+CI scans for leaked secrets in three places, and `.env.local` and the other `.env*` files stay out of git and out of the image.
+
+- **Source and history:** the `secrets` job runs gitleaks (8.30.1) over the full git history and the working tree. `.gitleaks.toml` extends the default rules and lists each triaged finding with the reason it isn't a secret. Locally: `gitleaks git . --config .gitleaks.toml --redact`.
+- **The browser bundle:** `scripts/scan-build-secrets.sh` searches `.next/static` after `npm run build` for secret patterns and the value of any server-only variable that is set. It prints the file and pattern name, never the value. `bash scripts/scan-build-secrets.sh --self-test` checks the patterns.
+- **The image:** `image.yml` runs the same script over the files copied out of the image, and only pushes the image if the scan passes.
+
+Only `NEXT_PUBLIC_SW_IN_DEV` is a `NEXT_PUBLIC_` variable (a development switch). Never give a secret that prefix: Next.js inlines it into the browser bundle.
