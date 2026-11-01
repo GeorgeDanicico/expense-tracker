@@ -4,7 +4,7 @@ import type { AuthAdmin, CreatedUser, CreateUserInput } from "@/lib/auth/admin";
 import type { AuthSession } from "@/lib/auth/service";
 import { DomainError } from "@/lib/errors";
 import { createAdminClient } from "@/lib/supabase/admin-client";
-import { createSessionClient, sessionFromClient } from "@/lib/supabase/auth";
+import { createSessionClient, createThrowawayClient, sessionFromClient } from "@/lib/supabase/auth";
 
 type ProviderError = { code?: string; message: string };
 
@@ -91,6 +91,28 @@ export function createSupabaseAuthAdmin(): AuthAdmin {
     async setPassword(userId, password) {
       const { error } = await client.auth.admin.updateUserById(userId, { password });
       if (error) throw authError(error, "Unable to change the password.");
+    },
+
+    async signOutEverywhere(userId) {
+      const failure = "Unable to sign the account out.";
+      // Supabase's admin API ends sessions by an access token of the user, not by their id. So open
+      // one more session the way `startSessionForUser` does (a magic link's one-time token, no email
+      // sent), then end every session with it, that one included, through the admin API.
+      const { data: found, error: findError } = await client.auth.admin.getUserById(userId);
+      if (findError) throw authError(findError, failure);
+      const email = found.user?.email;
+      if (!email) throw new Error(failure);
+
+      const { data: link, error: linkError } = await client.auth.admin.generateLink({ type: "magiclink", email });
+      const tokenHash = link?.properties?.hashed_token;
+      if (linkError || !tokenHash || link.user?.id !== userId) throw new Error(failure);
+
+      const { data, error } = await createThrowawayClient().auth.verifyOtp({ token_hash: tokenHash, type: "email" });
+      const accessToken = data?.session?.access_token;
+      if (error || !accessToken || data.user?.id !== userId) throw new Error(failure);
+
+      const { error: signOutError } = await client.auth.admin.signOut(accessToken, "global");
+      if (signOutError) throw new Error(failure);
     },
 
     async findEmailByUsername(username) {

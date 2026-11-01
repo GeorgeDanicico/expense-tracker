@@ -251,12 +251,16 @@ describe("PATCH /api/account", () => {
     expect(repositories.family.calls).toEqual([]);
   });
 
-  it("returns the password flag with the updated account", async () => {
+  it("refuses an account that must change its password with 403 password_change_required, saving nothing", async () => {
     repositories.account.mustChangePassword.add(user.id);
 
     const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
 
-    expect(response.body).toMatchObject({ currency: "USD", mustChangePassword: true });
+    expect(response).toMatchObject({
+      status: 403,
+      body: { error: "Choose a new password before you keep using the app.", code: "password_change_required" },
+    });
+    expect(repositories.account.currencies.size).toBe(0);
   });
 
   it("rejects an unsupported currency without saving it", async () => {

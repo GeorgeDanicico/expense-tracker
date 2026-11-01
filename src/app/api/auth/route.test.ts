@@ -489,7 +489,7 @@ describe("DELETE /api/auth", () => {
     auth = new FakeAuth();
   });
 
-  it("signs out", async () => {
+  it("signs this browser out only", async () => {
     auth.currentUser = auth.addUser(email, password);
 
     const response = await callRoute(DELETE, { method: "DELETE", url: "/api/auth" });
@@ -497,6 +497,33 @@ describe("DELETE /api/auth", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true });
     expect(auth.currentUser).toBeNull();
+    expect(auth.signOutScopes).toEqual(["local"]);
+  });
+
+  it("signs out everywhere with ?scope=global", async () => {
+    auth.currentUser = auth.addUser(email, password);
+
+    const response = await callRoute(DELETE, { method: "DELETE", url: "/api/auth?scope=global" });
+
+    expect(response).toMatchObject({ status: 200, body: { success: true } });
+    expect(auth.currentUser).toBeNull();
+    expect(auth.signOutScopes).toEqual(["global"]);
+  });
+
+  it.each(["others", "local", "everywhere", ""])("refuses ?scope=%s with 422 without signing out", async (scope) => {
+    auth.currentUser = auth.addUser(email, password);
+
+    const response = await callRoute(DELETE, { method: "DELETE", url: `/api/auth?scope=${scope}` });
+
+    expect(response).toMatchObject({ status: 422, body: { error: "Unknown sign-out scope." } });
+    expect(auth.signOutScopes).toEqual([]);
+    expect(auth.currentUser).not.toBeNull();
+  });
+
+  it("lets an account that must change its password sign out: the route doesn't check the flag", async () => {
+    auth.currentUser = auth.addUser(email, password);
+
+    expect((await callRoute(DELETE, { method: "DELETE", url: "/api/auth" })).status).toBe(200);
   });
 
   it("answers 500 when signing out fails", async () => {

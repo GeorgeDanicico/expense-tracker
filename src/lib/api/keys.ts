@@ -33,12 +33,22 @@ export function withMember(url: string, member?: string | null) {
 
 /** GET → `AccountData` (`@/lib/account/types`); PATCH returns the updated `AccountData`. */
 export const ACCOUNT_API_KEY = "/api/account";
-/** POST only: `{ password }` → 204. Not fetched with SWR; refresh `ACCOUNT_API_KEY` afterwards. */
+/**
+ * POST only: `{ currentPassword, password }` → 204, and every other session is signed out. A wrong
+ * current password is 422 on `currentPassword`. Not fetched with SWR; refresh `ACCOUNT_API_KEY` afterwards.
+ */
 export const ACCOUNT_PASSWORD_API_URL = "/api/account/password";
 /** PUT raw JPG/PNG bytes (`Content-Type: image/jpeg|image/png`) → `{ avatarUrl }`; DELETE → 204. Refresh `ACCOUNT_API_KEY` and `FAMILY_API_KEY` afterwards. */
 export const ACCOUNT_AVATAR_API_URL = "/api/account/avatar";
-/** PATCH only: `{ email }` → 204. The change applies once the link sent to the new address is opened. */
+/**
+ * PATCH only: `{ email, currentPassword }` → 204. The change applies once the link sent to the new
+ * address is opened. A wrong current password is 422 on `currentPassword`.
+ */
 export const ACCOUNT_EMAIL_API_URL = "/api/account/email";
+/** DELETE only → `{ success: true }`: signs this browser out. */
+export const SIGN_OUT_API_URL = "/api/auth";
+/** DELETE only → `{ success: true }`: signs out every session of the account, this one included. */
+export const SIGN_OUT_EVERYWHERE_API_URL = "/api/auth?scope=global";
 /** GET → {@link NoticesResponse}: the unseen notices, oldest first. 404 while the family flag is off. */
 export const ACCOUNT_NOTICES_API_KEY = "/api/account/notices";
 /** GET → `InvestmentsOverview` (`@/lib/investments/types`). Your own data; see {@link investmentsApiKey} for a member's. */

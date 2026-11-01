@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetFakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
 
 const mocks = vi.hoisted(() => ({ confirmDraft: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
 vi.mock("@/lib/imports/service", () => ({ confirmDraft: mocks.confirmDraft }));
+// `withUser` reads the caller's must-change-password flag from the account repository.
+vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
 import { POST } from "@/app/api/imports/[id]/confirm/route";
 
@@ -24,6 +27,7 @@ const confirm = (body: unknown) => callRoute(POST, { method: "POST", url: `/api/
 describe("POST /api/imports/[id]/confirm body limit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFakeRepositories();
     signedInAs();
     mocks.confirmDraft.mockResolvedValue({ batch: {}, created: [] });
   });

@@ -105,7 +105,7 @@ export const POST = withRequestGuard(async (request: NextRequest) => {
     if (signIn.ok) {
       // The unknown-username address signed in. Sign-up refuses it, so this can't happen; if it
       // ever did, drop the session and answer like any wrong password.
-      await getAuth().signOut();
+      await getAuth().signOut("local");
     } else if (signIn.kind === "rate_limited") {
       return json({ error: signIn.reason }, 429);
     } else if (signIn.kind === "email_not_confirmed") {
@@ -141,9 +141,17 @@ export const POST = withRequestGuard(async (request: NextRequest) => {
   );
 });
 
-/** Signs out. Behind the request guard, so another site can't sign the user out either. */
-export const DELETE = withRequestGuard(async () => {
-  const signOut = await getAuth().signOut();
+/**
+ * Signs out: this browser only, or with `?scope=global` every session of the account ("Sign out
+ * everywhere" in Settings: other browsers, phones and connected apps). Behind the request guard, so
+ * another site can't sign the user out either. Not behind `withUser`, so an account that must choose
+ * a new password can still sign out.
+ */
+export const DELETE = withRequestGuard(async (request: NextRequest) => {
+  const scope = request.nextUrl.searchParams.get("scope");
+  if (scope !== null && scope !== "global") return json({ error: "Unknown sign-out scope." }, 422);
+
+  const signOut = await getAuth().signOut(scope === "global" ? "global" : "local");
   if (!signOut.ok) {
     return json({ error: "Unable to sign out. Please try again." }, 500);
   }

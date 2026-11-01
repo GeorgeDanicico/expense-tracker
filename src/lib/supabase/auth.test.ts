@@ -179,12 +179,77 @@ describe("supabaseAuth", () => {
     });
   });
 
-  it("signs out", async () => {
-    mockAuth({ signOut: { error: null } });
-    expect(await supabaseAuth.signOut()).toEqual({ ok: true });
+  it.each(["local", "others", "global"] as const)("signs out with scope %s on the request's client", async (scope) => {
+    const auth = mockAuth({ signOut: { error: null } });
+    expect(await supabaseAuth.signOut(scope)).toEqual({ ok: true });
+    expect(auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope });
 
     mockAuth({ signOut: { error: PROVIDER_ERROR } });
-    expect(await supabaseAuth.signOut()).toEqual({ ok: false, reason: "provider says no" });
+    expect(await supabaseAuth.signOut(scope)).toEqual({ ok: false, reason: "provider says no" });
+  });
+
+  describe("verifyPassword", () => {
+    function throwaway(signIn: unknown, signOut: unknown = { error: null }) {
+      const auth = { signInWithPassword: vi.fn().mockResolvedValue(signIn), signOut: vi.fn().mockResolvedValue(signOut) };
+      mocks.createSupabaseClient.mockReturnValue({ auth });
+      return auth;
+    }
+
+    it("signs in on a throwaway client with no session storage, never the request's, then ends that session", async () => {
+      const auth = throwaway({ data: { session: { access_token: "check" } }, error: null });
+
+      expect(await supabaseAuth.verifyPassword("a@example.test", "secret-1")).toEqual({ ok: true });
+      expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "pk", {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      expect(auth.signInWithPassword).toHaveBeenCalledExactlyOnceWith({ email: "a@example.test", password: "secret-1" });
+      expect(auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+      // The request's client, which writes the session cookies, is never asked.
+      expect(mocks.createClient).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["the invalid_credentials code", { message: "Invalid login credentials", code: "invalid_credentials", status: 400 }],
+      ["the message alone, on a server without codes", { message: "Invalid login credentials", status: 400 }],
+    ])("answers a wrong password, recognised by %s, as invalid_credentials", async (_, error) => {
+      const auth = throwaway({ data: { session: null }, error });
+
+      expect(await supabaseAuth.verifyPassword("a@example.test", "wrong")).toEqual({
+        ok: false,
+        kind: "invalid_credentials",
+        reason: "That isn't your current password.",
+      });
+      expect(auth.signOut).not.toHaveBeenCalled();
+    });
+
+    it("passes a rate limit on", async () => {
+      throwaway({ data: { session: null }, error: { message: "slow down", code: "over_request_rate_limit", status: 429 } });
+
+      expect(await supabaseAuth.verifyPassword("a@example.test", "secret-1")).toMatchObject({ ok: false, kind: "rate_limited" });
+    });
+
+    it("still succeeds when ending the check's session fails", async () => {
+      const auth = throwaway({ data: { session: { access_token: "check" } }, error: null });
+      auth.signOut.mockRejectedValue(new Error("network"));
+
+      expect(await supabaseAuth.verifyPassword("a@example.test", "secret-1")).toEqual({ ok: true });
+    });
+
+    it("answers a wrong password without asking the provider when the account has no email or the password is empty", async () => {
+      expect(await supabaseAuth.verifyPassword("", "secret-1")).toMatchObject({ ok: false, kind: "invalid_credentials" });
+      expect(await supabaseAuth.verifyPassword("a@example.test", "")).toMatchObject({ ok: false, kind: "invalid_credentials" });
+      expect(mocks.createSupabaseClient).not.toHaveBeenCalled();
+    });
+
+    it("answers a plain failure, never a success, when the provider throws", async () => {
+      const auth = throwaway(undefined);
+      auth.signInWithPassword.mockRejectedValue(new Error("network"));
+
+      expect(await supabaseAuth.verifyPassword("a@example.test", "secret-1")).toEqual({
+        ok: false,
+        reason: "Unable to check your password. Please try again.",
+      });
+    });
   });
 
   it("updates the signed-in user's password", async () => {

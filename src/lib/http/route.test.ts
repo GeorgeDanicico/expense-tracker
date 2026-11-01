@@ -39,6 +39,18 @@ const schema = z.object({ name: z.string().min(1, "Name is required.") });
 const post = (body: string, headers: Record<string, string> = { "content-type": "application/json" }) =>
   new Request("http://localhost/api/test", { method: "POST", body, headers });
 
+/**
+ * The cookie session's database for the plain `withUser` tests: `withUser` reads the caller's
+ * "must change password" flag from `profiles` through the real account repository.
+ */
+function cookieDatabaseWith(profiles: Record<string, unknown>[] = [], fail?: Parameters<typeof fakeSupabase>[1]) {
+  const database = fakeSupabase({ profiles }, fail);
+  mocks.headers.mockResolvedValue(new Headers());
+  mocks.cookies.mockResolvedValue({ getAll: () => [], set: vi.fn() });
+  mocks.createServerClient.mockReturnValue(database.client);
+  return database;
+}
+
 describe("json", () => {
   it("adds the private no-store header to every response", async () => {
     const response = json({ ok: true }, { status: 405, headers: { Allow: "POST" } });
@@ -147,6 +159,7 @@ describe("the request guard in withUser and withRequestGuard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAuthenticatedUser.mockResolvedValue(user);
+    cookieDatabaseWith();
   });
 
   it.each([
@@ -189,6 +202,7 @@ describe("withUser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAuthenticatedUser.mockResolvedValue(user);
+    cookieDatabaseWith();
   });
 
   const respond = async (fail: () => never, options = { failure: "Unable to do it." }) => {
@@ -253,6 +267,63 @@ describe("withUser", () => {
   });
 });
 
+describe("withUser and the must-change-password flag", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getAuthenticatedUser.mockResolvedValue(user);
+  });
+
+  it("reads the caller's flag with one query on their own profile row", async () => {
+    const database = cookieDatabaseWith([{ id: user.id, must_change_password: false }]);
+
+    expect((await withUser(async () => json({ ok: true }))()).status).toBe(200);
+    expect(database.queries).toEqual([
+      expect.objectContaining({ table: "profiles", operation: "select", filters: [["eq", "id", user.id]] }),
+    ]);
+  });
+
+  it("refuses a flagged account with 403 password_change_required before the handler runs", async () => {
+    cookieDatabaseWith([{ id: user.id, must_change_password: true }]);
+    const handler = vi.fn(async () => json({ ok: true }));
+
+    const response = await withUser(handler, { failure: "x" })(post("{}"));
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get("cache-control")).toBe(PRIVATE);
+    expect(await response.json()).toEqual({
+      error: "Choose a new password before you keep using the app.",
+      code: "password_change_required",
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("lets a flagged account into a route that allows it, without reading the flag", async () => {
+    const database = cookieDatabaseWith([{ id: user.id, must_change_password: true }]);
+
+    const response = await withUser(async () => json({ ok: true }), { allowPasswordChangeRequired: true })();
+
+    expect(response.status).toBe(200);
+    expect(database.queries).toEqual([]);
+  });
+
+  it("lets an account without a profile row in", async () => {
+    cookieDatabaseWith([]);
+
+    expect((await withUser(async () => json({ ok: true }))()).status).toBe(200);
+  });
+
+  it("answers the route's 500, never the handler, when the flag can't be read", async () => {
+    cookieDatabaseWith([{ id: user.id, must_change_password: false }], { fail: () => true });
+    const handler = vi.fn(async () => json({ ok: true }));
+
+    const response = await withUser(handler, { failure: "Unable to do it." })();
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "Unable to do it." });
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
+
 describe("withUser on Supabase auth", () => {
   const cookieUser = { id: "10000000-0000-4000-8000-000000000141", email: "cookie@example.test" };
   const bearerUser = { id: "10000000-0000-4000-8000-000000000142", email: "bearer@example.test" };
@@ -313,7 +384,11 @@ describe("withUser on Supabase auth", () => {
     request({ authorization: `Bearer ${VALID_TOKEN}`, cookieSession: false });
 
     expect(await call()).toEqual({ status: 200, body: { user: bearerUser, currency: "RON" } });
-    expect(tokenDatabase.queries).toEqual([expect.objectContaining({ table: "profiles", filters: [["eq", "id", bearerUser.id]] })]);
+    // The must-change-password flag, then the handler's currency: both through the token client.
+    expect(tokenDatabase.queries).toEqual([
+      expect.objectContaining({ table: "profiles", filters: [["eq", "id", bearerUser.id]] }),
+      expect.objectContaining({ table: "profiles", filters: [["eq", "id", bearerUser.id]] }),
+    ]);
     expect(mocks.createSupabaseClient).toHaveBeenCalledWith("http://supabase.test", "pk", expect.objectContaining({
       global: { headers: { Authorization: `Bearer ${VALID_TOKEN}` } },
     }));

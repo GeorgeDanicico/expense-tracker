@@ -58,7 +58,7 @@ async function handle(request: Request) {
     return json({ error: "Too many failed attempts. Try again later." }, 429);
   }
   if (auth.status === "forbidden") {
-    return json({ error: auth.message }, 403);
+    return json(auth.code ? { error: auth.message, code: auth.code } : { error: auth.message }, 403);
   }
   if (auth.status === "unavailable") {
     // A 503, not a 401, so the client retries instead of discarding a valid token.

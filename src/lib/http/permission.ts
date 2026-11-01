@@ -4,7 +4,7 @@ import type { AuthenticatedUser } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
 import { getCurrentMember } from "@/lib/family/current-member";
 import type { CurrentMember } from "@/lib/family/repository";
-import { withUser, type RouteHandler } from "@/lib/http/route";
+import { withUser, type RouteHandler, type WithUserOptions } from "@/lib/http/route";
 import { can, type ModuleKey, type ModuleLevel } from "@/lib/permissions";
 
 export const FORBIDDEN_MESSAGE = "You don't have access to this.";
@@ -24,7 +24,7 @@ export function withPermission<M extends ModuleKey, Req extends Request = Reques
   module: M,
   level: ModuleLevel<M>,
   handler: (request: Req, user: AuthenticatedUser, context: Ctx, member: CurrentMember | null) => Promise<Response>,
-  options: { failure?: string } = {},
+  options: WithUserOptions = {},
 ): RouteHandler<Req, Ctx> {
   return withUser<Req, Ctx>(async (request, user, context) => {
     const member = await getCurrentMember();

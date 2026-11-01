@@ -34,6 +34,10 @@ const MESSAGES = {
   email_required: "Add and confirm an email address in Settings to use AI assistants.",
   kid_token: "Kids connect AI assistants through the app's sign-in page, not with tokens.",
 };
+const PASSWORD_CHANGE_REFUSAL = {
+  error: "Choose a new password in the app before using AI assistants: sign in there and you'll be asked for one.",
+  code: "password_change_required",
+};
 
 let repositories: FakeRepositories;
 let userA: AuthenticatedUser;
@@ -240,6 +244,26 @@ describe("/api/mcp", () => {
       expect(await response.json()).toEqual({ error: MESSAGES.mcp_off });
     });
 
+    it("answers 403 password_change_required while the owner must choose a new password, and lets them in once they have", async () => {
+      const { token } = personalToken(userA);
+      repositories.account.mustChangePassword.add(userA.id);
+
+      const response = await POST(rpc(listExpenses, bearer(token)));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual(PASSWORD_CHANGE_REFUSAL);
+
+      repositories.account.mustChangePassword.delete(userA.id);
+      expect(await listedExpenseIds(bearer(token))).toEqual(["expense-a"]);
+    });
+
+    it("answers 503 when the password flag can't be read", async () => {
+      const { token } = personalToken(userA);
+      vi.spyOn(repositories.account, "getMustChangePassword").mockRejectedValue(new Error("database down"));
+
+      expect((await POST(rpc(initialize, bearer(token)))).status).toBe(503);
+    });
+
     it("answers 403 for a kid's token", async () => {
       const { token } = personalToken(userA);
       setMcpUser(userA, { kid: { mcp: true } });
@@ -355,6 +379,16 @@ describe("/api/mcp", () => {
 
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({ error: message });
+    });
+
+    it("answers 403 password_change_required while the user must choose a new password", async () => {
+      setMcpUser(userA, { kid: { mcp: true } });
+      repositories.account.mustChangePassword.add(userA.id);
+
+      const response = await POST(rpc(listExpenses, bearer(auth.issueAppToken(userA, "claude-code"))));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual(PASSWORD_CHANGE_REFUSAL);
     });
 
     it("lets a kid with the permission and a real email in", async () => {

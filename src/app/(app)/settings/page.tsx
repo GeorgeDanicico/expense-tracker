@@ -5,6 +5,7 @@ import { Mail, Save } from "lucide-react";
 import { FormEvent, useState } from "react";
 
 import { AvatarCard } from "@/components/settings/avatar-card";
+import { SignOutEverywhereCard } from "@/components/settings/sign-out-everywhere-card";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
@@ -13,8 +14,9 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { useAccount } from "@/hooks/use-account";
 import { useApiForm } from "@/hooks/use-api-form";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { changeEmail } from "@/lib/api/account-requests";
 import { apiRequest } from "@/lib/api/client";
-import { ACCOUNT_API_KEY, ACCOUNT_EMAIL_API_URL } from "@/lib/api/keys";
+import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 import { KID_EMAIL_DOMAIN } from "@/lib/family/kid-account";
 import type { AccountData } from "@/lib/account/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
@@ -49,11 +51,15 @@ export default function SettingsPage() {
   function saveEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (emailForm.pending) return;
-    const email = String(new FormData(event.currentTarget).get("email") ?? "");
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const email = String(formData.get("email") ?? "");
+    const currentPassword = String(formData.get("currentPassword") ?? "");
 
     void emailForm.submit(async () => {
-      await apiRequest<void>(ACCOUNT_EMAIL_API_URL, { method: "PATCH", body: JSON.stringify({ email }) });
+      await changeEmail({ email, currentPassword });
       setEmailSentTo(email.trim());
+      form.reset();
     }, { fallback: "Unable to save your email. Please try again." });
   }
 
@@ -73,7 +79,7 @@ export default function SettingsPage() {
         <Card>
           <Card.Header
             title="Add an email address"
-            description="Use it to recover your account. You can keep signing in with your username."
+            description="Use it to recover your account. You can keep signing in with your username. Enter your current password to confirm it's you."
           />
           <form onSubmit={saveEmail}>
             <Card.Body>
@@ -96,6 +102,21 @@ export default function SettingsPage() {
                     autoComplete="email"
                     placeholder="you@example.com"
                     maxW={{ md: "20rem" }}
+                    required
+                  />
+                </FormField>
+                <FormField
+                  label="Current password"
+                  error={emailForm.fieldError("currentPassword")}
+                  orientation={{ base: "vertical", md: "horizontal" }}
+                  css={{ "--field-label-width": "sizes.40" }}
+                >
+                  <Input
+                    name="currentPassword"
+                    type="password"
+                    autoComplete="current-password"
+                    maxW={{ md: "20rem" }}
+                    maxLength={128}
                     required
                   />
                 </FormField>
@@ -153,6 +174,8 @@ export default function SettingsPage() {
           </Card.Footer>
         </form>
       </Card>
+
+      <SignOutEverywhereCard />
     </Stack>
   );
 }

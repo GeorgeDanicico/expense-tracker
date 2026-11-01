@@ -31,36 +31,100 @@ function changePassword(body: unknown) {
   return callRoute(POST, { method: "POST", url: "/api/account/password", body });
 }
 
+/** A change with the right current password, unless `body` says otherwise. */
+function change(body: Record<string, unknown> = {}) {
+  return changePassword({ currentPassword: OLD_PASSWORD, password: NEW_PASSWORD, ...body });
+}
+
 function storedPassword() {
   return auth.accounts.find((account) => account.id === user.id)?.password;
 }
 
 describe("POST /api/account/password", () => {
-  it("updates the password and clears the must-change-password flag", async () => {
-    const response = await changePassword({ password: NEW_PASSWORD });
+  it("checks the current password, updates the password, clears the flag and signs the other sessions out", async () => {
+    const response = await change();
+
+    expect(response.status).toBe(204);
+    expect(auth.verifiedEmails).toEqual([user.email]);
+    expect(storedPassword()).toBe(NEW_PASSWORD);
+    expect(repositories.account.mustChangePassword.has(user.id)).toBe(false);
+    expect(auth.signOutScopes).toEqual(["others"]);
+    // This session stays signed in.
+    expect(auth.currentUser).toEqual(user);
+  });
+
+  it("lets an account that must change its password in, since this is where it does", async () => {
+    expect(repositories.account.mustChangePassword.has(user.id)).toBe(true);
+
+    expect((await change()).status).toBe(204);
+  });
+
+  it.each([{}, { currentPassword: "" }, { currentPassword: 5 }])("asks for the current password: %j", async (body) => {
+    const response = await changePassword({ password: NEW_PASSWORD, ...body });
+
+    expect(response).toMatchObject({
+      status: 422,
+      body: { fieldErrors: { currentPassword: ["Enter your current password."] } },
+    });
+    expect(auth.verifiedEmails).toEqual([]);
+    expect(storedPassword()).toBe(OLD_PASSWORD);
+  });
+
+  it("refuses a wrong current password with 422 on the field, changing nothing and signing nobody out", async () => {
+    const response = await change({ currentPassword: "not-my-password" });
+
+    expect(response).toMatchObject({
+      status: 422,
+      body: {
+        error: "Check the highlighted details and try again.",
+        fieldErrors: { currentPassword: ["That isn't your current password."] },
+      },
+    });
+    expect(storedPassword()).toBe(OLD_PASSWORD);
+    expect(repositories.account.mustChangePassword.has(user.id)).toBe(true);
+    expect(auth.signOutScopes).toEqual([]);
+  });
+
+  it("answers 429 when the provider rate-limits the password check", async () => {
+    auth.fail("verifyPassword", "Too many attempts.", "rate_limited");
+
+    const response = await change();
+
+    expect(response).toMatchObject({ status: 429, body: { error: "Too many attempts." } });
+    expect(storedPassword()).toBe(OLD_PASSWORD);
+  });
+
+  it("still answers 204 when the other sessions can't be signed out, since the password did change", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    auth.fail("signOut");
+
+    const response = await change();
 
     expect(response.status).toBe(204);
     expect(storedPassword()).toBe(NEW_PASSWORD);
-    expect(repositories.account.mustChangePassword.has(user.id)).toBe(false);
+    expect(auth.signOutScopes).toEqual(["others"]);
+    expect(error).toHaveBeenCalledOnce();
+    expect(JSON.stringify(error.mock.calls)).not.toContain(NEW_PASSWORD);
+    error.mockRestore();
   });
 
   it("lets a user without the flag change their password too", async () => {
     repositories.account.mustChangePassword.clear();
 
-    const response = await changePassword({ password: NEW_PASSWORD });
+    const response = await change();
 
     expect(response.status).toBe(204);
     expect(storedPassword()).toBe(NEW_PASSWORD);
   });
 
   it("answers privately, so the response is never cached", async () => {
-    const { headers } = await changePassword({ password: NEW_PASSWORD });
+    const { headers } = await change();
 
     expect(headers.get("cache-control")).toBe("private, no-store, max-age=0");
   });
 
   it("rejects a password shorter than 8 characters without changing anything", async () => {
-    const response = await changePassword({ password: "short" });
+    const response = await change({ password: "short" });
 
     expect(response).toMatchObject({
       status: 422,
@@ -74,7 +138,7 @@ describe("POST /api/account/password", () => {
   });
 
   it("rejects a password longer than 128 characters", async () => {
-    const response = await changePassword({ password: "a".repeat(129) });
+    const response = await change({ password: "a".repeat(129) });
 
     expect(response).toMatchObject({
       status: 422,
@@ -90,7 +154,7 @@ describe("POST /api/account/password", () => {
   });
 
   it("rejects a body without a password", async () => {
-    const response = await changePassword({});
+    const response = await changePassword({ currentPassword: OLD_PASSWORD });
 
     expect(response).toMatchObject({ status: 422, body: { fieldErrors: { password: ["Enter a password."] } } });
   });
@@ -98,19 +162,20 @@ describe("POST /api/account/password", () => {
   it("keeps the flag and passes the reason on when the auth provider refuses the password", async () => {
     auth.fail("updatePassword", "New password should be different from the old password.");
 
-    const response = await changePassword({ password: NEW_PASSWORD });
+    const response = await change();
 
     expect(response).toMatchObject({
       status: 400,
       body: { error: "New password should be different from the old password." },
     });
     expect(repositories.account.mustChangePassword.has(user.id)).toBe(true);
+    expect(auth.signOutScopes).toEqual([]);
   });
 
   it("answers 429 when the auth provider rate-limits the change", async () => {
     auth.fail("updatePassword", "Too many attempts.", "rate_limited");
 
-    const response = await changePassword({ password: NEW_PASSWORD });
+    const response = await change();
 
     expect(response).toMatchObject({ status: 429, body: { error: "Too many attempts." } });
     expect(repositories.account.mustChangePassword.has(user.id)).toBe(true);
@@ -120,7 +185,7 @@ describe("POST /api/account/password", () => {
     const complete = vi.spyOn(repositories.account, "completePasswordChange");
     auth.fail("updatePassword");
 
-    await changePassword({ password: NEW_PASSWORD });
+    await change();
 
     expect(complete).not.toHaveBeenCalled();
   });
@@ -128,9 +193,22 @@ describe("POST /api/account/password", () => {
   it("hides a failure to clear the flag behind a generic message", async () => {
     vi.spyOn(repositories.account, "completePasswordChange").mockRejectedValue(new Error("private database failure"));
 
-    const response = await changePassword({ password: NEW_PASSWORD });
+    const response = await change();
 
     expect(response).toMatchObject({ status: 500, body: { error: "Unable to change your password. Please try again." } });
+  });
+
+  it("counts wrong current passwords toward the limit: the 11th attempt in an hour is a 429 without a check", async () => {
+    for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_ATTEMPTS; attempt += 1) {
+      expect((await change({ currentPassword: `guess-${attempt}` })).status).toBe(422);
+    }
+    const verify = vi.spyOn(auth, "verifyPassword");
+
+    const limited = await change();
+
+    expect(limited).toMatchObject({ status: 429, body: { error: "You've tried to change your password a lot recently. Try again in an hour." } });
+    expect(verify).not.toHaveBeenCalled();
+    expect(storedPassword()).toBe(OLD_PASSWORD);
   });
 
   it("answers the 11th attempt in an hour with 429 and Retry-After, counting refused ones, without asking the provider", async () => {
@@ -139,11 +217,11 @@ describe("POST /api/account/password", () => {
     try {
       for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_ATTEMPTS; attempt += 1) {
         auth.fail("updatePassword", "New password should be different from the old password.");
-        expect((await changePassword({ password: NEW_PASSWORD })).status).toBe(400);
+        expect((await change()).status).toBe(400);
       }
       const update = vi.spyOn(auth, "updatePassword");
 
-      const limited = await changePassword({ password: NEW_PASSWORD });
+      const limited = await change();
 
       expect(limited).toMatchObject({
         status: 429,
@@ -154,20 +232,20 @@ describe("POST /api/account/password", () => {
       expect(storedPassword()).toBe(OLD_PASSWORD);
 
       vi.setSystemTime(new Date(Date.now() + PASSWORD_CHANGE_WINDOW_MS));
-      expect((await changePassword({ password: NEW_PASSWORD })).status).toBe(204);
+      expect((await change()).status).toBe(204);
     } finally {
       vi.useRealTimers();
     }
   });
 
   it("counts attempts per user", async () => {
-    for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_ATTEMPTS; attempt += 1) await changePassword({ password: NEW_PASSWORD });
-    expect((await changePassword({ password: NEW_PASSWORD })).status).toBe(429);
+    for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_ATTEMPTS; attempt += 1) await change();
+    expect((await change()).status).toBe(429);
 
     const other = signedInAs(auth.addUser("other@example.test", OLD_PASSWORD));
     auth.currentUser = other;
     repositories.account.caller.userId = other.id;
 
-    expect((await changePassword({ password: NEW_PASSWORD })).status).toBe(204);
+    expect((await change()).status).toBe(204);
   });
 });

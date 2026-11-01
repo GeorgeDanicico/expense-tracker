@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { PASSWORD_CHANGE_REQUIRED, PASSWORD_CHANGE_REQUIRED_MESSAGE } from "@/lib/account/password-change";
 import { getAuthenticatedUser, type AuthenticatedUser } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
 import { touchLastActiveInBackground } from "@/lib/family/last-active";
@@ -10,6 +11,7 @@ import { readBodyWithLimit } from "@/lib/http/body";
 import { HttpError } from "@/lib/http/errors";
 import { refuseForeignRequest } from "@/lib/http/guard";
 import { ImportError } from "@/lib/imports/types";
+import { getRepositories } from "@/lib/repositories";
 import { idSchema } from "@/lib/validation/primitives";
 
 /** Every API response is per-user data and must never be cached by browsers or proxies. */
@@ -33,6 +35,11 @@ export function noContent() {
 
 export function unauthorized() {
   return json({ error: "Unauthorized" }, 401);
+}
+
+/** The 403 for an account that must choose a new password first, with `code: "password_change_required"` (audit P4). */
+export function passwordChangeRequired() {
+  return json({ error: PASSWORD_CHANGE_REQUIRED_MESSAGE, code: PASSWORD_CHANGE_REQUIRED }, 403);
 }
 
 /** A 429 with `{ error }` and a `Retry-After` of `retryAfterSeconds` (from a limiter's `retryAfterSeconds`). */
@@ -127,18 +134,33 @@ export function withRequestGuard<Req extends Request = Request, Ctx = unknown>(
   };
 }
 
+export type WithUserOptions = {
+  /** The 500 message for an unexpected error. Without it, such errors propagate to Next's default error response. */
+  failure?: string;
+  /**
+   * Lets an account that must choose a new password in. Only `GET /api/account` (the browser reads
+   * the flag there) and `POST /api/account/password` (where it chooses one) set it.
+   */
+  allowPasswordChangeRequired?: boolean;
+};
+
 /**
  * Wraps a route handler with the request guard, authentication and error mapping:
  * a write from another site → 403 before the session is even read (`refuseForeignRequest`),
- * no user → 401, `HttpError`/`DomainError` → their status, `ImportError` → its status with `{ error, code }`,
- * anything else → 500 with `failure`.
+ * no user → 401, an account that must choose a new password → 403 `password_change_required`
+ * (unless `allowPasswordChangeRequired`), `HttpError`/`DomainError` → their status, `ImportError` →
+ * its status with `{ error, code }`, anything else → 500 with `failure`.
  * Without `failure`, unexpected errors propagate to Next's default error response.
  * While the family flag is on, it also records the user's last activity in the background
  * (`touchLastActiveInBackground`), which never delays or changes the response.
+ *
+ * The "must change password" flag lives in `profiles`, not in the session's token, so checking it
+ * costs one primary-key read per request (as the caller, under RLS). A failed read is treated like
+ * any other unexpected error, never as "not flagged".
  */
 export function withUser<Req extends Request = Request, Ctx = unknown>(
   handler: (request: Req, user: AuthenticatedUser, context: Ctx) => Promise<Response>,
-  options: { failure?: string } = {},
+  options: WithUserOptions = {},
 ): RouteHandler<Req, Ctx> {
   return async (request?: Req, context?: Ctx): Promise<Response> => {
     const refused = refuseForeignRequest(request);
@@ -149,6 +171,9 @@ export function withUser<Req extends Request = Request, Ctx = unknown>(
     touchLastActiveInBackground(user.id);
 
     try {
+      if (!options.allowPasswordChangeRequired && (await getRepositories().account.getMustChangePassword(user.id))) {
+        return passwordChangeRequired();
+      }
       return await handler(request as Req, user, context as Ctx);
     } catch (error) {
       if (error instanceof HttpError || error instanceof DomainError || error instanceof ImportError) return errorResponse(error);
