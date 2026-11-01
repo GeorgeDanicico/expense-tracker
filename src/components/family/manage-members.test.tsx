@@ -3,17 +3,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { ledgerSystem } from "@/components/ui/theme";
-import type { FamilyData, FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView, FamilyView } from "@/lib/family/views";
 import { DEFAULT_KID_PERMISSIONS, PERMISSION_PRESETS } from "@/lib/permissions";
 
 import { KidSignInDetails } from "./kid-sign-in-details";
 import { matchingPreset, PermissionsEditor } from "./permissions-editor";
 import { ManageMembers } from "./manage-members";
 
-function member(overrides: Partial<FamilyMember>): FamilyMember {
+function member(overrides: Partial<FamilyMemberView>): FamilyMemberView {
   return {
     memberId: "m",
-    userId: "u",
     role: "parent",
     isCreator: false,
     displayName: null,
@@ -27,8 +26,8 @@ function member(overrides: Partial<FamilyMember>): FamilyMember {
   };
 }
 
-const data: FamilyData = {
-  family: { id: "f", name: "Popescu", createdAt: "2026-10-01T00:00:00Z" },
+const data: FamilyView = {
+  family: { name: "Popescu" },
   members: [
     member({ memberId: "1", displayName: "Ana", isCreator: true }),
     member({ memberId: "3", role: "kid", displayName: "Mara", username: "mara.p", permissions: DEFAULT_KID_PERMISSIONS }),
@@ -113,7 +112,7 @@ describe("KidSignInDetails", () => {
 });
 
 describe("ManageMembers removal", () => {
-  const withParent: FamilyData = {
+  const withParent: FamilyView = {
     ...data,
     members: [...data.members, member({ memberId: "2", displayName: "Dan" })],
   };

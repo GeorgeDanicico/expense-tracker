@@ -93,7 +93,7 @@ describe("Supabase family repository", () => {
     });
 
     it("translates a known database error into a domain error", async () => {
-      useRpc(() => ({ data: null, error: { code: "42501", message: "Authentication is required." } }));
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Authentication is required.", hint: "user" } }));
 
       await expect(family.getMembership()).rejects.toThrow(new DomainError("Authentication is required.", 403));
     });
@@ -250,7 +250,7 @@ describe("Supabase family repository", () => {
     });
 
     it("translates a known database error into a domain error", async () => {
-      useRpc(() => ({ data: null, error: { code: "42501", message: "Authentication is required." } }));
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Authentication is required.", hint: "user" } }));
 
       await expect(family.getFamily()).rejects.toThrow(new DomainError("Authentication is required.", 403));
     });
@@ -278,19 +278,19 @@ describe("Supabase family repository", () => {
     });
 
     it("translates being already in a family into a 409", async () => {
-      useRpc(() => ({ data: null, error: { code: "23505", message: "You're already in a family." } }));
+      useRpc(() => ({ data: null, error: { code: "23505", message: "You're already in a family.", hint: "user" } }));
 
       await expect(family.createFamily("The Smiths")).rejects.toThrow(new DomainError("You're already in a family.", 409));
     });
 
     it("translates an invalid name into a 422 with the database's message", async () => {
-      useRpc(() => ({ data: null, error: { code: "23514", message: "Use at most 60 characters." } }));
+      useRpc(() => ({ data: null, error: { code: "23514", message: "Use at most 60 characters.", hint: "user" } }));
 
       await expect(family.createFamily("x".repeat(61))).rejects.toThrow(new DomainError("Use at most 60 characters.", 422));
     });
 
     it("translates a missing caller into a 403", async () => {
-      useRpc(() => ({ data: null, error: { code: "42501", message: "Sign in to create a family." } }));
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Sign in to create a family.", hint: "user" } }));
 
       await expect(family.createFamily("The Smiths")).rejects.toThrow(new DomainError("Sign in to create a family.", 403));
     });
@@ -324,7 +324,7 @@ describe("Supabase family repository", () => {
       { code: "P0002", status: 404, message: "That family member wasn't found." },
       { code: "23514", status: 422, message: "Choose an allowed level for every module." },
     ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
-      useRpc(() => ({ data: null, error: { code, message } }));
+      useRpc(() => ({ data: null, error: { code, message, hint: "user" } }));
 
       await expect(family.setMemberPermissions(kidMemberId, teen)).rejects.toThrow(new DomainError(message, status));
     });
@@ -357,9 +357,20 @@ describe("Supabase family repository", () => {
       { code: "23514", status: 422, message: "Choose one of the eight colours." },
       { code: "23505", status: 409, message: "Another family member already has that colour." },
     ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
-      useRpc(() => ({ data: null, error: { code, message } }));
+      useRpc(() => ({ data: null, error: { code, message, hint: "user" } }));
 
       await expect(family.setMemberColor(kidMemberId, 4)).rejects.toThrow(new DomainError(message, status));
+    });
+
+    it("answers Postgres' own unique violation with a 409 and its own message, not the constraint's", async () => {
+      useRpc(() => ({
+        data: null,
+        error: { code: "23505", message: 'duplicate key value violates unique constraint "family_members_family_color_key"' },
+      }));
+
+      const error = await family.setMemberColor(kidMemberId, 4).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(DomainError);
+      expect(error).toMatchObject({ status: 409, message: "Unable to save the colour." });
     });
 
     it("hides any other database error behind a generic message", async () => {
@@ -392,7 +403,7 @@ describe("Supabase family repository", () => {
       { code: "23505", status: 409, message: "That account is already in a family." },
       { code: "23514", status: 422, message: "Choose an allowed level for every module." },
     ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
-      useRpc(() => ({ data: null, error: { code, message } }));
+      useRpc(() => ({ data: null, error: { code, message, hint: "user" } }));
 
       await expect(family.addManagedKid(kidUserId, youngKid)).rejects.toThrow(new DomainError(message, status));
     });
@@ -433,7 +444,7 @@ describe("Supabase family repository", () => {
       { code: "42501", status: 403, message: "Only parents can reset a kid's password." },
       { code: "P0002", status: 404, message: "That family member wasn't found." },
     ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
-      useRpc(() => ({ data: null, error: { code, message } }));
+      useRpc(() => ({ data: null, error: { code, message, hint: "user" } }));
 
       await expect(family.requirePasswordChange(kidMemberId)).rejects.toThrow(new DomainError(message, status));
     });
@@ -464,7 +475,7 @@ describe("Supabase family repository", () => {
       { code: "42501", status: 403, message: "Only the family's creator can remove members." },
       { code: "P0002", status: 404, message: "That family member wasn't found." },
     ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
-      useRpc(() => ({ data: null, error: { code, message } }));
+      useRpc(() => ({ data: null, error: { code, message, hint: "user" } }));
 
       await expect(family.removeMember(kidMemberId)).rejects.toThrow(new DomainError(message, status));
     });
@@ -489,7 +500,7 @@ describe("Supabase family repository", () => {
       { code: "42501", status: 403, message: "Only the family's creator can delete the family." },
       { code: "23514", status: 422, message: "Type the family's name to confirm." },
     ] as const)("translates $code into a $status with the database's message", async ({ code, status, message }) => {
-      useRpc(() => ({ data: null, error: { code, message } }));
+      useRpc(() => ({ data: null, error: { code, message, hint: "user" } }));
 
       await expect(family.deleteFamily("The Smiths")).rejects.toThrow(new DomainError(message, status));
     });
@@ -510,7 +521,7 @@ describe("Supabase family repository", () => {
     });
 
     it("translates a missing caller into a 403", async () => {
-      useRpc(() => ({ data: null, error: { code: "42501", message: "Sign in first." } }));
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Sign in first.", hint: "user" } }));
 
       await expect(family.touchLastActive()).rejects.toThrow(new DomainError("Sign in first.", 403));
     });
@@ -563,7 +574,7 @@ describe("Supabase family repository", () => {
     });
 
     it("translates a non-parent caller into a 403", async () => {
-      useRpc(() => ({ data: null, error: { code: "42501", message: "Only parents can invite people to the family." } }));
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Only parents can invite people to the family.", hint: "user" } }));
 
       await expect(family.createInvite({ role: "parent", permissions: null, codeHash })).rejects.toThrow(
         new DomainError("Only parents can invite people to the family.", 403),
@@ -571,7 +582,7 @@ describe("Supabase family repository", () => {
     });
 
     it("translates invalid permissions into a 422", async () => {
-      useRpc(() => ({ data: null, error: { code: "23514", message: "Choose an allowed level for every module." } }));
+      useRpc(() => ({ data: null, error: { code: "23514", message: "Choose an allowed level for every module.", hint: "user" } }));
 
       await expect(
         family.createInvite({ role: "kid", permissions: kidPermissions as Permissions, codeHash }),
@@ -579,7 +590,7 @@ describe("Supabase family repository", () => {
     });
 
     it("translates a hash already in use into a 409", async () => {
-      useRpc(() => ({ data: null, error: { code: "23505", message: "That invite code is already in use." } }));
+      useRpc(() => ({ data: null, error: { code: "23505", message: "That invite code is already in use.", hint: "user" } }));
 
       await expect(family.createInvite({ role: "parent", permissions: null, codeHash })).rejects.toThrow(
         new DomainError("That invite code is already in use.", 409),
@@ -658,7 +669,7 @@ describe("Supabase family repository", () => {
     });
 
     it("translates a non-parent caller into a 403", async () => {
-      useRpc(() => ({ data: null, error: { code: "42501", message: "Only parents can see the family's invites." } }));
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Only parents can see the family's invites.", hint: "user" } }));
 
       await expect(family.listInvites()).rejects.toThrow(new DomainError("Only parents can see the family's invites.", 403));
     });
@@ -679,13 +690,13 @@ describe("Supabase family repository", () => {
     });
 
     it("translates a non-parent caller into a 403", async () => {
-      useRpc(() => ({ data: null, error: { code: "42501", message: "Only parents can revoke invites." } }));
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Only parents can revoke invites.", hint: "user" } }));
 
       await expect(family.revokeInvite(inviteId)).rejects.toThrow(new DomainError("Only parents can revoke invites.", 403));
     });
 
     it("translates an unknown or other-family invite into a 404", async () => {
-      useRpc(() => ({ data: null, error: { code: "P0002", message: "That invite wasn't found." } }));
+      useRpc(() => ({ data: null, error: { code: "P0002", message: "That invite wasn't found.", hint: "user" } }));
 
       await expect(family.revokeInvite(inviteId)).rejects.toThrow(new DomainError("That invite wasn't found.", 404));
     });
@@ -760,7 +771,7 @@ describe("Supabase family repository", () => {
     });
 
     it("translates a missing caller into a 403", async () => {
-      useRpc(() => ({ data: null, error: { code: "42501", message: "Sign in to use an invite code." } }));
+      useRpc(() => ({ data: null, error: { code: "42501", message: "Sign in to use an invite code.", hint: "user" } }));
 
       await expect(family.previewInvite(codeHash)).rejects.toThrow(new DomainError("Sign in to use an invite code.", 403));
     });
@@ -790,13 +801,13 @@ describe("Supabase family repository", () => {
     });
 
     it("translates being already in a family into a 409", async () => {
-      useRpc(() => ({ data: null, error: { code: "23505", message: "You're already in a family." } }));
+      useRpc(() => ({ data: null, error: { code: "23505", message: "You're already in a family.", hint: "user" } }));
 
       await expect(family.redeemInvite(codeHash)).rejects.toThrow(new DomainError("You're already in a family.", 409));
     });
 
     it("translates a code that can't be redeemed into a 404", async () => {
-      useRpc(() => ({ data: null, error: { code: "P0002", message: "This code isn't valid anymore." } }));
+      useRpc(() => ({ data: null, error: { code: "P0002", message: "This code isn't valid anymore.", hint: "user" } }));
 
       await expect(family.redeemInvite(codeHash)).rejects.toThrow(new DomainError("This code isn't valid anymore.", 404));
     });

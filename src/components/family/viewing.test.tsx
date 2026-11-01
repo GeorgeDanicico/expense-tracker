@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ledgerSystem } from "@/components/ui/theme";
 import type { AccountData, AccountMembership } from "@/lib/account/types";
-import type { FamilyData, FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView, FamilyView } from "@/lib/family/views";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
 import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
 
@@ -16,7 +16,7 @@ const TEO_ID = "60000000-0000-4000-8000-000000000003";
 const state = vi.hoisted(() => ({
   search: "",
   account: undefined as AccountData | undefined,
-  family: undefined as { family: FamilyData | null } | undefined,
+  family: undefined as { family: FamilyView | null } | undefined,
   familyError: undefined as unknown,
   fetched: [] as unknown[],
 }));
@@ -41,10 +41,9 @@ import { useViewing } from "@/hooks/use-viewing";
 import { ViewingBar, ViewingPicker, viewingHref } from "./viewing-picker";
 import { WriteOnly } from "./write-only";
 
-function aMember(overrides: Partial<FamilyMember>): FamilyMember {
+function aMember(overrides: Partial<FamilyMemberView>): FamilyMemberView {
   return {
     memberId: ME_ID,
-    userId: "u",
     role: "kid",
     isCreator: false,
     displayName: "Member",
@@ -68,7 +67,7 @@ function membership(overrides: Partial<AccountMembership> = {}): AccountMembersh
 }
 
 function anAccount(m: AccountMembership | null): AccountData {
-  return { email: "me@example.com", currency: "EUR", features: { family: true }, membership: m, mustChangePassword: false, avatarUrl: null };
+  return { email: "me@example.com", signInName: "me@example.com", currency: "EUR", features: { family: true }, membership: m, mustChangePassword: false, avatarUrl: null };
 }
 
 function html(node: React.ReactNode) {
@@ -96,7 +95,7 @@ function viewingNow() {
 beforeEach(() => {
   state.search = "";
   state.account = anAccount(membership());
-  state.family = { family: { family: { id: "f", name: "The Smiths", createdAt: "2026-10-01T00:00:00Z" }, members: MEMBERS } };
+  state.family = { family: { family: { name: "The Smiths" }, members: MEMBERS } };
   state.familyError = undefined;
   state.fetched = [];
 });
@@ -232,7 +231,7 @@ describe("ViewingPicker", () => {
   });
 
   it("is hidden when nobody else is in the family", () => {
-    state.family = { family: { family: { id: "f", name: "x", createdAt: "" }, members: [MEMBERS[0]] } };
+    state.family = { family: { family: { name: "x" }, members: [MEMBERS[0]] } };
 
     expect(html(<ViewingPicker />)).toBe("");
   });

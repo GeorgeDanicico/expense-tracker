@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { familyView } from "@/lib/family/views";
 import { DomainError } from "@/lib/errors";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
 import { aFamily, aKid, aParent } from "@/test/builders";
@@ -63,7 +64,7 @@ describe("GET /api/family", () => {
 
     const response = await callRoute(GET);
 
-    expect(response).toMatchObject({ status: 200, body: { family } });
+    expect(response).toMatchObject({ status: 200, body: { family: familyView(family) } });
   });
 
   it("returns the family to a kid as well", async () => {
@@ -73,7 +74,7 @@ describe("GET /api/family", () => {
 
     const response = await callRoute(GET);
 
-    expect(response).toMatchObject({ status: 200, body: { family } });
+    expect(response).toMatchObject({ status: 200, body: { family: familyView(family) } });
   });
 
   it("answers privately, so the family is never cached", async () => {
@@ -106,11 +107,14 @@ describe("POST /api/family", () => {
     const response = await createFamily({ name: "The Smiths" });
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ family: repositories.family.family });
+    expect(response.body).toEqual({ family: familyView(repositories.family.family) });
     expect(response.body.family).toMatchObject({
       family: { name: "The Smiths" },
-      members: [{ userId: user.id, role: "parent", isCreator: true, permissions: PARENT_PERMISSIONS }],
+      members: [{ role: "parent", isCreator: true, permissions: PARENT_PERMISSIONS }],
     });
+    // The repository knows the creator's auth user id; the response doesn't carry it.
+    expect(repositories.family.family?.members[0].userId).toBe(user.id);
+    expect(response.body.family.members[0]).not.toHaveProperty("userId");
     expect(repositories.family.calls).toEqual(["touchLastActive", "createFamily", "getFamily"]);
   });
 

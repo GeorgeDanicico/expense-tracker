@@ -66,15 +66,16 @@ export const supabaseCalendarFeedRepository: CalendarFeedRepository = {
     const supabase = await createClient();
     const { data, error } = await supabase.from("calendar_feeds").select(FEED_COLUMNS)
       .is("revoked_at", null).maybeSingle();
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return data ? toFeed(data) : null;
   },
 
   async create(tokenHash) {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("create_calendar_feed", { p_token_hash: tokenHash });
-    // A 23514 is a hash that isn't 64 hex characters: the server made it, so that is our bug.
-    if (error) throw error.code === "23514" ? new Error(SAVE_ERROR) : translateDatabaseError(error, SAVE_ERROR);
+    // A 23514 is a hash that isn't 64 hex characters (the server made it, so our bug): Postgres' own
+    // check message, so the translator answers it with SAVE_ERROR.
+    if (error) throw translateDatabaseError(error, SAVE_ERROR);
     const row = data[0];
     if (!row) throw new Error(SAVE_ERROR);
     return toFeed(row);
@@ -89,7 +90,7 @@ export const supabaseCalendarFeedRepository: CalendarFeedRepository = {
 
   async read(tokenHash): Promise<CalendarFeedData | null> {
     const { data, error } = await createAnonClient().rpc("calendar_feed", { p_token_hash: tokenHash });
-    if (error) throw new Error(FEED_ERROR);
+    if (error) throw translateDatabaseError(error, FEED_ERROR);
     if (data === null) return null;
     if (!isRecord(data) || !Array.isArray(data.events) || (data.familyName !== null && typeof data.familyName !== "string")) {
       throw new Error(FEED_ERROR);

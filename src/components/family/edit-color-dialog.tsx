@@ -12,7 +12,7 @@ import { apiRequest } from "@/lib/api/client";
 import { afterFamilyChanged } from "@/lib/api/invalidate";
 import { familyMemberColorApiUrl, type FamilyResponse } from "@/lib/api/keys";
 import { MEMBER_COLOR_COUNT, MEMBER_COLOR_NAMES } from "@/lib/family/member-colors";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 
 const SLOTS = Array.from({ length: MEMBER_COLOR_COUNT }, (_, index) => index + 1);
 
@@ -26,8 +26,8 @@ export function EditColorDialog({
   open,
   onOpenChange,
 }: {
-  member: FamilyMember;
-  members: readonly FamilyMember[];
+  member: FamilyMemberView;
+  members: readonly FamilyMemberView[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {

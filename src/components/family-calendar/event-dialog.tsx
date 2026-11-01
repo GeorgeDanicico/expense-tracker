@@ -17,7 +17,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
 import { ApiError } from "@/lib/api/client";
 import { addDays } from "@/lib/calendar";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import {
   clampRepeatCount,
   draftFromEvent,
@@ -55,7 +55,7 @@ const REPEAT_OPTIONS: { value: SeriesRepeat; label: string }[] = [
   { value: "weekly", label: "Every week" },
 ];
 
-function memberName(member: FamilyMember) {
+function memberName(member: FamilyMemberView) {
   return member.displayName ?? member.username ?? "Family member";
 }
 
@@ -107,7 +107,7 @@ export function EventDialog({
   onRemove,
 }: {
   mode: EventDialogMode;
-  members: readonly FamilyMember[];
+  members: readonly FamilyMemberView[];
   myMemberId: string | null;
   colorOf: ColorOf;
   open: boolean;

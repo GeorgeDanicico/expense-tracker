@@ -118,7 +118,7 @@ describe("Supabase AI gate repository", () => {
 
     it("keeps the switch guard's message in a 403", async () => {
       const message = "A parent needs to turn on AI features for you.";
-      useRequestClient({ profiles: [{ id: user, ai_enabled: false }] }, { fail: () => ({ code: "42501", message }) });
+      useRequestClient({ profiles: [{ id: user, ai_enabled: false }] }, { fail: () => ({ code: "42501", message, hint: "user" }) });
 
       await expect(ai.setOptIn(user, true)).rejects.toThrow(new DomainError(message, 403));
     });

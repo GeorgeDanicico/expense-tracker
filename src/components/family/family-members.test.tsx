@@ -3,14 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { ledgerSystem } from "@/components/ui/theme";
-import type { FamilyData, FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView, FamilyView } from "@/lib/family/views";
 
 import { FamilyMembers, joinedLabel } from "./family-members";
 
-function member(overrides: Partial<FamilyMember>): FamilyMember {
+function member(overrides: Partial<FamilyMemberView>): FamilyMemberView {
   return {
     memberId: "m",
-    userId: "u",
     role: "parent",
     isCreator: false,
     displayName: null,
@@ -23,8 +22,8 @@ function member(overrides: Partial<FamilyMember>): FamilyMember {
   };
 }
 
-const data: FamilyData = {
-  family: { id: "f", name: "Popescu", createdAt: "2026-10-01T00:00:00Z" },
+const data: FamilyView = {
+  family: { name: "Popescu" },
   members: [
     member({ memberId: "1", displayName: "Ana", isCreator: true }),
     member({ memberId: "2", displayName: "Dan" }),
@@ -33,7 +32,7 @@ const data: FamilyData = {
   ],
 };
 
-function render(value: FamilyData) {
+function render(value: FamilyView) {
   return renderToStaticMarkup(
     <ChakraProvider value={ledgerSystem}>
       <FamilyMembers data={value} />

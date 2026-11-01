@@ -9,11 +9,11 @@ import { OfflineStatus } from "@/components/pwa/offline-status";
 
 export function AppShell({
   children,
-  email,
+  signInName,
   avatarUrl = null,
 }: {
   children: React.ReactNode;
-  email: string;
+  signInName: string;
   /** The signed-in user's picture, or `null` for their initials. */
   avatarUrl?: string | null;
 }) {
@@ -23,7 +23,7 @@ export function AppShell({
         Skip to content
       </a>
       <Flex maxW="1440px" minH="100dvh" mx="auto">
-        <SidebarNav email={email} avatarUrl={avatarUrl} />
+        <SidebarNav signInName={signInName} avatarUrl={avatarUrl} />
         <Box flex="1" minW="0">
           <Flex
             as="header"
@@ -52,7 +52,7 @@ export function AppShell({
           </Container>
         </Box>
       </Flex>
-      <MobileTabBar email={email} avatarUrl={avatarUrl} />
+      <MobileTabBar signInName={signInName} avatarUrl={avatarUrl} />
     </Box>
   );
 }

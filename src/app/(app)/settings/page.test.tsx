@@ -14,8 +14,9 @@ vi.mock("next/navigation", () => ({
 
 import SettingsPage from "./page";
 
-function anAccount(email: string): AccountData {
-  return { email, currency: "EUR", features: { family: true }, membership: null, mustChangePassword: false, avatarUrl: null };
+/** An account as `GET /api/account` answers it: a kid's generated address arrives as `email: null`. */
+function anAccount(email: string | null, signInName = email ?? "ana"): AccountData {
+  return { email, signInName, currency: "EUR", features: { family: true }, membership: null, mustChangePassword: false, avatarUrl: null };
 }
 
 function render(account: AccountData) {
@@ -30,7 +31,7 @@ function render(account: AccountData) {
 
 describe("Settings → Account", () => {
   it("asks a kid adding an email for their current password too", () => {
-    const html = render(anAccount("ana@kids.ifam.invalid"));
+    const html = render(anAccount(null));
 
     expect(html).toContain("Add an email address");
     expect(html).toMatch(/<input[^>]*name="email"/);

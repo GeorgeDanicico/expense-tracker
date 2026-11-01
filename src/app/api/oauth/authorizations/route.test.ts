@@ -62,7 +62,7 @@ describe("GET /api/oauth/authorizations/[id]", () => {
     expect(await details(id)).toMatchObject({ status: 401 });
   });
 
-  it("shows the app, the redirect and the caller's email while their access is ok", async () => {
+  it("shows the app, the redirect and who the caller is signed in as while their access is ok", async () => {
     allowMcp();
     const id = consent.addRequest(testUser.id, {
       app: { name: "Claude Code (ledger)", uri: "https://claude.ai" },
@@ -75,10 +75,9 @@ describe("GET /api/oauth/authorizations/[id]", () => {
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.body).toEqual({
       kind: "consent",
-      email: testUser.email,
-      app: { clientId: "client-1", name: "Claude Code (ledger)", uri: "https://claude.ai", logoUri: null },
+      signInName: testUser.email,
+      app: { clientId: "client-1", name: "Claude Code (ledger)", uri: "https://claude.ai" },
       redirectUri: "http://localhost:4567/callback",
-      scopes: ["email"],
     });
   });
 
@@ -109,7 +108,7 @@ describe("GET /api/oauth/authorizations/[id]", () => {
     const response = await details(id);
 
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ kind: "refused", reason, email: testUser.email, app: { name: "Claude Code (simple-ledger)" } });
+    expect(response.body).toMatchObject({ kind: "refused", reason, signInName: testUser.email, app: { name: "Claude Code (simple-ledger)" } });
   });
 
   it("follows an already approved request only while access is ok", async () => {
@@ -127,7 +126,7 @@ describe("GET /api/oauth/authorizations/[id]", () => {
 
     const response = await details(id);
 
-    expect(response.body).toEqual({ kind: "refused", reason: "mcp_off", email: testUser.email, app: null });
+    expect(response.body).toEqual({ kind: "refused", reason: "mcp_off", signInName: testUser.email, app: null });
     expect(JSON.stringify(response.body)).not.toContain("code=");
   });
 

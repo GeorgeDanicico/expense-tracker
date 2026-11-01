@@ -176,7 +176,7 @@ describe("Supabase reminder repository", () => {
     });
 
     it("passes a known database error on as a DomainError", async () => {
-      useDatabase({}, { fail: () => ({ code: "23514", message: "A reminder's lead times must be distinct." }) });
+      useDatabase({}, { fail: () => ({ code: "23514", message: "A reminder's lead times must be distinct.", hint: "user" }) });
 
       await expect(reminders.create(userId, values)).rejects.toMatchObject({
         status: 422, message: "A reminder's lead times must be distinct.",

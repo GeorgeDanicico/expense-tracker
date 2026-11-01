@@ -11,7 +11,7 @@ import { useApiForm } from "@/hooks/use-api-form";
 import { apiRequest } from "@/lib/api/client";
 import { afterFamilyChanged } from "@/lib/api/invalidate";
 import { familyMemberPermissionsApiUrl, type FamilyResponse } from "@/lib/api/keys";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import { DEFAULT_KID_PERMISSIONS, type Permissions } from "@/lib/permissions";
 
 /** Edit one kid's permissions. Saving calls `PATCH /api/family/members/[id]/permissions`. */
@@ -20,7 +20,7 @@ export function EditPermissionsDialog({
   open,
   onOpenChange,
 }: {
-  member: FamilyMember;
+  member: FamilyMemberView;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {

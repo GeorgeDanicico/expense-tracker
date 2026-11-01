@@ -17,79 +17,24 @@ vi.mock("next/headers", () => ({ cookies: mocks.cookies, headers: mocks.cookies 
 vi.mock("@/lib/repositories", () => ({ getRepositories: () => ({ calendarFeeds: { read: mocks.readFeed } }) }));
 
 import { CROSS_SITE_REFUSED, GUARDED_METHODS, REQUEST_GUARD_EXEMPTIONS } from "@/lib/http/guard";
+import { ROUTE_ACCESS } from "@/test/permissions";
 
 const API_DIR = fileURLToPath(new URL(".", import.meta.url));
 const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
 const HTTP_METHODS = ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"];
 
-// Routes that authenticate in their own way and are covered by their own tests.
-const PUBLIC_ROUTES = ["auth", "auth/google", "calendar/feed/[token]", "csp-report", "mcp"];
+// Every route handler must reject anonymous requests, except the public ones. Both come from the one
+// permission list (src/test/permissions.ts), so a route without auth fails below.
+const PUBLIC_ROUTES = [...new Set(Object.entries(ROUTE_ACCESS)
+  .filter(([, access]) => access.access === "public")
+  .map(([key]) => key.split(" ")[1].slice("/api/".length)))];
 
-// Every other route handler must reject anonymous requests. Adding a route
-// under src/app/api means adding it here, so a route without auth fails below.
-const PROTECTED_ROUTES: Record<string, string[]> = {
-  account: ["GET", "PATCH"],
-  "account/avatar": ["DELETE", "PUT"],
-  "account/email": ["PATCH"],
-  "account/ai": ["GET", "PATCH"],
-  "account/mcp": ["GET", "PATCH"],
-  "account/mcp/apps": ["GET"],
-  "account/mcp/apps/[clientId]": ["DELETE"],
-  "account/mcp/tokens": ["POST"],
-  "account/mcp/tokens/[id]": ["DELETE"],
-  "account/mcp/tokens/[id]/regenerate": ["POST"],
-  "account/notices": ["GET"],
-  "account/notices/[id]/dismiss": ["POST"],
-  "account/password": ["POST"],
-  "avatars/[userId]/[file]": ["GET"],
-  "calendar/events": ["GET", "POST"],
-  "calendar/events/[id]": ["DELETE", "GET", "PATCH"],
-  "calendar/feed-link": ["DELETE", "GET", "POST"],
-  dashboard: ["GET"],
-  "expense-tabs": ["GET", "POST"],
-  "expense-tabs/[id]": ["DELETE", "PATCH"],
-  "expense-tabs/[id]/expenses": ["GET"],
-  expenses: ["GET", "POST"],
-  "expenses/[id]": ["DELETE"],
-  "expenses/export": ["GET"],
-  family: ["DELETE", "GET", "POST"],
-  "family/invites": ["GET", "POST"],
-  "family/invites/[id]": ["DELETE"],
-  "family/join": ["POST"],
-  "family/join/preview": ["POST"],
-  "family/kids": ["POST"],
-  "family/members/[id]": ["DELETE"],
-  "family/members/[id]/color": ["PATCH"],
-  "family/members/[id]/password": ["POST"],
-  "family/members/[id]/permissions": ["PATCH"],
-  imports: ["GET", "POST"],
-  "imports/[id]": ["DELETE", "GET"],
-  "imports/[id]/confirm": ["POST"],
-  "imports/[id]/undo": ["POST"],
-  investments: ["GET"],
-  "investment-transactions": ["GET", "POST"],
-  "investment-transactions/[id]": ["DELETE"],
-  "net-worth": ["GET"],
-  "net-worth/items": ["POST"],
-  "net-worth/items/[id]": ["PATCH"],
-  "net-worth/items/[id]/valuations": ["POST"],
-  "net-worth/valuations/[id]": ["PATCH"],
-  "notifications/push-key": ["GET"],
-  "notifications/push-subscriptions": ["DELETE", "POST"],
-  "notifications/settings": ["GET", "PATCH"],
-  "notifications/test": ["POST"],
-  "oauth/authorizations/[id]": ["GET"],
-  "oauth/authorizations/[id]/approve": ["POST"],
-  "oauth/authorizations/[id]/deny": ["POST"],
-  reminders: ["GET", "POST"],
-  "reminders/[id]": ["DELETE", "PATCH"],
-  "reminders/[id]/complete": ["POST"],
-  "reminders/[id]/snooze": ["POST"],
-  "reminders/summary": ["GET"],
-  todos: ["GET", "POST"],
-  "todos/[id]": ["DELETE", "PATCH"],
-  "todos/[id]/move": ["POST"],
-};
+const PROTECTED_ROUTES: Record<string, string[]> = {};
+for (const [key, access] of Object.entries(ROUTE_ACCESS)) {
+  if (access.access === "public") continue;
+  const [method, path] = key.split(" ");
+  (PROTECTED_ROUTES[path.slice("/api/".length)] ??= []).push(method);
+}
 
 type Handler = (request: NextRequest, context: { params: Promise<{ id: string }> }) => Promise<Response>;
 

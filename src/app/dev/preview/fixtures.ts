@@ -250,6 +250,7 @@ const FAMILY_MEMBERS = [
 
 const ACCOUNT: AccountData = {
   email: "preview@example.com",
+  signInName: "preview@example.com",
   currency: "EUR",
   features: { family: true },
   membership: {
@@ -265,10 +266,9 @@ const ACCOUNT: AccountData = {
 
 const FAMILY: FamilyResponse = {
   family: {
-    family: { id: "f-preview", name: "The Danicicos", createdAt: "2026-01-04T10:00:00.000Z" },
+    family: { name: "The Danicicos" },
     members: FAMILY_MEMBERS.map((member, index) => ({
       memberId: member.memberId,
-      userId: `u-${member.memberId}`,
       role: member.role,
       isCreator: index === 0,
       displayName: member.name,
@@ -380,7 +380,7 @@ function previewsNoFamily() {
 function previewAccount(): AccountData {
   const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
   let account: AccountData = previewsNoFamily() ? { ...ACCOUNT, membership: null } : ACCOUNT;
-  if (params.has("kidEmail")) account = { ...account, email: "ana@kids.ifam.invalid" };
+  if (params.has("kidEmail")) account = { ...account, email: null, signInName: "ana" };
   if (params.has("mustChange")) account = { ...account, mustChangePassword: true };
   return account;
 }

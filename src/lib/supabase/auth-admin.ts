@@ -5,6 +5,7 @@ import type { AuthSession } from "@/lib/auth/service";
 import { DomainError } from "@/lib/errors";
 import { createAdminClient } from "@/lib/supabase/admin-client";
 import { createSessionClient, createThrowawayClient, sessionFromClient } from "@/lib/supabase/auth";
+import { translateDatabaseError } from "@/lib/supabase/errors";
 
 type ProviderError = { code?: string; message: string };
 
@@ -25,9 +26,9 @@ function authError(error: ProviderError, fallback: string): Error {
 
 /** A failed profile write. The raw Postgres messages name constraints, so these get messages of their own. */
 function profileError(error: ProviderError): Error {
-  if (error.code === "23505") return new DomainError("That username is taken.", 409);
-  if (error.code === "23514") return new DomainError("That username or display name isn't valid.", 422);
-  return new Error("Unable to create the account.");
+  return translateDatabaseError(error, "Unable to create the account.", {
+    messages: { "23505": "That username is taken.", "23514": "That username or display name isn't valid." },
+  });
 }
 
 /**

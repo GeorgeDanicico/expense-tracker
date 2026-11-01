@@ -77,7 +77,7 @@ describe("the session cache", () => {
     const { token, prefix, hash } = generateMcpToken();
     repositories.mcpTokens.tokens.push({
       id: `token-${index}`, userId: user.id, name: "VPS", prefix, hash, createdAt: "2026-10-01T00:00:00Z",
-      regeneratedAt: null, lastUsedAt: null, expiresAt: null, revokedAt: null,
+      lastUsedAt: null, expiresAt: null, revokedAt: null,
     });
     return token;
   }

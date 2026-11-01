@@ -36,7 +36,7 @@ function token(overrides: Partial<McpToken> = {}): McpToken {
     name: "Home server",
     prefix: "sl_mcp_Ab3xQ9",
     createdAt: "2026-10-01T08:00:00Z",
-    regeneratedAt: null,
+   
     lastUsedAt: null,
     expiresAt: new Date(NOW + 60 * DAY).toISOString(),
     ...overrides,

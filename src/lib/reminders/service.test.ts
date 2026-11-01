@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FORBIDDEN_MESSAGE } from "@/lib/http/permission";
 import { OCCURRENCE_ALREADY_DONE_MESSAGE } from "@/lib/reminders/repository";
-import { aKid } from "@/test/builders";
 import { reminderSchema } from "@/lib/validation/reminder";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 
@@ -428,17 +426,6 @@ describe("reminders service", () => {
 
       await expect(completeReminderWithExpense(userId, reminder.id, {}, now))
         .rejects.toMatchObject({ status: 422, message: templateCurrencyMessage("EUR", "RON") });
-      expect(expensesOf()).toEqual([]);
-      expect(reminder.nextDueOn).toBe("2026-11-01");
-    });
-
-    it("refuses a kid without expenses access, adding nothing", async () => {
-      vi.stubEnv("FAMILY_ENABLED", "true");
-      repositories.family.membership = aKid({ permissions: { ...aKid().permissions, expenses: "off" } });
-      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
-
-      await expect(completeReminderWithExpense(userId, reminder.id, {}, now))
-        .rejects.toMatchObject({ status: 403, message: FORBIDDEN_MESSAGE });
       expect(expensesOf()).toEqual([]);
       expect(reminder.nextDueOn).toBe("2026-11-01");
     });

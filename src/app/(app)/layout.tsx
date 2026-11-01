@@ -42,7 +42,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <AppShell email={data.email} avatarUrl={data.avatarUrl}>
+    <AppShell signInName={data.signInName} avatarUrl={data.avatarUrl}>
       {children}
       {data.features.family ? <AccountNoticeDialog /> : null}
     </AppShell>

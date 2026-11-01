@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { familyView } from "@/lib/family/views";
 import { DomainError } from "@/lib/errors";
 import { forgetLastActive } from "@/lib/family/last-active";
 import { PERMISSION_PRESETS } from "@/lib/permissions";
@@ -57,7 +58,7 @@ describe("POST /api/family/kids", () => {
 
     expect(response.status).toBe(201);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
-    expect(response.body).toEqual({ family: repositories.family.family });
+    expect(response.body).toEqual({ family: familyView(repositories.family.family) });
     expect(response.body.family.members).toContainEqual(
       expect.objectContaining({ role: "kid", displayName: "Ana", username: "ana", permissions: PERMISSION_PRESETS.young_kid }),
     );
@@ -71,13 +72,14 @@ describe("POST /api/family/kids", () => {
     expect(JSON.stringify(response.body)).not.toContain(ana.password);
   });
 
-  it("refuses a kid with 403 without creating an account", async () => {
+  it("refuses a kid with the one forbidden message, before reading the body or creating an account", async () => {
     repositories.family.membership = aKid();
 
-    const response = await createKid(ana);
+    const response = await createKid({});
 
-    expect(response).toMatchObject({ status: 403, body: { error: "Only parents can add a kid." } });
+    expect(response).toMatchObject({ status: 403, body: { error: "You don't have access to this." } });
     expect(auth.accounts).toEqual([]);
+    expect(repositories.family.calls).toEqual(["touchLastActive", "getMembership"]);
   });
 
   it("refuses a user without a family with 403", async () => {
@@ -86,7 +88,8 @@ describe("POST /api/family/kids", () => {
 
     const response = await createKid(ana);
 
-    expect(response).toMatchObject({ status: 403, body: { error: "Only parents can add a kid." } });
+    expect(response).toMatchObject({ status: 403, body: { error: "You don't have access to this." } });
+    expect(auth.accounts).toEqual([]);
   });
 
   it("refuses a taken username with 409", async () => {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { familyView } from "@/lib/family/views";
 import { forgetLastActive } from "@/lib/family/last-active";
 import { DomainError } from "@/lib/errors";
 import { PARENT_PERMISSIONS, type FamilyData } from "@/lib/family/repository";
@@ -72,7 +73,7 @@ describe("PATCH /api/family/members/[id]/color", () => {
 
     expect(response.status).toBe(200);
     expect(colorOf(kidId)).toBe(3);
-    expect(response.body).toEqual({ family: repositories.family.family });
+    expect(response.body).toEqual({ family: familyView(repositories.family.family) });
     expect(repositories.family.calls).toEqual(["touchLastActive", "setMemberColor", "getFamily"]);
   });
 

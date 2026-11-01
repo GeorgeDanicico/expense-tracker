@@ -13,13 +13,13 @@ import { Avatar } from "@/components/ui/avatar";
 
 /** Mobile bottom sheet with secondary destinations and account actions. */
 export function MoreSheet({
-  email,
+  signInName,
   avatarUrl = null,
   trigger,
   open,
   onOpenChange,
 }: {
-  email: string;
+  signInName: string;
   avatarUrl?: string | null;
   trigger: ReactNode;
   open: boolean;
@@ -42,9 +42,9 @@ export function MoreSheet({
         <Separator my="2" />
         <NavItem item={NAV_ITEMS.settings} onNavigate={() => onOpenChange(false)} />
         <Flex px="3" align="center" gap="2">
-          <Avatar size="xs" name={email} src={avatarUrl} decorative />
+          <Avatar size="xs" name={signInName} src={avatarUrl} decorative />
           <Text flex="1" minW="0" textStyle="caption" overflowWrap="anywhere">
-            {email}
+            {signInName}
           </Text>
         </Flex>
         <SignOutButton />

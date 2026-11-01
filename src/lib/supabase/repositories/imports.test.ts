@@ -114,8 +114,10 @@ describe("translateImportError", () => {
     expect(error).toMatchObject({ status, message });
   });
 
-  it("maps 42501 to a 403 with the database's message, and anything else to the fallback", () => {
-    expect(translate("42501")).toMatchObject({ status: 403, message: "private text: value (12.5)" });
+  it("maps 42501 to a 403, with the database's message only when our SQL marked it, and anything else to the fallback", () => {
+    expect(translate("42501")).toMatchObject({ status: 403, message: "Fallback." });
+    expect(translateImportError({ code: "42501", message: "Sign in to import a statement.", hint: "user" }, "Fallback.", "Wrong status."))
+      .toMatchObject({ status: 403, message: "Sign in to import a statement." });
     for (const code of ["23502", "22P02", undefined]) {
       const error = translate(code);
       expect(error).not.toBeInstanceOf(DomainError);

@@ -13,13 +13,13 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { lastActiveLabel } from "@/lib/family/last-active-label";
 import { memberColorTokens } from "@/lib/family/member-colors";
-import type { FamilyData, FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView, FamilyView } from "@/lib/family/views";
 
-function memberName(member: FamilyMember) {
+function memberName(member: FamilyMemberView) {
   return member.displayName ?? member.username ?? "Unnamed";
 }
 
-function roleLabel(member: FamilyMember) {
+function roleLabel(member: FamilyMemberView) {
   return member.role === "parent" ? "Parent" : "Kid";
 }
 
@@ -29,8 +29,8 @@ function MemberRow({
   canRemove,
   color,
 }: {
-  member: FamilyMember;
-  members: readonly FamilyMember[];
+  member: FamilyMemberView;
+  members: readonly FamilyMemberView[];
   canRemove: boolean;
   color: string | undefined;
 }) {
@@ -113,7 +113,7 @@ function MemberRow({
 }
 
 /** The members table for parents: role, last activity, kid accounts, a colour button for each member, permission and password buttons for each kid, and Remove for the creator. */
-export function ManageMembers({ data, isCreator = false }: { data: FamilyData; isCreator?: boolean }) {
+export function ManageMembers({ data, isCreator = false }: { data: FamilyView; isCreator?: boolean }) {
   const [adding, setAdding] = useState(false);
   const colors = memberColorTokens(data.members);
 

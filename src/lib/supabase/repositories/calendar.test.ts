@@ -235,9 +235,9 @@ describe("Supabase calendar repository", () => {
     });
 
     it.each([
-      ["an attendee outside the family", { code: "23514", message: "An event can only be for members of its family." }, 422],
-      ["no attendees", { code: "22023", message: "Choose who the event is for." }, 422],
-      ["no family", { code: "42501", message: "Join or create a family to use the calendar." }, 403],
+      ["an attendee outside the family", { code: "23514", message: "An event can only be for members of its family.", hint: "user" }, 422],
+      ["no attendees", { code: "22023", message: "Choose who the event is for.", hint: "user" }, 422],
+      ["no family", { code: "42501", message: "Join or create a family to use the calendar.", hint: "user" }, 403],
     ])("maps %s to a %i DomainError", async (_name, failure, status) => {
       useDatabase([], { rpc: () => ({ data: null, error: failure }) });
 
@@ -291,9 +291,9 @@ describe("Supabase calendar repository", () => {
     });
 
     it.each([
-      ["an event that isn't there", { code: "P0002", message: EVENT_GONE_MESSAGE }, 404],
-      ["an attendee outside the family", { code: "23514", message: "An event can only be for members of its family." }, 422],
-      ["an empty attendee list", { code: "22023", message: "Choose who the event is for." }, 422],
+      ["an event that isn't there", { code: "P0002", message: EVENT_GONE_MESSAGE, hint: "user" }, 404],
+      ["an attendee outside the family", { code: "23514", message: "An event can only be for members of its family.", hint: "user" }, 422],
+      ["an empty attendee list", { code: "22023", message: "Choose who the event is for.", hint: "user" }, 422],
     ])("maps %s to a %i DomainError", async (_name, failure, status) => {
       useDatabase([], { rpc: () => ({ data: null, error: failure }) });
 
@@ -330,14 +330,17 @@ describe("Supabase calendar repository", () => {
 
 describe("translateCalendarWriteError", () => {
   it("reads 23514 about the family as an attendee error with its field", () => {
-    const error = translateCalendarWriteError({ code: "23514", message: "An event can only be for members of its family." }, "Unable.");
+    const error = translateCalendarWriteError({ code: "23514", message: "An event can only be for members of its family.", hint: "user" }, "Unable.");
 
     expect(error).toBeInstanceOf(DomainError);
     expect(error).toMatchObject({ status: 422, fieldErrors: { attendeeMemberIds: [ATTENDEE_OUTSIDE_FAMILY_MESSAGE] } });
   });
 
-  it("leaves other 23514s and unknown codes as a plain error with the fallback", () => {
-    for (const code of ["23514", "XX000", undefined]) {
+  it("answers a table check (no marker) with a 422 and the fallback, and unknown codes with a plain error", () => {
+    const check = translateCalendarWriteError({ code: "23514", message: 'violates check constraint "calendar_events_title_check"' }, "Unable.");
+    expect(check).toBeInstanceOf(DomainError);
+    expect(check).toMatchObject({ status: 422, message: "Unable." });
+    for (const code of ["XX000", undefined]) {
       const error = translateCalendarWriteError({ code, message: "private detail" }, "Unable.");
       expect(error).not.toBeInstanceOf(DomainError);
       expect(error.message).toBe("Unable.");

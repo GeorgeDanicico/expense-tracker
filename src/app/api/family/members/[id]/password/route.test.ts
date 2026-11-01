@@ -184,13 +184,13 @@ describe("POST /api/family/members/[id]/password", () => {
     expect(setPassword).not.toHaveBeenCalled();
   });
 
-  it("refuses a kid with 403 and never sets a password", async () => {
+  it("refuses a kid with the one forbidden message and never sets a password", async () => {
     repositories.family.membership = aKid({ memberId: kidMemberId });
     const setPassword = vi.spyOn(admin, "setPassword");
 
     const response = await resetPassword(kidMemberId, { password: newPassword });
 
-    expect(response).toMatchObject({ status: 403, body: { error: "Only parents can reset a kid's password." } });
+    expect(response).toMatchObject({ status: 403, body: { error: "You don't have access to this." } });
     expect(setPassword).not.toHaveBeenCalled();
   });
 

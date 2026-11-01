@@ -47,18 +47,18 @@ export function removeAvatar() {
   return apiRequest<void>(ACCOUNT_AVATAR_API_URL, { method: "DELETE" });
 }
 
-/** The fallback name: the email's part before the `@` (`AccountData` has no display name yet). */
-export function avatarName(email: string) {
-  return email.split("@")[0] || email;
+/** The fallback name: the sign-in name's part before any `@` (`AccountData` has no display name yet). */
+export function avatarName(signInName: string) {
+  return signInName.split("@")[0] || signInName;
 }
 
 /** Settings → Profile picture. Only ever changes the signed-in user's own picture. */
-export function AvatarCard({ email, avatarUrl }: { email: string; avatarUrl: string | null }) {
+export function AvatarCard({ signInName, avatarUrl }: { signInName: string; avatarUrl: string | null }) {
   const { mutate } = useSWRConfig();
   const form = useApiForm();
   const input = useRef<HTMLInputElement>(null);
   const [removing, setRemoving] = useState(false);
-  const name = avatarName(email);
+  const name = avatarName(signInName);
 
   function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

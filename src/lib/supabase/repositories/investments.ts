@@ -12,6 +12,7 @@ import {
   type InvestmentTransaction,
   type InvestmentTransactionSide,
 } from "@/lib/investments/types";
+import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
 type Tables = Database["public"]["Tables"];
@@ -85,7 +86,7 @@ async function findOwnedAccount(userId: string, by: { id: string } | { brokerId:
   query = "id" in by ? query.eq("id", by.id) : query.eq("broker_id", by.brokerId);
   const { data, error } = await query.maybeSingle();
 
-  if (error) throw new Error("Unable to load investment account.");
+  if (error) throw translateDatabaseError(error, "Unable to load investment account.");
   return data ? toAccount(data, "Unable to load investment account.") : null;
 }
 
@@ -93,7 +94,8 @@ async function findOwnedAccount(userId: string, by: { id: string } | { brokerId:
  * `InvestmentRepository` on the `investment_accounts` and `investment_transactions` tables. Every
  * read filters by owner: accounts on `user_id`, transactions through their account. Writes go to an
  * account the caller already read as its own, and the tables' write policies stay owner-only.
- * Errors stay the plain `Error`s (500s) the data functions threw before the repository existed.
+ * Database errors go through `translateDatabaseError`: a known code is its status (a unique violation
+ * a 409) with the generic message, anything else a 500.
  */
 export const supabaseInvestmentRepository: InvestmentRepository = {
   async listAccountsWithTransactions(userId, limits) {
@@ -114,7 +116,7 @@ export const supabaseInvestmentRepository: InvestmentRepository = {
       .limit(limits.accounts)
       .limit(limits.transactionsPerAccount, { foreignTable: "investment_transactions" });
 
-    if (error) throw new Error("Unable to load investments.");
+    if (error) throw translateDatabaseError(error, "Unable to load investments.");
     return (data as unknown as InvestmentAccountWithTransactionsRow[]).map(parseAccountRow);
   },
 
@@ -138,7 +140,7 @@ export const supabaseInvestmentRepository: InvestmentRepository = {
       .limit(limit, { foreignTable: "investment_transactions" })
       .maybeSingle();
 
-    if (error) throw new Error("Unable to load investment transactions.");
+    if (error) throw translateDatabaseError(error, "Unable to load investment transactions.");
     const row = data as unknown as InvestmentAccountWithTransactionsRow | null;
     if (!row || !isInvestmentBrokerId(row.broker_id)) return null;
 
@@ -161,7 +163,7 @@ export const supabaseInvestmentRepository: InvestmentRepository = {
       .order("id", { ascending: true })
       .limit(limit);
 
-    if (error) throw new Error("Unable to load investment history.");
+    if (error) throw translateDatabaseError(error, "Unable to load investment history.");
     return (data as unknown as InvestmentTransactionRow[]).map(toTransaction);
   },
 
@@ -185,7 +187,7 @@ export const supabaseInvestmentRepository: InvestmentRepository = {
       if (racedAccount) return racedAccount;
     }
 
-    throw new Error("Unable to create investment account.");
+    throw error ? translateDatabaseError(error, "Unable to create investment account.") : new Error("Unable to create investment account.");
   },
 
   async findTransaction(userId, transactionId) {
@@ -197,7 +199,7 @@ export const supabaseInvestmentRepository: InvestmentRepository = {
       .eq("investment_accounts.user_id", userId)
       .maybeSingle();
 
-    if (error) throw new Error("Unable to load investment order.");
+    if (error) throw translateDatabaseError(error, "Unable to load investment order.");
     return data ? toTransaction(data as unknown as InvestmentTransactionRow) : null;
   },
 
@@ -210,7 +212,9 @@ export const supabaseInvestmentRepository: InvestmentRepository = {
       .select(TRANSACTION_COLUMNS)
       .single();
 
-    if (error || !data) throw new Error("The investment order could not be saved.");
+    if (error) throw translateDatabaseError(error, "The investment order could not be saved.");
+
+    if (!data) throw new Error("The investment order could not be saved.");
   },
 
   // A delete cannot embed the account, so it is scoped to the account `findTransaction` checked.
@@ -222,6 +226,6 @@ export const supabaseInvestmentRepository: InvestmentRepository = {
       .eq("id", transaction.id)
       .eq("investment_account_id", transaction.investmentAccountId);
 
-    if (error) throw new Error("Unable to remove investment order.");
+    if (error) throw translateDatabaseError(error, "Unable to remove investment order.");
   },
 };

@@ -37,7 +37,7 @@ describe("GET /api/account", () => {
   it("returns the default currency when the user has not chosen one", async () => {
     const response = await callRoute(GET);
 
-    expect(response.body).toEqual({ email: user.email, currency: "EUR", features: { family: false }, membership: null, mustChangePassword: false, avatarUrl: null });
+    expect(response.body).toEqual({ email: user.email, signInName: user.email, currency: "EUR", features: { family: false }, membership: null, mustChangePassword: false, avatarUrl: null });
   });
 
   it("reports the family feature as on when FAMILY_ENABLED is true", async () => {
@@ -219,7 +219,7 @@ describe("PATCH /api/account", () => {
   it("returns the family feature as off when FAMILY_ENABLED is false", async () => {
     const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
 
-    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: false }, membership: null, mustChangePassword: false, avatarUrl: null });
+    expect(response.body).toEqual({ email: user.email, signInName: user.email, currency: "USD", features: { family: false }, membership: null, mustChangePassword: false, avatarUrl: null });
   });
 
   it("returns the family feature as on when FAMILY_ENABLED is true", async () => {
@@ -227,7 +227,7 @@ describe("PATCH /api/account", () => {
 
     const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
 
-    expect(response.body).toEqual({ email: user.email, currency: "USD", features: { family: true }, membership: null, mustChangePassword: false, avatarUrl: null });
+    expect(response.body).toEqual({ email: user.email, signInName: user.email, currency: "USD", features: { family: true }, membership: null, mustChangePassword: false, avatarUrl: null });
   });
 
   it("returns the membership with the updated account", async () => {

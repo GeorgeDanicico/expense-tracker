@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { Database } from "@/lib/database.types";
-import { DomainError } from "@/lib/errors";
 import type { NetWorthRepository } from "@/lib/net-worth/repository";
 import {
   NET_WORTH_ITEM_KINDS,
@@ -9,8 +8,11 @@ import {
   type NetWorthManualItemSource,
   type NetWorthValuation,
 } from "@/lib/net-worth/types";
+import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
+const CREATE_ITEM_ERROR = "The net-worth item could not be created.";
+const VALUATION_EXISTS = "A valuation for this date already exists.";
 const MAX_ACTIVE_ITEMS = 500;
 
 type Tables = Database["public"]["Tables"];
@@ -83,7 +85,7 @@ export const supabaseNetWorthRepository: NetWorthRepository = {
       .limit(MAX_ACTIVE_ITEMS)
       .limit(2, { foreignTable: "net_worth_valuations" });
 
-    if (error) throw new Error("Unable to load net-worth items.");
+    if (error) throw translateDatabaseError(error, "Unable to load net-worth items.");
     return (data as unknown as NetWorthItemRow[]).map(toManualItem);
   },
 
@@ -96,7 +98,7 @@ export const supabaseNetWorthRepository: NetWorthRepository = {
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (error) throw new Error("Unable to load the net-worth item.");
+    if (error) throw translateDatabaseError(error, "Unable to load the net-worth item.");
     if (!data) return null;
     // The table's check constraint limits `kind` to the known kinds.
     return { id: data.id, kind: data.kind as NetWorthItemKind, category: data.category, archivedAt: data.archived_at };
@@ -118,12 +120,14 @@ export const supabaseNetWorthRepository: NetWorthRepository = {
       p_valued_on: input.valuedOn,
     });
 
-    if (error || !data) {
-      if (error?.code === "42501") {
-        throw new DomainError("The net-worth item could not be created.", 422);
-      }
-      throw new Error("The net-worth item could not be created.");
+    // The function's "Authentication is required." (42501) has always answered a 422 with our message.
+    if (error) {
+      throw translateDatabaseError(error, CREATE_ITEM_ERROR, {
+        statuses: { "42501": 422 },
+        messages: { "42501": CREATE_ITEM_ERROR },
+      });
     }
+    if (!data) throw new Error(CREATE_ITEM_ERROR);
 
     return { itemId: String(data) };
   },
@@ -142,7 +146,7 @@ export const supabaseNetWorthRepository: NetWorthRepository = {
       .eq("id", itemId)
       .eq("user_id", userId);
 
-    if (error) throw new Error("The net-worth item could not be updated.");
+    if (error) throw translateDatabaseError(error, "The net-worth item could not be updated.");
   },
 
   /** An upsert takes no filters; the item's owner is checked by the caller (`getItem`) and by RLS. */
@@ -157,12 +161,8 @@ export const supabaseNetWorthRepository: NetWorthRepository = {
       .select(VALUATION_COLUMNS)
       .single();
 
-    if (error || !data) {
-      if (error?.code === "23505") {
-        throw new DomainError("A valuation for this date already exists.", 409);
-      }
-      throw new Error("The valuation could not be saved.");
-    }
+    if (error) throw translateDatabaseError(error, "The valuation could not be saved.", { messages: { "23505": VALUATION_EXISTS } });
+    if (!data) throw new Error("The valuation could not be saved.");
 
     return toValuation(data);
   },
@@ -177,7 +177,7 @@ export const supabaseNetWorthRepository: NetWorthRepository = {
       .eq("net_worth_items.user_id", userId)
       .maybeSingle();
 
-    if (lookupError) throw new Error("Unable to load the valuation.");
+    if (lookupError) throw translateDatabaseError(lookupError, "Unable to load the valuation.");
     if (!existing) return null;
     const { item_id: itemId } = existing as unknown as Pick<NetWorthValuationRow, "id" | "item_id">;
 
@@ -189,12 +189,8 @@ export const supabaseNetWorthRepository: NetWorthRepository = {
       .select(VALUATION_COLUMNS)
       .single();
 
-    if (error || !data) {
-      if (error?.code === "23505") {
-        throw new DomainError("A valuation for this date already exists.", 409);
-      }
-      throw new Error("The valuation could not be corrected.");
-    }
+    if (error) throw translateDatabaseError(error, "The valuation could not be corrected.", { messages: { "23505": VALUATION_EXISTS } });
+    if (!data) throw new Error("The valuation could not be corrected.");
 
     return toValuation(data);
   },

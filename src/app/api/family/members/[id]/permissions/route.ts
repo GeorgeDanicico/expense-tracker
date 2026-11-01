@@ -1,4 +1,5 @@
 import { requireFamilyFeature } from "@/lib/family/feature";
+import { familyView } from "@/lib/family/views";
 import { json, parseBody, parseId, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { memberPermissionsSchema } from "@/lib/validation/family";
@@ -16,5 +17,5 @@ export const PATCH = withUser(async (request, _user, context: { params: Promise<
   const family = await repository.getFamily();
   if (!family) throw new Error(FAILURE);
 
-  return json({ family });
+  return json({ family: familyView(family) });
 }, { failure: FAILURE });

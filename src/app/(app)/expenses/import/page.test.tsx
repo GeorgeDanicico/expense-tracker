@@ -19,7 +19,7 @@ vi.mock("@/components/expenses/import/import-screen", () => ({ ImportScreen: scr
 import ImportPage from "./page";
 
 function anAccount(membership: AccountMembership | null): AccountData {
-  return { email: "user@example.com", currency: "EUR", features: { family: true }, membership, mustChangePassword: false, avatarUrl: null };
+  return { email: "user@example.com", signInName: "user@example.com", currency: "EUR", features: { family: true }, membership, mustChangePassword: false, avatarUrl: null };
 }
 
 const kid = (permissions: AccountMembership["permissions"]): AccountMembership =>

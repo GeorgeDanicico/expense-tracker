@@ -37,7 +37,8 @@ export const supabaseNotificationSettingsRepository: NotificationSettingsReposit
       supabase.from("notification_settings").select("push_enabled, reminders_enabled, todos_enabled, calendar_enabled").maybeSingle(),
       supabase.from("push_subscriptions").select("id", { count: "exact", head: true }),
     ]);
-    if (settings.error || devices.error) throw new Error(LOAD_ERROR);
+    if (settings.error) throw translateDatabaseError(settings.error, LOAD_ERROR);
+    if (devices.error) throw translateDatabaseError(devices.error, LOAD_ERROR);
     return {
       ...(settings.data
         ? {

@@ -5,7 +5,7 @@ import useSWR from "swr";
 
 import { useAccount } from "@/hooks/use-account";
 import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import { ALL_MEMBERS, MEMBER_PARAM } from "@/lib/family/viewing";
 
 export type ViewingState = {
@@ -19,7 +19,7 @@ export type ViewingState = {
   /** True while viewing someone else: every add, edit, delete and import control stays hidden. */
   readOnly: boolean;
   /** The viewed member from the family list; `null` for yourself, or until the family has loaded. */
-  viewed: FamilyMember | null;
+  viewed: FamilyMemberView | null;
   /** The viewed member's name for sentences ("Ana"), or "this member" until it is known; "you" for yourself. */
   name: string;
   /** The currency amounts are shown in: the viewed member's, else your own account currency. */

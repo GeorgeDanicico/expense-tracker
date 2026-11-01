@@ -11,7 +11,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
 import { apiRequest } from "@/lib/api/client";
 import { familyMemberPasswordApiUrl } from "@/lib/api/keys";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 
 /** Give a kid a new temporary password. Calls `POST /api/family/members/[id]/password`. */
 export function ResetPasswordDialog({
@@ -19,7 +19,7 @@ export function ResetPasswordDialog({
   open,
   onOpenChange,
 }: {
-  member: FamilyMember;
+  member: FamilyMemberView;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {

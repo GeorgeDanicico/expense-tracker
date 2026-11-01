@@ -6,7 +6,7 @@ import useSWR, { useSWRConfig } from "swr";
 import { useCalendarApi } from "@/components/family-calendar/calendar-api";
 import { ApiError } from "@/lib/api/client";
 import { calendarEventsApiKey, isCalendarEventsKey, type CalendarEventsResponse } from "@/lib/api/keys";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import { eventsAttendedBy, memberOfKey } from "@/lib/family-calendar/filters";
 import { withEditedEvent, withoutEvents, withPendingEvents } from "@/lib/family-calendar/optimistic";
 import type { CalendarAttendee, CalendarEvent, EditScope } from "@/lib/family-calendar/types";
@@ -63,7 +63,7 @@ export function usePrefetchRanges(ranges: readonly [DateRange, DateRange], { ena
  * guesses. If the API refuses, every range goes back to what it held and the error is thrown for
  * the form to show.
  */
-export function useCalendarWrites(members: readonly FamilyMember[]) {
+export function useCalendarWrites(members: readonly FamilyMemberView[]) {
   const api = useCalendarApi();
   const { mutate, cache } = useSWRConfig();
 

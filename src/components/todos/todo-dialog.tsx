@@ -12,7 +12,7 @@ import { FormField } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import { TODO_STATUS_LABELS, type Todo } from "@/lib/todos/types";
 
 type Draft = { title: string; notes: string; assigneeMemberId: string; dueDate: string };
@@ -31,7 +31,7 @@ export function todoChanges(todo: Todo, draft: Draft): TodoChanges {
   return changes;
 }
 
-function memberName(member: FamilyMember) {
+function memberName(member: FamilyMemberView) {
   return member.displayName ?? member.username ?? "Family member";
 }
 
@@ -45,7 +45,7 @@ export function TodoDialog({
   onDelete,
 }: {
   todo: Todo;
-  members: readonly FamilyMember[];
+  members: readonly FamilyMemberView[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (id: string, changes: TodoChanges) => Promise<unknown>;

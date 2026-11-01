@@ -11,7 +11,7 @@ import { todoChanges } from "@/components/todos/todo-dialog";
 import { useLinkedCard } from "@/components/todos/use-linked-card";
 import { doneSinceForStep, OLDER_DONE_STEPS } from "@/components/todos/use-todo-board";
 import { ledgerSystem } from "@/components/ui/theme";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import { DEFAULT_TODO_FILTERS, linkedCard, withoutCardHref, type TodoFilters } from "@/lib/todos/filters";
 import type { Todo } from "@/lib/todos/types";
 
@@ -121,10 +121,10 @@ describe("moveToTop", () => {
 });
 
 describe("TodoFilterChips", () => {
-  const member = (memberId: string, displayName: string): FamilyMember => ({
+  const member = (memberId: string, displayName: string): FamilyMemberView => ({
     memberId, userId: `u-${memberId}`, role: "parent", isCreator: false, displayName, username: null,
     currency: "EUR", color: null, avatarUrl: null, joinedAt: "2026-01-01T00:00:00Z",
-  } as FamilyMember);
+  } as FamilyMemberView);
 
   function render(filters: TodoFilters) {
     return renderToStaticMarkup(

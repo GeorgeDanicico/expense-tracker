@@ -13,13 +13,13 @@ import { useViewing } from "@/hooks/use-viewing";
 import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 import { FILTER_KEYS } from "@/lib/expenses/filters";
 import { memberColorTokens } from "@/lib/family/member-colors";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import { ALL_MEMBERS, MEMBER_PARAM } from "@/lib/family/viewing";
 import { can } from "@/lib/permissions";
 
 const ME = "";
 
-function memberLabel(member: FamilyMember) {
+function memberLabel(member: FamilyMemberView) {
   return member.displayName ?? member.username ?? "Unnamed";
 }
 

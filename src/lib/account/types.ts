@@ -15,7 +15,10 @@ export type AccountMembership = {
 };
 
 export type AccountData = {
-  email: string;
+  /** The caller's email; `null` for a kid account that has only its generated address, which never leaves the server. */
+  email: string | null;
+  /** What the app shows as "signed in as": the email, or a kid's username. */
+  signInName: string;
   currency: string;
   features: { family: boolean };
   /** `null` when the user has no family, and always `null` while the family flag is off. */

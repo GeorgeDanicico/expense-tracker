@@ -9,12 +9,12 @@ import { useNavigation } from "@/components/layout/use-navigation";
 import { SignOutIconButton } from "@/components/layout/sign-out-button";
 import { Avatar } from "@/components/ui/avatar";
 
-function AccountRow({ email, avatarUrl }: { email: string; avatarUrl: string | null }) {
+function AccountRow({ signInName, avatarUrl }: { signInName: string; avatarUrl: string | null }) {
   return (
     <Flex position="relative" align="center" gap="2" ps="2" pe="1" py="1.5">
-      <Avatar size="xs" name={email} src={avatarUrl} decorative />
-      <Text flex="1" minW="0" textStyle="bodySm" color="fg.muted" truncate title={email}>
-        {email}
+      <Avatar size="xs" name={signInName} src={avatarUrl} decorative />
+      <Text flex="1" minW="0" textStyle="bodySm" color="fg.muted" truncate title={signInName}>
+        {signInName}
       </Text>
       <SignOutIconButton />
     </Flex>
@@ -22,7 +22,7 @@ function AccountRow({ email, avatarUrl }: { email: string; avatarUrl: string | n
 }
 
 /** Desktop sidebar: brand, Home, the grouped sections, settings and the account row. */
-export function SidebarNav({ email, avatarUrl = null }: { email: string; avatarUrl?: string | null }) {
+export function SidebarNav({ signInName, avatarUrl = null }: { signInName: string; avatarUrl?: string | null }) {
   const { sections } = useNavigation();
   return (
     <Box
@@ -53,7 +53,7 @@ export function SidebarNav({ email, avatarUrl = null }: { email: string; avatarU
       <Stack mt="auto" gap="1">
         <NavItem item={NAV_ITEMS.settings} compact />
         <Separator />
-        <AccountRow email={email} avatarUrl={avatarUrl} />
+        <AccountRow signInName={signInName} avatarUrl={avatarUrl} />
       </Stack>
     </Box>
   );
