@@ -15,7 +15,8 @@ concurrency:
 jobs:
   # gitleaks over the whole git history and the working tree, on every push and pull request.
   # .gitleaks.toml extends the default rules and records every triaged finding with its reason.
-  # --redact keeps a finding's value out of the log. Pinned: gitleaks 8.30.1, by image digest.
+  # --redact keeps a finding's value out of the log. The tree scan runs from the repo root so the
+  # paths in .gitleaks.toml (src/...) match. Pinned: gitleaks 8.30.1, by image digest.
   secrets:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
@@ -36,8 +37,8 @@ jobs:
 
       - name: Scan the working tree
         run: >
-          docker run --rm -v "$PWD:/repo"
-          "$GITLEAKS_IMAGE" dir /repo --config /repo/.gitleaks.toml --redact --verbose --no-banner --exit-code 1
+          docker run --rm -v "$PWD:/repo" -w /repo
+          "$GITLEAKS_IMAGE" dir . --config .gitleaks.toml --redact --verbose --no-banner --exit-code 1
 
   app:
     name: Lint, types, tests and build
