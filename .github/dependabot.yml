@@ -1,8 +1,10 @@
 version: 2
 
 # Weekly update PRs. The npm versions in package.json are exact, so Dependabot bumps the pin and the
-# lockfile together. Minor and patch updates arrive as one grouped PR per ecosystem; a major update
-# opens its own PR so it can be read on its own. Security updates are separate and not grouped.
+# lockfile together. Minor and patch updates arrive as one grouped PR per ecosystem. Major versions
+# are ignored: each one is planned and done on purpose (they can change behaviour or break the build).
+# GitHub applies these ignore rules to security updates too; `npm audit` and Trivy in CI still fail on
+# a high or critical finding, so a fix that needs a major version is never missed.
 updates:
   - package-ecosystem: npm
     directory: /
@@ -13,6 +15,9 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # Keeps the SHA pins in .github/workflows current: the PR moves the SHA and its version comment.
   - package-ecosystem: github-actions
@@ -23,10 +28,17 @@ updates:
     groups:
       actions-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
-  # The base image in the Dockerfile (tag and digest).
+  # The base image in the Dockerfile: new digests of the same Node major (24). Moving to a new Node
+  # major is a planned change.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
