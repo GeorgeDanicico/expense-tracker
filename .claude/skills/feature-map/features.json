@@ -1,0 +1,645 @@
+{
+  "scan": {
+    "roots": [
+      "src",
+      "supabase",
+      "public"
+    ],
+    "extensions": [
+      ".ts",
+      ".tsx",
+      ".mts",
+      ".mjs",
+      ".js",
+      ".jsx",
+      ".css",
+      ".sql"
+    ],
+    "skipDirectories": [
+      "node_modules",
+      ".next",
+      "dist",
+      "tmp",
+      ".claude",
+      "__fixtures__",
+      "__snapshots__",
+      "fixtures",
+      "samples"
+    ]
+  },
+  "nav": {
+    "files": [
+      "src/components/layout/nav-items.ts",
+      "src/components/settings/settings-nav.tsx"
+    ]
+  },
+  "flags": {
+    "file": "src/lib/features.ts"
+  },
+  "env": {
+    "example": ".env.example"
+  },
+  "routes": {
+    "guardCalls": [
+      "requireFamilyFeature",
+      "getAuthenticatedUser",
+      "getAuth",
+      "authenticateMcpRequest",
+      "verifyAppToken"
+    ]
+  },
+  "mcp": {
+    "server": "src/lib/mcp/server.ts",
+    "toolsDir": "src/lib/mcp/tools/"
+  },
+  "worker": {
+    "tickFile": "src/lib/notifications/worker.ts",
+    "tickFunction": "tick",
+    "storeFile": "src/lib/supabase/worker-store.ts"
+  },
+  "features": [
+    {
+      "id": "dashboard",
+      "name": "Home dashboard",
+      "kind": "feature",
+      "summary": "The Home page: this month's spending, history and comparisons, for the user or (for a parent) the family.",
+      "paths": [
+        "src/app/(app)/dashboard/**",
+        "src/components/dashboard/**",
+        "src/app/api/dashboard/**",
+        "supabase/tests/dashboard_takes_user.sql"
+      ],
+      "sqlFunctions": [
+        "public.get_expense_dashboard"
+      ]
+    },
+    {
+      "id": "expenses",
+      "name": "Expenses",
+      "kind": "feature",
+      "summary": "Recording, filtering, exporting and categorising expenses (categories, subtypes and merchant classification).",
+      "docs": [
+        "docs/expense-classification-rollout.md"
+      ],
+      "paths": [
+        "src/lib/expenses/**",
+        "src/app/(app)/expenses/page*",
+        "src/app/api/expenses/**",
+        "src/components/expenses/**",
+        "src/lib/validation/expense.*",
+        "src/lib/export/**",
+        "src/lib/supabase/repositories/expenses*",
+        "src/test/fakes/expenses*",
+        "src/lib/mcp/tools/expenses.ts",
+        "supabase/maintenance/expense-classification*",
+        "supabase/tests/expense_classification.sql",
+        "supabase/tests/expense_subtypes.sql"
+      ],
+      "tables": [
+        "expenses",
+        "categories",
+        "expense_classification_private.*"
+      ],
+      "sqlFunctions": [
+        "public.set_expense_updated_at",
+        "expense_classification_private.*"
+      ]
+    },
+    {
+      "id": "expense-tabs",
+      "name": "Expense tabs",
+      "kind": "feature",
+      "summary": "Custom tabs on the Expenses page that group expenses by category and subtype, with their own totals.",
+      "docs": [
+        "docs/expense-tabs-and-subtypes-plan.md"
+      ],
+      "paths": [
+        "src/lib/expenses/tab-repository.ts",
+        "src/lib/expenses/tabs.ts",
+        "src/app/api/expense-tabs/**",
+        "src/components/expenses/expense-tab*",
+        "src/components/expenses/custom-expense-tab.tsx",
+        "src/components/dashboard/expense-tab-dashboard.tsx",
+        "src/lib/validation/expense-tab.*",
+        "src/lib/supabase/repositories/expense-tabs*",
+        "src/test/fakes/expense-tabs*",
+        "src/lib/mcp/tools/expense-tabs.ts",
+        "src/hooks/use-expense-tab-routing.ts",
+        "supabase/tests/expense_tabs_rls.sql"
+      ],
+      "tables": [
+        "expense_tabs"
+      ]
+    },
+    {
+      "id": "investments",
+      "name": "Investments",
+      "kind": "feature",
+      "summary": "Brokerage accounts and buy/sell orders, valued with live quotes from the price service.",
+      "docs": [
+        "docs/investments-contract.md"
+      ],
+      "paths": [
+        "src/lib/investments/**",
+        "src/app/(app)/investments/**",
+        "src/app/api/investments/**",
+        "src/app/api/investment-transactions/**",
+        "src/components/investments/**",
+        "src/lib/validation/investment.*",
+        "src/lib/supabase/repositories/investments*",
+        "src/test/fakes/investments*",
+        "src/lib/mcp/tools/investments.ts",
+        "supabase/tests/investments_rls.sql"
+      ],
+      "tables": [
+        "investment_*"
+      ]
+    },
+    {
+      "id": "net-worth",
+      "name": "Net worth",
+      "kind": "feature",
+      "summary": "Assets and liabilities with dated valuations, summed into a net-worth figure.",
+      "docs": [
+        "docs/net-worth-plan.md"
+      ],
+      "paths": [
+        "src/lib/net-worth/**",
+        "src/app/(app)/net-worth/**",
+        "src/app/api/net-worth/**",
+        "src/components/net-worth/**",
+        "src/lib/validation/net-worth.*",
+        "src/lib/supabase/repositories/net-worth*",
+        "src/test/fakes/net-worth*",
+        "src/lib/mcp/tools/net-worth.ts",
+        "supabase/tests/net_worth_rls.sql"
+      ],
+      "tables": [
+        "net_worth_*"
+      ],
+      "sqlFunctions": [
+        "public.create_net_worth_item_with_valuation"
+      ]
+    },
+    {
+      "id": "families",
+      "name": "Families, roles and permissions",
+      "kind": "feature",
+      "summary": "Creating and joining a family, invites, parent and kid roles, managed kid accounts, per-module permissions, member colours, viewing another member's finances, and account notices.",
+      "docs": [
+        "docs/family-hub-roadmap.md",
+        "docs/family-phase-1-tasks.md"
+      ],
+      "paths": [
+        "src/lib/family/**",
+        "src/lib/permissions.*",
+        "src/app/api/family/**",
+        "src/components/family/**",
+        "src/app/(app)/settings/family/**",
+        "src/app/(app)/settings/permissions/**",
+        "src/app/join/**",
+        "src/hooks/use-can*",
+        "src/hooks/use-viewing*",
+        "src/hooks/use-member-colors*",
+        "src/lib/validation/family.*",
+        "src/lib/supabase/repositories/family*",
+        "src/test/fakes/family*",
+        "src/components/layout/permission-gate*",
+        "src/lib/account/notice-repository.ts",
+        "src/app/api/account/notices/**",
+        "src/lib/supabase/repositories/notices*",
+        "src/test/fakes/notices*",
+        "src/app/api/family-*.test.ts",
+        "src/app/api/finance-*.test.ts",
+        "supabase/tests/family_*.sql",
+        "supabase/tests/account_notices.sql"
+      ],
+      "tables": [
+        "families",
+        "family_members",
+        "member_permissions",
+        "family_invites",
+        "account_notices"
+      ],
+      "sqlFunctions": [
+        "family_private.*",
+        "public.get_my_membership",
+        "public.get_family",
+        "public.get_my_notices",
+        "public.dismiss_notice",
+        "public.create_family",
+        "public.set_member_permissions",
+        "public.touch_last_active",
+        "public.remove_family_member",
+        "public.delete_family",
+        "public.add_managed_kid",
+        "public.require_password_change",
+        "public.guard_profile_managed_account",
+        "public.*_family_invite*",
+        "public.list_family_invites",
+        "public.set_member_color"
+      ]
+    },
+    {
+      "id": "avatars",
+      "name": "Profile pictures",
+      "kind": "feature",
+      "summary": "Uploading, resizing and serving profile pictures, visible to the user and their family.",
+      "docs": [
+        "docs/avatars-plan.md"
+      ],
+      "paths": [
+        "src/lib/avatars/**",
+        "src/app/api/account/avatar/**",
+        "src/app/api/avatars/**",
+        "src/components/settings/avatar-card*",
+        "src/lib/supabase/repositories/avatars*",
+        "src/test/fakes/avatars*",
+        "supabase/tests/profile_avatars.sql"
+      ],
+      "tables": [
+        "storage.objects"
+      ],
+      "sqlFunctions": [
+        "public.guard_profile_avatar_path",
+        "family_private.visible_avatar_owner_ids"
+      ],
+      "buckets": [
+        "avatars"
+      ]
+    },
+    {
+      "id": "mcp-access",
+      "name": "MCP access (AI assistants)",
+      "kind": "feature",
+      "summary": "Letting AI assistants use the app through the MCP server: personal tokens, OAuth app connections and consent, and the tools they can call.",
+      "docs": [
+        "docs/mcp-access-plan.md"
+      ],
+      "paths": [
+        "src/lib/mcp/**",
+        "src/app/api/mcp/**",
+        "src/app/api/account/mcp/**",
+        "src/app/api/oauth/**",
+        "src/app/.well-known/**",
+        "src/app/oauth/**",
+        "src/components/oauth/**",
+        "src/components/settings/mcp-*",
+        "src/app/(app)/settings/mcp/**",
+        "src/hooks/use-mcp-settings*",
+        "src/lib/validation/mcp.*",
+        "src/lib/validation/oauth.*",
+        "src/lib/auth/oauth-consent.ts",
+        "src/lib/supabase/oauth-consent*",
+        "src/lib/supabase/app-token*",
+        "src/lib/supabase/repositories/mcp-tokens*",
+        "src/test/fakes/mcp-tokens*",
+        "src/test/fakes/oauth-consent*",
+        "src/app/api/expenses/personal-token.test.ts",
+        "supabase/tests/mcp_*.sql"
+      ],
+      "tables": [
+        "mcp_tokens"
+      ],
+      "sqlFunctions": [
+        "mcp_private.*",
+        "public.my_mcp_access",
+        "public.guard_profile_mcp_enabled",
+        "public.*_mcp_token"
+      ]
+    },
+    {
+      "id": "todos",
+      "name": "To-do board",
+      "kind": "feature",
+      "summary": "The family's shared Kanban board of cards with assignees, due dates and drag-and-drop ordering.",
+      "docs": [
+        "docs/todo-board-plan.md"
+      ],
+      "paths": [
+        "src/lib/todos/**",
+        "src/app/(app)/todos/**",
+        "src/app/api/todos/**",
+        "src/components/todos/**",
+        "src/lib/validation/todo.*",
+        "src/lib/supabase/repositories/todos*",
+        "src/test/fakes/todos*",
+        "src/test/todo-board.ts",
+        "src/lib/mcp/tools/todos*",
+        "src/app/dev/preview/todo-fixtures.ts",
+        "supabase/tests/todos_rls.sql"
+      ],
+      "tables": [
+        "todos"
+      ],
+      "sqlFunctions": [
+        "public.todos_*"
+      ]
+    },
+    {
+      "id": "reminders",
+      "name": "Reminders",
+      "kind": "feature",
+      "summary": "Personal one-off and repeating reminders with snooze, completion and an optional expense to log.",
+      "docs": [
+        "docs/reminders-plan.md"
+      ],
+      "paths": [
+        "src/lib/reminders/**",
+        "src/app/(app)/reminders/**",
+        "src/app/api/reminders/**",
+        "src/components/reminders/**",
+        "src/lib/validation/reminder.*",
+        "src/lib/supabase/repositories/reminders*",
+        "src/test/fakes/reminders*",
+        "src/lib/mcp/tools/reminders*",
+        "src/app/dev/preview/reminder-fixtures.ts",
+        "supabase/tests/reminders_rls.sql"
+      ],
+      "tables": [
+        "reminders",
+        "reminder_completions"
+      ],
+      "sqlFunctions": [
+        "public.reminders_guard",
+        "public.claim_due_reminders"
+      ]
+    },
+    {
+      "id": "notifications",
+      "name": "Notifications",
+      "kind": "feature",
+      "summary": "Browser push notifications: the settings page, device subscriptions and the outbox the worker delivers from.",
+      "docs": [
+        "docs/reminders-plan.md"
+      ],
+      "paths": [
+        "src/lib/notifications/**",
+        "src/app/api/notifications/**",
+        "src/components/settings/notification-*",
+        "src/app/(app)/settings/notifications/**",
+        "src/hooks/use-notification-settings*",
+        "src/lib/validation/notifications.*",
+        "src/lib/supabase/repositories/notification-settings*",
+        "src/test/fakes/notification-settings*",
+        "supabase/tests/notifications_rls.sql"
+      ],
+      "tables": [
+        "notification_settings",
+        "push_subscriptions",
+        "notifications"
+      ],
+      "sqlFunctions": [
+        "public.register_push_subscription",
+        "public.send_test_notification",
+        "public.claim_notifications"
+      ]
+    },
+    {
+      "id": "calendar",
+      "name": "Family calendar and feeds",
+      "kind": "feature",
+      "summary": "The family calendar (month, week and agenda views, repeating events, attendees) and private iCalendar feed links.",
+      "docs": [
+        "docs/calendar-plan.md"
+      ],
+      "paths": [
+        "src/lib/family-calendar/**",
+        "src/app/(app)/calendar/**",
+        "src/app/api/calendar/**",
+        "src/components/family-calendar/**",
+        "src/lib/validation/calendar-event.*",
+        "src/lib/supabase/repositories/calendar*",
+        "src/test/fakes/calendar*",
+        "src/test/calendar-events.ts",
+        "src/test/ics.ts",
+        "src/lib/mcp/tools/calendar*",
+        "src/app/dev/preview/calendar-fixtures.ts",
+        "supabase/tests/calendar_*.sql"
+      ],
+      "tables": [
+        "calendar_*"
+      ],
+      "sqlFunctions": [
+        "public.*calendar*"
+      ]
+    },
+    {
+      "id": "statement-import",
+      "name": "Statement import",
+      "kind": "feature",
+      "summary": "Importing bank statements (CSV or PDF, read with the AI when allowed): upload, review, confirm and undo.",
+      "docs": [
+        "docs/statement-import-plan.md"
+      ],
+      "paths": [
+        "src/lib/imports/**",
+        "src/app/api/imports/**",
+        "src/components/expenses/import/**",
+        "src/components/expenses/import-statement-button.tsx",
+        "src/app/(app)/expenses/import/**",
+        "src/lib/validation/import.*",
+        "src/lib/supabase/repositories/imports*",
+        "src/test/fakes/imports*",
+        "src/test/pdf.ts",
+        "src/app/dev/preview/import-fixtures*",
+        "supabase/tests/import_*.sql"
+      ],
+      "tables": [
+        "import_*"
+      ],
+      "sqlFunctions": [
+        "public.*import_batch*"
+      ]
+    },
+    {
+      "id": "ai-gate",
+      "name": "AI gate",
+      "kind": "feature",
+      "summary": "Who may use AI features and how much: provider settings, per-family and global monthly budgets, the kill switch and the AI settings page.",
+      "docs": [
+        "docs/statement-import-plan.md"
+      ],
+      "paths": [
+        "src/lib/ai/**",
+        "src/app/api/account/ai/**",
+        "src/components/settings/ai-*",
+        "src/app/(app)/settings/ai/**",
+        "src/hooks/use-ai-settings*",
+        "src/lib/validation/ai.*",
+        "src/lib/supabase/repositories/ai*",
+        "src/test/fakes/ai*",
+        "supabase/tests/ai_gate.sql"
+      ],
+      "tables": [
+        "app_flags",
+        "ai_usage"
+      ],
+      "sqlFunctions": [
+        "ai_private.*",
+        "public.set_app_flag",
+        "public.my_ai_access",
+        "public.guard_profile_ai_enabled",
+        "public.ai_*_spend"
+      ]
+    },
+    {
+      "id": "settings",
+      "name": "Account settings",
+      "kind": "feature",
+      "summary": "The Account settings page (name, email, currency) and the settings layout and tabs.",
+      "paths": [
+        "src/lib/account/**",
+        "src/app/api/account/route*",
+        "src/app/api/account/email/**",
+        "src/app/(app)/settings/page.tsx",
+        "src/app/(app)/settings/layout.tsx",
+        "src/components/settings/settings-nav*",
+        "src/hooks/use-account*",
+        "src/lib/validation/account.*",
+        "src/lib/supabase/repositories/account*",
+        "src/test/fakes/account*",
+        "supabase/tests/profile_identity.sql"
+      ],
+      "tables": [
+        "profiles"
+      ]
+    },
+    {
+      "id": "auth",
+      "name": "Sign-in and authentication",
+      "kind": "feature",
+      "summary": "Signing in (email, username for kid accounts, Google), sign-up confirmation, password changes, sessions and the request proxy.",
+      "paths": [
+        "src/lib/auth/**",
+        "src/app/(auth)/**",
+        "src/app/api/auth/**",
+        "src/app/auth/**",
+        "src/app/confirm-email/**",
+        "src/app/change-password/**",
+        "src/app/api/account/password/**",
+        "src/components/auth/**",
+        "src/proxy*",
+        "src/lib/supabase/auth*",
+        "src/lib/supabase/proxy.ts",
+        "src/test/fakes/auth*",
+        "src/lib/validation/password.*",
+        "src/app/api/protected-routes.test.ts"
+      ],
+      "tables": [
+        "auth.*"
+      ],
+      "sqlFunctions": [
+        "public.complete_password_change",
+        "public.guard_profile_username",
+        "auth.*",
+        "public.handle_new_user"
+      ]
+    },
+    {
+      "id": "app-shell",
+      "name": "App shell, navigation and PWA",
+      "kind": "feature",
+      "summary": "The signed-in layout, sidebar and mobile navigation, the offline page, the web app manifest and the service worker.",
+      "paths": [
+        "src/app/layout.tsx",
+        "src/app/page.tsx",
+        "src/app/(app)/layout.tsx",
+        "src/app/(app)/error.tsx",
+        "src/app/manifest.ts",
+        "src/app/globals.css",
+        "src/app/offline/**",
+        "src/components/layout/**",
+        "src/components/pwa/**",
+        "src/hooks/use-is-phone*",
+        "src/hooks/use-document-title*",
+        "src/lib/brand.ts",
+        "public/sw.js"
+      ]
+    },
+    {
+      "id": "design-system",
+      "name": "Design system (UI kit)",
+      "kind": "infrastructure",
+      "summary": "Shared Chakra UI theme, tokens and primitives in src/components/ui, and the dev-only UI gallery.",
+      "docs": [
+        "docs/ui-styling-refactor-plan.md"
+      ],
+      "paths": [
+        "src/components/ui/**",
+        "src/app/dev/ui/**"
+      ]
+    },
+    {
+      "id": "dev-previews",
+      "name": "Dev screen previews",
+      "kind": "infrastructure",
+      "summary": "Development-only previews of whole screens with fixture data (/dev/preview/[screen]).",
+      "paths": [
+        "src/app/dev/preview/**"
+      ]
+    },
+    {
+      "id": "platform",
+      "name": "Platform and shared plumbing",
+      "kind": "infrastructure",
+      "summary": "Request handling (withUser, withPermission), the API client and SWR keys, the repository registry, Supabase clients, dates, time zones and shared test helpers.",
+      "paths": [
+        "src/lib/http/**",
+        "src/lib/api/**",
+        "src/lib/repositories.ts",
+        "src/lib/errors.ts",
+        "src/lib/database.types.ts",
+        "src/lib/features.ts",
+        "src/lib/time-zone*",
+        "src/lib/calendar.*",
+        "src/lib/utils/**",
+        "src/lib/validation/primitives*",
+        "src/lib/supabase/config.ts",
+        "src/lib/supabase/server*",
+        "src/lib/supabase/admin-client.ts",
+        "src/lib/supabase/anon-client.ts",
+        "src/lib/supabase/errors*",
+        "src/hooks/use-api-form*",
+        "src/test/**",
+        "src/app/health/**",
+        "src/app/api/health/**",
+        "supabase/tests/support/**",
+        "supabase/tests/app_current_user.sql"
+      ],
+      "sqlFunctions": [
+        "public.set_updated_at",
+        "app_private.*"
+      ]
+    },
+    {
+      "id": "worker",
+      "name": "Background worker",
+      "kind": "infrastructure",
+      "summary": "The Node process that runs every minute: queues due reminders, events and to-dos, delivers push notifications and cleans up.",
+      "docs": [
+        "docs/reminders-plan.md"
+      ],
+      "paths": [
+        "src/worker/**",
+        "src/lib/notifications/worker*",
+        "src/lib/supabase/worker-store*",
+        "src/test/fakes/worker-store*"
+      ],
+      "tables": [
+        "worker_heartbeats"
+      ],
+      "diagram": true
+    }
+  ],
+  "sql": {
+    "preMigrations": [
+      "supabase/tests/support/legacy-bootstrap.sql"
+    ],
+    "externalSchemas": [
+      "auth",
+      "storage"
+    ]
+  },
+  "ignore": []
+}
