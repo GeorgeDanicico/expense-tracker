@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthAdmin } from "@/lib/auth/admin";
+import { UNKNOWN_USERNAME_EMAIL } from "@/lib/family/kid-account";
+import {
+  resetRateLimits,
+  SIGN_IN_IP_MAX_FAILURES,
+  SIGN_IN_NAME_MAX_FAILURES,
+  SIGN_IN_WINDOW_MS,
+  SIGN_UP_MAX_ATTEMPTS,
+  SIGN_UP_WINDOW_MS,
+} from "@/lib/http/rate-limit";
 import { callRoute } from "@/test/route";
 import { FakeAuth, FakeAuthAdmin } from "@/test/fakes/auth";
 
@@ -20,9 +29,11 @@ const password = "correct-horse";
 const kidEmail = "ana@kids.ifam.invalid";
 const signInFailed = { status: 401, body: { error: "Email or password is incorrect." } };
 
-function post(body: unknown) {
-  return callRoute(POST, { method: "POST", url: "/api/auth", body });
+function post(body: unknown, ip?: string) {
+  return callRoute(POST, { method: "POST", url: "/api/auth", body, headers: ip ? { "X-Forwarded-For": ip } : {} });
 }
+
+const tooManySignIns = { status: 429, body: { error: "Too many sign-in attempts. Try again in a few minutes." } };
 
 function addKid(username = "ana") {
   return admin.createUser({
@@ -47,10 +58,12 @@ describe("POST /api/auth", () => {
     admin = new FakeAuthAdmin(auth);
     mocks.getAuthAdmin.mockReset();
     mocks.getAuthAdmin.mockImplementation(() => admin);
+    resetRateLimits();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("rejects an invalid body with 422 and field errors", async () => {
@@ -166,6 +179,40 @@ describe("POST /api/auth", () => {
     expect(auth.currentUser).toBeNull();
   });
 
+  it("signs an unknown username in against the dummy address, as a real username goes through sign-in", async () => {
+    await addKid();
+    const signIn = vi.spyOn(auth, "signInWithPassword");
+
+    await post({ mode: "login", email: "ana", password: "wrong-password" });
+    const unknown = await post({ mode: "login", email: "nobody", password });
+
+    expect(unknown).toMatchObject(signInFailed);
+    expect(signIn.mock.calls).toEqual([
+      [kidEmail, "wrong-password"],
+      [UNKNOWN_USERNAME_EMAIL, password],
+    ]);
+  });
+
+  it("signs in against the dummy address when the username lookup fails", async () => {
+    await addKid();
+    admin.fail("findEmailByUsername", new Error("Unable to look up the username."));
+    const signIn = vi.spyOn(auth, "signInWithPassword");
+
+    const response = await post({ mode: "login", email: "ana", password });
+
+    expect(response).toMatchObject(signInFailed);
+    expect(signIn).toHaveBeenCalledWith(UNKNOWN_USERNAME_EMAIL, password);
+  });
+
+  it("never keeps a session for the dummy address, even if an account had it", async () => {
+    auth.addUser(UNKNOWN_USERNAME_EMAIL, password);
+
+    const response = await post({ mode: "login", email: "nobody", password });
+
+    expect(response).toMatchObject(signInFailed);
+    expect(auth.currentUser).toBeNull();
+  });
+
   it("answers 401 without logging when the username lookup fails", async () => {
     const logs = [
       vi.spyOn(console, "error").mockImplementation(() => {}),
@@ -215,6 +262,16 @@ describe("POST /api/auth", () => {
     expect(auth.lastConfirmationUrl).toBe("http://localhost/auth/confirm?next=%2Fdashboard");
   });
 
+  it("refuses to sign up with a generated kid address, the dummy sign-in address included", async () => {
+    for (const address of ["ana@kids.ifam.invalid", "Ana@KIDS.ifam.invalid", UNKNOWN_USERNAME_EMAIL]) {
+      const response = await post({ mode: "signup", email: address, password });
+
+      expect(response.status).toBe(422);
+      expect(response.body.fieldErrors).toEqual({ email: ["Enter a valid email address."] });
+    }
+    expect(auth.accounts).toEqual([]);
+  });
+
   it("refuses to sign up with a username", async () => {
     const response = await post({ mode: "signup", email: "ana", password });
 
@@ -247,6 +304,183 @@ describe("POST /api/auth", () => {
     const response = await post({ mode: "signup", email, password });
 
     expect(response).toMatchObject({ status: 429, body: { error: "We've sent too many emails." } });
+  });
+});
+
+describe("POST /api/auth rate limits", () => {
+  const ip = "203.0.113.7";
+
+  beforeEach(() => {
+    auth = new FakeAuth();
+    admin = new FakeAuthAdmin(auth);
+    mocks.getAuthAdmin.mockReset();
+    mocks.getAuthAdmin.mockImplementation(() => admin);
+    resetRateLimits();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-01T09:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  async function failSignIns(name: string, times: number, ipFor: (attempt: number) => string | undefined = () => ip) {
+    for (let attempt = 0; attempt < times; attempt += 1) {
+      expect(await post({ mode: "login", email: name, password: "wrong-password" }, ipFor(attempt))).toMatchObject(signInFailed);
+    }
+  }
+
+  it("answers the sixth wrong password for one name with 429 and Retry-After, before asking the provider", async () => {
+    auth.addUser(email, password);
+    await failSignIns(email, SIGN_IN_NAME_MAX_FAILURES);
+    const signIn = vi.spyOn(auth, "signInWithPassword");
+
+    const limited = await post({ mode: "login", email, password }, ip);
+
+    expect(limited).toMatchObject(tooManySignIns);
+    expect(limited.headers.get("retry-after")).toBe(String(SIGN_IN_WINDOW_MS / 1000));
+    expect(limited.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    expect(signIn).not.toHaveBeenCalled();
+    expect(auth.currentUser).toBeNull();
+  });
+
+  it("still lets a different name sign in from the same IP", async () => {
+    auth.addUser(email, password);
+    const other = auth.addUser("other@example.test", password);
+    await failSignIns(email, SIGN_IN_NAME_MAX_FAILURES);
+
+    const response = await post({ mode: "login", email: "other@example.test", password }, ip);
+
+    expect(response).toMatchObject({ status: 200, body: { authenticated: true } });
+    expect(auth.currentUser).toEqual(other);
+  });
+
+  it("counts an email whatever its case, so changing the case doesn't reset the limit", async () => {
+    auth.addUser(email, password);
+    await failSignIns("Owner@Example.test", SIGN_IN_NAME_MAX_FAILURES);
+
+    expect(await post({ mode: "login", email: "OWNER@EXAMPLE.TEST", password: "wrong-password" }, ip)).toMatchObject(tooManySignIns);
+  });
+
+  it("counts a username however it's typed, without asking for its email once limited", async () => {
+    await addKid();
+    await failSignIns(" Ana ", SIGN_IN_NAME_MAX_FAILURES);
+    const lookup = vi.spyOn(admin, "findEmailByUsername");
+
+    expect(await post({ mode: "login", email: "ANA", password }, ip)).toMatchObject(tooManySignIns);
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it("counts unknown usernames too", async () => {
+    await failSignIns("nobody", SIGN_IN_NAME_MAX_FAILURES);
+
+    expect(await post({ mode: "login", email: "nobody", password }, ip)).toMatchObject(tooManySignIns);
+  });
+
+  it("keeps limiting a name when each guess claims a new IP", async () => {
+    auth.addUser(email, password);
+    await failSignIns(email, SIGN_IN_NAME_MAX_FAILURES, (attempt) => `198.51.100.${attempt}`);
+
+    expect(await post({ mode: "login", email, password }, "198.51.100.99")).toMatchObject(tooManySignIns);
+  });
+
+  it("limits names even when the request carries no IP", async () => {
+    auth.addUser(email, password);
+    await failSignIns(email, SIGN_IN_NAME_MAX_FAILURES, () => undefined);
+
+    expect(await post({ mode: "login", email, password })).toMatchObject(tooManySignIns);
+  });
+
+  it("answers 429 to any name from an IP with 20 failures, while other IPs still sign in", async () => {
+    const user = auth.addUser(email, password);
+    for (let attempt = 0; attempt < SIGN_IN_IP_MAX_FAILURES; attempt += 1) {
+      // A new name each time, so only the IP limit can be reached.
+      expect(await post({ mode: "login", email: `guess${attempt}`, password }, ip)).toMatchObject(signInFailed);
+    }
+
+    const limited = await post({ mode: "login", email, password }, ip);
+    expect(limited).toMatchObject(tooManySignIns);
+    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+
+    expect(await post({ mode: "login", email, password }, "203.0.113.8")).toMatchObject({ status: 200 });
+    expect(auth.currentUser).toEqual(user);
+  });
+
+  it("uses the last X-Forwarded-For hop, so a made-up first hop doesn't reset the IP limit", async () => {
+    auth.addUser(email, password);
+    for (let attempt = 0; attempt < SIGN_IN_IP_MAX_FAILURES; attempt += 1) {
+      await post({ mode: "login", email: `guess${attempt}`, password }, `198.51.100.${attempt}, ${ip}`);
+    }
+
+    expect(await post({ mode: "login", email, password }, `198.51.100.99, ${ip}`)).toMatchObject(tooManySignIns);
+  });
+
+  it("doesn't count successful sign-ins", async () => {
+    auth.addUser(email, password);
+    for (let attempt = 0; attempt < SIGN_IN_NAME_MAX_FAILURES * 2; attempt += 1) {
+      expect((await post({ mode: "login", email, password }, ip)).status).toBe(200);
+    }
+    await failSignIns(email, SIGN_IN_NAME_MAX_FAILURES - 1);
+
+    expect((await post({ mode: "login", email, password }, ip)).status).toBe(200);
+  });
+
+  it("doesn't count the provider's own rate limit or an unconfirmed email", async () => {
+    await auth.signUp(email, password, "http://localhost/auth/confirm");
+    for (let attempt = 0; attempt < SIGN_IN_NAME_MAX_FAILURES; attempt += 1) {
+      auth.fail("signInWithPassword", "Too many attempts.", "rate_limited");
+      expect((await post({ mode: "login", email, password }, ip)).status).toBe(429);
+      expect((await post({ mode: "login", email, password }, ip)).status).toBe(403);
+    }
+
+    expect((await post({ mode: "login", email, password: "wrong-password" }, ip)).status).toBe(401);
+  });
+
+  it("lets a name try again once its oldest failure is 15 minutes old", async () => {
+    auth.addUser(email, password);
+    await failSignIns(email, SIGN_IN_NAME_MAX_FAILURES);
+
+    vi.setSystemTime(new Date(Date.now() + SIGN_IN_WINDOW_MS - 1_000));
+    const limited = await post({ mode: "login", email, password }, ip);
+    expect(limited).toMatchObject(tooManySignIns);
+    expect(limited.headers.get("retry-after")).toBe("1");
+
+    vi.setSystemTime(new Date(Date.now() + 1_000));
+    expect((await post({ mode: "login", email, password }, ip)).status).toBe(200);
+  });
+
+  it("answers the 11th sign-up from one IP in an hour with 429 and Retry-After, without asking the provider", async () => {
+    for (let attempt = 0; attempt < SIGN_UP_MAX_ATTEMPTS; attempt += 1) {
+      // Failed sign-ups count too.
+      expect((await post({ mode: "signup", email, password }, ip)).status).toBe(attempt === 0 ? 200 : 400);
+    }
+    const signUp = vi.spyOn(auth, "signUp");
+
+    const limited = await post({ mode: "signup", email: "new@example.test", password }, ip);
+
+    expect(limited).toMatchObject({ status: 429, body: { error: "Too many sign-ups from this network. Try again in an hour." } });
+    expect(limited.headers.get("retry-after")).toBe(String(SIGN_UP_WINDOW_MS / 1000));
+    expect(signUp).not.toHaveBeenCalled();
+
+    expect((await post({ mode: "signup", email: "new@example.test", password }, "203.0.113.8")).status).toBe(200);
+    vi.setSystemTime(new Date(Date.now() + SIGN_UP_WINDOW_MS));
+    expect((await post({ mode: "signup", email: "later@example.test", password }, ip)).status).toBe(200);
+  });
+
+  it("doesn't count a sign-up the body check refuses", async () => {
+    for (let attempt = 0; attempt < SIGN_UP_MAX_ATTEMPTS; attempt += 1) {
+      expect((await post({ mode: "signup", email: "not-an-email", password }, ip)).status).toBe(422);
+    }
+
+    expect((await post({ mode: "signup", email, password }, ip)).status).toBe(200);
+  });
+
+  it("doesn't let sign-ups use up the sign-in limits", async () => {
+    auth.addUser(email, password);
+    for (let attempt = 0; attempt < SIGN_UP_MAX_ATTEMPTS; attempt += 1) await post({ mode: "signup", email, password }, ip);
+
+    expect((await post({ mode: "login", email, password }, ip)).status).toBe(200);
   });
 });
 

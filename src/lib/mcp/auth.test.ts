@@ -7,6 +7,7 @@ let admin: FakeAuthAdmin;
 vi.mock("@/lib/auth", () => ({ getAuth: () => auth, getAuthAdmin: () => admin }));
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
+import { MAX_TRACKED_KEYS } from "@/lib/http/rate-limit";
 import { getMcpTokenSession, readMcpAuthorization, resetMcpAuthForTests } from "@/lib/mcp/auth";
 import { generateMcpToken } from "@/lib/mcp/tokens";
 import { type FakeRepositories, resetFakeRepositories } from "@/test/fakes/repositories";
@@ -31,6 +32,38 @@ describe("readMcpAuthorization", () => {
     ["another scheme", "Digest abc", { kind: "none" }],
   ])("reads %s", (_, header, expected) => {
     expect(readMcpAuthorization(request(header))).toEqual(expected);
+  });
+});
+
+describe("the token throttle", () => {
+  /** A malformed token whose display prefix is `sl_mcp_` and six characters from `index`: it fails without a lookup. */
+  function badToken(index: number) {
+    return `sl_mcp_${index.toString(36).padStart(6, "0")}-bad`;
+  }
+
+  beforeEach(() => {
+    resetMcpAuthForTests();
+  });
+
+  it("throttles the sixth bad token with one prefix and from one IP", async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect(await getMcpTokenSession(badToken(1), null)).toEqual({ status: "unauthorized" });
+    }
+    expect(await getMcpTokenSession(badToken(1), null)).toEqual({ status: "throttled" });
+
+    for (let attempt = 0; attempt < 5; attempt += 1) await getMcpTokenSession(badToken(100 + attempt), "203.0.113.7");
+    expect(await getMcpTokenSession(badToken(200), "203.0.113.7")).toEqual({ status: "throttled" });
+    expect(await getMcpTokenSession(badToken(200), "203.0.113.8")).toEqual({ status: "unauthorized" });
+  });
+
+  it("is the shared limiter, so it forgets the oldest keys instead of growing without bound", async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) await getMcpTokenSession(badToken(0), null);
+    expect(await getMcpTokenSession(badToken(0), null)).toEqual({ status: "throttled" });
+
+    // One failure under each of MAX_TRACKED_KEYS other prefixes pushes the first one out.
+    for (let index = 1; index <= MAX_TRACKED_KEYS; index += 1) await getMcpTokenSession(badToken(index), null);
+
+    expect(await getMcpTokenSession(badToken(0), null)).toEqual({ status: "unauthorized" });
   });
 });
 

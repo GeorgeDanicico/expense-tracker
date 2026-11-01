@@ -21,7 +21,7 @@ const TOO_MANY = "You've changed your picture a lot recently. Try again in an ho
  */
 export const PUT = withUser(async (request, user) => {
   if (avatarUploadAttempts.isLimited(user.id)) throw new HttpError(429, TOO_MANY);
-  avatarUploadAttempts.recordFailure(user.id);
+  avatarUploadAttempts.recordAttempt(user.id);
 
   // Refuse before reading the body when the header already says it's something else.
   const declaredType = request.headers.get("content-type")?.split(";")[0].trim().toLowerCase();

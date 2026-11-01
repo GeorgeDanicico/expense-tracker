@@ -88,7 +88,7 @@ function looksLikeText(bytes: Uint8Array): boolean {
  */
 export function recordImportUploadAttempt(userId: string): void {
   if (importUploadAttempts.isLimited(userId)) throw new ImportError("rate_limited", TOO_MANY_IMPORT_UPLOADS);
-  importUploadAttempts.recordFailure(userId);
+  importUploadAttempts.recordAttempt(userId);
 }
 
 /**

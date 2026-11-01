@@ -5,7 +5,11 @@ import {
   INVITE_CODE_WINDOW_MS,
   IMPORT_UPLOAD_MAX_ATTEMPTS,
   IMPORT_UPLOAD_WINDOW_MS,
+  SIGN_IN_IP_MAX_FAILURES,
+  SIGN_IN_NAME_MAX_FAILURES,
+  SIGN_IN_WINDOW_MS,
   createFailureLimiter,
+  type FailureLimiter,
   importUploadAttempts,
   inviteCodeAttempts,
   resetRateLimits,
@@ -13,7 +17,7 @@ import {
 
 const WINDOW_MS = 1_000;
 
-function fail(limiter: { recordFailure(key: string): void }, key: string, times: number) {
+function fail(limiter: FailureLimiter, key: string, times: number) {
   for (let attempt = 0; attempt < times; attempt += 1) limiter.recordFailure(key);
 }
 
@@ -75,6 +79,34 @@ describe("createFailureLimiter", () => {
     expect(limiter.isLimited("c")).toBe(true);
   });
 
+  it("says how long a limited key must wait, in whole seconds, and 0 for a key that isn't limited", () => {
+    const limiter = createFailureLimiter({ maxFailures: 2, windowMs: 60_000 });
+
+    limiter.recordFailure("a");
+    expect(limiter.retryAfterSeconds("a")).toBe(0);
+    vi.advanceTimersByTime(10_500);
+    limiter.recordFailure("a");
+
+    // The first failure leaves the window 49.5 seconds from now.
+    expect(limiter.retryAfterSeconds("a")).toBe(50);
+    expect(limiter.retryAfterSeconds("b")).toBe(0);
+
+    vi.advanceTimersByTime(49_499);
+    expect(limiter.retryAfterSeconds("a")).toBe(1);
+    vi.advanceTimersByTime(1);
+    expect(limiter.retryAfterSeconds("a")).toBe(0);
+    expect(limiter.isLimited("a")).toBe(false);
+  });
+
+  it("counts recordAttempt exactly like recordFailure", () => {
+    const limiter = createFailureLimiter({ maxFailures: 2, windowMs: WINDOW_MS });
+
+    limiter.recordAttempt("a");
+    limiter.recordFailure("a");
+
+    expect(limiter.isLimited("a")).toBe(true);
+  });
+
   it("is cleared by resetRateLimits", () => {
     const limiter = createFailureLimiter({ maxFailures: 1, windowMs: WINDOW_MS });
     limiter.recordFailure("a");
@@ -109,11 +141,19 @@ describe("importUploadAttempts", () => {
     fail(importUploadAttempts, "user", 29);
     expect(importUploadAttempts.isLimited("user")).toBe(false);
 
-    importUploadAttempts.recordFailure("user");
+    importUploadAttempts.recordAttempt("user");
     expect(importUploadAttempts.isLimited("user")).toBe(true);
     expect(importUploadAttempts.isLimited("someone-else")).toBe(false);
 
     vi.advanceTimersByTime(IMPORT_UPLOAD_WINDOW_MS);
     expect(importUploadAttempts.isLimited("user")).toBe(false);
+  });
+});
+
+describe("the sign-in limits", () => {
+  it("allow 5 failures per name and 20 per IP in 15 minutes", () => {
+    expect(SIGN_IN_NAME_MAX_FAILURES).toBe(5);
+    expect(SIGN_IN_IP_MAX_FAILURES).toBe(20);
+    expect(SIGN_IN_WINDOW_MS).toBe(15 * 60 * 1000);
   });
 });

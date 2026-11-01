@@ -10,3 +10,10 @@ export const KID_EMAIL_DOMAIN = "kids.ifam.invalid";
 export function kidAccountEmail(username: string) {
   return `${username}@${KID_EMAIL_DOMAIN}`;
 }
+
+/**
+ * The address sign-in tries for a username no account has, so an unknown username goes through the
+ * same provider call as a real one and answers alike, in about the same time (audit B7). No account
+ * can have it: usernames start with a letter or number, and sign-up refuses `KID_EMAIL_DOMAIN`.
+ */
+export const UNKNOWN_USERNAME_EMAIL = `_unknown-username@${KID_EMAIL_DOMAIN}`;

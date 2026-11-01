@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PASSWORD_CHANGE_MAX_ATTEMPTS, PASSWORD_CHANGE_WINDOW_MS, resetRateLimits } from "@/lib/http/rate-limit";
 import { FakeAuth } from "@/test/fakes/auth";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
@@ -17,6 +18,7 @@ let repositories: FakeRepositories;
 let user: ReturnType<typeof signedInAs>;
 
 beforeEach(() => {
+  resetRateLimits();
   auth = new FakeAuth();
   repositories = resetFakeRepositories();
   user = signedInAs(auth.addUser("kid@kids.ifam.invalid", OLD_PASSWORD));
@@ -129,5 +131,43 @@ describe("POST /api/account/password", () => {
     const response = await changePassword({ password: NEW_PASSWORD });
 
     expect(response).toMatchObject({ status: 500, body: { error: "Unable to change your password. Please try again." } });
+  });
+
+  it("answers the 11th attempt in an hour with 429 and Retry-After, counting refused ones, without asking the provider", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-01T09:00:00.000Z"));
+    try {
+      for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_ATTEMPTS; attempt += 1) {
+        auth.fail("updatePassword", "New password should be different from the old password.");
+        expect((await changePassword({ password: NEW_PASSWORD })).status).toBe(400);
+      }
+      const update = vi.spyOn(auth, "updatePassword");
+
+      const limited = await changePassword({ password: NEW_PASSWORD });
+
+      expect(limited).toMatchObject({
+        status: 429,
+        body: { error: "You've tried to change your password a lot recently. Try again in an hour." },
+      });
+      expect(limited.headers.get("retry-after")).toBe(String(PASSWORD_CHANGE_WINDOW_MS / 1000));
+      expect(update).not.toHaveBeenCalled();
+      expect(storedPassword()).toBe(OLD_PASSWORD);
+
+      vi.setSystemTime(new Date(Date.now() + PASSWORD_CHANGE_WINDOW_MS));
+      expect((await changePassword({ password: NEW_PASSWORD })).status).toBe(204);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("counts attempts per user", async () => {
+    for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_ATTEMPTS; attempt += 1) await changePassword({ password: NEW_PASSWORD });
+    expect((await changePassword({ password: NEW_PASSWORD })).status).toBe(429);
+
+    const other = signedInAs(auth.addUser("other@example.test", OLD_PASSWORD));
+    auth.currentUser = other;
+    repositories.account.caller.userId = other.id;
+
+    expect((await changePassword({ password: NEW_PASSWORD })).status).toBe(204);
   });
 });
