@@ -13,7 +13,7 @@ import { createMcpTokenSchema } from "@/lib/validation/mcp";
  */
 export const POST = withUser(async (request, user) => {
   if (mcpTokenChangeAttempts.isLimited(user.id)) throw new HttpError(429, TOO_MANY_MCP_TOKEN_CHANGES);
-  mcpTokenChangeAttempts.recordFailure(user.id);
+  mcpTokenChangeAttempts.recordAttempt(user.id);
 
   const { name, expiry } = await parseBody(request, createMcpTokenSchema, "Invalid token.");
   const { token: secret, prefix, hash } = generateMcpToken();

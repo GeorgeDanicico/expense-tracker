@@ -20,17 +20,19 @@ type CallOptions<Params> = {
   url?: string;
   /** Sent as JSON; a string is sent as-is. */
   body?: unknown;
+  /** Extra request headers, such as `X-Forwarded-For`. */
+  headers?: Record<string, string>;
   params?: Params;
 };
 
 /** Calls a route handler like Next does and returns its status, headers and parsed JSON body (null when not JSON). */
 export async function callRoute<Params = Record<string, string>>(
   handler: (request: NextRequest, context: { params: Promise<Params> }) => Promise<Response>,
-  { method = "GET", url = "/api", body, params }: CallOptions<Params> = {},
+  { method = "GET", url = "/api", body, headers, params }: CallOptions<Params> = {},
 ) {
   const request = new NextRequest(new URL(url, "http://localhost"), {
     method,
-    headers: body === undefined ? undefined : { "content-type": "application/json" },
+    headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers },
     body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
   });
   const response = await handler(request, { params: Promise.resolve(params ?? ({} as Params)) });

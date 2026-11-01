@@ -9,7 +9,7 @@ import { MCP_TOKEN_NOT_FOUND } from "@/lib/validation/mcp";
  */
 export const DELETE = withUser(async (_request, user, context: RouteContext<"/api/account/mcp/tokens/[id]">) => {
   if (mcpTokenChangeAttempts.isLimited(user.id)) throw new HttpError(429, TOO_MANY_MCP_TOKEN_CHANGES);
-  mcpTokenChangeAttempts.recordFailure(user.id);
+  mcpTokenChangeAttempts.recordAttempt(user.id);
 
   const id = parseId((await context.params).id, "Invalid token id.");
   if (!(await getRepositories().mcpTokens.revoke(id))) notFound(MCP_TOKEN_NOT_FOUND);

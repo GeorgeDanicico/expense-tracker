@@ -30,6 +30,11 @@ export function unauthorized() {
   return json({ error: "Unauthorized" }, 401);
 }
 
+/** A 429 with `{ error }` and a `Retry-After` of `retryAfterSeconds` (from a limiter's `retryAfterSeconds`). */
+export function tooManyRequests(error: string, retryAfterSeconds: number) {
+  return json({ error }, { status: 429, headers: { "Retry-After": String(Math.max(1, retryAfterSeconds)) } });
+}
+
 /** An expected request failure. `withUser` turns it into `{ error, fieldErrors? }` with its status. */
 export class HttpError extends Error {
   readonly status: 400 | 404 | 413 | 415 | 422 | 429;

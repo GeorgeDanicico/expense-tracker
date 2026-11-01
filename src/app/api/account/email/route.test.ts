@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { EMAIL_CHANGE_MAX_ATTEMPTS, EMAIL_CHANGE_WINDOW_MS, resetRateLimits } from "@/lib/http/rate-limit";
 import { FakeAuth } from "@/test/fakes/auth";
 import { callRoute, signedInAs } from "@/test/route";
 
@@ -9,6 +10,7 @@ vi.mock("@/lib/auth", () => ({ getAuth: () => auth, getAuthenticatedUser: vi.fn(
 import { PATCH } from "@/app/api/account/email/route";
 
 beforeEach(() => {
+  resetRateLimits();
   auth = new FakeAuth();
   auth.currentUser = signedInAs(auth.addUser("ana@kids.ifam.invalid", "kid-password"));
 });
@@ -65,5 +67,40 @@ describe("PATCH /api/account/email", () => {
     const response = await changeEmail({ email: "ana@example.com" });
 
     expect(response).toMatchObject({ status: 500, body: { error: "Unable to change your email. Please try again." } });
+  });
+
+  it("answers the 6th attempt in an hour with 429 and Retry-After, counting refused ones, without asking the provider", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-01T09:00:00.000Z"));
+    try {
+      auth.addUser("taken@example.com", "other-password");
+      for (let attempt = 0; attempt < EMAIL_CHANGE_MAX_ATTEMPTS; attempt += 1) {
+        expect((await changeEmail({ email: "taken@example.com" })).status).toBe(400);
+      }
+      const update = vi.spyOn(auth, "updateEmail");
+
+      const limited = await changeEmail({ email: "ana@example.com" });
+
+      expect(limited).toMatchObject({
+        status: 429,
+        body: { error: "You've tried to change your email a lot recently. Try again in an hour." },
+      });
+      expect(limited.headers.get("retry-after")).toBe(String(EMAIL_CHANGE_WINDOW_MS / 1000));
+      expect(update).not.toHaveBeenCalled();
+
+      vi.setSystemTime(new Date(Date.now() + EMAIL_CHANGE_WINDOW_MS));
+      expect((await changeEmail({ email: "ana@example.com" })).status).toBe(204);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("counts attempts per user", async () => {
+    for (let attempt = 0; attempt < EMAIL_CHANGE_MAX_ATTEMPTS; attempt += 1) await changeEmail({ email: "ana@example.com" });
+    expect((await changeEmail({ email: "ana@example.com" })).status).toBe(429);
+
+    auth.currentUser = signedInAs(auth.addUser("bob@example.com", "bob-password"));
+
+    expect((await changeEmail({ email: "bob@example.org" })).status).toBe(204);
   });
 });

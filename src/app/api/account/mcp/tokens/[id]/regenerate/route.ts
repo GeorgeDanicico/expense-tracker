@@ -13,7 +13,7 @@ import { regenerateMcpTokenSchema } from "@/lib/validation/mcp";
  */
 export const POST = withUser(async (request, user, context: RouteContext<"/api/account/mcp/tokens/[id]/regenerate">) => {
   if (mcpTokenChangeAttempts.isLimited(user.id)) throw new HttpError(429, TOO_MANY_MCP_TOKEN_CHANGES);
-  mcpTokenChangeAttempts.recordFailure(user.id);
+  mcpTokenChangeAttempts.recordAttempt(user.id);
 
   const id = parseId((await context.params).id, "Invalid token id.");
   const { expiry } = await parseBody(request, regenerateMcpTokenSchema, "Invalid token.");

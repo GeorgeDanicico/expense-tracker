@@ -1,6 +1,7 @@
 import "server-only";
 
 import { type AuthSession, getAuth, getAuthAdmin } from "@/lib/auth";
+import { createFailureLimiter, resetRateLimits } from "@/lib/http/rate-limit";
 import { MCP_REFUSALS } from "@/lib/mcp/refusals";
 import type { McpTokenCheck } from "@/lib/mcp/token-repository";
 import { hashMcpToken, hasMcpTokenPrefix, mcpTokenDisplayPrefix, parseMcpToken } from "@/lib/mcp/tokens";
@@ -29,7 +30,13 @@ const FAILURE_WINDOW_MS = 15 * 60_000;
  * entry can be found without its id. Oldest first; at most `MAX_SESSIONS`.
  */
 const sessions = new Map<string, Promise<AuthSession | null>>();
-const failures = new Map<string, number[]>();
+
+/**
+ * Bad personal tokens, by `prefix:<display prefix>` and by `ip:<client IP>`: a key with
+ * `MAX_FAILURES` in `FAILURE_WINDOW_MS` is throttled. The shared limiter, so the keys it remembers
+ * are capped and each key's list is trimmed.
+ */
+const tokenFailures = createFailureLimiter({ maxFailures: MAX_FAILURES, windowMs: FAILURE_WINDOW_MS });
 
 /**
  * Routes on the header: `Bearer sl_mcp_…` is a personal token, any other `Bearer` an OAuth app's
@@ -51,18 +58,11 @@ function failureKeys(key: string, clientIp: string | null) {
 }
 
 function isThrottled(keys: string[]) {
-  const cutoff = Date.now() - FAILURE_WINDOW_MS;
-  return keys.some((key) => {
-    const recent = (failures.get(key) ?? []).filter((time) => time > cutoff);
-    if (recent.length) failures.set(key, recent);
-    else failures.delete(key);
-    return recent.length >= MAX_FAILURES;
-  });
+  return keys.some((key) => tokenFailures.isLimited(key));
 }
 
 function recordFailure(keys: string[]) {
-  const now = Date.now();
-  for (const key of keys) failures.set(key, [...(failures.get(key) ?? []), now]);
+  for (const key of keys) tokenFailures.recordFailure(key);
 }
 
 function endSession(pending: Promise<AuthSession | null>) {
@@ -181,7 +181,8 @@ export function authenticateMcpRequest(authorization: McpAuthorization, clientIp
   }
 }
 
+/** For tests only: forgets the cached sessions and every failure (of every limiter, through `resetRateLimits`). */
 export function resetMcpAuthForTests() {
   sessions.clear();
-  failures.clear();
+  resetRateLimits();
 }
