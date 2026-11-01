@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
-# Update this digest periodically to pick up Node.js and Debian security fixes.
-FROM node:24-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e AS base
+# Dependabot (.github/dependabot.yml) opens a weekly PR to move this digest, which picks up the
+# Node.js and Debian security fixes. The image build then runs Trivy on the result.
+FROM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -21,6 +22,11 @@ FROM base AS runner
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=3000
+
+# Both containers only run `node`. The base image also ships npm (with its own copies of tar,
+# undici, brace-expansion), corepack and yarn, which nothing here uses and which Trivy would flag.
+RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-v1.22.22
 
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static

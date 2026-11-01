@@ -4,7 +4,7 @@
 #   scripts/scan-build-secrets.sh                      scan .next/static, the browser bundle
 #   scripts/scan-build-secrets.sh DIR [DIR...]         scan the given browser-facing folders
 #   scripts/scan-build-secrets.sh --server DIR [...]   scan a whole server tree, such as the files
-#                                                      copied out of the image (see image.yml)
+#                                                      copied out of the image (see the image job in ci.yml)
 #   scripts/scan-build-secrets.sh --self-test          check that the patterns catch planted fakes
 #
 # Exit codes: 0 clean, 1 a secret pattern was found, 2 misuse or nothing to scan.

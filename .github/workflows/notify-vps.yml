@@ -1,9 +1,12 @@
 name: Notify VPS deployments
 
 # Runs once the image for a main commit is in GHCR, so the VPS deploy can pull it straight away.
+# The image is built and pushed by the last job of the CI workflow (after every other job passed),
+# so a successful CI run on main means the image for that commit is already in GHCR. CI runs from
+# pull requests are ignored: only a push to main or a manual run on main deploys.
 on:
   workflow_run:
-    workflows: [Build image]
+    workflows: [CI]
     types: [completed]
     branches: [main]
 
@@ -12,7 +15,9 @@ permissions:
 
 jobs:
   notify:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+      && (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     steps:
       - name: Wake the central deployment workflow

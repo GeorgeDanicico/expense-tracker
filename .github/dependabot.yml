@@ -1,0 +1,32 @@
+version: 2
+
+# Weekly update PRs. The npm versions in package.json are exact, so Dependabot bumps the pin and the
+# lockfile together. Minor and patch updates arrive as one grouped PR per ecosystem; a major update
+# opens its own PR so it can be read on its own. Security updates are separate and not grouped.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Keeps the SHA pins in .github/workflows current: the PR moves the SHA and its version comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions-minor-and-patch:
+        update-types: [minor, patch]
+
+  # The base image in the Dockerfile (tag and digest).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
