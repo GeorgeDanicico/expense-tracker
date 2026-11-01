@@ -185,6 +185,43 @@ describe("MCP server", () => {
     expect(expenses.create).not.toHaveBeenCalled();
   });
 
+  describe("amounts of more than two decimal places", () => {
+    const fuel = { description: "Fuel", category: "car", subtype: "car_fuel" };
+
+    it.each([0.004, 0.005, 1.005, 0.1 + 0.2, 1e-7, "0.004", "12.345"])("refuses add_expense with %j and saves nothing", async (amount) => {
+      const result = await call("add_expense", { ...fuel, amount });
+
+      expect(result.isError).toBe(true);
+      expect(result.body.fieldErrors.amount).toEqual(["Use at most two decimal places."]);
+      expect(expenses.create).not.toHaveBeenCalled();
+    });
+
+    it.each([0.004, 0.005, 1.005, 0.1 + 0.2, 1e-7, "0.004", "12.345"])("refuses update_expense with %j and changes nothing", async (amount) => {
+      const result = await call("update_expense", { id: ID, amount });
+
+      expect(result.isError).toBe(true);
+      expect(result.body.fieldErrors.amount).toEqual(["Use at most two decimal places."]);
+      expect(expenses.update).not.toHaveBeenCalled();
+    });
+
+    it.each([[0.1, 0.1], [0.29, 0.29], [12.34, 12.34], ["12.34", 12.34], ["12.50", 12.5]])("accepts %j", async (amount, expected) => {
+      expenses.create.mockResolvedValue(stored);
+
+      const result = await call("add_expense", { ...fuel, amount });
+
+      expect(result.isError).toBeFalsy();
+      expect(expenses.create).toHaveBeenCalledWith("owner", expect.objectContaining({ amount: expected }));
+    });
+
+    it("tells the client the amount takes a number or text of at most two decimals", async () => {
+      const client = await connect();
+      const { tools } = await client.listTools();
+      const amount = tools.find((tool) => tool.name === "add_expense")?.inputSchema.properties?.amount as { description: string };
+
+      expect(amount.description).toContain("two decimal places");
+    });
+  });
+
   it("deletes expenses through the data layer", async () => {
     repositories.expenses.expenses.set("owner", [stored]);
     const result = await call("delete_expense", { id: ID });

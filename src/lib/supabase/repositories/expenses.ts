@@ -10,6 +10,7 @@ import type { ExpenseRepository } from "@/lib/expenses/repository";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { Expense } from "@/lib/expenses/types";
 import { getMonthRange } from "@/lib/calendar";
+import { expenseTabMembershipFilter } from "@/lib/supabase/filters";
 import { createClient } from "@/lib/supabase/server";
 import { applyExpensePatch, type ExpenseInput } from "@/lib/validation/expense";
 
@@ -53,10 +54,9 @@ function selectOwnedExpensePage(supabase: SupabaseClient<Database>, userId: stri
 /** Narrows an owner-scoped query by tab membership, date bounds, category and subtype. */
 function applyExpenseScope(query: ExpenseFilterQuery, options: ExpenseQuery) {
   if (options.tab) {
-    const membership: string[] = [];
-    if (options.tab.categoryKeys.length) membership.push(`category.in.(${options.tab.categoryKeys.join(",")})`);
-    if (options.tab.subtypeKeys.length) membership.push(`subtype.in.(${options.tab.subtypeKeys.join(",")})`);
-    query = query.or(membership.join(","));
+    // Throws for a key outside the category and subtype catalogue: nothing unchecked reaches `.or()`.
+    // eslint-disable-next-line no-restricted-syntax -- the string comes from expenseTabMembershipFilter, which checks every key
+    query = query.or(expenseTabMembershipFilter(options.tab.categoryKeys, options.tab.subtypeKeys));
   }
   if (options.start) query = query.gte("expense_date", options.start);
   if (options.endExclusive) query = query.lt("expense_date", options.endExclusive);

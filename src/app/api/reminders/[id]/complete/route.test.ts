@@ -160,6 +160,16 @@ describe("POST /api/reminders/[id]/complete", () => {
       expect(kidExpenses()).toEqual([]);
     });
 
+    it.each([0.004, 0.005, 1.005, "12.345"])("answers 422 for the amount %j and logs nothing", async (amount) => {
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+
+      expect(await complete(reminder.id, { logExpense: true, amount })).toMatchObject({
+        status: 422, body: { fieldErrors: { amount: ["Use at most two decimal places."] } },
+      });
+      expect(kidExpenses()).toEqual([]);
+      expect(reminder.nextDueOn).toBe("2026-11-01");
+    });
+
     it("answers 500 and marks nothing done when the expense can't be added", async () => {
       const reminder = repositories.reminders.seed({ expenseTemplate: rent });
       vi.spyOn(repositories.expenses, "create").mockRejectedValueOnce(new Error("boom"));

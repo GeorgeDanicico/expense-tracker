@@ -67,6 +67,10 @@ describe("confirmImportSchema", () => {
     expect(errors([row({ notes: "n".repeat(500) })])).toBeNull();
   });
 
+  it.each([0.004, 0.005, 1.005, 0.1 + 0.2, 1e-7, "12.345"])("refuses the amount %j of a confirmed row, naming the row", (amount) => {
+    expect(errors([row(), row({ id: OTHER, amount })])).toEqual(["rows.1.amount: Use at most two decimal places."]);
+  });
+
   it("requires a subtype to belong to the category", () => {
     expect(errors([row({ category: "groceries", subtype: "car_fuel" })]))
       .toEqual(["rows.0.subtype: Choose a subtype belonging to the selected category."]);

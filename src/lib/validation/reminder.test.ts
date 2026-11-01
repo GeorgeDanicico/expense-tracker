@@ -98,6 +98,25 @@ describe("snoozeSchema", () => {
   });
 });
 
+describe("amounts of more than two decimal places", () => {
+  const rent = { amount: 650, currency: "EUR", category: "housing", subtype: null };
+
+  it.each([0.004, 0.005, 1.005, 0.1 + 0.2, 1e-7, "12.345"])("refuses %j in an expense template and in a completion", (amount) => {
+    const template = expenseTemplateSchema.safeParse({ ...rent, amount });
+    expect(template.success).toBe(false);
+    if (!template.success) expect(template.error.flatten().fieldErrors.amount).toEqual(["Use at most two decimal places."]);
+
+    const completion = completeReminderSchema.safeParse({ logExpense: true, amount });
+    expect(completion.success).toBe(false);
+    if (!completion.success) expect(completion.error.flatten().fieldErrors.amount).toEqual(["Use at most two decimal places."]);
+  });
+
+  it.each([[0.1, 0.1], [0.29, 0.29], ["12.34", 12.34]])("accepts %j", (amount, expected) => {
+    expect(expenseTemplateSchema.parse({ ...rent, amount }).amount).toBe(expected);
+    expect(completeReminderSchema.parse({ logExpense: true, amount }).amount).toBe(expected);
+  });
+});
+
 describe("expenseTemplateSchema", () => {
   const rent = { amount: 650, currency: "EUR", category: "housing", subtype: null };
 

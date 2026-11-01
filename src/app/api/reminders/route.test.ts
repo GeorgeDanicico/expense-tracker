@@ -34,6 +34,16 @@ function add(body: unknown) {
 
 const validReminder = { title: "Pay rent", startsOn: "2026-11-01", repeatUnit: "month", repeatInterval: 1 };
 
+describe("POST /api/reminders, expense template amount", () => {
+  it.each([0.004, 0.005, 1.005, "12.345"])("answers 422 with a field error for the amount %j", async (amount) => {
+    const response = await add({ ...validReminder, expenseTemplate: { amount, currency: "EUR", category: "housing", subtype: null } });
+
+    expect(response.status).toBe(422);
+    expect(response.body.fieldErrors).toHaveProperty("expenseTemplate");
+    expect(repositories.reminders.rows).toHaveLength(0);
+  });
+});
+
 describe("GET /api/reminders", () => {
   it("answers 401 to an anonymous caller", async () => {
     vi.mocked(getAuthenticatedUser).mockResolvedValue(null);
