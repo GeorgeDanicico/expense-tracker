@@ -1,6 +1,6 @@
 import "server-only";
 
-import { HttpError } from "@/lib/http/route";
+import { HttpError } from "@/lib/http/errors";
 
 /**
  * The request body as bytes, refusing more than `maxBytes` with a 413 `tooLarge`. It checks

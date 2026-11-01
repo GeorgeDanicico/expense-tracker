@@ -120,6 +120,35 @@ describe("GET /api/todos", () => {
 });
 
 describe("POST /api/todos", () => {
+  // The request guard (security plan S5), through withUser.
+  it.each([
+    ["Sec-Fetch-Site: cross-site", { "Sec-Fetch-Site": "cross-site" }],
+    ["a foreign Origin", { Origin: "https://evil.example" }],
+  ])("refuses a write with %s with 403, before reading the session", async (_name, headers) => {
+    vi.mocked(getAuthenticatedUser).mockClear();
+    const response = await callRoute(POST, { method: "POST", url: "/api/todos", body: { title: "Walk the dog" }, headers });
+
+    expect(response).toMatchObject({ status: 403, body: { error: "This request didn't come from the app, so it was refused." } });
+    expect(getAuthenticatedUser).not.toHaveBeenCalled();
+    expect(repositories.todos.rows).toEqual([]);
+  });
+
+  it("refuses a text/plain body with 415 and one over 64 KB with 413", async () => {
+    const plain = await callRoute(POST, {
+      method: "POST", url: "/api/todos", body: { title: "Walk the dog" }, headers: { "Content-Type": "text/plain;charset=UTF-8" },
+    });
+    const huge = await add({ title: "Walk the dog", padding: "x".repeat(65 * 1024) });
+
+    expect(plain.status).toBe(415);
+    expect(huge.status).toBe(413);
+    expect(repositories.todos.rows).toEqual([]);
+  });
+
+  it("saves a write sent from the app's own page", async () => {
+    const headers = { "Sec-Fetch-Site": "same-origin", Origin: "http://localhost" };
+    expect((await callRoute(POST, { method: "POST", url: "/api/todos", body: { title: "Walk the dog" }, headers })).status).toBe(201);
+  });
+
   it("answers 404 without saving while the family flag is off", async () => {
     vi.stubEnv("FAMILY_ENABLED", "false");
 

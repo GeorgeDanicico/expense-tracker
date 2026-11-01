@@ -18,14 +18,26 @@ vi.mock("@/lib/supabase/config", () => ({ getSupabaseConfig: () => ({ url: "http
 
 import { DomainError } from "@/lib/errors";
 import { ImportError } from "@/lib/imports/types";
-import { HttpError, json, noContent, notFound, parseBody, parseId, withUser } from "@/lib/http/route";
+import {
+  HttpError,
+  json,
+  JSON_BODY_MAX_BYTES,
+  noContent,
+  notFound,
+  parseBody,
+  parseId,
+  readJson,
+  withRequestGuard,
+  withUser,
+} from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { fakeSupabase } from "@/test/fake-supabase";
 
 const PRIVATE = "private, no-store, max-age=0";
 const user = { id: "user-1", email: "user@example.com" };
 const schema = z.object({ name: z.string().min(1, "Name is required.") });
-const post = (body: string) => new Request("http://localhost/api/test", { method: "POST", body });
+const post = (body: string, headers: Record<string, string> = { "content-type": "application/json" }) =>
+  new Request("http://localhost/api/test", { method: "POST", body, headers });
 
 describe("json", () => {
   it("adds the private no-store header to every response", async () => {
@@ -75,6 +87,101 @@ describe("parseBody", () => {
       status: 422,
       fieldErrors: { name: ["Name is required."] },
     });
+  });
+});
+
+describe("readJson", () => {
+  it("accepts application/json with a charset, in any case", async () => {
+    await expect(readJson(post('{"a":1}', { "content-type": "Application/JSON; charset=utf-8" }))).resolves.toEqual({ a: 1 });
+  });
+
+  it("drops a leading byte-order mark, like request.json()", async () => {
+    await expect(readJson(post('\uFEFF{"a":1}'))).resolves.toEqual({ a: 1 });
+  });
+
+  it.each([
+    ["text/plain", { "content-type": "text/plain" }],
+    ["form-encoded", { "content-type": "application/x-www-form-urlencoded" }],
+    ["multipart", { "content-type": "multipart/form-data; boundary=x" }],
+    ["application/json-ish", { "content-type": "application/jsonp" }],
+    ["no Content-Type", {}],
+  ])("refuses a %s body with a 415", async (_name, headers) => {
+    const request = new Request("http://localhost/api/test", { method: "POST", body: '{"a":1}', headers });
+    if (!("content-type" in headers)) request.headers.delete("content-type");
+    await expect(readJson(request)).rejects.toMatchObject({ status: 415 });
+  });
+
+  it("answers null for an empty body whatever its type, so bodyless writes still work", async () => {
+    await expect(readJson(new Request("http://localhost/api/test", { method: "DELETE" }))).resolves.toBeNull();
+    await expect(readJson(post("", { "content-type": "text/plain" }))).resolves.toBeNull();
+  });
+
+  it("refuses a body over 64 KB with a 413, by Content-Length or by counting", async () => {
+    const big = JSON.stringify({ text: "x".repeat(JSON_BODY_MAX_BYTES) });
+    await expect(readJson(post(big))).rejects.toMatchObject({ status: 413 });
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(big));
+        controller.close();
+      },
+    });
+    const streamed = new Request("http://localhost/api/test", {
+      method: "POST", body: stream, duplex: "half", headers: { "content-type": "application/json" },
+    } as RequestInit);
+    expect(streamed.headers.get("content-length")).toBeNull();
+    await expect(readJson(streamed)).rejects.toMatchObject({ status: 413 });
+  });
+
+  it("takes a route's own larger limit", async () => {
+    const big = JSON.stringify({ text: "x".repeat(JSON_BODY_MAX_BYTES) });
+    await expect(readJson(post(big), { maxBytes: 2 * JSON_BODY_MAX_BYTES })).resolves.toEqual({ text: "x".repeat(JSON_BODY_MAX_BYTES) });
+  });
+});
+
+describe("the request guard in withUser and withRequestGuard", () => {
+  const ok = async () => json({ ok: true });
+  const write = (headers: Record<string, string>, method = "POST") =>
+    new Request("http://localhost/api/test", { method, headers });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getAuthenticatedUser.mockResolvedValue(user);
+  });
+
+  it.each([
+    ["Sec-Fetch-Site: cross-site", { "sec-fetch-site": "cross-site" }],
+    ["Sec-Fetch-Site: same-site", { "sec-fetch-site": "same-site" }],
+    ["a foreign Origin", { origin: "https://evil.example" }],
+  ])("refuses %s with a 403 before reading the session", async (_name, headers) => {
+    const handler = vi.fn(ok);
+    const response = await withUser(handler)(write(headers));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "This request didn't come from the app, so it was refused." });
+    expect(response.headers.get("cache-control")).toBe(PRIVATE);
+    expect(mocks.getAuthenticatedUser).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("lets a same-origin write through to the session check", async () => {
+    const response = await withUser(ok)(write({ "sec-fetch-site": "same-origin", origin: "http://localhost" }));
+    expect(response.status).toBe(200);
+    expect(mocks.getAuthenticatedUser).toHaveBeenCalledOnce();
+  });
+
+  it("never checks a GET", async () => {
+    const response = await withUser(ok)(write({ "sec-fetch-site": "cross-site", origin: "https://evil.example" }, "GET"));
+    expect(response.status).toBe(200);
+  });
+
+  it("guards a route outside withUser and maps its HttpErrors", async () => {
+    const guarded = withRequestGuard(async (request: Request) => json(await readJson(request)));
+
+    expect((await guarded(write({ origin: "https://evil.example" }))).status).toBe(403);
+    expect((await guarded(post("hi", { "content-type": "text/plain" }))).status).toBe(415);
+    expect(await (await guarded(post('{"a":1}'))).json()).toEqual({ a: 1 });
+    await expect(withRequestGuard(async () => { throw new Error("boom"); })()).rejects.toThrow("boom");
   });
 });
 

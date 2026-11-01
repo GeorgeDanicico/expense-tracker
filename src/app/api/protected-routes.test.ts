@@ -16,6 +16,8 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies, headers: mocks.cookies }));
 vi.mock("@/lib/repositories", () => ({ getRepositories: () => ({ calendarFeeds: { read: mocks.readFeed } }) }));
 
+import { CROSS_SITE_REFUSED, GUARDED_METHODS, REQUEST_GUARD_EXEMPTIONS } from "@/lib/http/guard";
+
 const API_DIR = fileURLToPath(new URL(".", import.meta.url));
 const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
 const HTTP_METHODS = ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"];
@@ -126,13 +128,64 @@ describe("protected REST routes", () => {
   it.each(cases)("rejects an anonymous %s /api/%s with 401", async (method, route) => {
     const handler = (await loadHandlers(route))[method];
     const url = `http://localhost/api/${route.replaceAll(/\[\w+\]/g, ID)}`;
-    const response = await handler(new NextRequest(url, { method }), { params: Promise.resolve({ id: ID }) });
+    // Sent like the app's own pages send it, so the request guard lets it through to the session check.
+    const headers = { "sec-fetch-site": "same-origin", origin: "http://localhost" };
+    const response = await handler(new NextRequest(url, { method, headers }), { params: Promise.resolve({ id: ID }) });
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
     expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
     expect(mocks.getAuthenticatedUser).toHaveBeenCalledOnce();
     expect(mocks.createClient).not.toHaveBeenCalled();
+  });
+
+  // The request guard (security plan S5): every POST, PUT, PATCH and DELETE under src/app/api refuses
+  // a write from another site before reading the session, except the routes in
+  // REQUEST_GUARD_EXEMPTIONS. This walks the route files themselves, public ones included, so a new
+  // route that skips the guard fails here without anyone adding it to a list.
+  describe("the request guard", () => {
+    const exempt = new Set(Object.keys(REQUEST_GUARD_EXEMPTIONS));
+    const guardedRoutes = discoverRoutes().filter((route) => !exempt.has(`/api/${route}`)).sort();
+
+    it("exempts only routes that exist, each with a reason", () => {
+      const routes = new Set(discoverRoutes().map((route) => `/api/${route}`));
+      for (const [route, reason] of Object.entries(REQUEST_GUARD_EXEMPTIONS)) {
+        expect(routes.has(route), route).toBe(true);
+        expect(reason.length, route).toBeGreaterThan(20);
+      }
+    });
+
+    it("finds mutating handlers to check, the public sign-in route among them", async () => {
+      const auth = await loadHandlers("auth");
+      expect(Object.keys(auth).filter((method) => GUARDED_METHODS.has(method)).sort()).toEqual(["DELETE", "POST"]);
+    });
+
+    it.each(guardedRoutes)("refuses a cross-site write to every mutating handler of /api/%s", async (route) => {
+      mocks.getAuthenticatedUser.mockResolvedValue({ id: "10000000-0000-4000-8000-000000000001", email: "owner@example.test" });
+      const handlers = Object.entries(await loadHandlers(route)).filter(([method]) => GUARDED_METHODS.has(method));
+      const url = `http://localhost/api/${route.replaceAll(/\[\w+\]/g, ID)}`;
+
+      for (const [method, handler] of handlers) {
+        for (const headers of [
+          { "sec-fetch-site": "cross-site" } as Record<string, string>,
+          { origin: "https://evil.example" },
+          { "sec-fetch-site": "same-site", origin: "https://other.localhost" },
+        ]) {
+          const request = new NextRequest(url, {
+            method,
+            headers: { ...headers, "content-type": "application/json" },
+            body: "{}",
+          });
+          const response = await handler(request, { params: Promise.resolve({ id: ID }) });
+
+          expect(response.status, `${method} /api/${route} ${JSON.stringify(headers)}`).toBe(403);
+          expect(await response.json()).toEqual({ error: CROSS_SITE_REFUSED });
+        }
+      }
+      // Refused before the session was read, so nothing else ran either.
+      expect(mocks.getAuthenticatedUser).not.toHaveBeenCalled();
+      expect(mocks.createClient).not.toHaveBeenCalled();
+    });
   });
 
   // The calendar feed is read by a calendar app with no session: its secret in the path is the only
