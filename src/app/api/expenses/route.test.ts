@@ -53,6 +53,36 @@ describe("POST /api/expenses", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  // Two-decimal amounts (security plan S8, audit finding B1).
+  it.each([
+    ["0.004", 0.004],
+    ["0.005", 0.005],
+    ["1.005", 1.005],
+    ["a float sum", 0.1 + 0.2],
+    ["1e-7", 1e-7],
+    ["12.345", "12.345"],
+    ["a large value with three decimals", 9_999_999_999.999],
+  ])("answers 422 with a field error for the amount %s, and saves nothing", async (_label, amount) => {
+    const response = await post({ ...body, amount });
+
+    expect(response.status).toBe(422);
+    expect(response.body.fieldErrors.amount).toEqual(["Use at most two decimal places."]);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["0.1", 0.1],
+    ["0.29", 0.29],
+    ["12.34", 12.34],
+    ["1.10", 1.1],
+    ["9999999999.99", 9_999_999_999.99],
+  ])("saves the amount %s", async (amount, expected) => {
+    const response = await post({ ...body, amount });
+
+    expect(response.status).toBe(201);
+    expect(create).toHaveBeenCalledWith(user.id, expect.objectContaining({ amount: expected }));
+  });
+
   // The request guard (security plan S5), through withPermission.
   it.each([
     ["Sec-Fetch-Site: cross-site", { "Sec-Fetch-Site": "cross-site" }],

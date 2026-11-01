@@ -78,6 +78,35 @@ describe("GET /api/avatars/[userId]/[file]", () => {
     expect(response).toMatchObject({ status: 400, body: NOT_FOUND });
   });
 
+  // Path traversal: whatever the URL's two segments hold, only a uuid pair ever becomes a storage key.
+  it.each([
+    ["dot-dot as the file", { userId: USER_ID, file: ".." }],
+    ["dot as the file", { userId: USER_ID, file: "." }],
+    ["a relative path as the user", { userId: "../..", file: FILE_ID }],
+    ["a relative path as the file", { userId: USER_ID, file: `../${USER_ID}/${FILE_ID}` }],
+    ["a slash inside the file", { userId: USER_ID, file: `${USER_ID}/${FILE_ID}` }],
+    ["a slash inside the user", { userId: `${USER_ID}/${FILE_ID}`, file: FILE_ID }],
+    ["an encoded slash that was already decoded", { userId: USER_ID, file: `..%2F${FILE_ID}` }],
+    ["an encoded dot-dot", { userId: "%2e%2e", file: FILE_ID }],
+    ["an absolute path as the file", { userId: USER_ID, file: "/etc/passwd" }],
+    ["an absolute path as the user", { userId: "/etc", file: FILE_ID }],
+    ["a backslash path", { userId: USER_ID, file: `..\\${FILE_ID}` }],
+    ["a trailing newline", { userId: USER_ID, file: `${FILE_ID}\n` }],
+    ["a null byte", { userId: USER_ID, file: `${FILE_ID}\0` }],
+    ["a leading space", { userId: USER_ID, file: ` ${FILE_ID}` }],
+    ["an empty user", { userId: "", file: FILE_ID }],
+    ["an empty file", { userId: USER_ID, file: "" }],
+    ["a storage wildcard", { userId: "*", file: "*" }],
+  ])("never reads storage for %s", async (_label, params) => {
+    repositories.avatars.files.set(PATH, BYTES);
+    const read = vi.spyOn(repositories.avatars, "read");
+
+    const response = await callRoute<Params>(GET, { params });
+
+    expect(response).toMatchObject({ status: 400, body: NOT_FOUND });
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it("finds the lowercase key for upper-case ids in the URL", async () => {
     repositories.avatars.files.set(PATH, BYTES);
 

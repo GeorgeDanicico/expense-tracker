@@ -168,6 +168,31 @@ describe("listForTab", () => {
     expect(queries[0].filters).toContainEqual(["or", "", "category.in.(car),subtype.in.(car_fuel)"]);
   });
 
+  it.each([
+    ["a comma", "car,user_id.neq.owner"],
+    ["a closing parenthesis", "car)"],
+    ["a dot", "car.id"],
+    ["an operator clause", "car),id.not.is.null,category.in.(car"],
+    ["an unknown but well-formed key", "pets"],
+    ["an empty key", ""],
+  ])("refuses a tab category key with %s before any query runs", async (_label, key) => {
+    const { queries } = useDatabase(fixtures());
+    const bad = aTab({ categoryKeys: [key as never], subtypeKeys: [] });
+
+    await expect(repository.listForTab("owner", bad, DEFAULT_EXPENSE_TAB_FILTERS)).rejects.toThrow("Unknown expense category key");
+
+    expect(queries).toEqual([]);
+  });
+
+  it.each(["car_fuel,id.not.is.null", "car_fuel)", "car.fuel", "car"])("refuses a tab subtype key %j before any query runs", async (key) => {
+    const { queries } = useDatabase(fixtures());
+    const bad = aTab({ categoryKeys: [], subtypeKeys: [key as never] });
+
+    await expect(repository.listForTab("owner", bad, DEFAULT_EXPENSE_TAB_FILTERS)).rejects.toThrow("Unknown expense subtype key");
+
+    expect(queries).toEqual([]);
+  });
+
   it("includes the first and last day of a year and excludes adjacent years", async () => {
     useDatabase(fixtures());
 

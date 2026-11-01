@@ -12,7 +12,7 @@ import {
   isValidDate,
   isValidMonth,
 } from "@/lib/calendar";
-import { expenseSchema } from "@/lib/validation/expense";
+import { expenseAmountInput, expenseSchema } from "@/lib/validation/expense";
 import { idSchema } from "@/lib/validation/primitives";
 
 const fields = expenseSchema.shape;
@@ -73,7 +73,7 @@ export const expenseTools = [
     title: "Add expense",
     description: "Record an expense. expenseDate defaults to today; subtype must belong to the category.",
     schema: addExpenseSchema,
-    shape: { ...fields, expenseDate: fields.expenseDate.optional() },
+    shape: { ...fields, amount: expenseAmountInput, expenseDate: fields.expenseDate.optional() },
     annotations: CREATE,
     module: "expenses",
     run: async (input, { userId }) => ({ expense: await getRepositories().expenses.create(userId, input) }),
@@ -83,7 +83,7 @@ export const expenseTools = [
     title: "Update expense",
     description: "Change fields of an expense. Changing the category clears a subtype that no longer fits.",
     schema: updateExpenseSchema,
-    shape: updateExpenseSchema.shape,
+    shape: { ...updateExpenseSchema.shape, amount: expenseAmountInput.optional() },
     annotations: UPDATE,
     module: "expenses",
     notFound: "Expense not found.",

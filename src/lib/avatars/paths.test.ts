@@ -39,6 +39,15 @@ describe("avatar paths", () => {
     ["a .png key", `${userId}/${fileId}.png`],
     ["a key with an extra folder", `extra/${userId}/${fileId}.webp`],
     ["a key with a nested file", `${userId}/extra/${fileId}.webp`],
+    ["a traversal in the folder", `../${fileId}.webp`],
+    ["a traversal after the user's folder", `${userId}/../${userId}/${fileId}.webp`],
+    ["a traversal instead of the file", `${userId}/..`],
+    ["an encoded traversal", `${userId}/%2e%2e%2f${fileId}.webp`],
+    ["an absolute path", `/${userId}/${fileId}.webp`],
+    ["a backslash path", `${userId}\\${fileId}.webp`],
+    ["a key with a trailing newline", `${userId}/${fileId}.webp\n`],
+    ["a key with a null byte", `${userId}/${fileId}.webp\0`],
+    ["a key with a trailing slash", `${userId}/${fileId}.webp/`],
     ["an upper-case key", "ABCDEF00-0000-4000-8000-00000000000A/ABCDEF00-0000-4000-8000-00000000000B.webp"],
   ])("gives no URL for %s", (_name, path) => {
     expect(avatarUrl(path)).toBeNull();

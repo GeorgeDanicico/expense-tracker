@@ -9,6 +9,38 @@ const CONTROLS = "/^(Button|IconButton|Input|Textarea)$/";
 const MEMBER_CONTROLS =
   "JSXOpeningElement[name.type='JSXMemberExpression'][name.object.name=/^(NativeSelect|Dialog|Tabs)$/][name.property.name=/^(Field|Content|Trigger)$/]";
 
+const FILTER_CALL = "CallExpression[callee.type='MemberExpression']";
+const FILTER_MESSAGE =
+  "Don't build a PostgREST filter from a string: it can inject operators and clauses. Pass values as arguments (.eq, .in, .gte), " +
+  "or check each part against a catalogue first (see src/lib/supabase/filters.ts). A reviewed constant may use " +
+  "// eslint-disable-next-line no-restricted-syntax -- <reason>.";
+
+/**
+ * Injection guard (security plan S8): the string given to `.or()` and `.filter()` is parsed by
+ * PostgREST, so `,` `(` `)` and `.` in it change the query. A template literal or `+` there is
+ * refused, and so is any `.or()` argument that isn't a plain string literal (for example a joined
+ * array). Where the string is built from a catalogue or is a constant, add a reviewed disable comment.
+ */
+const injectionRestrictions = [
+  {
+    selector: `${FILTER_CALL}[callee.property.name=/^(or|filter)$/] > TemplateLiteral.arguments:first-child`,
+    message: FILTER_MESSAGE,
+  },
+  {
+    selector: `${FILTER_CALL}[callee.property.name=/^(or|filter)$/] > BinaryExpression[operator='+'].arguments:first-child`,
+    message: FILTER_MESSAGE,
+  },
+  {
+    selector: `${FILTER_CALL}[callee.property.name='or'] > :not(:matches(Literal, TemplateLiteral, BinaryExpression[operator='+'])).arguments:first-child`,
+    message: FILTER_MESSAGE,
+  },
+];
+
+const injectionGuard = {
+  files: ["src/**/*.{ts,tsx}"],
+  rules: { "no-restricted-syntax": ["error", ...injectionRestrictions] },
+};
+
 /**
  * UI guardrails: styling belongs to the theme (src/components/ui/theme) and
  * the primitives in src/components/ui. See "UI conventions" in README.md.
@@ -17,6 +49,7 @@ const uiGuardrails = {
   files: ["src/**/*.{ts,tsx}"],
   ignores: ["src/components/ui/**"],
   rules: {
+    // Replaces injectionGuard's options for these files, so they are repeated at the end.
     "no-restricted-syntax": [
       "error",
       {
@@ -48,6 +81,7 @@ const uiGuardrails = {
         selector: `${MEMBER_CONTROLS} > JSXAttribute[name.name=/^(minH|minHeight)$/][value.value=/^(11|14)$/]`,
         message: "Controls use theme sizes (xs/sm/md); don't force 44px minimum heights.",
       },
+      ...injectionRestrictions,
     ],
   },
 };
@@ -123,6 +157,7 @@ const workerBoundary = {
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  injectionGuard,
   uiGuardrails,
   supabaseBoundary,
   workerBoundary,

@@ -42,10 +42,11 @@ export const expenseTemplateSchema = z.object({
 }).superRefine((template, context) => {
   // The expense schema's cross-field rules (a subtype belonging to its category), on the expense
   // this template logs; the description and date are placeholders it fills in when logging. Its
-  // field rules already ran above, through the same field schemas, so only its own checks are kept.
+  // field rules already ran above, through the same field schemas, so only its own checks are kept
+  // (the amount's two-decimal rule is a custom issue too, and would be reported twice).
   const parsed = expenseSchema.safeParse({ ...template, description: "Reminder", expenseDate: "2000-01-01" });
   for (const issue of parsed.error?.issues ?? []) {
-    if (issue.code === "custom") context.addIssue({ code: "custom", path: issue.path, message: issue.message });
+    if (issue.code === "custom" && issue.path[0] !== "amount") context.addIssue({ code: "custom", path: issue.path, message: issue.message });
   }
 });
 

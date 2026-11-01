@@ -84,9 +84,11 @@ exports[`MCP tool surface > lists the same tools, schemas and annotations 1`] = 
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "amount": {
-          "exclusiveMinimum": 0,
-          "maximum": 9999999999.99,
-          "type": "number",
+          "description": "A positive amount in the account currency, at most two decimal places, like 12.50",
+          "type": [
+            "number",
+            "string",
+          ],
         },
         "category": {
           "enum": [
@@ -157,9 +159,11 @@ exports[`MCP tool surface > lists the same tools, schemas and annotations 1`] = 
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "amount": {
-          "exclusiveMinimum": 0,
-          "maximum": 9999999999.99,
-          "type": "number",
+          "description": "A positive amount in the account currency, at most two decimal places, like 12.50",
+          "type": [
+            "number",
+            "string",
+          ],
         },
         "category": {
           "enum": [
