@@ -3,7 +3,9 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { getEnv } from "@/lib/env";
 import { clientKey } from "@/lib/http/client-ip";
 import { mcpIpRequests, mcpUserRequests, TOO_MANY_REQUESTS } from "@/lib/http/rate-limit";
+import { logRequest } from "@/lib/http/request-log";
 import { json, PRIVATE_HEADERS, tooManyRequests } from "@/lib/http/route";
+import { setRequestUser } from "@/lib/log/request-context";
 import { authenticateMcpRequest, readMcpAuthorization } from "@/lib/mcp/auth";
 import { mcpBearerChallenge, mcpResourceOrigin } from "@/lib/mcp/authorization-server";
 import { createMcpServer } from "@/lib/mcp/server";
@@ -89,6 +91,7 @@ async function handle(request: Request) {
   }
 
   const { session } = auth;
+  setRequestUser(session.userId);
   const userWait = mcpUserRequests.take(session.userId);
   if (userWait > 0) return tooManyRequests(TOO_MANY_REQUESTS, userWait);
 
@@ -100,4 +103,12 @@ async function handle(request: Request) {
   return withPrivateHeaders(response);
 }
 
-export { handle as DELETE, handle as GET, handle as POST };
+/**
+ * Every MCP request runs in its own request context and writes one `request` line, with an
+ * `x-request-id` on the response (`logRequest`): the proxy skips this route, so the id is always new.
+ */
+function route(request: Request) {
+  return logRequest(request, () => handle(request));
+}
+
+export { route as DELETE, route as GET, route as POST };

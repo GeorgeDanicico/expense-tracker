@@ -187,6 +187,7 @@ describe("parseServerEnv", () => {
       AI_MONTHLY_BUDGET_USD: 10,
       APP_ADMIN_USER_IDS: [],
       LOG_LEVEL: "info",
+      LOG_SLOW_MS: 1000,
       GIT_SHA: undefined,
     });
   });
@@ -204,6 +205,14 @@ describe("parseServerEnv", () => {
     expect(parseServerEnv({ LOG_LEVEL: "error" }).LOG_LEVEL).toBe("error");
     for (const bad of ["", "   ", "verbose", "trace", "10"]) {
       expect(parseServerEnv({ LOG_LEVEL: bad }).LOG_LEVEL, bad).toBe("info");
+    }
+  });
+
+  it("reads LOG_SLOW_MS as a whole number of milliseconds and falls back to 1000", () => {
+    expect(parseServerEnv({ LOG_SLOW_MS: "250" }).LOG_SLOW_MS).toBe(250);
+    expect(parseServerEnv({ LOG_SLOW_MS: " 5000 " }).LOG_SLOW_MS).toBe(5000);
+    for (const bad of ["", "  ", "0", "-5", "1.5", "slow", "1e3", "3600001"]) {
+      expect(parseServerEnv({ LOG_SLOW_MS: bad }).LOG_SLOW_MS, bad).toBe(1000);
     }
   });
 

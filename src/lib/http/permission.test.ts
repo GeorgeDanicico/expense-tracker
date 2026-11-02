@@ -97,7 +97,7 @@ describe("withPermission", () => {
   it("maps a failure to read the membership to the route's failure message", async () => {
     vi.spyOn(repositories.family, "getMembership").mockRejectedValue(new Error("private failure"));
 
-    expect(await call()).toEqual({ status: 500, body: { error: "Unable to do it." } });
+    expect(await call()).toEqual({ status: 500, body: { error: "Unable to do it.", requestId: expect.any(String) } });
     expect(handler).not.toHaveBeenCalled();
   });
 

@@ -15,6 +15,9 @@ vi.mock("next/headers", () => ({ headers: mocks.headers, cookies: mocks.cookies 
 vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.createServerClient }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
 vi.mock("@/lib/supabase/config", () => ({ getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "pk" }) }));
+// The wrappers' request lines go to `logged` instead of stdout (see "the request line" below).
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 
 import { DomainError } from "@/lib/errors";
 import { ImportError } from "@/lib/imports/types";
@@ -39,8 +42,11 @@ import {
   USER_READ_MAX_REQUESTS,
   USER_WRITE_MAX_REQUESTS,
 } from "@/lib/http/rate-limit";
+import { log } from "@/lib/log";
+import { addRequestFields, currentRequest } from "@/lib/log/request-context";
 import { getRepositories } from "@/lib/repositories";
 import { fakeSupabase } from "@/test/fake-supabase";
+import { loggedLines } from "@/test/log-lines";
 
 beforeEach(() => {
   resetRateLimits();
@@ -272,7 +278,7 @@ describe("withUser", () => {
   });
 
   it("maps any other error to a 500 with the route's failure message", async () => {
-    expect(await respond(() => { throw new Error("boom"); })).toEqual({ status: 500, body: { error: "Unable to do it." } });
+    expect(await respond(() => { throw new Error("boom"); })).toEqual({ status: 500, body: { error: "Unable to do it.", requestId: expect.any(String) } });
   });
 
   it("lets unexpected errors propagate when no failure message is given", async () => {
@@ -488,7 +494,7 @@ describe("withUser and the must-change-password flag", () => {
     const response = await withUser(handler, { failure: "Unable to do it." })();
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "Unable to do it." });
+    expect(await response.json()).toEqual({ error: "Unable to do it.", requestId: expect.any(String) });
     expect(handler).not.toHaveBeenCalled();
   });
 });
@@ -601,5 +607,263 @@ describe("withUser on Supabase auth", () => {
 
     expect(await call()).toEqual({ status: 200, body: { user: cookieUser, currency: "USD" } });
     expect(mocks.createSupabaseClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("the request line", () => {
+  const ok = async () => json({ ok: true });
+  const sameOrigin = { "sec-fetch-site": "same-origin" };
+  const call = (method = "GET", path = "/api/test", headers: Record<string, string> = {}, body?: string) =>
+    new Request(`http://localhost${path}`, { method, headers: { ...sameOrigin, ...headers }, body });
+  const requestLines = () => loggedLines(logged, "request");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    logged.length = 0;
+    mocks.getAuthenticatedUser.mockResolvedValue(user);
+    cookieDatabaseWith();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  /** The one request line written, checked against the response's `x-request-id`. */
+  function onlyLine(response: Response) {
+    const lines = requestLines();
+    expect(lines).toHaveLength(1);
+    const [line] = lines;
+    expect(response.headers.get("x-request-id")).toMatch(/^[A-Za-z0-9]{12}$/);
+    expect(line.requestId).toBe(response.headers.get("x-request-id"));
+    return line;
+  }
+
+  it("writes one info line for a signed-in 200, with the user, the route template and the timing", async () => {
+    const response = await withUser(ok)(call("GET", "/api/expenses/6c3f4a8e-2b1d-4c5e-9f70-1a2b3c4d5e6f"));
+
+    expect(response.status).toBe(200);
+    expect(onlyLine(response)).toEqual({
+      time: expect.any(String),
+      level: "info",
+      event: "request",
+      requestId: response.headers.get("x-request-id"),
+      method: "GET",
+      route: "/api/expenses/:id",
+      status: 200,
+      ms: expect.any(Number),
+      userId: user.id,
+      spans: [],
+    });
+  });
+
+  it("never logs the body, the query string or the caller's email", async () => {
+    const route = withUser(async (request: Request) => json(await readJson(request)));
+    const secret = ["sb", "secret", "x".repeat(20)].join("_");
+    await route(call("POST", "/api/test?email=someone@example.test&token=abc", { "content-type": "application/json" }, JSON.stringify({ password: secret })));
+
+    const written = logged.join("");
+    expect(written).not.toContain(secret);
+    expect(written).not.toContain("someone@example.test");
+    expect(written).not.toContain(user.email);
+    expect(written).not.toContain("?");
+    expect(requestLines()[0].route).toBe("/api/test");
+  });
+
+  it("writes one info line without a user for a 401", async () => {
+    mocks.getAuthenticatedUser.mockResolvedValue(null);
+    const response = await withUser(ok)(call());
+
+    const line = onlyLine(response);
+    expect(line).toMatchObject({ level: "info", status: 401 });
+    expect(line).not.toHaveProperty("userId");
+  });
+
+  it("writes one info line for a 403 from the request guard, in withUser and withRequestGuard", async () => {
+    const foreign = { "sec-fetch-site": "cross-site" };
+    const fromUser = await withUser(ok)(call("POST", "/api/test", foreign));
+    expect(onlyLine(fromUser)).toMatchObject({ level: "info", status: 403, method: "POST" });
+
+    logged.length = 0;
+    const fromGuard = await withRequestGuard(ok)(call("POST", "/api/auth", foreign));
+    expect(onlyLine(fromGuard)).toMatchObject({ level: "info", status: 403, route: "/api/auth" });
+  });
+
+  it("writes a 429 at warn", async () => {
+    const route = withUser(ok);
+    for (let sent = 0; sent < USER_WRITE_MAX_REQUESTS; sent += 1) await route(call("POST"));
+    logged.length = 0;
+
+    const response = await route(call("POST"));
+
+    expect(response.status).toBe(429);
+    expect(onlyLine(response)).toMatchObject({ level: "warn", status: 429, userId: user.id });
+  });
+
+  it.each([
+    ["an HttpError", () => new HttpError(404, "Thing not found."), 404, undefined],
+    ["a DomainError", () => new DomainError("Not enough shares.", 409), 409, undefined],
+    ["an ImportError", () => new ImportError("already_imported", "You imported this statement."), 409, "already_imported"],
+  ])("writes %s at info with its status, and no failure", async (_name, error, status, errorCode) => {
+    const response = await withUser(async () => { throw error(); }, { failure: "x" })(call());
+
+    const line = onlyLine(response);
+    expect(line).toMatchObject({ level: "info", status });
+    expect(line.errorCode).toBe(errorCode);
+    expect(loggedLines(logged, "request_failed")).toEqual([]);
+  });
+
+  it("names the password-change refusal by its code", async () => {
+    cookieDatabaseWith([{ id: user.id, must_change_password: true }]);
+    const response = await withUser(ok)(call());
+
+    expect(onlyLine(response)).toMatchObject({ level: "info", status: 403, errorCode: "password_change_required" });
+  });
+
+  it("logs an unexpected error before answering 500 with the request id in the body", async () => {
+    const response = await withUser(async () => { throw new Error("database exploded"); }, { failure: "Unable to do it." })(call());
+
+    const line = onlyLine(response);
+    expect(line).toMatchObject({ level: "error", status: 500, userId: user.id });
+    expect(await response.json()).toEqual({ error: "Unable to do it.", requestId: line.requestId });
+    const failures = loggedLines(logged, "request_failed");
+    expect(failures).toEqual([
+      expect.objectContaining({
+        level: "error",
+        requestId: line.requestId,
+        route: "/api/test",
+        error: expect.objectContaining({ name: "Error", message: "database exploded" }),
+      }),
+    ]);
+    expect(logged.findIndex((text) => text.includes('"request_failed"'))).toBeLessThan(logged.findIndex((text) => text.includes('"event":"request",')));
+  });
+
+  it("logs an unexpected error without a failure message once, then lets it propagate unchanged", async () => {
+    const boom = new Error("boom");
+    await expect(withUser(async () => { throw boom; })(call())).rejects.toBe(boom);
+
+    expect(loggedLines(logged, "request_failed")).toHaveLength(1);
+    expect(requestLines()).toEqual([expect.objectContaining({ level: "error", status: 500, userId: user.id })]);
+  });
+
+  it("logs an error withRequestGuard and withAnonymousLimit let through, and rethrows it", async () => {
+    await expect(withRequestGuard(async () => { throw new Error("boom"); })(call())).rejects.toThrow("boom");
+    await expect(withAnonymousLimit(async () => { throw new Error("boom"); })(call())).rejects.toThrow("boom");
+
+    expect(loggedLines(logged, "request_failed")).toHaveLength(2);
+    expect(requestLines().map((line) => [line.level, line.status])).toEqual([["error", 500], ["error", 500]]);
+  });
+
+  it("writes a request slower than LOG_SLOW_MS at warn with slow: true", async () => {
+    vi.stubEnv("LOG_SLOW_MS", "5");
+    const response = await withUser(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return json({ ok: true });
+    })(call());
+
+    expect(onlyLine(response)).toMatchObject({ level: "warn", status: 200, slow: true });
+  });
+
+  it("writes one line with an id for withRequestGuard and withAnonymousLimit", async () => {
+    const guarded = await withRequestGuard(ok)(call("POST", "/api/auth"));
+    expect(onlyLine(guarded)).toMatchObject({ level: "info", status: 200, method: "POST", route: "/api/auth" });
+
+    logged.length = 0;
+    const token = `sl_cal_${"A".repeat(43)}`;
+    const anonymous = await withAnonymousLimit(ok)(call("GET", `/api/calendar/feed/${token}.ics`));
+    const line = onlyLine(anonymous);
+    expect(line).toMatchObject({ level: "info", status: 200, route: "/api/calendar/feed/:token" });
+    expect(JSON.stringify(line)).not.toContain(token);
+  });
+
+  it("writes one line when one wrapper runs inside another", async () => {
+    const response = await withRequestGuard(withAnonymousLimit(ok))(call("POST"));
+
+    onlyLine(response);
+  });
+
+  it("adds a handler's own fields to the line, without letting them replace its own", async () => {
+    const response = await withUser(async () => {
+      addRequestFields({ familyId: "family-1", status: 999, route: "/forged" });
+      return json({ ok: true });
+    })(call());
+
+    expect(onlyLine(response)).toMatchObject({ familyId: "family-1", status: 200, route: "/api/test" });
+  });
+
+  it("puts the request id on every line written inside the request, and on none outside", async () => {
+    log.info("before");
+    const response = await withUser(async () => {
+      log.warn("inside", { step: 1 });
+      return json({ ok: true });
+    })(call());
+    log.info("after");
+
+    const id = response.headers.get("x-request-id");
+    expect(loggedLines(logged, "inside")).toEqual([expect.objectContaining({ requestId: id, step: 1 })]);
+    expect(loggedLines(logged, "before")[0]).not.toHaveProperty("requestId");
+    expect(loggedLines(logged, "after")[0]).not.toHaveProperty("requestId");
+    expect(currentRequest()).toBeUndefined();
+  });
+
+  it("keeps two interleaved requests apart: each line carries its own request's id", async () => {
+    let releaseFirst!: () => void;
+    const firstWaits = new Promise<void>((resolve) => (releaseFirst = resolve));
+    const route = withUser(async (request: Request) => {
+      const name = new URL(request.url).searchParams.get("name");
+      log.info("step", { name, at: "start" });
+      if (name === "first") await firstWaits;
+      log.info("step", { name, at: "end" });
+      return json({ name });
+    });
+
+    const first = route(call("GET", "/api/test?name=first"));
+    const second = await route(call("GET", "/api/test?name=second"));
+    releaseFirst();
+    const firstResponse = await first;
+
+    const ids = { first: firstResponse.headers.get("x-request-id"), second: second.headers.get("x-request-id") };
+    expect(ids.first).not.toBe(ids.second);
+    const steps = loggedLines(logged, "step");
+    expect(steps.map((line) => line.name)).toEqual(["first", "second", "second", "first"]);
+    for (const line of steps) expect(line.requestId).toBe(ids[line.name as "first" | "second"]);
+    for (const line of requestLines()) expect([ids.first, ids.second]).toContain(line.requestId);
+    expect(new Set(requestLines().map((line) => line.requestId)).size).toBe(2);
+  });
+
+  it("uses the id the proxy gave the request", async () => {
+    const response = await withUser(ok)(call("GET", "/api/test", { "x-request-id": "Proxy1234567", "x-request-id-source": "proxy" }));
+
+    expect(response.headers.get("x-request-id")).toBe("Proxy1234567");
+    expect(onlyLine(response).requestId).toBe("Proxy1234567");
+  });
+
+  it.each([
+    ["without the proxy's marker", { "x-request-id": "Forged123456" }],
+    ["with a forged marker", { "x-request-id": "Forged123456", "x-request-id-source": "proxy" }],
+  ])("ignores a client's x-request-id %s on a route the proxy skips", async (_name, headers) => {
+    const response = await withAnonymousLimit(ok)(call("GET", "/api/calendar/feed/sl_cal_token.ics", headers));
+
+    expect(response.headers.get("x-request-id")).not.toBe("Forged123456");
+    expect(onlyLine(response).requestId).not.toBe("Forged123456");
+  });
+
+  it("ignores an x-request-id without the proxy's marker even where the proxy runs", async () => {
+    const response = await withUser(ok)(call("GET", "/api/test", { "x-request-id": "Forged123456" }));
+
+    expect(onlyLine(response).requestId).not.toBe("Forged123456");
+  });
+
+  it("sets x-request-id on a response whose headers can't be changed", async () => {
+    const response = await withAnonymousLimit(async () => Response.redirect("http://localhost/login", 302))(call());
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("http://localhost/login");
+    onlyLine(response);
+  });
+
+  it("writes a line for a handler called without a request, as tests do", async () => {
+    const response = await withUser(ok)();
+
+    expect(onlyLine(response)).toMatchObject({ method: "GET", route: "unknown", status: 200 });
   });
 });

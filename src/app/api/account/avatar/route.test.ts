@@ -241,7 +241,7 @@ describe("PUT /api/account/avatar", () => {
 
     const response = await upload(bytes(await photo("jpeg")));
 
-    expect(response).toEqual({ status: 500, body: { error: "Unable to save your picture. Please try again." } });
+    expect(response).toEqual({ status: 500, body: { error: "Unable to save your picture. Please try again.", requestId: expect.any(String) } });
   });
 });
 

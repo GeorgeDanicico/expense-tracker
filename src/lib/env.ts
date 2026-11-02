@@ -42,6 +42,11 @@ export const DEFAULT_TRUSTED_PROXY_HOPS = 1;
 /** The most hops `TRUSTED_PROXY_HOPS` may name. */
 export const MAX_TRUSTED_PROXY_HOPS = 5;
 
+/** How long a request may take, in milliseconds, before its request line is a `warn` with `slow: true`, when `LOG_SLOW_MS` isn't set. */
+export const DEFAULT_LOG_SLOW_MS = 1000;
+/** The longest `LOG_SLOW_MS` may name: an hour. */
+const MAX_LOG_SLOW_MS = 3_600_000;
+
 /** Where variables are read from: `process.env`, or a plain record in tests. */
 export type EnvSource = Readonly<Record<string, string | undefined>>;
 
@@ -139,6 +144,8 @@ export const serverEnvSchema = z.object({
     .string()
     .optional()
     .transform((value) => parseLogLevel(value)),
+  /** A request slower than this many milliseconds is logged at `warn` with `slow: true`. A whole number of 1 or more; 1000 when unset or invalid. */
+  LOG_SLOW_MS: optionalInteger({ fallback: DEFAULT_LOG_SLOW_MS, min: 1, max: MAX_LOG_SLOW_MS }),
 
   // The worker.
   /** The build written with the worker's heartbeat; the package version when it's unset. */

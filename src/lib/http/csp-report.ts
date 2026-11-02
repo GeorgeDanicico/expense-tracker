@@ -1,3 +1,5 @@
+import { redactPath } from "@/lib/log/redact-path";
+
 /**
  * Reading the CSP violation reports browsers send to `POST /api/csp-report` (security plan S7),
  * down to the few fields worth a log line. Two formats arrive:
@@ -135,19 +137,6 @@ function describeResource(value: unknown, documentUrl: URL | null): string | und
   if (!["http:", "https:", "ws:", "wss:"].includes(url.protocol)) return url.protocol.slice(0, -1);
   if (documentUrl && url.origin === documentUrl.origin) return clip(redactPath(url.pathname));
   return clip(`${url.origin}${url.pathname}`);
-}
-
-/** Paths whose segments are secrets, with what they're logged as. */
-const SECRET_PATHS: readonly [RegExp, string][] = [
-  [/^\/join\/[^/]+/, "/join/:code"], // An invite link's code.
-];
-
-/** `path` with any secret segment replaced (an invite code in `/join/<code>`). */
-function redactPath(path: string): string {
-  for (const [pattern, replacement] of SECRET_PATHS) {
-    if (pattern.test(path)) return path.replace(pattern, replacement);
-  }
-  return path;
 }
 
 function parseUrl(value: unknown): URL | null {

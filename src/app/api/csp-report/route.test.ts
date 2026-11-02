@@ -6,7 +6,13 @@ import { REQUEST_GUARD_EXEMPTIONS } from "@/lib/http/guard";
 import { CSP_REPORT_MAX_ATTEMPTS, resetRateLimits, TOO_MANY_CSP_REPORTS } from "@/lib/http/rate-limit";
 import { BODY_TOO_LARGE } from "@/lib/http/route";
 
+import { loggedLines as loggerLines } from "@/test/log-lines";
+
 import { POST } from "./route";
+
+// The request lines (debug) go to `requestLog` instead of stdout.
+const requestLog = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), requestLog));
 
 const URL = "http://localhost/api/csp-report";
 
@@ -191,5 +197,38 @@ describe("POST /api/csp-report", () => {
       expect((await post(LEGACY_REPORT, { headers })).status, JSON.stringify(headers)).toBe(204);
     }
     expect(REQUEST_GUARD_EXEMPTIONS["/api/csp-report"]).toMatch(/never reads cookies or the session/);
+  });
+});
+
+describe("POST /api/csp-report's request line", () => {
+  beforeEach(() => {
+    resetRateLimits();
+    requestLog.length = 0;
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("writes one debug line and an x-request-id for every answer, 204, 415 and 429 alike", async () => {
+    const responses = [await post(LEGACY_REPORT), await post(LEGACY_REPORT, { contentType: "text/plain" })];
+    for (let attempt = responses.length; attempt <= CSP_REPORT_MAX_ATTEMPTS; attempt++) responses.push(await post(LEGACY_REPORT));
+
+    const lines = loggerLines(requestLog, "request");
+    expect(lines).toHaveLength(responses.length);
+    expect(lines.map((line) => line.status)).toEqual(responses.map((response) => response.status));
+    expect(new Set(lines.map((line) => line.status))).toEqual(new Set([204, 415, 429]));
+    responses.forEach((response, index) => {
+      expect(response.headers.get("x-request-id")).toBe(lines[index].requestId);
+      expect(lines[index]).toMatchObject({ level: "debug", method: "POST", route: "/api/csp-report" });
+    });
+  });
+
+  it("ignores an x-request-id the browser sent, even with the proxy's marker: the proxy never sees this route", async () => {
+    const response = await post(LEGACY_REPORT, { headers: { "x-request-id": "Forged123456", "x-request-id-source": "proxy" } });
+
+    expect(response.headers.get("x-request-id")).toMatch(/^[A-Za-z0-9]{12}$/);
+    expect(response.headers.get("x-request-id")).not.toBe("Forged123456");
   });
 });
