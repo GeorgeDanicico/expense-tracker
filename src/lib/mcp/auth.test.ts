@@ -45,25 +45,36 @@ describe("the token throttle", () => {
     resetMcpAuthForTests();
   });
 
-  it("throttles the sixth bad token with one prefix and from one IP", async () => {
+  it("throttles the sixth bad token from one IP, whatever prefixes it tries", async () => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      expect(await getMcpTokenSession(badToken(1), null)).toEqual({ status: "unauthorized" });
+      expect(await getMcpTokenSession(badToken(100 + attempt), "203.0.113.7")).toEqual({ status: "unauthorized" });
     }
-    expect(await getMcpTokenSession(badToken(1), null)).toEqual({ status: "throttled" });
 
-    for (let attempt = 0; attempt < 5; attempt += 1) await getMcpTokenSession(badToken(100 + attempt), "203.0.113.7");
-    expect(await getMcpTokenSession(badToken(200), "203.0.113.7")).toEqual({ status: "throttled" });
+    expect(await getMcpTokenSession(badToken(200), "203.0.113.7")).toEqual({ status: "throttled", retryAfterSeconds: 15 * 60 });
     expect(await getMcpTokenSession(badToken(200), "203.0.113.8")).toEqual({ status: "unauthorized" });
   });
 
+  it("doesn't key a failure by the token's prefix, which the caller chooses", async () => {
+    // One prefix from five IPs, then the same prefix from a sixth: nothing links them.
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      expect(await getMcpTokenSession(badToken(1), `203.0.113.${attempt}`)).toEqual({ status: "unauthorized" });
+    }
+  });
+
+  it("puts every request without a trusted IP in one bucket", async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) await getMcpTokenSession(badToken(attempt), null);
+
+    expect(await getMcpTokenSession(badToken(9), null)).toMatchObject({ status: "throttled" });
+  });
+
   it("is the shared limiter, so it forgets the oldest keys instead of growing without bound", async () => {
-    for (let attempt = 0; attempt < 5; attempt += 1) await getMcpTokenSession(badToken(0), null);
-    expect(await getMcpTokenSession(badToken(0), null)).toEqual({ status: "throttled" });
+    for (let attempt = 0; attempt < 5; attempt += 1) await getMcpTokenSession(badToken(attempt), "ip-0");
+    expect(await getMcpTokenSession(badToken(9), "ip-0")).toMatchObject({ status: "throttled" });
 
-    // One failure under each of MAX_TRACKED_KEYS other prefixes pushes the first one out.
-    for (let index = 1; index <= MAX_TRACKED_KEYS; index += 1) await getMcpTokenSession(badToken(index), null);
+    // One failure from each of MAX_TRACKED_KEYS other IPs pushes the first one out.
+    for (let index = 1; index <= MAX_TRACKED_KEYS; index += 1) await getMcpTokenSession(badToken(index), `ip-${index}`);
 
-    expect(await getMcpTokenSession(badToken(0), null)).toEqual({ status: "unauthorized" });
+    expect(await getMcpTokenSession(badToken(9), "ip-0")).toEqual({ status: "unauthorized" });
   });
 });
 

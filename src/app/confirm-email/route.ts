@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuth } from "@/lib/auth";
 import { siteOrigin } from "@/lib/http/origin";
+import { withAnonymousLimit } from "@/lib/http/route";
 
 const confirmationSchema = z.object({
   email: z.email(),
@@ -10,7 +11,7 @@ const confirmationSchema = z.object({
   type: z.literal("email"),
 });
 
-export async function GET(request: NextRequest) {
+export const GET = withAnonymousLimit(async (request: NextRequest) => {
   const parsed = confirmationSchema.safeParse({
     email: request.nextUrl.searchParams.get("email"),
     token: request.nextUrl.searchParams.get("token"),
@@ -25,4 +26,4 @@ export async function GET(request: NextRequest) {
   const { ok } = await getAuth().completeEmailLink(parsed.data);
 
   return NextResponse.redirect(ok ? new URL("/dashboard", origin) : failed);
-}
+});

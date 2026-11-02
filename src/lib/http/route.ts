@@ -8,8 +8,17 @@ import { getAuthenticatedUser, type AuthenticatedUser } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
 import { touchLastActiveInBackground } from "@/lib/family/last-active";
 import { readBodyWithLimit } from "@/lib/http/body";
+import { clientKey } from "@/lib/http/client-ip";
 import { HttpError } from "@/lib/http/errors";
 import { refuseForeignRequest } from "@/lib/http/guard";
+import {
+  anonymousRequests,
+  signedOutRequests,
+  TOO_MANY_REQUESTS,
+  userReadRequests,
+  userWriteRequests,
+  type RequestLimiter,
+} from "@/lib/http/rate-limit";
 import { ImportError } from "@/lib/imports/types";
 import { getRepositories } from "@/lib/repositories";
 import { idSchema } from "@/lib/validation/primitives";
@@ -108,6 +117,31 @@ export type RouteHandler<Req, Ctx> = {
   (request: Req, context: Ctx): Promise<Response>;
 };
 
+/** The methods that change nothing; every other method counts as a write for the request limit. */
+const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** The 429 for `key` going over `limiter`, or null when the request may go on and has been counted. */
+function refuseOverLimit(limiter: RequestLimiter, key: string) {
+  const wait = limiter.take(key);
+  return wait > 0 ? tooManyRequests(TOO_MANY_REQUESTS, wait) : null;
+}
+
+/**
+ * Runs the per-IP request limit (`anonymousRequests`) for a route that needs no session, then the
+ * handler. For the public routes that don't use `withRequestGuard` (the calendar feed, the OAuth and
+ * email-link redirects, the OAuth metadata). A request with no `request` is a test calling a handler
+ * directly.
+ */
+export function withAnonymousLimit<Req extends Request = Request, Ctx = unknown>(
+  handler: (request: Req, context: Ctx) => Promise<Response>,
+): RouteHandler<Req, Ctx> {
+  return async (request?: Req, context?: Ctx): Promise<Response> => {
+    const refused = refuseOverLimit(anonymousRequests, clientKey(request));
+    if (refused) return refused;
+    return handler(request as Req, context as Ctx);
+  };
+}
+
 function errorResponse(error: HttpError | DomainError | ImportError) {
   // A refused statement carries the `code` the import screen tells refusals apart by, and no field errors.
   if (error instanceof ImportError) return json({ error: error.message, code: error.code }, error.status);
@@ -117,7 +151,8 @@ function errorResponse(error: HttpError | DomainError | ImportError) {
 /**
  * Runs the request guard (`refuseForeignRequest`: a write from another site is a 403) and maps an
  * `HttpError` to its response, for the routes that don't sign the caller in through `withUser`
- * (`/api/auth`). Any other error propagates.
+ * (`/api/auth`). It also counts the request against the per-IP limit for anonymous routes
+ * (`anonymousRequests`): 429 past it. Any other error propagates.
  */
 export function withRequestGuard<Req extends Request = Request, Ctx = unknown>(
   handler: (request: Req, context: Ctx) => Promise<Response>,
@@ -125,6 +160,8 @@ export function withRequestGuard<Req extends Request = Request, Ctx = unknown>(
   return async (request?: Req, context?: Ctx): Promise<Response> => {
     const refused = refuseForeignRequest(request);
     if (refused) return errorResponse(refused);
+    const overLimit = refuseOverLimit(anonymousRequests, clientKey(request));
+    if (overLimit) return overLimit;
     try {
       return await handler(request as Req, context as Ctx);
     } catch (error) {
@@ -147,7 +184,9 @@ export type WithUserOptions = {
 /**
  * Wraps a route handler with the request guard, authentication and error mapping:
  * a write from another site → 403 before the session is even read (`refuseForeignRequest`),
- * no user → 401, an account that must choose a new password → 403 `password_change_required`
+ * no user → 401 (counted per client IP, 429 past `signedOutRequests`), a signed-in user past their
+ * request limit (`userReadRequests` for `GET`/`HEAD`/`OPTIONS`, `userWriteRequests` for the rest) →
+ * 429 with `Retry-After` before anything else runs, an account that must choose a new password → 403 `password_change_required`
  * (unless `allowPasswordChangeRequired`), `HttpError`/`DomainError` → their status, `ImportError` →
  * its status with `{ error, code }`, anything else → 500 with `failure`.
  * Without `failure`, unexpected errors propagate to Next's default error response.
@@ -167,7 +206,9 @@ export function withUser<Req extends Request = Request, Ctx = unknown>(
     if (refused) return errorResponse(refused);
 
     const user = await getAuthenticatedUser();
-    if (!user) return unauthorized();
+    if (!user) return refuseOverLimit(signedOutRequests, clientKey(request)) ?? unauthorized();
+    const overLimit = refuseOverLimit(READ_METHODS.has(request?.method.toUpperCase() ?? "GET") ? userReadRequests : userWriteRequests, user.id);
+    if (overLimit) return overLimit;
     touchLastActiveInBackground(user.id);
 
     try {

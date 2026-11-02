@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 const mocks = vi.hoisted(() => ({
@@ -27,11 +27,24 @@ import {
   parseBody,
   parseId,
   readJson,
+  withAnonymousLimit,
   withRequestGuard,
   withUser,
 } from "@/lib/http/route";
+import {
+  ANONYMOUS_MAX_REQUESTS,
+  resetRateLimits,
+  SIGNED_OUT_MAX_REQUESTS,
+  TOO_MANY_REQUESTS,
+  USER_READ_MAX_REQUESTS,
+  USER_WRITE_MAX_REQUESTS,
+} from "@/lib/http/rate-limit";
 import { getRepositories } from "@/lib/repositories";
 import { fakeSupabase } from "@/test/fake-supabase";
+
+beforeEach(() => {
+  resetRateLimits();
+});
 
 const PRIVATE = "private, no-store, max-age=0";
 const user = { id: "user-1", email: "user@example.com" };
@@ -264,6 +277,162 @@ describe("withUser", () => {
 
   it("lets unexpected errors propagate when no failure message is given", async () => {
     await expect(withUser(async () => { throw new Error("boom"); })()).rejects.toThrow("boom");
+  });
+});
+
+describe("the request limits in the wrappers", () => {
+  const ok = async () => json({ ok: true });
+  const sameOrigin = { "sec-fetch-site": "same-origin" };
+  const call = (method: string, headers: Record<string, string> = {}) =>
+    new Request("http://localhost/api/test", { method, headers: { ...sameOrigin, ...headers } });
+  const otherUser = { id: "user-2", email: "other@example.com" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-16T09:00:00.000Z"));
+    mocks.getAuthenticatedUser.mockResolvedValue(user);
+    cookieDatabaseWith();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Sends `times` requests and returns how many were answered 429. */
+  async function limitedOf(handler: ReturnType<typeof withUser>, times: number, method: string) {
+    let limited = 0;
+    for (let sent = 0; sent < times; sent += 1) if ((await handler(call(method))).status === 429) limited += 1;
+    return limited;
+  }
+
+  it("answers a signed-in read past 600 a minute with 429, Retry-After and the usual error shape", async () => {
+    const handler = withUser(ok);
+    expect(await limitedOf(handler, USER_READ_MAX_REQUESTS, "GET")).toBe(0);
+
+    const response = await handler(call("GET"));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(response.headers.get("cache-control")).toBe(PRIVATE);
+    expect(await response.json()).toEqual({ error: TOO_MANY_REQUESTS });
+  });
+
+  it("answers a signed-in write past 120 a minute with 429, while reads still go through", async () => {
+    const handler = vi.fn(ok);
+    const route = withUser(handler);
+    expect(await limitedOf(route, USER_WRITE_MAX_REQUESTS, "POST")).toBe(0);
+
+    const response = await route(call("POST"));
+
+    expect(response.status).toBe(429);
+    expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(handler).toHaveBeenCalledTimes(USER_WRITE_MAX_REQUESTS);
+    expect((await route(call("GET"))).status).toBe(200);
+  });
+
+  it.each(["PUT", "PATCH", "DELETE"])("counts %s as a write", async (method) => {
+    const route = withUser(ok);
+    expect(await limitedOf(route, USER_WRITE_MAX_REQUESTS, method)).toBe(0);
+
+    expect((await route(call(method))).status).toBe(429);
+  });
+
+  it("counts HEAD and OPTIONS as reads", async () => {
+    const route = withUser(ok);
+    for (let sent = 0; sent < USER_WRITE_MAX_REQUESTS + 5; sent += 1) {
+      expect((await route(call(sent % 2 === 0 ? "HEAD" : "OPTIONS"))).status).toBe(200);
+    }
+  });
+
+  it("limits each user alone, whatever their IP", async () => {
+    const route = withUser(ok);
+    await limitedOf(route, USER_WRITE_MAX_REQUESTS + 1, "POST");
+
+    mocks.getAuthenticatedUser.mockResolvedValue(otherUser);
+    expect((await route(call("POST"))).status).toBe(200);
+  });
+
+  it("lets a user in again as the window slides, without waiting for a whole minute to pass", async () => {
+    const route = withUser(ok);
+    await route(call("POST"));
+    vi.advanceTimersByTime(30_000);
+    await limitedOf(route, USER_WRITE_MAX_REQUESTS - 1, "POST");
+    expect((await route(call("POST"))).status).toBe(429);
+
+    // The first request leaves the window after 60 seconds, so one more is allowed, then none.
+    vi.advanceTimersByTime(30_000);
+    expect((await route(call("POST"))).status).toBe(200);
+    expect((await route(call("POST"))).status).toBe(429);
+  });
+
+  it("doesn't run the handler for a limited request", async () => {
+    const handler = vi.fn(ok);
+    const route = withUser(handler);
+    await limitedOf(route, USER_WRITE_MAX_REQUESTS, "POST");
+    handler.mockClear();
+
+    await route(call("POST"));
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("never limits a realistic burst: a page load, SWR revalidation, then an import and a few edits, all inside a minute", async () => {
+    const route = withUser(ok);
+    // Ten tabs' worth of page loads (about ten GETs each), then 30 edits and an upload and its confirm.
+    expect(await limitedOf(route, 100, "GET")).toBe(0);
+    expect(await limitedOf(route, 30, "POST")).toBe(0);
+    expect(await limitedOf(route, 40, "GET")).toBe(0);
+  });
+
+  it("counts requests that carry no session per client IP, answering 429 past 120 a minute and 401 before", async () => {
+    mocks.getAuthenticatedUser.mockResolvedValue(null);
+    const route = withUser(ok);
+    const from = (ip: string) => route(call("GET", { "x-forwarded-for": ip }));
+    for (let sent = 0; sent < SIGNED_OUT_MAX_REQUESTS; sent += 1) expect((await from("203.0.113.7")).status).toBe(401);
+
+    const response = await from("203.0.113.7");
+
+    expect(response.status).toBe(429);
+    expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect((await from("203.0.113.8")).status).toBe(401);
+  });
+
+  it("doesn't let a made-up first X-Forwarded-For hop get a fresh signed-out limit", async () => {
+    mocks.getAuthenticatedUser.mockResolvedValue(null);
+    const route = withUser(ok);
+    for (let sent = 0; sent < SIGNED_OUT_MAX_REQUESTS; sent += 1) {
+      await route(call("GET", { "x-forwarded-for": `198.51.100.${sent}, 203.0.113.7` }));
+    }
+
+    expect((await route(call("GET", { "x-forwarded-for": "198.51.100.250, 203.0.113.7" }))).status).toBe(429);
+  });
+
+  it("limits withRequestGuard routes per client IP, 60 a minute", async () => {
+    const route = withRequestGuard(ok);
+    const from = (ip: string) => route(call("POST", { "x-forwarded-for": ip }));
+    for (let sent = 0; sent < ANONYMOUS_MAX_REQUESTS; sent += 1) expect((await from("203.0.113.7")).status).toBe(200);
+
+    const response = await from("203.0.113.7");
+
+    expect(response.status).toBe(429);
+    expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(await response.json()).toEqual({ error: TOO_MANY_REQUESTS });
+    expect((await from("203.0.113.8")).status).toBe(200);
+  });
+
+  it("limits withAnonymousLimit routes per client IP, 60 a minute, and passes the request and context on", async () => {
+    const handler = vi.fn(ok);
+    const route = withAnonymousLimit(handler);
+    const request = call("GET", { "x-forwarded-for": "203.0.113.7" });
+    const context = { params: Promise.resolve({}) };
+    await route(request, context);
+    expect(handler).toHaveBeenCalledWith(request, context);
+
+    for (let sent = 1; sent < ANONYMOUS_MAX_REQUESTS; sent += 1) await route(call("GET", { "x-forwarded-for": "203.0.113.7" }));
+
+    expect((await route(call("GET", { "x-forwarded-for": "203.0.113.7" }))).status).toBe(429);
+    expect((await route(call("GET", { "x-forwarded-for": "203.0.113.8" }))).status).toBe(200);
   });
 });
 

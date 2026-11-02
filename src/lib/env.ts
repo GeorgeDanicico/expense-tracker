@@ -32,6 +32,14 @@ export const DEFAULT_FAMILY_MONTHLY_USD = 3;
 /** What everyone may spend in a month when `AI_MONTHLY_BUDGET_USD` isn't set: about three families' worth. */
 export const DEFAULT_GLOBAL_MONTHLY_USD = 10;
 
+/**
+ * How many `X-Forwarded-For` hops our own proxies add when `TRUSTED_PROXY_HOPS` isn't set: one, the
+ * address the proxy in front of the container saw (Tailscale Serve on the VPS).
+ */
+export const DEFAULT_TRUSTED_PROXY_HOPS = 1;
+/** The most hops `TRUSTED_PROXY_HOPS` may name. */
+export const MAX_TRUSTED_PROXY_HOPS = 5;
+
 /** Where variables are read from: `process.env`, or a plain record in tests. */
 export type EnvSource = Readonly<Record<string, string | undefined>>;
 
@@ -53,6 +61,19 @@ function optionalUsd(fallback: number) {
       if (!text) return fallback;
       const parsed = Number(text);
       return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+    });
+}
+
+/** A whole number from `min` to `max`, else `fallback` (unset, empty, not a number, or out of range). */
+function optionalInteger({ fallback, min, max }: { fallback: number; min: number; max: number }) {
+  return z
+    .string()
+    .optional()
+    .transform((value) => {
+      const text = value?.trim();
+      if (!text || !/^\d+$/.test(text)) return fallback;
+      const parsed = Number(text);
+      return parsed >= min && parsed <= max ? parsed : fallback;
     });
 }
 
@@ -82,6 +103,12 @@ export const serverEnvSchema = z.object({
   // The app's own address and its helpers.
   /** The public address of the app; sign-in links and MCP use the request's own address when it's unset. */
   SITE_URL: optionalText,
+  /**
+   * How many proxies in front of the app add a hop to `X-Forwarded-For`, which decides the client IP
+   * the rate limits use (`clientIp`). 1 (the default) is one proxy, such as Tailscale Serve; 2 is
+   * two in a row; 0 trusts the header not at all and puts every client in one shared bucket.
+   */
+  TRUSTED_PROXY_HOPS: optionalInteger({ fallback: DEFAULT_TRUSTED_PROXY_HOPS, min: 0, max: MAX_TRUSTED_PROXY_HOPS }),
   /** The investment price service; quote lookups fail without it. */
   PRICE_SERVICE_URL: optionalText,
   /** The family module is on only when this is exactly `true`. */

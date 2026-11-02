@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getAuth, type EmailLink, type EmailLinkType } from "@/lib/auth";
 import { safeNextPath, siteOrigin } from "@/lib/http/origin";
+import { withAnonymousLimit } from "@/lib/http/route";
 
 function emailLink(searchParams: URLSearchParams): EmailLink | null {
   const code = searchParams.get("code");
@@ -12,7 +13,7 @@ function emailLink(searchParams: URLSearchParams): EmailLink | null {
   return null;
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withAnonymousLimit(async (request: NextRequest) => {
   const searchParams = request.nextUrl.searchParams;
   const link = emailLink(searchParams);
   const next = safeNextPath(searchParams.get("next"));
@@ -23,4 +24,4 @@ export async function GET(request: NextRequest) {
   const origin = siteOrigin(request);
   const target = confirmed ? new URL(next, origin) : new URL("/login?message=confirmation-failed", origin);
   return NextResponse.redirect(target);
-}
+});

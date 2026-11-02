@@ -126,10 +126,16 @@ A kid can use AI assistants only when all three hold: a parent has turned on the
 - OAuth tokens and personal tokens work only on `/api/mcp`; the REST API refuses both, and neither can sign in to the web app or change a password.
 - Production must be served over HTTPS. The deploy workflow binds the container to `127.0.0.1:3000`. For private access from your own devices, run `sudo tailscale serve --bg 3000` on the VPS and set `SITE_URL` to the resulting `https://<host>.<tailnet>.ts.net` origin. `SITE_URL` must be exactly the address clients are given, since the OAuth challenge points at it.
 - Personal tokens live in your local Claude config, so keep those files private.
-- After 5 bad tokens within 15 minutes from one IP or with one token prefix, requests return 429 until the window passes.
+- After 5 bad personal tokens within 15 minutes from one client IP (30 bad app tokens, for OAuth apps), requests from that IP return 429 until the window passes. Failures are keyed by IP only, never by the token's prefix, which the caller chooses.
 - A personal token's session is cached in server memory. A restart or redeploy only means a fresh session on the next request.
 - Browser requests with an `Origin` other than `SITE_URL` are rejected with 403 (DNS-rebinding guard). Without `SITE_URL`, only localhost origins are accepted; Claude Code sends no `Origin`.
 - The REST API (and sign-in) refuses writes from other sites the same way: a `POST`, `PUT`, `PATCH` or `DELETE` with `Sec-Fetch-Site: cross-site` or `same-site`, or with an `Origin` other than `SITE_URL`, gets 403, and JSON bodies must be `application/json` and at most 64 KB. Browsers mark the app's own requests `Sec-Fetch-Site: same-origin`, which is trusted on its own; only a browser that doesn't send that header has its `Origin` compared with `SITE_URL`, so keep `SITE_URL` set to the address you open the app at. The rules and the one exemption (`/api/mcp`) are in `src/lib/http/guard.ts`.
+
+### Rate limits and the client IP
+
+Every route has a request limit (a sliding one-minute window; a limited request gets 429 with `Retry-After`): 600 reads and 120 writes per signed-in user, 60 per client IP on the pages and endpoints that need no session, and the MCP and CSP-report limits. All the numbers and where each one is applied are in the table in `src/lib/http/rate-limit.ts`.
+
+Limits by IP use the address from `X-Forwarded-For`, but only the hop our own proxy added: the last one by default (`TRUSTED_PROXY_HOPS=1`, one proxy such as Tailscale Serve). Anything earlier in the header comes from the client and is ignored, so sending a made-up `X-Forwarded-For` doesn't reset a limit. This assumes the proxy in front of the app appends the client's address to `X-Forwarded-For` (Next fills the header from the connection itself when nothing sent one); if it doesn't, every client shares the proxy's address and one limit. Set `TRUSTED_PROXY_HOPS=2` if a second proxy sits in front of the first, or `0` to ignore the header and put every client in one bucket. Without a usable address, requests share one `unknown` bucket.
 
 ## Docker on a VPS
 

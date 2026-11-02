@@ -3,7 +3,8 @@ import "server-only";
 /**
  * Counts failed attempts per key (such as a user id) and says when a key has too many. In memory:
  * the app runs as a single process, so a restart forgetting the counts is acceptable. Every limit in
- * the app, the MCP token throttle included, is one of these.
+ * the app, the MCP token throttle included, is one of these (a request limit is one too, through
+ * `createRequestLimiter`).
  */
 export type FailureLimiter = {
   /** Whether `key` already has the maximum failures inside the window, so its next attempt must be refused. */
@@ -85,6 +86,88 @@ export function createFailureLimiter({
     recordAttempt: recordFailure,
   };
 }
+
+/**
+ * Counts every request per key (a user id or a client IP) and refuses the ones past a limit. Built on
+ * the failure counter, so it has the same sliding window, the same bounded memory and the same
+ * reset for tests.
+ */
+export type RequestLimiter = {
+  /**
+   * Counts a request by `key`. Returns 0 when it may go on, or the whole seconds (at least 1) until
+   * `key` may send another. A refused request isn't counted, so a client that keeps trying is let
+   * through again as soon as its oldest counted request leaves the window.
+   */
+  take(key: string): number;
+};
+
+/** A limiter that lets a key send `maxRequests` requests in any `windowMs` (a sliding window, not a fixed minute). */
+export function createRequestLimiter({
+  maxRequests,
+  windowMs,
+  maxKeys,
+}: {
+  maxRequests: number;
+  windowMs: number;
+  maxKeys?: number;
+}): RequestLimiter {
+  const requests = createFailureLimiter({ maxFailures: maxRequests, windowMs, maxKeys });
+  return {
+    take(key) {
+      if (requests.isLimited(key)) return requests.retryAfterSeconds(key);
+      requests.recordAttempt(key);
+      return 0;
+    },
+  };
+}
+
+const MINUTE_MS = 60 * 1000;
+
+/**
+ * Request limits (security plan S11, audit P8). Every route is behind one of them, set by the route
+ * wrappers in `src/lib/http/route.ts` and the MCP route, never by a route by hand. They are generous
+ * on purpose: one page load makes under ten requests, so normal use is nowhere near them. They stop
+ * a script or a runaway client, and are to be tightened once real usage shows in the logs
+ * (phase 15). All of them are per minute, in a sliding window, and a limited request gets 429 with
+ * `Retry-After` and `{ error }`. (The sign-in, upload and token limits above, and the CSP report
+ * limit below, are separate and stay.)
+ *
+ * | Who                                                   | Limit      | Key              | Where                  |
+ * | ----------------------------------------------------- | ---------- | ---------------- | ---------------------- |
+ * | Signed in, `GET`/`HEAD`/`OPTIONS`                     | 600 a min  | user id          | `withUser` (and so `withPermission`, `withParent`) |
+ * | Signed in, any other method                           | 120 a min  | user id          | `withUser`             |
+ * | A signed-in route with no valid session (401)         | 120 a min  | client IP        | `withUser`             |
+ * | Anonymous: sign-in and sign-up, calendar feed, OAuth and email-link redirects, OAuth metadata | 60 a min | client IP | `withRequestGuard`, `withAnonymousLimit` |
+ * | MCP, before the token is read                         | 600 a min  | client IP        | `/api/mcp`             |
+ * | MCP, a signed-in user                                 | 300 a min  | user id          | `/api/mcp`             |
+ * | CSP reports                                           | 60 a min   | client IP        | `/api/csp-report`      |
+ *
+ * Not limited: `/health` (the deploy's check, no data) and the worker, which talks to the database
+ * and never to the app's routes.
+ */
+export const USER_READ_MAX_REQUESTS = 600;
+export const USER_WRITE_MAX_REQUESTS = 120;
+export const SIGNED_OUT_MAX_REQUESTS = 120;
+export const ANONYMOUS_MAX_REQUESTS = 60;
+export const MCP_IP_MAX_REQUESTS = 600;
+export const MCP_USER_MAX_REQUESTS = 300;
+export const REQUEST_WINDOW_MS = MINUTE_MS;
+
+/** Reads (`GET`, `HEAD`, `OPTIONS`) per signed-in user id. */
+export const userReadRequests = createRequestLimiter({ maxRequests: USER_READ_MAX_REQUESTS, windowMs: REQUEST_WINDOW_MS });
+/** Writes (every other method) per signed-in user id. */
+export const userWriteRequests = createRequestLimiter({ maxRequests: USER_WRITE_MAX_REQUESTS, windowMs: REQUEST_WINDOW_MS });
+/** Requests to a signed-in route that carry no valid session, per client IP: each one costs a session check. */
+export const signedOutRequests = createRequestLimiter({ maxRequests: SIGNED_OUT_MAX_REQUESTS, windowMs: REQUEST_WINDOW_MS });
+/** Requests to the routes that need no session, per client IP. */
+export const anonymousRequests = createRequestLimiter({ maxRequests: ANONYMOUS_MAX_REQUESTS, windowMs: REQUEST_WINDOW_MS });
+/** Requests to `/api/mcp` per client IP, counted before the token is checked. */
+export const mcpIpRequests = createRequestLimiter({ maxRequests: MCP_IP_MAX_REQUESTS, windowMs: REQUEST_WINDOW_MS });
+/** Requests to `/api/mcp` per authenticated user id. */
+export const mcpUserRequests = createRequestLimiter({ maxRequests: MCP_USER_MAX_REQUESTS, windowMs: REQUEST_WINDOW_MS });
+
+/** What a route answers, with status 429, to a client over a request limit. */
+export const TOO_MANY_REQUESTS = "You're sending requests too fast. Wait a moment and try again.";
 
 /** Failed invite codes allowed per user in `INVITE_CODE_WINDOW_MS`, across preview and join together. */
 export const INVITE_CODE_MAX_FAILURES = 10;

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { readBodyWithLimit } from "@/lib/http/body";
-import { clientIp } from "@/lib/http/client-ip";
+import { clientKey } from "@/lib/http/client-ip";
 import {
   CSP_REPORT_MAX_BYTES,
   cspReportFormat,
@@ -25,7 +25,7 @@ import { BODY_TOO_LARGE, json, noContent, tooManyRequests } from "@/lib/http/rou
  * `CSP_REPORT_MAX_BYTES` (413), and only the two report content types are read (415).
  */
 export async function POST(request: NextRequest) {
-  const ip = clientIp(request) ?? "unknown";
+  const ip = clientKey(request);
   if (cspReportAttempts.isLimited(ip)) {
     return tooManyRequests(TOO_MANY_CSP_REPORTS, cspReportAttempts.retryAfterSeconds(ip));
   }

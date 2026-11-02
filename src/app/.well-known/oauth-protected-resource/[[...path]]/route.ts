@@ -1,3 +1,4 @@
+import { withAnonymousLimit } from "@/lib/http/route";
 import { mcpProtectedResourceMetadata, mcpResourceOrigin } from "@/lib/mcp/authorization-server";
 
 /**
@@ -5,7 +6,7 @@ import { mcpProtectedResourceMetadata, mcpResourceOrigin } from "@/lib/mcp/autho
  * Served at `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/api/mcp`;
  * any other path under it is a 404. Public: it holds no user data.
  */
-export async function GET(request: Request, { params }: RouteContext<"/.well-known/oauth-protected-resource/[[...path]]">) {
+export const GET = withAnonymousLimit(async (request: Request, { params }: RouteContext<"/.well-known/oauth-protected-resource/[[...path]]">) => {
   const { path } = await params;
   if (path !== undefined && path.join("/") !== "api/mcp") {
     return Response.json({ error: "Not found" }, { status: 404, headers: { "Cache-Control": "no-store" } });
@@ -13,4 +14,4 @@ export async function GET(request: Request, { params }: RouteContext<"/.well-kno
   return Response.json(mcpProtectedResourceMetadata(mcpResourceOrigin(request)), {
     headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" },
   });
-}
+});

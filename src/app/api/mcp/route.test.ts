@@ -282,18 +282,28 @@ describe("/api/mcp", () => {
       const response = await POST(rpc(initialize, { ...bearer(personalToken(userA).token), ...ip }));
 
       expect(response.status).toBe(429);
+      expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
       expect(repositories.mcpTokens.check).toHaveBeenCalledTimes(5);
       expect((await POST(rpc(initialize, { ...bearer(personalToken(userA).token), "X-Forwarded-For": "203.0.113.8" }))).status).toBe(200);
     });
 
-    it("answers 429 to repeated bad tokens with one prefix, from any IP", async () => {
-      const prefix = generateMcpToken().token.slice(0, 13);
-      const guess = () => `${prefix}${generateMcpToken().token.slice(13)}`;
+    it("doesn't let a made-up first X-Forwarded-For hop reset the limit: only the last hop, our proxy's, counts", async () => {
       for (let attempt = 0; attempt < 5; attempt += 1) {
-        await POST(rpc(initialize, { ...bearer(guess()), "X-Forwarded-For": `10.0.0.${attempt}` }));
+        const forwarded = { "X-Forwarded-For": `10.0.0.${attempt}, 203.0.113.7` };
+        expect((await POST(rpc(initialize, { ...bearer(generateMcpToken().token), ...forwarded }))).status).toBe(401);
       }
 
-      expect((await POST(rpc(initialize, { ...bearer(guess()), "X-Forwarded-For": "10.0.0.99" }))).status).toBe(429);
+      const spoofed = { "X-Forwarded-For": "10.0.0.99, 203.0.113.7" };
+      expect((await POST(rpc(initialize, { ...bearer(generateMcpToken().token), ...spoofed }))).status).toBe(429);
+    });
+
+    it("doesn't throttle a token's prefix, which the caller chooses: one prefix from other IPs goes on", async () => {
+      const prefix = generateMcpToken().token.slice(0, 13);
+      const guess = () => `${prefix}${generateMcpToken().token.slice(13)}`;
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const response = await POST(rpc(initialize, { ...bearer(guess()), "X-Forwarded-For": `10.0.0.${attempt}` }));
+        expect(response.status).toBe(401);
+      }
     });
 
     it("doesn't count access refusals toward the throttle", async () => {
@@ -362,6 +372,30 @@ describe("/api/mcp", () => {
       expect(response.headers.get("www-authenticate")).toBe(BEARER_CHALLENGE);
     });
 
+    it("counts bad app tokens as failures by client IP: 30 of them, then 429 with Retry-After and no call to the provider", async () => {
+      const ip = { "X-Forwarded-For": "203.0.113.7" };
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        expect((await POST(rpc(initialize, { ...bearer(`bad-${attempt}`), ...ip }))).status).toBe(401);
+      }
+      vi.mocked(auth.verifyAppToken).mockClear();
+
+      const response = await POST(rpc(initialize, { ...bearer("bad-31"), ...ip }));
+
+      expect(response.status).toBe(429);
+      expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
+      expect(await response.json()).toEqual({ error: "Too many failed attempts. Try again later." });
+      expect(auth.verifyAppToken).not.toHaveBeenCalled();
+      // Another client is untouched.
+      expect((await POST(rpc(initialize, { ...bearer("bad-1"), "X-Forwarded-For": "203.0.113.8" }))).status).toBe(401);
+    });
+
+    it("doesn't count a valid app token as a failure", async () => {
+      const token = auth.issueAppToken(userA, "claude-code");
+      for (let attempt = 0; attempt < 35; attempt += 1) {
+        expect((await POST(rpc(initialize, bearer(token)))).status).toBe(200);
+      }
+    });
+
     it.each([["an unknown token", "not-a-token"], ["an empty Bearer", ""]])("answers 401 for %s", async (_, token) => {
       const response = await POST(rpc(initialize, { Authorization: `Bearer ${token}`.trim() }));
 
@@ -395,6 +429,41 @@ describe("/api/mcp", () => {
       setMcpUser(userA, { kid: { mcp: true } });
 
       expect(await listedExpenseIds(bearer(auth.issueAppToken(userA, "claude-code")))).toEqual(["expense-a"]);
+    });
+  });
+
+  describe("request limits", () => {
+    it("answers 429 with Retry-After past 600 requests a minute from one IP, before looking at the token", async () => {
+      const ip = { "X-Forwarded-For": "203.0.113.7" };
+      for (let attempt = 0; attempt < 600; attempt += 1) await POST(rpc(initialize, ip));
+      vi.mocked(auth.verifyAppToken).mockClear();
+
+      const response = await POST(rpc(initialize, { ...bearer(auth.issueAppToken(userA, "claude-code")), ...ip }));
+
+      expect(response.status).toBe(429);
+      expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
+      expect(await response.json()).toEqual({ error: "You're sending requests too fast. Wait a moment and try again." });
+      expect(auth.verifyAppToken).not.toHaveBeenCalled();
+      expect((await POST(rpc(initialize, { ...bearer(auth.issueAppToken(userA, "claude-code")), "X-Forwarded-For": "203.0.113.8" }))).status).toBe(200);
+    });
+
+    it("answers 429 with Retry-After past 300 requests a minute for one user, from any IP, and leaves other users alone", async () => {
+      const token = auth.issueAppToken(userA, "claude-code");
+      for (let attempt = 0; attempt < 300; attempt += 1) {
+        const response = await POST(rpc(initialize, { ...bearer(token), "X-Forwarded-For": `10.0.${Math.floor(attempt / 200)}.${attempt % 200}` }));
+        expect(response.status).toBe(200);
+      }
+
+      const limited = await POST(rpc(initialize, { ...bearer(token), "X-Forwarded-For": "10.9.9.9" }));
+
+      expect(limited.status).toBe(429);
+      expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+      expect((await POST(rpc(initialize, { ...bearer(auth.issueAppToken(userB, "claude-code")), "X-Forwarded-For": "10.9.9.9" }))).status).toBe(200);
+    });
+
+    it("lets an assistant calling tools in a burst of 100 through", async () => {
+      const headers = bearer(personalToken(userA).token);
+      for (let call = 0; call < 100; call += 1) expect((await POST(rpc(listExpenses, headers))).status).toBe(200);
     });
   });
 
