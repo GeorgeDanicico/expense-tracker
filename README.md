@@ -162,9 +162,16 @@ docker run -d --name expense-tracker \
   --restart unless-stopped \
   --env-file /etc/expense-tracker/.env.production \
   --publish 127.0.0.1:3000:3000 \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+  --tmpfs /app/.next/cache:rw,noexec,nosuid,nodev,uid=1000,gid=1000,size=128m \
+  --security-opt no-new-privileges --cap-drop ALL \
+  --memory 768m --memory-swap 768m \
   --log-opt max-size=10m --log-opt max-file=3 \
   expense-tracker:latest
 ```
+
+The hardening flags are the ones `scripts/deploy.sh` uses (see "Hardened containers" below).
 
 The same image also holds the notifications worker (`worker.js`, bundled by
 `npm run build:worker`). It needs `SUPABASE_URL` and `SUPABASE_SECRET_KEY`, has no port, and
@@ -176,6 +183,11 @@ skipped notifications older than 30 days. Run it next to the web container:
 docker run -d --name expense-tracker-worker \
   --restart unless-stopped \
   --env-file /etc/expense-tracker/.env.production \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+  --tmpfs /app/.next/cache:rw,noexec,nosuid,nodev,uid=1000,gid=1000,size=128m \
+  --security-opt no-new-privileges --cap-drop ALL \
+  --memory 256m --memory-swap 256m \
   --log-opt max-size=10m --log-opt max-file=3 \
   expense-tracker:latest node worker.js
 ```
@@ -231,6 +243,29 @@ environment file at `/etc/expense-tracker/.env.production`, and ensure the runne
 user can read it and use Docker. To use a different environment-file path, add a
 repository variable named `DEPLOY_ENV_FILE`. The workflow publishes the container
 on `127.0.0.1:3000` by default, matching the Docker command above.
+
+### Hardened containers
+
+`scripts/deploy.sh` starts the web and worker containers with the same flags as the examples above:
+
+- `--read-only`: the container's filesystem can't be written. The only writable places are two
+  in-memory mounts: `/tmp`, and `/app/.next/cache`, where Next.js keeps the optimized-image cache
+  (it starts empty after a restart and fills again on demand). Nothing else the app does touches the
+  disk: avatars (sharp), statement PDFs and push all work in memory.
+- `--security-opt no-new-privileges` and `--cap-drop ALL`: the process can't gain privileges and has
+  no Linux capabilities. It still binds port 3000 as the non-root `node` user, since that port is
+  above 1024.
+- `--memory` with `--memory-swap` set to the same value: a runaway process is stopped by the kernel
+  instead of slowing down the whole VPS. The in-memory mounts count against this limit.
+
+The sizes can be changed with environment variables (set them in `/etc/vps-apps/expense-tracker.sh`
+on the VPS; the script sources it): `WEB_MEMORY_LIMIT` (default `768m`), `WORKER_MEMORY_LIMIT`
+(`256m`), `TMP_TMPFS_SIZE` (`64m`) and `NEXT_CACHE_TMPFS_SIZE` (`128m`). Production runs this
+script through the vps-apps adapter, so a change to the flags here is a change to production, and
+nothing has to change in vps-apps.
+
+If something breaks after a deploy, see [docs/incident-checklist.md](docs/incident-checklist.md).
+What Supabase backs up, and how to rehearse a restore, is in [docs/backups.md](docs/backups.md).
 
 ### Prebuilt images (GHCR)
 
