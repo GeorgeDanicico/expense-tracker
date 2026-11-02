@@ -51,8 +51,11 @@ export interface ExpenseRepository {
   /** Saves a new expense owned by the user, returning it as stored. */
   create(userId: string, input: ExpenseInput): Promise<Expense>;
   /**
-   * Applies the patch with `applyExpensePatch`, throwing its ZodError for an invalid result.
-   * Returns the expense as stored, or null when the user owns no such expense.
+   * Writes only the fields the patch names, checked with `validateExpensePatch` (its ZodError for an
+   * invalid field), in one atomic update: a parallel edit to another field isn't lost. A new category
+   * drops a stored subtype that doesn't belong to it; a subtype that doesn't belong to the expense's
+   * category is a `DomainError` 422 on `subtype`. Returns the expense as stored, or null when the
+   * user owns no such expense.
    */
   update(userId: string, id: string, patch: ExpensePatch): Promise<Expense | null>;
   /** Deletes the expense, returning false when the user owns no such expense. */

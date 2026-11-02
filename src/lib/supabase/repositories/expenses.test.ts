@@ -41,71 +41,71 @@ const dashboardRanges = {
 beforeEach(() => vi.resetAllMocks());
 
 describe("update", () => {
-  const fuel = () => anExpenseRow({ id: "fuel", description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel", expenseDate: "2026-09-01", notes: "Full tank" });
-  const foreign = () => ({ ...fuel(), id: "foreign", user_id: "other" });
+  const storedFuel = { id: "fuel", description: "Fuel", amount: "12.00", category: "car", subtype: "car_fuel", expense_date: "2026-09-01", notes: null };
+  const answer = (data: unknown[]) => ({ rpc: () => ({ data, error: null }) });
 
-  it("merges the patch into the stored expense and returns the result", async () => {
-    const { tables } = useDatabase([fuel()]);
+  it("sends only the changed fields to update_expense and returns the stored expense", async () => {
+    const { rpcs, queries } = useDatabase([], answer([storedFuel]));
 
     const expense = await repository.update("owner", "fuel", { amount: "12", notes: null });
 
+    expect(rpcs).toEqual([{ fn: "update_expense", args: { p_id: "fuel", p_patch: { amount: 12, notes: null } } }]);
+    expect(queries).toEqual([]);
     expect(expense).toEqual({ id: "fuel", description: "Fuel", amount: 12, category: "car", subtype: "car_fuel", expenseDate: "2026-09-01", notes: null });
-    expect(tables.expenses[0]).toMatchObject({ amount: 12, notes: null, description: "Fuel" });
   });
 
-  it("scopes both the load and the write to the owner", async () => {
-    const { queries } = useDatabase([fuel()]);
+  it("names each changed field by its column, trimmed and with cleared notes as null", async () => {
+    const { rpcs } = useDatabase([], answer([storedFuel]));
 
-    await repository.update("owner", "fuel", { amount: "12" });
+    await repository.update("owner", "fuel", { description: " Fuel ", category: "car", subtype: "car_fuel", expenseDate: "2026-09-02", notes: "  " });
 
-    expect(queries.map((query) => [query.operation, query.filters])).toEqual([
-      ["select", [["eq", "id", "fuel"], ["eq", "user_id", "owner"]]],
-      ["update", [["eq", "id", "fuel"], ["eq", "user_id", "owner"]]],
-    ]);
+    expect(rpcs[0].args.p_patch).toEqual({ description: "Fuel", category: "car", subtype: "car_fuel", expense_date: "2026-09-02", notes: null });
   });
 
-  it("rejects an explicit subtype that does not belong to the category without writing", async () => {
-    const { queries } = useDatabase([fuel()]);
-
-    const error = await repository.update("owner", "fuel", { category: "groceries", subtype: "car_fuel" }).catch((caught) => caught);
-
-    expect(error).toBeInstanceOf(ZodError);
-    expect((error as ZodError).flatten().fieldErrors).toHaveProperty("subtype");
-    expect(queries.map((query) => query.operation)).toEqual(["select"]);
-  });
-
-  it("resets a stored subtype that no longer fits a changed category", async () => {
-    useDatabase([fuel()]);
+  it("leaves a subtype the patch doesn't name to the database", async () => {
+    const { rpcs } = useDatabase([], answer([{ ...storedFuel, category: "groceries", subtype: null }]));
 
     const expense = await repository.update("owner", "fuel", { category: "groceries" });
 
+    expect(rpcs[0].args.p_patch).toEqual({ category: "groceries" });
     expect(expense).toMatchObject({ category: "groceries", subtype: null });
   });
 
-  it("keeps a stored subtype that still fits the patched category", async () => {
-    useDatabase([fuel()]);
+  it.each([
+    [{ category: "groceries", subtype: "car_fuel" }, "subtype"],
+    [{ amount: "1.005" }, "amount"],
+    [{ description: "  " }, "description"],
+  ] as const)("rejects an invalid patch %j without calling the database", async (patch, field) => {
+    const { rpcs } = useDatabase([]);
 
-    const expense = await repository.update("owner", "fuel", { category: "car" });
+    const error = await repository.update("owner", "fuel", patch).catch((caught) => caught);
 
-    expect(expense).toMatchObject({ category: "car", subtype: "car_fuel" });
+    expect(error).toBeInstanceOf(ZodError);
+    expect((error as ZodError).flatten().fieldErrors).toHaveProperty(field);
+    expect(rpcs).toEqual([]);
   });
 
-  it.each(["foreign", "missing"])("returns null for a %s expense without writing", async (id) => {
-    const { queries, tables } = useDatabase([fuel(), foreign()]);
+  it("turns the database's refusal of a subtype outside the stored category into a subtype error", async () => {
+    const message = "Choose a subtype belonging to the selected category.";
+    useDatabase([], { rpc: () => ({ data: null, error: { code: "23514", message, hint: "user" } }) });
 
-    const expense = await repository.update("owner", id, { amount: 1 });
-
-    expect(expense).toBeNull();
-    expect(queries.map((query) => query.operation)).toEqual(["select"]);
-    expect(tables.expenses).toEqual([fuel(), foreign()]);
+    await expect(repository.update("owner", "rent", { subtype: "car_fuel" })).rejects.toMatchObject({
+      name: "DomainError", message, status: 422, fieldErrors: { subtype: [message] },
+    });
   });
 
-  it("returns the classification the database stored, not the one requested", async () => {
-    useDatabase([fuel()], { trigger: (row) => ({ ...row, category: "car", subtype: "car_fuel" }) });
+  it("returns null when the user has no such expense", async () => {
+    useDatabase([], answer([]));
 
-    const expense = await repository.update("owner", "fuel", { category: "transport", subtype: null });
+    expect(await repository.update("owner", "missing", { amount: 1 })).toBeNull();
+  });
 
-    expect(expense).toMatchObject({ category: "car", subtype: "car_fuel" });
+  it("hides a database error behind a generic message", async () => {
+    useDatabase([], { rpc: () => ({ data: null, error: { code: "23514", message: "violates check constraint \"expenses_amount_valid\"" } }) });
+
+    await expect(repository.update("owner", "fuel", { amount: 1 })).rejects.toMatchObject({
+      message: "The expense could not be saved.", status: 422, fieldErrors: undefined,
+    });
   });
 });
 
@@ -427,20 +427,6 @@ describe("delete", () => {
   });
 });
 
-describe("update errors", () => {
-  it("fails a failed load with the load message", async () => {
-    useDatabase([], { fail: () => true });
-
-    await expect(repository.update("owner", "owned", { amount: 2 })).rejects.toThrow(new Error("Unable to load expense."));
-  });
-
-  it("fails a failed write with the save message", async () => {
-    useDatabase([anExpenseRow({ id: "owned" })], { fail: (_query, index) => index === 1 });
-
-    await expect(repository.update("owner", "owned", { amount: 2 })).rejects.toThrow(new Error("The expense could not be saved."));
-  });
-});
-
 describe("owner filters", () => {
   it.each([
     ["listMonth", () => repository.listMonth("owner", "2026-09")],
@@ -448,7 +434,6 @@ describe("owner filters", () => {
     ["recentCategoriesByMerchant", () => repository.recentCategoriesByMerchant("owner", "2025-09-01")],
     ["listForTab", () => repository.listForTab("owner", aTab(), DEFAULT_EXPENSE_TAB_FILTERS)],
     ["getDashboard", () => repository.getDashboard("owner", dashboardRanges)],
-    ["update", () => repository.update("owner", "owned", { amount: 2 })],
     ["delete", () => repository.delete("owner", "owned")],
   ] as const)("%s filters every table query by owner explicitly", async (_name, call) => {
     const { queries } = useDatabase([anExpenseRow({ id: "owned", category: "car", expenseDate: "2026-09-01" })], { rpc: () => ({ data: {}, error: null }) });

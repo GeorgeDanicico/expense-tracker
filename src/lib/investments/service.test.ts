@@ -143,6 +143,16 @@ describe("createInvestmentTransaction", () => {
     await expect(result).rejects.toMatchObject({ message, status: 422, fieldErrors: { quantity: [message] } });
     expect(repositories.investments.transactions).toEqual([]);
   });
+
+  it("refuses one of two sells of the whole position made at once", async () => {
+    seedAccount(USER);
+    const sellAll = { ...order, side: "sell" as const, amount: "165", quantity: "1.5", unitPrice: "110", executedAt: "2026-02-01T10:00:00.000Z" };
+
+    const results = await Promise.allSettled([createInvestmentTransaction(USER, sellAll), createInvestmentTransaction(USER, sellAll)]);
+
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(repositories.investments.transactions.filter((transaction) => transaction.side === "sell")).toHaveLength(1);
+  });
 });
 
 describe("deleteInvestmentTransaction", () => {

@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Database } from "@/lib/database.types";
+import { DomainError } from "@/lib/errors";
 import type {
   InvestmentAccountWithTransactions,
   InvestmentRepository,
@@ -12,7 +13,7 @@ import {
   type InvestmentTransaction,
   type InvestmentTransactionSide,
 } from "@/lib/investments/types";
-import { translateDatabaseError } from "@/lib/supabase/errors";
+import { isUserFacing, translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
 type Tables = Database["public"]["Tables"];
@@ -20,11 +21,8 @@ type Tables = Database["public"]["Tables"];
 const TRANSACTION_COLUMNS =
   "id, investment_account_id, instrument, currency, side, amount, quantity, unit_price, executed_at";
 const ACCOUNT_COLUMNS = "id, broker_id";
-/**
- * `investment_transactions` has no `user_id`, so a transaction query embeds its account and filters
- * on `investment_accounts.user_id`. `!inner` drops transactions whose account does not match.
- */
-const OWNING_ACCOUNT = "investment_accounts!inner(user_id)";
+/** Postgres' check_violation. */
+const CHECK_VIOLATION = "23514";
 
 type InvestmentTransactionRow = Tables["investment_transactions"]["Row"];
 type InvestmentAccountRow = Pick<Tables["investment_accounts"]["Row"], "id" | "broker_id">;
@@ -46,20 +44,6 @@ function toTransaction(row: InvestmentTransactionRow): InvestmentTransaction {
     quantity: String(row.quantity),
     unitPrice: String(row.unit_price),
     executedAt: row.executed_at,
-  };
-}
-
-function toTransactionInsert(transaction: InvestmentTransaction): Tables["investment_transactions"]["Insert"] {
-  return {
-    id: transaction.id,
-    investment_account_id: transaction.investmentAccountId,
-    instrument: transaction.instrument,
-    currency: transaction.currency,
-    side: transaction.side,
-    amount: transaction.amount,
-    quantity: transaction.quantity,
-    unit_price: transaction.unitPrice,
-    executed_at: transaction.executedAt,
   };
 }
 
@@ -91,10 +75,22 @@ async function findOwnedAccount(userId: string, by: { id: string } | { brokerId:
 }
 
 /**
+ * The order functions refuse a sale larger than the position with a check violation marked for users
+ * (supabase/migrations/20261102000200_close_check_then_write_races.sql). It is the quantity's
+ * problem, so it carries a field error as well; anything else goes through `translateDatabaseError`.
+ */
+function translateOrderError(error: DatabaseError, fallback: string) {
+  if (error.code === CHECK_VIOLATION && isUserFacing(error)) {
+    return new DomainError(error.message, 422, { quantity: [error.message] });
+  }
+  return translateDatabaseError(error, fallback);
+}
+
+/**
  * `InvestmentRepository` on the `investment_accounts` and `investment_transactions` tables. Every
- * read filters by owner: accounts on `user_id`, transactions through their account. Writes go to an
- * account the caller already read as its own, and the tables' write policies stay owner-only.
- * Database errors go through `translateDatabaseError`: a known code is its status (a unique violation
+ * read filters by owner: accounts on `user_id`, transactions through their account. Orders are
+ * written by `record_investment_order` and `delete_investment_order`, which lock the account, check
+ * that it is the caller's and check the position inside the same transaction. Database errors go through `translateDatabaseError`: a known code is its status (a unique violation
  * a 409) with the generic message, anything else a 500.
  */
 export const supabaseInvestmentRepository: InvestmentRepository = {
@@ -150,23 +146,6 @@ export const supabaseInvestmentRepository: InvestmentRepository = {
     };
   },
 
-  async listAssetTransactions(userId, { accountId, instrument, currency }, limit) {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("investment_transactions")
-      .select(`${TRANSACTION_COLUMNS}, ${OWNING_ACCOUNT}`)
-      .eq("investment_account_id", accountId)
-      .eq("investment_accounts.user_id", userId)
-      .eq("instrument", instrument)
-      .eq("currency", currency)
-      .order("executed_at", { ascending: true })
-      .order("id", { ascending: true })
-      .limit(limit);
-
-    if (error) throw translateDatabaseError(error, "Unable to load investment history.");
-    return (data as unknown as InvestmentTransactionRow[]).map(toTransaction);
-  },
-
   async getOrCreateAccount(userId, brokerId) {
     const existing = await findOwnedAccount(userId, { brokerId });
     if (existing) return existing;
@@ -190,42 +169,30 @@ export const supabaseInvestmentRepository: InvestmentRepository = {
     throw error ? translateDatabaseError(error, "Unable to create investment account.") : new Error("Unable to create investment account.");
   },
 
-  async findTransaction(userId, transactionId) {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("investment_transactions")
-      .select(`${TRANSACTION_COLUMNS}, ${OWNING_ACCOUNT}`)
-      .eq("id", transactionId)
-      .eq("investment_accounts.user_id", userId)
-      .maybeSingle();
-
-    if (error) throw translateDatabaseError(error, "Unable to load investment order.");
-    return data ? toTransaction(data as unknown as InvestmentTransactionRow) : null;
-  },
-
-  // An insert cannot filter. The account comes from `getOrCreateAccount`, which filters by owner.
+  // The account comes from `getOrCreateAccount`; the function checks again that it is the caller's.
   async createTransaction(_userId, transaction) {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("investment_transactions")
-      .insert(toTransactionInsert(transaction))
-      .select(TRANSACTION_COLUMNS)
-      .single();
+    const { error } = await supabase.rpc("record_investment_order", {
+      p_id: transaction.id,
+      p_account_id: transaction.investmentAccountId,
+      p_instrument: transaction.instrument,
+      p_currency: transaction.currency,
+      p_side: transaction.side,
+      p_amount: transaction.amount,
+      p_quantity: transaction.quantity,
+      p_unit_price: transaction.unitPrice,
+      p_executed_at: transaction.executedAt,
+    });
 
-    if (error) throw translateDatabaseError(error, "The investment order could not be saved.");
-
-    if (!data) throw new Error("The investment order could not be saved.");
+    if (error) throw translateOrderError(error, "The investment order could not be saved.");
   },
 
-  // A delete cannot embed the account, so it is scoped to the account `findTransaction` checked.
-  async deleteTransaction(_userId, transaction) {
+  // The function finds the order through an account the caller owns.
+  async deleteTransaction(_userId, transactionId) {
     const supabase = await createClient();
-    const { error } = await supabase
-      .from("investment_transactions")
-      .delete()
-      .eq("id", transaction.id)
-      .eq("investment_account_id", transaction.investmentAccountId);
+    const { data, error } = await supabase.rpc("delete_investment_order", { p_transaction_id: transactionId });
 
-    if (error) throw translateDatabaseError(error, "Unable to remove investment order.");
+    if (error) throw translateOrderError(error, "Unable to remove investment order.");
+    return data === true;
   },
 };

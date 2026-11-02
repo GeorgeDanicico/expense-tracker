@@ -2,11 +2,15 @@
 // replace with `./repositories`, which imports this file. A value import of the gate here would be a
 // cycle that never loads. The fake model moved to `src/lib/ai/providers/fake.ts` (I15).
 import { DomainError } from "@/lib/errors";
-import type { AiAccess, AiGateRepository, AiUsageRecord, BudgetRecipients } from "@/lib/ai/repository";
+import type { AiAccess, AiGateRepository, AiOutcome, AiReservation, AiReservationRequest, AiSettlement, BudgetRecipients } from "@/lib/ai/repository";
 import type { NewNotification } from "@/lib/notifications/worker-store";
 
 // The SQL's message (supabase/migrations/20261030000100_create_ai_gate.sql).
 const NOT_PERMITTED = "A parent needs to turn on AI features for you.";
+
+/** Whether an estimate fits what is left of a month, as the gate has always counted it. */
+const fits = (spentMicros: number, estimatedMicros: number, limitMicros: number) =>
+  spentMicros < limitMicros && spentMicros + estimatedMicros <= limitMicros;
 
 /** What the fake knows about a user. */
 export type FakeAiUser = {
@@ -19,13 +23,27 @@ export type FakeAiUser = {
   kidAiPermission: boolean;
 };
 
-/** A ledger row as the fake keeps it. */
-export type FakeUsageRow = AiUsageRecord & { familyId: string | null; createdAt: Date };
+/** A ledger row as the fake keeps it: a reservation (`reserved`) until it is settled. */
+export type FakeUsageRow = {
+  id: string;
+  userId: string;
+  familyId: string | null;
+  feature: string;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  costMicros: number;
+  outcome: AiOutcome | "reserved";
+  createdAt: Date;
+};
 
 /**
  * In-memory `AiGateRepository`, following the SQL's rules: a family's month is the rows stamped with
- * its id (a member who left keeps their past rows in it, a member who joins brings none), and a user
- * without a family counts their own rows made without one. `now` is the clock that stamps rows;
+ * its id (a member who left keeps their past rows in it, a member who joins brings none), a user
+ * without a family counts their own rows made without one, and a reservation counts its worst case
+ * until it is settled. `now` is the clock that stamps rows;
  * `users` holds each user's family, role and opt-in (a user missing from it is an adult with no
  * family who hasn't opted in). `calls` records every method call.
  */
@@ -53,6 +71,7 @@ export class FakeAiGateRepository implements AiGateRepository {
   /** Adds a ledger row directly, as if a call had been recorded at `at`, in the user's current family unless given. */
   seedUsage(userId: string, costMicros: number, at: Date, overrides: Partial<FakeUsageRow> = {}): FakeUsageRow {
     const row: FakeUsageRow = {
+      id: crypto.randomUUID(),
       userId,
       familyId: this.users.get(userId)?.familyId ?? null,
       feature: "statements",
@@ -82,6 +101,10 @@ export class FakeAiGateRepository implements AiGateRepository {
 
   async access(userId: string): Promise<AiAccess> {
     this.call("access");
+    return this.accessOf(userId);
+  }
+
+  private accessOf(userId: string): AiAccess {
     const user = this.users.get(userId);
     if (user?.role === "kid" && user.familyId && !user.kidAiPermission) return "not_permitted";
     return user?.optedIn ? "ok" : "ai_off";
@@ -106,23 +129,56 @@ export class FakeAiGateRepository implements AiGateRepository {
     if (!permitted && user.role === "kid") user.optedIn = false;
   }
 
-  async familySpendMicros(userId: string, monthStart: Date) {
-    this.call("familySpendMicros");
-    const familyId = this.users.get(userId)?.familyId ?? null;
+  /**
+   * Like `ai_reserve_budget`. Nothing awaits between the check and the write, so two reservations
+   * made at once are checked one after the other, as the SQL's locks make them.
+   */
+  async reserve(request: AiReservationRequest): Promise<AiReservation> {
+    this.call("reserve");
+    if (!this.enabled) return { status: "flag_off" };
+    const access = this.accessOf(request.userId);
+    if (access !== "ok") return { status: access };
+
+    const familyId = this.users.get(request.userId)?.familyId ?? null;
+    const familySpentMicros = this.familySpend(request.userId, familyId, request.monthStart);
+    if (!fits(familySpentMicros, request.estimatedMicros, request.familyLimitMicros)) return { status: "family_budget", familySpentMicros };
+    const globalSpentMicros = this.globalSpend(request.monthStart);
+    if (!fits(globalSpentMicros, request.estimatedMicros, request.globalLimitMicros)) return { status: "global_budget", familySpentMicros, globalSpentMicros };
+
+    const row = this.seedUsage(request.userId, request.estimatedMicros, this.now(), {
+      feature: request.feature, provider: request.provider, model: request.model, outcome: "reserved",
+    });
+    return { status: "ok", reservationId: row.id, familySpentMicros, globalSpentMicros };
+  }
+
+  /** Like `ai_settle_usage`: a reservation of the user's is settled once; anything else throws. */
+  async settle(settlement: AiSettlement) {
+    this.call("settle");
+    const row = this.usage.find((stored) => stored.id === settlement.reservationId && stored.userId === settlement.userId && stored.outcome === "reserved");
+    if (!row) throw new Error("That AI reservation wasn't found or was already settled.");
+    Object.assign(row, {
+      inputTokens: settlement.inputTokens,
+      outputTokens: settlement.outputTokens,
+      cachedInputTokens: settlement.cachedInputTokens,
+      costMicros: settlement.costMicros,
+      outcome: settlement.outcome,
+    });
+    return {
+      familySpentMicros: this.familySpend(row.userId, row.familyId, settlement.monthStart),
+      globalSpentMicros: this.globalSpend(settlement.monthStart),
+    };
+  }
+
+  /** The rows of a family's month, or of the user's own without a family, as the SQL counts them. */
+  private familySpend(userId: string, familyId: string | null, monthStart: Date) {
     return this.usage
       .filter((row) => row.createdAt >= monthStart)
       .filter((row) => (familyId ? row.familyId === familyId : row.userId === userId && row.familyId === null))
       .reduce((sum, row) => sum + row.costMicros, 0);
   }
 
-  async globalSpendMicros(monthStart: Date) {
-    this.call("globalSpendMicros");
+  private globalSpend(monthStart: Date) {
     return this.usage.filter((row) => row.createdAt >= monthStart).reduce((sum, row) => sum + row.costMicros, 0);
-  }
-
-  async insertUsage(record: AiUsageRecord) {
-    this.call("insertUsage");
-    this.usage.push({ ...record, familyId: this.users.get(record.userId)?.familyId ?? null, createdAt: this.now() });
   }
 
   async setEnabled(enabled: boolean) {

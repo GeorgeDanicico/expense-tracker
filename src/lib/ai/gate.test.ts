@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { checkBudget, recordUsage, AiGateError, type AiGateDependencies } from "@/lib/ai/gate";
+import { reserveBudget, settleUsage, AiGateError, type AiGateDependencies, type SettleUsageInput } from "@/lib/ai/gate";
 import { FakeAiGateRepository } from "@/test/fakes/ai";
 
 // A family of two parents and a kid, a kid without a permission, and two users without a family.
@@ -38,14 +38,17 @@ function dependencies(overrides: Partial<AiGateDependencies> = {}): AiGateDepend
 }
 
 function check(userId: string, estimatedMicros = 10_000, overrides: Partial<AiGateDependencies> = {}) {
-  return checkBudget({ userId, feature: "statements", estimatedMicros }, dependencies(overrides));
+  return reserveBudget({ userId, feature: "statements", provider: "fake", model: "fake-model", estimatedMicros }, dependencies(overrides));
 }
 
-function record(userId: string, costMicros: number, overrides: Partial<Parameters<typeof recordUsage>[0]> = {}) {
-  return recordUsage(
-    { userId, feature: "statements", provider: "fake", model: "fake-model", outcome: "ok", costMicros, ...overrides },
-    dependencies(),
-  );
+/** A reservation made past the gate, as one made before the month filled up. */
+function reservation(userId: string) {
+  return repository.seedUsage(userId, 0, now, { outcome: "reserved" }).id;
+}
+
+/** Settles a fresh reservation of the user's at `costMicros`. */
+function record(userId: string, costMicros: number, overrides: Partial<SettleUsageInput> = {}, gate: Partial<AiGateDependencies> = {}) {
+  return settleUsage({ reservationId: reservation(userId), userId, outcome: "ok", costMicros, ...overrides }, dependencies(gate));
 }
 
 async function refusal(promise: Promise<unknown>) {
@@ -71,8 +74,8 @@ beforeEach(() => {
   repository.setUser(outsider, { familyId: otherFamily, role: "parent", optedIn: true });
 });
 
-describe("checkBudget", () => {
-  it("lets a call through and reports the month's numbers", async () => {
+describe("reserveBudget", () => {
+  it("lets a call through, reports the month's numbers and reserves the worst case", async () => {
     repository.seedUsage(mum, 1 * USD, new Date("2026-10-02T10:00:00Z"));
     repository.seedUsage(outsider, 2 * USD, new Date("2026-10-03T10:00:00Z"));
 
@@ -87,17 +90,49 @@ describe("checkBudget", () => {
     expect(budget.month.key).toBe("2026-10");
     expect(budget.month.start).toEqual(OCTOBER);
     expect(budget.month.resetsAt).toEqual(NOVEMBER);
+    expect(repository.usage.at(-1)).toMatchObject({
+      id: budget.reservationId, userId: kid, familyId: family, provider: "fake", model: "fake-model", costMicros: 10_000, outcome: "reserved",
+    });
+    expect(repository.calls).toEqual(["reserve"]);
+  });
+
+  it("counts a reservation in the month until it is settled", async () => {
+    const first = await check(mum, 2 * USD);
+
+    await expect(check(dad, 2 * USD)).rejects.toMatchObject({ reason: "family_budget", spentMicros: 2 * USD });
+
+    await settleUsage({ reservationId: first.reservationId, userId: mum, outcome: "ok", costMicros: 0.5 * USD }, dependencies());
+    await expect(check(dad, 2 * USD)).resolves.toMatchObject({ familySpentMicros: 0.5 * USD });
+  });
+
+  it("lets only one of two calls made at once take the last of the family's month", async () => {
+    repository.seedUsage(mum, 1 * USD, new Date("2026-10-05T10:00:00Z"));
+
+    const results = await Promise.allSettled([check(mum, 1.5 * USD), check(dad, 1.5 * USD)]);
+
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(repository.usage.filter((row) => row.outcome === "reserved")).toHaveLength(1);
+  });
+
+  it("lets only one of two calls from different families take the last of everyone's month", async () => {
+    repository.seedUsage(solo, 3 * USD, new Date("2026-10-05T10:00:00Z"));
+    repository.seedUsage(otherSolo, 3 * USD, new Date("2026-10-05T10:00:00Z"));
+
+    const results = await Promise.allSettled([check(mum, 2.5 * USD), check(outsider, 2.5 * USD)]);
+
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(results.find((result) => result.status === "rejected")).toMatchObject({ reason: { reason: "global_budget" } });
   });
 
   describe("the kill switch and the opt-in", () => {
-    it("refuses everyone while the flag is off, and reads nothing else", async () => {
+    it("refuses everyone while the flag is off, and reserves nothing", async () => {
       repository.enabled = false;
 
       const error = await refusal(check(mum));
 
       expect(error.reason).toBe("flag_off");
       expect(error.status).toBe(403);
-      expect(repository.calls).toEqual(["isEnabled"]);
+      expect(repository.usage).toEqual([]);
     });
 
     it("refuses a user who hasn't opted in", async () => {
@@ -107,7 +142,6 @@ describe("checkBudget", () => {
 
       expect(error.reason).toBe("not_opted_in");
       expect(error.message).toMatch(/Settings/);
-      expect(repository.calls).toEqual(["isEnabled", "access"]);
     });
 
     it("refuses a kid whose parent hasn't allowed AI, even with the switch on", async () => {
@@ -249,18 +283,19 @@ describe("checkBudget", () => {
     await expect(check("", 1)).rejects.toThrow(TypeError);
     await expect(check(mum, -1)).rejects.toThrow(TypeError);
     await expect(check(mum, 1.5)).rejects.toThrow(TypeError);
-    await expect(checkBudget({ userId: mum, feature: "Statements", estimatedMicros: 1 }, dependencies())).rejects.toThrow(TypeError);
+    await expect(reserveBudget({ userId: mum, feature: "Statements", provider: "fake", model: "fake-model", estimatedMicros: 1 }, dependencies())).rejects.toThrow(TypeError);
+    expect(repository.usage).toEqual([]);
   });
 });
 
-describe("recordUsage", () => {
-  it("writes the ledger row with the real tokens and cost, stamped with the user's family", async () => {
-    await recordUsage(
+describe("settleUsage", () => {
+  it("settles the reservation to the real tokens and cost, in the family it was made in", async () => {
+    const { reservationId } = await check(kid, 50_000);
+
+    await settleUsage(
       {
+        reservationId,
         userId: kid,
-        feature: "statements",
-        provider: "openai",
-        model: "gpt-5.6-luna",
         outcome: "ok",
         inputTokens: 6000,
         outputTokens: 5000,
@@ -272,11 +307,12 @@ describe("recordUsage", () => {
 
     expect(repository.usage).toEqual([
       {
+        id: reservationId,
         userId: kid,
         familyId: family,
         feature: "statements",
-        provider: "openai",
-        model: "gpt-5.6-luna",
+        provider: "fake",
+        model: "fake-model",
         inputTokens: 6000,
         outputTokens: 5000,
         cachedInputTokens: 4000,
@@ -287,13 +323,13 @@ describe("recordUsage", () => {
     ]);
   });
 
-  it("records a failed call even when the provider billed nothing", async () => {
+  it("settles a failed call even when the provider billed nothing", async () => {
     const result = await record(solo, 0, { outcome: "timeout" });
 
     expect(repository.usage).toMatchObject([{ userId: solo, familyId: null, outcome: "timeout", costMicros: 0, inputTokens: 0, outputTokens: 0 }]);
-    // Nothing was spent, so the month isn't looked at.
-    expect(result).toEqual({ familySpentMicros: null, globalSpentMicros: null, warned: null, switchedOff: false });
-    expect(repository.calls).toEqual(["insertUsage"]);
+    // Nothing was spent, so nobody is warned.
+    expect(result).toEqual({ familySpentMicros: 0, globalSpentMicros: 0, warned: null, switchedOff: false });
+    expect(repository.calls).toEqual(["settle"]);
   });
 
   it("records a failed call that the provider did bill, and counts it against the month", async () => {
@@ -303,17 +339,26 @@ describe("recordUsage", () => {
     await expect(check(mum, 0.2 * USD)).rejects.toMatchObject({ reason: "family_budget" });
   });
 
-  it("throws when the ledger row can't be written, since the spend would go uncounted", async () => {
-    repository.failing.add("insertUsage");
+  it("throws when the reservation can't be settled, since the spend would be counted wrong", async () => {
+    repository.failing.add("settle");
 
-    await expect(record(mum, 1000)).rejects.toThrow("The fake insertUsage failed.");
+    await expect(record(mum, 1000)).rejects.toThrow("The fake settle failed.");
   });
 
-  it("refuses a nonsense record as a programming error", async () => {
+  it("settles a reservation once, and only the user's own", async () => {
+    const reservationId = reservation(mum);
+    await settleUsage({ reservationId, userId: mum, outcome: "ok", costMicros: 1 }, dependencies());
+
+    await expect(settleUsage({ reservationId, userId: mum, outcome: "ok", costMicros: 1 }, dependencies())).rejects.toThrow(/already settled/);
+    await expect(settleUsage({ reservationId: reservation(mum), userId: dad, outcome: "ok" }, dependencies())).rejects.toThrow(/already settled/);
+  });
+
+  it("refuses a nonsense settlement as a programming error", async () => {
     await expect(record(mum, -5)).rejects.toThrow(TypeError);
     await expect(record(mum, 1, { inputTokens: 0.5 })).rejects.toThrow(TypeError);
-    await expect(record("", 1)).rejects.toThrow(TypeError);
-    expect(repository.usage).toEqual([]);
+    await expect(settleUsage({ reservationId: "", userId: mum, outcome: "ok" }, dependencies())).rejects.toThrow(TypeError);
+    await expect(settleUsage({ reservationId: reservation(mum), userId: "", outcome: "ok" }, dependencies())).rejects.toThrow(TypeError);
+    expect(repository.usage.every((row) => row.outcome === "reserved")).toBe(true);
   });
 
   describe("the family's 80% and 100% notifications", () => {
@@ -428,10 +473,7 @@ describe("recordUsage", () => {
 
     it("tells each admin once, and still turns the switch off when no admin is configured", async () => {
       repository.seedUsage(solo, 9 * USD, new Date("2026-10-05T10:00:00Z"));
-      await recordUsage(
-        { userId: mum, feature: "statements", provider: "fake", model: "fake-model", outcome: "ok", costMicros: 1 * USD },
-        dependencies({ adminUserIds: [] }),
-      );
+      await record(mum, 1 * USD, {}, { adminUserIds: [] });
       expect(repository.enabled).toBe(false);
       expect(repository.notifications.filter((n) => n.payload.tag === "ai-budget-global")).toEqual([]);
 
@@ -454,7 +496,7 @@ describe("recordUsage", () => {
   });
 
   describe("a follow-up that fails", () => {
-    it("is logged, not thrown: the call is recorded and the next check refuses on the spend", async () => {
+    it("is logged, not thrown: the call is settled and the next reservation refuses on the spend", async () => {
       repository.seedUsage(solo, 9 * USD, new Date("2026-10-05T10:00:00Z"));
       repository.failing.add("setEnabled");
 
@@ -472,7 +514,7 @@ describe("recordUsage", () => {
 
       const result = await record(mum, 1 * USD);
 
-      expect(logged).toEqual(["AI gate: could not check the family's budget after a call."]);
+      expect(logged).toEqual(["AI gate: could not warn the family about its budget after a call."]);
       expect(result.switchedOff).toBe(true);
     });
 
@@ -485,10 +527,7 @@ describe("recordUsage", () => {
         return enqueue(notification);
       };
 
-      await recordUsage(
-        { userId: mum, feature: "statements", provider: "fake", model: "fake-model", outcome: "ok", costMicros: 1 * USD },
-        dependencies({ adminUserIds: [admin, second] }),
-      );
+      await record(mum, 1 * USD, {}, { adminUserIds: [admin, second] });
 
       expect(repository.notifications.filter((n) => n.userId === second)).toHaveLength(1);
       expect(logged).toContain("AI gate: could not notify an admin.");

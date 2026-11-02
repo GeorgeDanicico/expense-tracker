@@ -19,8 +19,9 @@ export type InvestmentAsset = {
 };
 
 /**
- * Investment accounts and their transactions. Storage only: the limits, the position checks, the
- * aggregation and the quotes live in `src/lib/investments/service.ts`. Every method acts for
+ * Investment accounts and their transactions. The limits, the aggregation and the quotes live in
+ * `src/lib/investments/service.ts`. The position check on a write is the storage's, so it runs
+ * under a lock on the account (S10: two sells at once can't both pass it). Every method acts for
  * `userId` and only ever sees that user's own accounts and transactions. Get it from
  * `getRepositories()`; never import an implementation.
  *
@@ -45,17 +46,18 @@ export interface InvestmentRepository {
     asset: InvestmentAsset,
     limit: number,
   ): Promise<InvestmentAccountWithTransactions | null>;
-  /**
-   * The oldest `limit` transactions for one asset, oldest first. Empty when the account is not the
-   * user's.
-   */
-  listAssetTransactions(userId: string, asset: InvestmentAsset, limit: number): Promise<InvestmentTransaction[]>;
   /** The user's account at `brokerId`, created on first use. */
   getOrCreateAccount(userId: string, brokerId: InvestmentBrokerId): Promise<InvestmentAccount>;
-  /** One of the user's transactions, or null when it does not exist or belongs to someone else. */
-  findTransaction(userId: string, transactionId: string): Promise<InvestmentTransaction | null>;
-  /** Saves a new transaction. Its account must be one the user owns, from `getOrCreateAccount`. */
+  /**
+   * Saves a new transaction in one of the user's accounts, from `getOrCreateAccount`. Under a lock on
+   * the account, so orders are checked one at a time: rejects (`DomainError` 422, on `quantity`) a
+   * sale larger than the position the asset's history leaves for it, saving nothing.
+   */
   createTransaction(userId: string, transaction: InvestmentTransaction): Promise<void>;
-  /** Deletes a transaction the user owns, as returned by `findTransaction`. */
-  deleteTransaction(userId: string, transaction: InvestmentTransaction): Promise<void>;
+  /**
+   * Deletes one of the user's transactions, under the same lock. False when the user has no such
+   * transaction. Rejects (`DomainError` 422, on `quantity`) a removal that would leave a later sale
+   * larger than the position, deleting nothing.
+   */
+  deleteTransaction(userId: string, transactionId: string): Promise<boolean>;
 }

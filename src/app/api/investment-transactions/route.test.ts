@@ -103,12 +103,12 @@ describe("GET /api/investment-transactions", () => {
 
 describe("DELETE /api/investment-transactions/[id]", () => {
   it("rejects a malformed id before touching the data layer", async () => {
-    const findTransaction = vi.spyOn(repositories.investments, "findTransaction");
+    const deleteTransaction = vi.spyOn(repositories.investments, "deleteTransaction");
 
     const response = await deleteOrder("not-a-uuid");
 
     expect(response.status).toBe(400);
-    expect(findTransaction).not.toHaveBeenCalled();
+    expect(deleteTransaction).not.toHaveBeenCalled();
   });
 
   it("returns 404 for another user's order", async () => {
@@ -129,16 +129,17 @@ describe("DELETE /api/investment-transactions/[id]", () => {
     expect(repositories.investments.transactions).toEqual([]);
   });
 
-  it("returns 409 when deleting would invalidate later history", async () => {
-    // A stored order the calculation cannot read, after the one being removed.
-    const unreadable = aTransaction({ id: "30000000-0000-4000-8000-000000000002", investmentAccountId: ACCOUNT_ID, executedAt: "not-a-date" });
-    seedAccount(user.id, [transaction, unreadable]);
+  it("returns 422 when deleting would leave a later sale larger than the position", async () => {
+    const sale = aTransaction({
+      id: "30000000-0000-4000-8000-000000000002", investmentAccountId: ACCOUNT_ID, side: "sell", executedAt: "2026-02-01T10:00:00Z",
+    });
+    seedAccount(user.id, [transaction, sale]);
 
     const response = await deleteOrder(transaction.id);
 
     expect(response).toMatchObject({
-      status: 409,
-      body: { error: "This order cannot be removed because it would invalidate the later history: executedAt must be a valid timestamp." },
+      status: 422,
+      body: { error: "This order cannot be removed because it would invalidate the later history: Sell quantity exceeds the available VWCE.DE position." },
     });
     expect(repositories.investments.transactions).toHaveLength(2);
   });

@@ -2,7 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database } from "@/lib/database.types";
+import type { Database, Json } from "@/lib/database.types";
+import { DomainError } from "@/lib/errors";
 import type { DashboardSummary } from "@/lib/expenses/analytics";
 import type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
 import { expenseTabDateBounds, matchesExpenseSearch, type ExpenseTabFilters } from "@/lib/expenses/filters";
@@ -11,11 +12,13 @@ import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { Expense } from "@/lib/expenses/types";
 import { getMonthRange } from "@/lib/calendar";
 import { expenseTabMembershipFilter } from "@/lib/supabase/filters";
-import { translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
+import { isUserFacing, translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
-import { applyExpensePatch, type ExpenseInput } from "@/lib/validation/expense";
+import { validateExpensePatch, type ExpenseChanges, type ExpenseInput } from "@/lib/validation/expense";
 
 const EXPENSE_COLUMNS = "id, description, amount, category, subtype, expense_date, notes";
+/** Postgres' check_violation. */
+const CHECK_VIOLATION = "23514";
 
 type ExpenseRow = Pick<
   Database["public"]["Tables"]["expenses"]["Row"],
@@ -115,10 +118,23 @@ function toExpenseWrite(input: ExpenseInput) {
   };
 }
 
+/** The patch for `update_expense`, keyed by column. Only the fields the change names are in it. */
+function toExpenseChanges(changes: ExpenseChanges): Json {
+  const columns: Record<string, Json> = {};
+  if (changes.description !== undefined) columns.description = changes.description;
+  if (changes.amount !== undefined) columns.amount = changes.amount;
+  if (changes.category !== undefined) columns.category = changes.category;
+  if (changes.subtype !== undefined) columns.subtype = changes.subtype;
+  if (changes.expenseDate !== undefined) columns.expense_date = changes.expenseDate;
+  if (changes.notes !== undefined) columns.notes = changes.notes;
+  return columns;
+}
+
 /**
  * `ExpenseRepository` on the `expenses` table. Every table query filters by `user_id` itself instead
  * of relying on RLS, so the user's own pages stay theirs once parents may read family rows (F43).
- * The `get_expense_dashboard` RPC gets the same `userId` as `p_user_id`.
+ * The `get_expense_dashboard` RPC gets the same `userId` as `p_user_id`; `update_expense` finds the
+ * expense by the caller, so an edit for anyone but the signed-in user finds nothing.
  * Database errors go through `translateDatabaseError`: a known code is its status (a unique violation
  * a 409) with the generic message, anything else a 500.
  */
@@ -198,27 +214,22 @@ export const supabaseExpenseRepository: ExpenseRepository = {
     return toExpense(data);
   },
 
-  async update(userId, id, patch) {
+  /**
+   * One `update_expense` call: only the fields in the patch are written, in a single update ...
+   * returning, so a parallel edit to another field isn't lost.
+   */
+  async update(_userId, id, patch) {
+    const changes = validateExpensePatch(patch);
     const supabase = await createClient();
-    const { data: existing, error: loadError } = await supabase
-      .from("expenses")
-      .select(EXPENSE_COLUMNS)
-      .eq("id", id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (loadError) throw translateDatabaseError(loadError, "Unable to load expense.");
-    if (!existing) return null;
-
-    const validated = applyExpensePatch(toExpense(existing), patch);
-    const { data, error } = await supabase
-      .from("expenses")
-      .update(toExpenseWrite(validated))
-      .eq("id", id)
-      .eq("user_id", userId)
-      .select(EXPENSE_COLUMNS)
-      .maybeSingle();
-    if (error) throw translateDatabaseError(error, "The expense could not be saved.");
-    return data ? toExpense(data) : null;
+    const { data, error } = await supabase.rpc("update_expense", { p_id: id, p_patch: toExpenseChanges(changes) });
+    if (error) {
+      // A subtype outside the stored category, which only the database can see.
+      if (error.code === CHECK_VIOLATION && isUserFacing(error)) {
+        throw new DomainError(error.message, 422, { subtype: [error.message] });
+      }
+      throw translateDatabaseError(error, "The expense could not be saved.");
+    }
+    return data[0] ? toExpense(data[0]) : null;
   },
 
   async delete(userId, id) {
