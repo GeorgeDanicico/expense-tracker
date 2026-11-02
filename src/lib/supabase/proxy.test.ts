@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({ createServerClient: vi.fn(), getClaims: vi.fn(
 vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.createServerClient }));
 vi.mock("@/lib/supabase/config", () => ({ getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "publishable" }) }));
 
+import { tracedFetch } from "@/lib/log/traced-fetch";
 import { updateSession } from "@/lib/supabase/proxy";
 
 /** The request headers the response forwards to the page, as Next reads them. */
@@ -28,6 +29,11 @@ describe("updateSession", () => {
       return { auth: { getClaims: mocks.getClaims } };
     });
     mocks.getClaims.mockResolvedValue({ data: null });
+  });
+
+  it("builds its client with the traced fetch, like every other Supabase client", async () => {
+    await updateSession(new NextRequest("http://localhost/dashboard"));
+    expect(mocks.createServerClient.mock.calls[0][2].global).toEqual({ fetch: tracedFetch });
   });
 
   it("forwards the extra request headers (the CSP nonce) when nothing is refreshed", async () => {

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
 
 import { getAuthAdmin } from "@/lib/auth";
+import { tracedFetch } from "@/lib/log/traced-fetch";
 import { createSupabaseAuthAdmin } from "@/lib/supabase/auth-admin";
 
 const SECRET_KEY = "sb_secret_test_key";
@@ -73,6 +74,7 @@ describe("Supabase AuthAdmin", () => {
       createSupabaseAuthAdmin();
 
       expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", SECRET_KEY, {
+        global: { fetch: tracedFetch },
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
     });
@@ -367,6 +369,7 @@ describe("Supabase AuthAdmin", () => {
       expect(admin.generateLink).toHaveBeenCalledExactlyOnceWith({ type: "magiclink", email: adult.email });
       expect(sessionAuth.verifyOtp).toHaveBeenCalledExactlyOnceWith({ token_hash: "hashed-token-1", type: "email" });
       expect(mocks.createSupabaseClient).toHaveBeenCalledWith("http://supabase.test", PUBLISHABLE_KEY, {
+        global: { fetch: tracedFetch },
         auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
       });
       expect(await session?.isActive()).toBe(true);
@@ -480,6 +483,7 @@ describe("Supabase AuthAdmin", () => {
       expect(admin.signOut).toHaveBeenCalledExactlyOnceWith("kid-access-token", "global");
       // The token is redeemed on a client that keeps no session and never refreshes one.
       expect(mocks.createSupabaseClient).toHaveBeenCalledWith("http://supabase.test", PUBLISHABLE_KEY, {
+        global: { fetch: tracedFetch },
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
       expect(throwawayAuth.signInWithOtp).not.toHaveBeenCalled();

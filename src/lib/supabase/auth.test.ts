@@ -20,6 +20,7 @@ vi.mock("@/lib/supabase/config", () => ({
   getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "pk" }),
 }));
 
+import { tracedFetch } from "@/lib/log/traced-fetch";
 import { createSessionClient, sessionFromClient, supabaseAuth } from "@/lib/supabase/auth";
 
 const PROVIDER_ERROR = { message: "provider says no" };
@@ -200,6 +201,7 @@ describe("supabaseAuth", () => {
 
       expect(await supabaseAuth.verifyPassword("a@example.test", "secret-1")).toEqual({ ok: true });
       expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "pk", {
+        global: { fetch: tracedFetch },
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
       expect(auth.signInWithPassword).toHaveBeenCalledExactlyOnceWith({ email: "a@example.test", password: "secret-1" });
@@ -475,6 +477,7 @@ describe("supabaseAuth", () => {
 
       expect(session()).toMatchObject({ userId: "user-1", email: "a@example.test" });
       expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "pk", {
+        global: { fetch: tracedFetch },
         auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
       });
       expect(mocks.createClient).not.toHaveBeenCalled();

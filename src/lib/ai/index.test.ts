@@ -8,6 +8,7 @@ import { AI_FEATURES, estimateInputTokens, structured, type StructuredDependenci
 import type { AiGateDependencies } from "@/lib/ai/gate";
 import type { PricingTable } from "@/lib/ai/pricing";
 import { FakeProvider } from "@/lib/ai/providers/fake";
+import { createRequestContext, runWithRequestContext } from "@/lib/log/request-context";
 import { FakeAiGateRepository } from "@/test/fakes/ai";
 import { loggedLines } from "@/test/log-lines";
 
@@ -369,6 +370,21 @@ describe("structured", () => {
     await expect(structured(input(), dependencies())).rejects.toThrow("nothing scripted");
 
     expect(repository.usage).toMatchObject([{ outcome: "provider_error", costMicros: 0 }]);
+  });
+
+  it("times the provider call as an ai.<provider>.<model> span, failed or not", async () => {
+    provider.willReturn(answer, { inputTokens: 1000, outputTokens: 200, cachedInputTokens: 0 });
+    const context = createRequestContext(undefined);
+
+    await runWithRequestContext(context, async () => {
+      await structured(input(), dependencies());
+      await structured(input(), dependencies()).catch(() => undefined);
+    });
+
+    expect(context.spans).toEqual([
+      { name: "ai.fake.fake-model", ms: expect.any(Number) },
+      { name: "ai.fake.fake-model", ms: expect.any(Number), error: true },
+    ]);
   });
 
   it("throws for programming errors", async () => {

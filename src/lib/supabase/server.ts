@@ -7,8 +7,11 @@ import { createClient as createSupabaseClient, type SupabaseClient } from "@supa
 import { cookies, headers } from "next/headers";
 
 import type { Database } from "@/lib/database.types";
+import { tracedFetch } from "@/lib/log/traced-fetch";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { authCookieOptions } from "@/lib/supabase/cookie-options";
+
+// Every client built here is given `tracedFetch`, so its calls are spans in the request line (logging plan, L4).
 
 const scopedClient = new AsyncLocalStorage<SupabaseClient<Database>>();
 
@@ -36,7 +39,7 @@ export async function getBearerToken(): Promise<string | null> {
 function createTokenClient(token: string): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
   return createSupabaseClient<Database>(url, publishableKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: tracedFetch },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
@@ -84,6 +87,7 @@ export async function createClient(): Promise<SupabaseClient<Database>> {
     url,
     publishableKey,
     {
+      global: { fetch: tracedFetch },
       cookieOptions: authCookieOptions(),
       cookies: {
         getAll() {

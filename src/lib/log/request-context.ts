@@ -17,8 +17,23 @@ import { routeTemplate } from "@/lib/log/route-template";
  * Node-only (`node:async_hooks`), so it stays out of `src/lib/log/index.ts`, which client code imports.
  */
 
-/** One timed call inside a request, as the request line lists it. `count` is set when several calls of one name are merged. */
-export type Span = { name: string; ms: number; count?: number; error?: true; status?: number };
+/**
+ * One timed call inside a request, as the request line lists it (see `span.ts`). `count` is set when
+ * several calls of one name are merged, `error` when the call threw, `status` when an HTTP call
+ * answered 400 or more, and `deviceId` on a Web Push send (the subscription's id, never its endpoint).
+ */
+export type Span = { name: string; ms: number; count?: number; error?: true; status?: number; deviceId?: string };
+
+/** What `span.ts` adds up over every call of a request, before the span list is merged or capped. */
+export type SpanTotals = {
+  /** Milliseconds in Supabase calls (`db.*`, `rpc.*`, `auth.*`, `storage.*` spans), unrounded and summed. */
+  dbMs: number;
+  dbCalls: number;
+  /** The single slowest call, unrounded. */
+  slowest?: { name: string; ms: number };
+  /** Set once the span list has filled up: from then on calls of one name share an entry. */
+  merging?: boolean;
+};
 
 export type RequestContext = {
   requestId: string;
@@ -30,6 +45,8 @@ export type RequestContext = {
   /** The signed-in caller, once the wrapper knows them. */
   userId?: string;
   spans: Span[];
+  /** Set by the first span recorded; the request line reads `dbMs`, `dbCalls` and `slowestSpan` from it. */
+  spanTotals?: SpanTotals;
   /** Extra fields for the request line (`familyId`, `mcpTool`). */
   fields: LogFields;
 };

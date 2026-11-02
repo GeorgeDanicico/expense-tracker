@@ -3,6 +3,7 @@ import "server-only";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
+import { tracedFetch } from "@/lib/log/traced-fetch";
 import { getSupabaseAdminConfig } from "@/lib/supabase/config";
 
 export type AdminClient = SupabaseClient<Database>;
@@ -19,6 +20,7 @@ export type AdminClient = SupabaseClient<Database>;
 export function createAdminClient(): AdminClient {
   const { url, secretKey } = getSupabaseAdminConfig();
   return createSupabaseClient<Database>(url, secretKey, {
+    global: { fetch: tracedFetch },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }

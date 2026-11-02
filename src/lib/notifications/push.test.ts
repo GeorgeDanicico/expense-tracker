@@ -1,6 +1,7 @@
 import webpush, { WebPushError } from "web-push";
 import { describe, expect, it, vi } from "vitest";
 
+import { createRequestContext, runWithRequestContext } from "@/lib/log/request-context";
 import { PUSH_TTL_SECONDS, classifyPushStatus, createWebPushSender, readVapidConfig } from "@/lib/notifications/push";
 
 // A throwaway pair made for this test run; never a real key.
@@ -71,6 +72,29 @@ describe("createWebPushSender", () => {
   ])("turns %s into a result instead of throwing", async (error, expected) => {
     const send = vi.fn().mockRejectedValue(error);
     expect(await createWebPushSender(vapid, send).send(target, payload)).toEqual(expected);
+  });
+
+  it("times each send as a push.send span with the device id, never the endpoint", async () => {
+    const send = vi.fn()
+      .mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} })
+      .mockRejectedValueOnce(webPushError(410))
+      .mockRejectedValueOnce(Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }));
+    const sender = createWebPushSender(vapid, send);
+    const context = createRequestContext(undefined);
+
+    await runWithRequestContext(context, async () => {
+      await sender.send({ ...target, id: "device-1" }, payload);
+      await sender.send({ ...target, id: "device-2" }, payload);
+      await sender.send(target, payload);
+    });
+
+    expect(context.spans).toEqual([
+      { name: "push.send", ms: expect.any(Number), deviceId: "device-1" },
+      { name: "push.send", ms: expect.any(Number), deviceId: "device-2", status: 410 },
+      { name: "push.send", ms: expect.any(Number), error: true },
+    ]);
+    expect(JSON.stringify(context.spans)).not.toContain("push.example.test");
+    expect(send.mock.calls[0][0]).toEqual({ endpoint: target.endpoint, keys: { p256dh: target.p256dh, auth: target.auth } });
   });
 
   it("never puts the endpoint in an error", async () => {
