@@ -7,7 +7,11 @@ import { ACCOUNT_DELETION_MAX_ATTEMPTS, resetRateLimits, TOO_MANY_ACCOUNT_DELETI
 import { aKid, aParent } from "@/test/builders";
 import { FakeAuth, FakeAuthAdmin } from "@/test/fakes/auth";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
+import { loggedLines } from "@/test/log-lines";
 import { callRoute, signedInAs } from "@/test/route";
+
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 
 let auth: FakeAuth;
 let admin: FakeAuthAdmin;
@@ -26,6 +30,7 @@ let repositories: FakeRepositories;
 let user: ReturnType<typeof signedInAs>;
 
 beforeEach(() => {
+  logged.length = 0;
   resetRateLimits();
   forgetLastActive();
   auth = new FakeAuth();
@@ -164,11 +169,15 @@ describe("DELETE /api/account", () => {
   });
 
   it("still answers 204 when only clearing this browser's cookies fails: the account is gone", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
     auth.fail("signOut");
 
     expect((await deleteAccount(valid)).status).toBe(204);
     expect(admin.deletedUserIds).toEqual([user.id]);
+    expect(loggedLines(logged, "account_deleted_cookie_clear_failed")).toEqual([
+      expect.objectContaining({ level: "error", userId: user.id, reason: expect.any(String) }),
+    ]);
+    expect(logged.join("")).not.toContain(EMAIL);
+    expect(logged.join("")).not.toContain(PASSWORD);
   });
 
   it(`answers 429 past ${ACCOUNT_DELETION_MAX_ATTEMPTS} attempts an hour, wrong passwords included`, async () => {

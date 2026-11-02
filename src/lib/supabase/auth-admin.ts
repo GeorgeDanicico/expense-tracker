@@ -3,6 +3,7 @@ import "server-only";
 import type { AuthAdmin, CreatedUser, CreateUserInput } from "@/lib/auth/admin";
 import type { AuthSession } from "@/lib/auth/service";
 import { DomainError } from "@/lib/errors";
+import { errorFields, log } from "@/lib/log";
 import { createAdminClient } from "@/lib/supabase/admin-client";
 import { createSessionClient, createThrowawayClient, sessionFromClient } from "@/lib/supabase/auth";
 import { translateDatabaseError } from "@/lib/supabase/errors";
@@ -106,8 +107,8 @@ export function createSupabaseAuthAdmin(): AuthAdmin {
         // Don't leave an account without its profile behind.
         try {
           await deleteUser(user.id);
-        } catch {
-          console.error(`AuthAdmin: could not delete account ${user.id} after its profile write failed.`);
+        } catch (cleanupError) {
+          log.error("auth_user_cleanup_failed", { userId: user.id, ...errorFields(cleanupError) });
         }
         throw profileError(writeError);
       }

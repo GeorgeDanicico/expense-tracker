@@ -5,7 +5,10 @@ import { PERMISSION_PRESETS } from "@/lib/permissions";
 import { aFamily, aParent } from "@/test/builders";
 import { FakeAuth, FakeAuthAdmin } from "@/test/fakes/auth";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
+import { loggedLines } from "@/test/log-lines";
 
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 const mocks = vi.hoisted(() => ({ getAuthAdmin: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getAuthAdmin: mocks.getAuthAdmin }));
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
@@ -158,11 +161,13 @@ describe("createKidAccount", () => {
     const refusal = new Error("private database failure");
     vi.spyOn(repositories.family, "addManagedKid").mockRejectedValue(refusal);
     admin.fail("deleteUser", new Error("Auth admin failure"));
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    logged.length = 0;
 
     await expect(addKid(ana)).rejects.toBe(refusal);
 
-    expect(log).toHaveBeenCalledOnce();
-    expect(JSON.stringify(log.mock.calls)).not.toContain(password);
+    expect(loggedLines(logged, "kid_account_cleanup_failed")).toEqual([
+      expect.objectContaining({ level: "error", userId: auth.accounts[0]?.id ?? expect.any(String), error: expect.objectContaining({ message: "Auth admin failure" }) }),
+    ]);
+    expect(logged.join("")).not.toContain(password);
   });
 });

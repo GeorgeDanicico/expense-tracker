@@ -6,6 +6,7 @@ import { getAuthAdmin } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
 import { kidAccountEmail } from "@/lib/family/kid-account";
 import type { CurrentMember } from "@/lib/family/repository";
+import { errorFields, log } from "@/lib/log";
 import { getRepositories } from "@/lib/repositories";
 import { createKidSchema } from "@/lib/validation/family";
 
@@ -62,8 +63,8 @@ export async function createKidAccount(parent: CurrentMember, input: unknown): P
     // Don't leave an account behind that no family can see.
     try {
       await admin.deleteUser(user.id);
-    } catch {
-      console.error(`createKidAccount: could not delete account ${user.id} after adding it to the family failed.`);
+    } catch (cleanupError) {
+      log.error("kid_account_cleanup_failed", { userId: user.id, ...errorFields(cleanupError) });
     }
     throw error;
   }

@@ -548,7 +548,7 @@ describe("a tampered reading", () => {
         "The rows read add up to 312.50, but the statement's printed total of money out is 357.70 (a difference of 45.20).",
         "1 line with an amount wasn't read as a transaction.",
       ]);
-      expect(logged).toContainEqual({ mode: "read", outcome: "ok", rows: 3, warnings: 3, dropped: [{ reason: "amount_not_found", row: 0 }] });
+      expect(logged).toContainEqual({ mode: "read", outcome: "ok", rowCount: 3, warnings: 3, dropped: [{ reason: "amount_not_found", row: 0 }] });
       expect(repositories.imports.rows.map((row) => row.description)).toEqual(["Corner Cafe", "OMV 1642 Satu Mare"]);
     });
 
@@ -919,7 +919,7 @@ describe("a CSV a parser claims and then can't read", () => {
       ["OMV 1642 Satu Mare", "car", "car_fuel", "rule"],
     ]);
     expect(logged).toContainEqual({ mode: "read", fallbackFrom: "unreadable_statement" });
-    expect(logged).toContainEqual({ mode: "read", outcome: "ok", rows: 3, warnings: 0 });
+    expect(logged).toContainEqual({ mode: "read", outcome: "ok", rowCount: 3, warnings: 0 });
     // The prompt carries the numbered lines only: no word about the parser or its refusal.
     expect(provider.requests[0].input).not.toMatch(/parser|couldn't be read|fallback/i);
   });

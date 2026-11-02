@@ -2,6 +2,7 @@ import { getAuthAdmin } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
 import { withParent } from "@/lib/http/permission";
 import { json, parseBody, parseId } from "@/lib/http/route";
+import { errorFields, log } from "@/lib/log";
 import { getRepositories } from "@/lib/repositories";
 import { resetKidPasswordSchema } from "@/lib/validation/family";
 
@@ -47,8 +48,8 @@ export const POST = withParent(async (request, _user, context: { params: Promise
 
   try {
     await admin.signOutEverywhere(kidUserId);
-  } catch {
-    console.error("Kid password reset: the kid's sessions could not be signed out.");
+  } catch (error) {
+    log.error("kid_sessions_signout_failed", { memberId: id, ...errorFields(error) });
   }
 
   return json({ success: true });

@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { reserveBudget, settleUsage, AiGateError, type AiGateDependencies, type SettleUsageInput } from "@/lib/ai/gate";
+const lines = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), lines));
+
+import { logFollowupFailure, reserveBudget, settleUsage, AiGateError, type AiGateDependencies, type SettleUsageInput } from "@/lib/ai/gate";
 import { FakeAiGateRepository } from "@/test/fakes/ai";
+import { loggedLines } from "@/test/log-lines";
 
 // A family of two parents and a kid, a kid without a permission, and two users without a family.
 const mum = "10000000-0000-4000-8000-000000000141";
@@ -532,5 +536,35 @@ describe("settleUsage", () => {
       expect(repository.notifications.filter((n) => n.userId === second)).toHaveLength(1);
       expect(logged).toContain("AI gate: could not notify an admin.");
     });
+  });
+});
+
+describe("the default follow-up log", () => {
+  it("is an ai_followup_failed line with the step and the error, and nothing the error carried beyond its message", () => {
+    lines.length = 0;
+
+    logFollowupFailure("AI gate: could not notify an admin.", new Error("outbox down for admin@example.test"));
+
+    expect(loggedLines(lines)).toEqual([
+      expect.objectContaining({
+        level: "error",
+        event: "ai_followup_failed",
+        step: "AI gate: could not notify an admin.",
+        error: expect.objectContaining({ name: "Error", message: "outbox down for [redacted]" }),
+      }),
+    ]);
+  });
+
+  it("is what a failed follow-up writes when the caller gives no log", async () => {
+    lines.length = 0;
+    repository.failing.add("budgetRecipients");
+    repository.seedUsage(solo, 7 * USD, new Date("2026-10-05T10:00:00Z"));
+    repository.seedUsage(mum, 2.5 * USD, new Date("2026-10-05T10:00:00Z"));
+
+    await record(mum, 1 * USD, {}, { log: undefined });
+
+    expect(loggedLines(lines, "ai_followup_failed")).toEqual([
+      expect.objectContaining({ step: "AI gate: could not warn the family about its budget after a call." }),
+    ]);
   });
 });

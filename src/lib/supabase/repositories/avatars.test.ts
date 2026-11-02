@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeSupabase, type FakeSupabaseOptions } from "@/test/fake-supabase";
+import { loggedLines } from "@/test/log-lines";
 
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 const mocks = vi.hoisted(() => ({ createClient: vi.fn(), createAdminClient: vi.fn(), getAuthenticatedUser: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("@/lib/supabase/admin-client", () => ({ createAdminClient: mocks.createAdminClient }));
@@ -179,7 +182,7 @@ describe("Supabase avatar repository", () => {
     });
 
     it("still returns the new key when deleting the old object fails", async () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      logged.length = 0;
       const { tables } = useAdminClient([{ id: user.id, avatar_path: oldPath }], {
         failStorage: (call) => call.operation === "remove",
       });
@@ -188,7 +191,7 @@ describe("Supabase avatar repository", () => {
 
       expect(path).toMatch(newKey);
       expect(tables.profiles).toEqual([{ id: user.id, avatar_path: path }]);
-      expect(error).toHaveBeenCalledWith(`Avatars: could not delete ${oldPath}.`);
+      expect(loggedLines(logged, "avatar_delete_failed")).toEqual([expect.objectContaining({ level: "error", path: oldPath })]);
     });
 
     it("hides a failed profile read behind the save message and uploads nothing", async () => {

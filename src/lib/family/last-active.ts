@@ -1,6 +1,9 @@
 import "server-only";
 
+import { after } from "next/server";
+
 import { isFamilyEnabled } from "@/lib/features";
+import { errorFields, log } from "@/lib/log";
 import { getRepositories } from "@/lib/repositories";
 
 /** How long after a touch the same user isn't touched again. `touch_last_active()` skips the same window. */
@@ -20,17 +23,40 @@ function makeRoom(now: number) {
   }
 }
 
-async function touch() {
-  await getRepositories().family.touchLastActive();
+/** Runs `task` after the response is sent, or at some later point. The task never rejects. */
+export type Scheduler = (task: () => Promise<void>) => void;
+
+/**
+ * The default scheduler: Next's `after()`, which runs the task once the response is finished and
+ * lets it read cookies and headers (route handlers, which `withUser` always is). Outside a request
+ * scope, where `after()` throws (a unit test calling the function directly), it starts the task at once.
+ */
+const afterResponse: Scheduler = (task) => {
+  try {
+    after(task);
+  } catch {
+    void task();
+  }
+};
+
+async function touch(userId: string) {
+  try {
+    await getRepositories().family.touchLastActive();
+  } catch (error) {
+    // Best effort, so debug only: it must never reach the response, and a database blip every
+    // 5 minutes per user isn't news.
+    log.debug("last_active_failed", { userId, ...errorFields(error) });
+  }
 }
 
 /**
- * Records that `userId` is active, without delaying the caller: when the family flag is on, starts
- * `touchLastActive()` and returns at once, at most once per user per 5 minutes in this process.
- * Any failure is ignored. No membership lookup first: the SQL already does nothing for a user
- * without a family.
+ * Records that `userId` is active, without delaying the caller: when the family flag is on, schedules
+ * `touchLastActive()` with `schedule` (by default Next's `after()`, so it runs once the response is
+ * sent) and returns at once, at most once per user per 5 minutes in this process. A failure is
+ * logged as `last_active_failed` at `debug` and never reaches the response. No membership lookup
+ * first: the SQL already does nothing for a user without a family.
  */
-export function touchLastActiveInBackground(userId: string): void {
+export function touchLastActiveInBackground(userId: string, schedule: Scheduler = afterResponse): void {
   if (!isFamilyEnabled()) return;
 
   const now = Date.now();
@@ -41,8 +67,11 @@ export function touchLastActiveInBackground(userId: string): void {
   if (lastTouched.size >= MAX_REMEMBERED) makeRoom(now);
   lastTouched.set(userId, now);
 
-  // Last activity is best effort: a failure must never reach the response, and isn't logged.
-  touch().catch(() => {});
+  try {
+    schedule(() => touch(userId));
+  } catch (error) {
+    log.debug("last_active_failed", { userId, ...errorFields(error) });
+  }
 }
 
 /**

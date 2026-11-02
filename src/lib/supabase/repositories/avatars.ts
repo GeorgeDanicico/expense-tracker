@@ -3,6 +3,7 @@ import "server-only";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { newAvatarPath } from "@/lib/avatars/paths";
 import type { AvatarRepository } from "@/lib/avatars/repository";
+import { errorFields, log } from "@/lib/log";
 import { type AdminClient, createAdminClient } from "@/lib/supabase/admin-client";
 import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
@@ -31,7 +32,7 @@ async function callerId(failure: string): Promise<string> {
 /** Deletes an object, logging instead of throwing: a leftover file is harmless, a failed request isn't. */
 async function removeObject(admin: AdminClient, path: string) {
   const { error } = await admin.storage.from(BUCKET).remove([path]);
-  if (error) console.error(`Avatars: could not delete ${path}.`);
+  if (error) log.error("avatar_delete_failed", { path, ...errorFields(error) });
 }
 
 /**
