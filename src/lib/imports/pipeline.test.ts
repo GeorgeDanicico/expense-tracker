@@ -15,6 +15,7 @@ import {
   IMPORT_NOTES_MAX_LENGTH,
   ImportError,
 } from "@/lib/imports/types";
+import { createRequestContext, runWithRequestContext } from "@/lib/log/request-context";
 import { loggedLines } from "@/test/log-lines";
 import { buildTextPdf } from "@/test/pdf";
 
@@ -253,6 +254,19 @@ describe("buildDraft", () => {
       const fromCsv = await buildDraft(csv(HEADER, "2026-09-01,Corner Cafe,-4.50,RON", "2026-09-02,Fresh Market,-123.40,RON"));
 
       expect(fromPdf.batch.content_hash).toBe(fromCsv.batch.content_hash);
+    });
+
+    it("times the PDF parse as an import.parse_pdf span, failed or not", async () => {
+      const context = createRequestContext(undefined);
+      await runWithRequestContext(context, async () => {
+        await buildDraft({ kind: "pdf", bytes: table(["2026-09-01", "Corner Cafe", "-4.50"]) });
+        await refusal(() => buildDraft({ kind: "pdf", bytes: buildTextPdf([[]], { imageOnly: true }) }));
+      });
+
+      expect(context.spans).toEqual([
+        { name: "import.parse_pdf", ms: expect.any(Number) },
+        { name: "import.parse_pdf", ms: expect.any(Number), error: true },
+      ]);
     });
 
     it("masks an IBAN read from the PDF", async () => {

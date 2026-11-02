@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import type { Database } from "@/lib/database.types";
+import { tracedFetch } from "@/lib/log/traced-fetch";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { authCookieOptions } from "@/lib/supabase/cookie-options";
 
@@ -21,6 +22,9 @@ export async function updateSession(request: NextRequest, extraRequestHeaders: R
     url,
     publishableKey,
     {
+      // No request context exists yet in the proxy (the route wrappers open it), so the traced fetch
+      // records nothing here; it's passed so every Supabase client is built the same way.
+      global: { fetch: tracedFetch },
       cookieOptions: authCookieOptions(),
       cookies: {
         getAll() {

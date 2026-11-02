@@ -43,6 +43,7 @@ import {
   USER_WRITE_MAX_REQUESTS,
 } from "@/lib/http/rate-limit";
 import { log } from "@/lib/log";
+import { tracedFetch } from "@/lib/log/traced-fetch";
 import { addRequestFields, currentRequest } from "@/lib/log/request-context";
 import { getRepositories } from "@/lib/repositories";
 import { fakeSupabase } from "@/test/fake-supabase";
@@ -565,7 +566,7 @@ describe("withUser on Supabase auth", () => {
       expect.objectContaining({ table: "profiles", filters: [["eq", "id", bearerUser.id]] }),
     ]);
     expect(mocks.createSupabaseClient).toHaveBeenCalledWith("http://supabase.test", "pk", expect.objectContaining({
-      global: { headers: { Authorization: `Bearer ${VALID_TOKEN}` } },
+      global: { headers: { Authorization: `Bearer ${VALID_TOKEN}` }, fetch: tracedFetch },
     }));
     expect(mocks.cookies).not.toHaveBeenCalled();
   });
@@ -653,6 +654,8 @@ describe("the request line", () => {
       ms: expect.any(Number),
       userId: user.id,
       spans: [],
+      dbMs: 0,
+      dbCalls: 0,
     });
   });
 

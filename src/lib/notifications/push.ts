@@ -1,5 +1,7 @@
 import webpush, { WebPushError } from "web-push";
 
+import { recordSpan } from "@/lib/log/span";
+
 /** What a push shows: the service worker passes these to `showNotification` (see `public/sw.js`). */
 export type PushPayload = {
   title: string;
@@ -12,6 +14,8 @@ export type PushPayload = {
 
 /** One browser's subscription, as stored in `push_subscriptions`. */
 export type PushTarget = {
+  /** The subscription's row id, for the `push.send` span; never sent. */
+  id?: string;
   endpoint: string;
   /** The subscription's public key (base64url). */
   p256dh: string;
@@ -90,10 +94,19 @@ function isNetworkError(error: unknown) {
   return typeof (error as NodeJS.ErrnoException).code === "string" || error.message === "Socket timeout";
 }
 
+/** The span fields for a send's result: the push service's status when it refused, `error` when there was no answer (a network error, or a subscription it couldn't encrypt for). */
+function spanFields(result: PushResult) {
+  if (result.outcome === "sent") return {};
+  return result.status === null ? { error: true as const } : { status: result.status };
+}
+
 /**
  * `PushSender` with the `web-push` package: payload encrypted for the subscription, signed with the
  * VAPID keys, TTL 24 hours, urgency high. `setVapidDetails` validates the keys, so a bad key throws
  * here, at start-up, rather than on every send.
+ *
+ * Each send is a `push.send` span (logging plan, L4) with the subscription's id as `deviceId`, and
+ * the push service's status when it refused; never the endpoint, a per-device URL.
  */
 export function createWebPushSender(vapid: VapidConfig, send: typeof webpush.sendNotification = webpush.sendNotification): PushSender {
   // Throws for a malformed key or subject; the options below pass them per send.
@@ -105,17 +118,24 @@ export function createWebPushSender(vapid: VapidConfig, send: typeof webpush.sen
     timeout: PUSH_TIMEOUT_MS,
   };
 
+  async function sendOnce(target: PushTarget, payload: PushPayload): Promise<PushResult> {
+    const body = JSON.stringify({ title: payload.title, body: payload.body, url: payload.url, tag: payload.tag });
+    try {
+      await send({ endpoint: target.endpoint, keys: { p256dh: target.p256dh, auth: target.auth } }, body, options);
+      return { outcome: "sent" };
+    } catch (error) {
+      if (error instanceof WebPushError && error.statusCode > 0) return classifyPushStatus(error.statusCode, describe(error));
+      if (isNetworkError(error)) return { outcome: "retry", status: null, error: describe(error) };
+      return { outcome: "rejected", status: null, error: describe(error) };
+    }
+  }
+
   return {
     async send(target, payload) {
-      const body = JSON.stringify({ title: payload.title, body: payload.body, url: payload.url, tag: payload.tag });
-      try {
-        await send({ endpoint: target.endpoint, keys: { p256dh: target.p256dh, auth: target.auth } }, body, options);
-        return { outcome: "sent" };
-      } catch (error) {
-        if (error instanceof WebPushError && error.statusCode > 0) return classifyPushStatus(error.statusCode, describe(error));
-        if (isNetworkError(error)) return { outcome: "retry", status: null, error: describe(error) };
-        return { outcome: "rejected", status: null, error: describe(error) };
-      }
+      const startedAt = performance.now();
+      const result = await sendOnce(target, payload);
+      recordSpan("push.send", performance.now() - startedAt, { ...spanFields(result), deviceId: target.id });
+      return result;
     },
   };
 }

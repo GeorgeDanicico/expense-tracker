@@ -7,6 +7,7 @@ import { findPrice, usageCostMicros, worstCaseMicros, PRICING, type PricingTable
 import type { AiProvider, AiProviderId, AiUsage, StructuredRequest, StructuredResult } from "@/lib/ai/provider";
 import { getAiEnv } from "@/lib/env";
 import { log as sharedLog, type LogFields } from "@/lib/log";
+import { span, spanNamePart } from "@/lib/log/span";
 
 /**
  * The only entry point features use to call a model (docs/statement-import-plan.md, I15; roadmap
@@ -189,7 +190,7 @@ export async function structured<T>(request: StructuredInput<T>, dependencies: S
 
   let result: StructuredResult<T>;
   try {
-    result = await provider.structured(providerRequest);
+    result = await span(`ai.${spanNamePart(provider.id)}.${spanNamePart(model)}`, () => provider.structured(providerRequest));
   } catch (error) {
     // Nothing came back to price, so the reservation is released (settled at zero) and the error
     // goes on. If that fails too, the reservation keeps counting its worst case: too much, never too little.

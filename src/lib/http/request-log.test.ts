@@ -8,6 +8,8 @@ const logged = vi.hoisted(() => [] as string[]);
 vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 
 import { isLoggedRequestFailure, logRequest, logRequestFailure, withRequestIdHeader } from "@/lib/http/request-log";
+import { addRequestFields } from "@/lib/log/request-context";
+import { recordSpan, span } from "@/lib/log/span";
 import { loggedLines } from "@/test/log-lines";
 
 const request = (path = "/api/csp-report") => new Request(`http://localhost${path}`, { method: "POST" });
@@ -50,6 +52,62 @@ describe("logRequest", () => {
     expect(loggedLines(logged, "request_failed")).toEqual([
       expect.objectContaining({ error: { name: "NonError", message: "plain string" } }),
     ]);
+  });
+});
+
+describe("the request line's spans", () => {
+  it("lists the spans with dbMs and dbCalls, and no slowestSpan when the request was quick", async () => {
+    await logRequest(request(), async () => {
+      recordSpan("db.expenses.get", 12.4);
+      recordSpan("rpc.move_todo", 30);
+      recordSpan("push.send", 50);
+      return new Response(null, { status: 204 });
+    });
+
+    const [line] = loggedLines(logged, "request");
+    expect(line).toMatchObject({
+      level: "info",
+      spans: [
+        { name: "db.expenses.get", ms: 12 },
+        { name: "rpc.move_todo", ms: 30 },
+        { name: "push.send", ms: 50 },
+      ],
+      dbMs: 42,
+      dbCalls: 2,
+    });
+    expect(line).not.toHaveProperty("slowestSpan");
+  });
+
+  it("names the slowest single call of a slow request", async () => {
+    vi.stubEnv("LOG_SLOW_MS", "5");
+    await logRequest(request(), async () => {
+      recordSpan("db.expenses.get", 2);
+      await span("ai.openai.gpt-5", () => new Promise((resolve) => setTimeout(resolve, 15)));
+      recordSpan("db.expenses.get", 3);
+      return new Response(null, { status: 200 });
+    });
+
+    const [line] = loggedLines(logged, "request");
+    expect(line).toMatchObject({ level: "warn", slow: true, dbMs: 5, dbCalls: 2, slowestSpan: { name: "ai.openai.gpt-5", ms: expect.any(Number) } });
+    expect((line.slowestSpan as { ms: number }).ms).toBeGreaterThanOrEqual(10);
+  });
+
+  it("keeps the span totals of a request that failed", async () => {
+    await logRequest(request(), async () => {
+      recordSpan("db.expenses.get", 4);
+      throw new Error("boom");
+    }).catch(() => {});
+
+    expect(loggedLines(logged, "request")[0]).toMatchObject({ status: 500, dbMs: 4, dbCalls: 1 });
+  });
+
+  it("doesn't let a handler's fields replace them", async () => {
+    await logRequest(request(), async () => {
+      addRequestFields({ dbMs: 999, dbCalls: 999, slowestSpan: "x", spans: "x" });
+      return new Response(null, { status: 204 });
+    });
+
+    expect(loggedLines(logged, "request")[0]).toMatchObject({ spans: [], dbMs: 0, dbCalls: 0 });
   });
 });
 

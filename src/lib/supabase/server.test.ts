@@ -9,6 +9,7 @@ vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.createServerClient }
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
 vi.mock("@/lib/supabase/config", () => ({ getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "publishable" }) }));
 
+import { tracedFetch } from "@/lib/log/traced-fetch";
 import { createAppTokenClient, createClient, getBearerToken, getScopedAppToken, runWithSupabaseClient } from "@/lib/supabase/server";
 
 const cookieClient = { kind: "cookie" };
@@ -32,6 +33,7 @@ describe("createClient", () => {
     expect(await createClient()).toBe(cookieClient);
     expect(mocks.cookies).toHaveBeenCalledOnce();
     expect(mocks.createServerClient).toHaveBeenCalledWith("http://supabase.test", "publishable", expect.any(Object));
+    expect(mocks.createServerClient.mock.calls[0][2].global).toEqual({ fetch: tracedFetch });
     expect(mocks.createSupabaseClient).not.toHaveBeenCalled();
   });
 
@@ -57,7 +59,7 @@ describe("createClient", () => {
 
     expect(await createClient()).toBe(tokenClient);
     expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "publishable", {
-      global: { headers: { Authorization: "Bearer token-1" } },
+      global: { headers: { Authorization: "Bearer token-1" }, fetch: tracedFetch },
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
     expect(mocks.cookies).not.toHaveBeenCalled();
@@ -125,7 +127,7 @@ describe("app-token clients", () => {
     createAppTokenClient("app-token");
 
     expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "publishable", {
-      global: { headers: { Authorization: "Bearer app-token" } },
+      global: { headers: { Authorization: "Bearer app-token" }, fetch: tracedFetch },
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
   });

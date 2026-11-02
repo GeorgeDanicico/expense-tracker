@@ -4,6 +4,7 @@ import { getEnv } from "@/lib/env";
 import { errorFields, log, type LogFields, type LogLevel } from "@/lib/log";
 import { createRequestContext, currentRequest, runWithRequestContext, type RequestContext } from "@/lib/log/request-context";
 import { REQUEST_ID_HEADER } from "@/lib/log/request-id";
+import { spanSummary } from "@/lib/log/span";
 
 /**
  * One `request` line per API request (logging plan, L2). The route wrappers (`withUser`,
@@ -13,7 +14,19 @@ import { REQUEST_ID_HEADER } from "@/lib/log/request-id";
  */
 
 /** The fields the request line sets itself, which a handler's `addRequestFields` can't replace. */
-const LINE_KEYS: ReadonlySet<string> = new Set(["requestId", "method", "route", "status", "ms", "userId", "slow", "spans"]);
+const LINE_KEYS: ReadonlySet<string> = new Set([
+  "requestId",
+  "method",
+  "route",
+  "status",
+  "ms",
+  "userId",
+  "slow",
+  "spans",
+  "dbMs",
+  "dbCalls",
+  "slowestSpan",
+]);
 
 // Errors already written as `request_failed`, so a wrapper that rethrows one doesn't write it twice.
 // One set per process even if a bundler loads this module more than once: `onRequestError` in
@@ -77,6 +90,7 @@ function writeRequestLine(context: RequestContext, status: number, quiet: boolea
     userId: context.userId,
     slow: slow || undefined,
     spans: context.spans,
+    ...spanSummary(context, slow),
   };
   for (const [key, value] of Object.entries(context.fields)) if (!LINE_KEYS.has(key)) fields[key] = value;
   log[lineLevel(status, slow, quiet)]("request", fields);
@@ -85,9 +99,10 @@ function writeRequestLine(context: RequestContext, status: number, quiet: boolea
 /**
  * Runs `handle` as one request: inside a new request context (so every line it writes carries the
  * request id), then sets `x-request-id` on its response and writes one `request` line
- * `{ method, route, status, ms, userId?, slow?, spans, ...fields }`. The level is `info`, `warn`
- * when the request took longer than `LOG_SLOW_MS` (with `slow: true`) or answered 429, and `error`
- * for 5xx.
+ * `{ method, route, status, ms, userId?, slow?, spans, dbMs, dbCalls, slowestSpan?, ...fields }`
+ * (see `span.ts`: `dbMs` and `dbCalls` add up the Supabase calls, and `slowestSpan` names the slowest
+ * single call of a slow request). The level is `info`, `warn` when the request took longer than
+ * `LOG_SLOW_MS` (with `slow: true`) or answered 429, and `error` for 5xx.
  *
  * An error `handle` throws is logged as `request_failed` (unless already logged), counted as a 500
  * in the line, and rethrown unchanged, so Next answers it as before. Inside a request that already

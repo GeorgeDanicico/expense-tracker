@@ -16,6 +16,7 @@ import type {
   SignUpResult,
 } from "@/lib/auth/service";
 import type { Database } from "@/lib/database.types";
+import { tracedFetch } from "@/lib/log/traced-fetch";
 import { hasMcpTokenPrefix } from "@/lib/mcp/tokens";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import {
@@ -89,6 +90,7 @@ function unverifiedClaims(token: string): Record<string, unknown> | null {
 export function createSessionClient(): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
   return createSupabaseClient<Database>(url, publishableKey, {
+    global: { fetch: tracedFetch },
     auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
   });
 }
@@ -101,6 +103,7 @@ export function createSessionClient(): SupabaseClient<Database> {
 export function createThrowawayClient(): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
   return createSupabaseClient<Database>(url, publishableKey, {
+    global: { fetch: tracedFetch },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }

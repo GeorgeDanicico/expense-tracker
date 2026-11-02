@@ -29,6 +29,7 @@ import {
   type ParsedStatement,
 } from "@/lib/imports/types";
 import { log as sharedLog, type LogFields } from "@/lib/log";
+import { span } from "@/lib/log/span";
 
 /**
  * Turns an uploaded statement into draft rows, in memory (docs/statement-import-plan.md, tasks I4
@@ -144,7 +145,7 @@ const NO_CURRENCY = "This statement doesn't say which currency its amounts are i
 
 async function readSource(kind: ImportSourceKind, bytes: Uint8Array): Promise<StatementSource> {
   if (kind === "pdf") {
-    const pages = await extractPdfText(bytes);
+    const pages = await span("import.parse_pdf", () => extractPdfText(bytes));
     return { kind: "pdf", text: pages.flat().join("\n"), pages };
   }
   return { kind: "csv", text: decodeStatementText(bytes) };
