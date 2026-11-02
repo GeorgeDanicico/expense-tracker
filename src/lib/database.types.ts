@@ -905,9 +905,21 @@ export type Database = {
         Args: { p_transaction_id: string };
         Returns: boolean;
       };
+      delete_managed_kid_data: {
+        Args: { p_confirm_name: string; p_member_id: string };
+        Returns: string;
+      };
+      delete_my_data: {
+        Args: { p_confirm: string };
+        Returns: undefined;
+      };
       dismiss_notice: {
         Args: { p_notice_id: string };
         Returns: undefined;
+      };
+      export_my_data: {
+        Args: { p_section: string };
+        Returns: Json;
       };
       get_expense_dashboard: {
         Args: {

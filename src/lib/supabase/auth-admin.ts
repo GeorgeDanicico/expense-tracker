@@ -9,6 +9,11 @@ import { translateDatabaseError } from "@/lib/supabase/errors";
 
 type ProviderError = { code?: string; message: string };
 
+/** The bucket of profile pictures, one folder per user id (see `src/lib/avatars/paths.ts`). */
+const AVATARS_BUCKET = "avatars";
+const AVATAR_PAGE_SIZE = 100;
+const MAX_AVATAR_PAGES = 10;
+
 /** An auth API error as a domain error, keeping the provider's details private unless they are meant for users. */
 function authError(error: ProviderError, fallback: string): Error {
   switch (error.code) {
@@ -41,7 +46,30 @@ function profileError(error: ProviderError): Error {
 export function createSupabaseAuthAdmin(): AuthAdmin {
   const client = createAdminClient();
 
+  /**
+   * Deletes every file in the user's folder of the `avatars` bucket (`<userId>/<uuid>.webp`). By the
+   * folder, not by `profiles.avatar_path`, so a retry finds a file the profile no longer names.
+   * Throws when Storage fails, so the account isn't deleted with its picture left behind.
+   */
+  async function deleteAvatarFiles(userId: string): Promise<void> {
+    const failure = "Unable to delete the account.";
+    const folder = userId.toLowerCase();
+    const bucket = client.storage.from(AVATARS_BUCKET);
+    // A user has one picture at a time (an old one is deleted on replace), so one page is the norm;
+    // the bound only stops a Storage that keeps answering with files it doesn't delete.
+    for (let page = 0; page < MAX_AVATAR_PAGES; page += 1) {
+      const { data, error } = await bucket.list(folder, { limit: AVATAR_PAGE_SIZE });
+      if (error) throw new Error(failure);
+      if (!data || data.length === 0) return;
+      const { error: removeError } = await bucket.remove(data.map((file) => `${folder}/${file.name}`));
+      if (removeError) throw new Error(failure);
+      if (data.length < AVATAR_PAGE_SIZE) return;
+    }
+    throw new Error(failure);
+  }
+
   async function deleteUser(userId: string): Promise<void> {
+    await deleteAvatarFiles(userId);
     const { error } = await client.auth.admin.deleteUser(userId);
     if (error) throw authError(error, "Unable to delete the account.");
   }

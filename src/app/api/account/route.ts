@@ -1,14 +1,17 @@
 import type { NextRequest } from "next/server";
 
+import { DELETE_INVALID, deleteOwnAccount } from "@/lib/account/deletion";
 import type { AccountData, AccountMembership } from "@/lib/account/types";
 import type { AuthenticatedUser } from "@/lib/auth";
 import { avatarUrl } from "@/lib/avatars/paths";
 import { isFamilyEnabled } from "@/lib/features";
 import { getCurrentMember } from "@/lib/family/current-member";
 import { signInName, visibleEmail } from "@/lib/family/kid-account";
-import { HttpError, json, readJson, withUser } from "@/lib/http/route";
+import { accountDeletionAttempts, TOO_MANY_ACCOUNT_DELETIONS } from "@/lib/http/rate-limit";
+import { HttpError, json, noContent, parseBody, readJson, tooManyRequests, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { isSupportedCurrency } from "@/lib/utils/currency";
+import { deleteAccountSchema } from "@/lib/validation/account";
 
 /** The caller's membership with their own member id only (not the family's id); `null` with no family or while the flag is off. */
 async function accountMembership(): Promise<AccountMembership | null> {
@@ -61,3 +64,24 @@ export const PATCH = withUser(async (request: NextRequest, user) => {
 
   return json(await accountData(user, payload.currency));
 }, { failure: "The currency could not be saved. Please try again." });
+
+/**
+ * Deletes the signed-in user's account: `{ currentPassword, confirm }` with `confirm` the typed
+ * phrase "delete my account" → 204, every session ended and this browser signed out. See
+ * `deleteOwnAccount` for the order of the steps and why a failure can be retried.
+ *
+ * Refused with the database's own message: a family's creator (409, delete the family first), a
+ * member of a family (409, be removed first) and an account a family manages (403, a parent deletes
+ * it). A wrong password is a 422 on `currentPassword`. Every attempt counts toward
+ * `ACCOUNT_DELETION_MAX_ATTEMPTS` an hour (429 past it), which also caps password guessing.
+ */
+export const DELETE = withUser(async (request: NextRequest, user) => {
+  const wait = accountDeletionAttempts.retryAfterSeconds(user.id);
+  if (wait > 0) return tooManyRequests(TOO_MANY_ACCOUNT_DELETIONS, wait);
+
+  const input = await parseBody(request, deleteAccountSchema, DELETE_INVALID);
+  accountDeletionAttempts.recordAttempt(user.id);
+
+  await deleteOwnAccount(user, input);
+  return noContent();
+}, { failure: "Unable to delete your account. Please try again." });

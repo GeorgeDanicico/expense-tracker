@@ -9,7 +9,8 @@ import type { ModuleKey } from "@/lib/permissions";
  * - `withPermission(module, level)` (src/lib/http/permission.ts): module checks for routes.
  * - `requirePermission(module, level)`: the same check, called by a route for one kind of request.
  * - `defineTool({ module })` (src/lib/mcp/define-tool.ts): module checks for MCP tools, always `edit`.
- * - `withParent`: the role check for the one family route whose work starts outside the database.
+ * - `withParent`: the role check for the family routes whose work starts or ends outside the
+ *   database (creating a kid's account, resetting its password, deleting it).
  * - SQL: role checks inside the RPC (`only parents can…`), RLS for "members of the family" and
  *   "your own rows", and the profile guards for the AI and MCP switches. Their refusals keep the
  *   RPC's own message.
@@ -42,11 +43,13 @@ const creatorInSql = (check: string) => ({ access: "sql", who: "creator", check 
 export const ROUTE_ACCESS: Record<string, Access> = {
   "GET /api/account": signedIn,
   "PATCH /api/account": signedIn,
+  "DELETE /api/account": { access: "sql", who: "no family", check: "delete_my_data: not a family's creator or member, nor a managed kid account" },
   "GET /api/account/ai": signedIn,
   "PATCH /api/account/ai": { access: "sql", who: "kid's module", check: "guard_profile_ai_enabled: a kid needs `ai` to turn it on" },
   "PUT /api/account/avatar": signedIn,
   "DELETE /api/account/avatar": signedIn,
   "PATCH /api/account/email": signedIn,
+  "POST /api/account/export": signedIn,
   "GET /api/account/mcp": signedIn,
   "PATCH /api/account/mcp": { access: "sql", who: "kid's module", check: "guard_profile_mcp_enabled: a kid needs `mcp` (and a real email) to turn it on" },
   "GET /api/account/mcp/apps": signedIn,
@@ -92,6 +95,7 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   "POST /api/family/join/preview": signedIn,
   "POST /api/family/kids": { access: "parent" },
   "DELETE /api/family/members/[id]": creatorInSql("remove_family_member"),
+  "DELETE /api/family/members/[id]/account": { access: "parent" },
   "PATCH /api/family/members/[id]/color": parentInSql("set_member_color"),
   "POST /api/family/members/[id]/password": { access: "parent" },
   "PATCH /api/family/members/[id]/permissions": parentInSql("set_member_permissions"),

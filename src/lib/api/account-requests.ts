@@ -1,5 +1,12 @@
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { ACCOUNT_EMAIL_API_URL, ACCOUNT_PASSWORD_API_URL, SIGN_OUT_API_URL, SIGN_OUT_EVERYWHERE_API_URL } from "@/lib/api/keys";
+import {
+  ACCOUNT_API_KEY,
+  ACCOUNT_EMAIL_API_URL,
+  ACCOUNT_EXPORT_API_URL,
+  ACCOUNT_PASSWORD_API_URL,
+  SIGN_OUT_API_URL,
+  SIGN_OUT_EVERYWHERE_API_URL,
+} from "@/lib/api/keys";
 
 /**
  * The requests behind the account forms (Settings → Account and the change-password page), kept out
@@ -34,4 +41,44 @@ export async function signOut() {
 /** Signs every session of the account out: other browsers, phones and connected apps, and this one. */
 export async function signOutEverywhere() {
   await apiRequest<{ success: true }>(SIGN_OUT_EVERYWHERE_API_URL, { method: "DELETE" });
+}
+
+/**
+ * Deletes the signed-in user's account and everything in it. The server checks the password, the
+ * typed phrase and the family rules, and signs this browser out.
+ */
+export async function deleteAccount({ currentPassword, confirm }: { currentPassword: string; confirm: string }) {
+  await apiRequest<void>(ACCOUNT_API_KEY, { method: "DELETE", body: JSON.stringify({ currentPassword, confirm }) });
+}
+
+/** An export can take a while for a big account; far longer than an ordinary request's timeout. */
+const EXPORT_TIMEOUT_MS = 120_000;
+
+/**
+ * Downloads everything the signed-in user owns as a ZIP, and returns it with the file name the server
+ * chose. Throws an `ApiError` with the server's message when it refuses (for example 429), and a
+ * generic one when the download breaks off.
+ */
+export async function downloadMyData(): Promise<{ blob: Blob; fileName: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), EXPORT_TIMEOUT_MS);
+  try {
+    const response = await fetch(ACCOUNT_EXPORT_API_URL, {
+      method: "POST",
+      cache: "no-store",
+      credentials: "same-origin",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new ApiError(payload.error || "Unable to download your data. Please try again.", response.status);
+    }
+    const fileName = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ?? "my-data.zip";
+    return { blob: await response.blob(), fileName };
+  } catch (caught) {
+    if (caught instanceof ApiError) throw caught;
+    throw new ApiError("Unable to download your data. Check your connection and try again.", 503);
+  } finally {
+    clearTimeout(timeout);
+  }
 }

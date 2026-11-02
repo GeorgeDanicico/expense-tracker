@@ -4,6 +4,7 @@ import { Box, Button, Flex, Table, Text } from "@chakra-ui/react";
 import { useState } from "react";
 
 import { CreateKidDialog } from "@/components/family/create-kid-dialog";
+import { DeleteKidAccountDialog } from "@/components/family/delete-kid-account-dialog";
 import { MemberSwatch } from "@/components/family/member-swatch";
 import { EditColorDialog } from "@/components/family/edit-color-dialog";
 import { EditPermissionsDialog } from "@/components/family/edit-permissions-dialog";
@@ -38,6 +39,7 @@ function MemberRow({
   const [editing, setEditing] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const name = memberName(member);
 
   return (
@@ -89,6 +91,15 @@ function MemberRow({
               >
                 Reset password
               </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                colorPalette="danger"
+                onClick={() => setDeleting(true)}
+                aria-label={`Delete ${name}'s account`}
+              >
+                Delete account
+              </Button>
             </>
           ) : null}
           {canRemove && !member.isCreator ? (
@@ -107,12 +118,13 @@ function MemberRow({
         {editing ? <EditPermissionsDialog member={member} open onOpenChange={setEditing} /> : null}
         {resetting ? <ResetPasswordDialog member={member} open onOpenChange={setResetting} /> : null}
         {removing ? <RemoveMemberDialog member={member} open onOpenChange={setRemoving} /> : null}
+        {deleting ? <DeleteKidAccountDialog member={member} open onOpenChange={setDeleting} /> : null}
       </Table.Cell>
     </Table.Row>
   );
 }
 
-/** The members table for parents: role, last activity, kid accounts, a colour button for each member, permission and password buttons for each kid, and Remove for the creator. */
+/** The members table for parents: role, last activity, kid accounts, a colour button for each member, permission, password and delete-account buttons for each kid, and Remove for the creator. */
 export function ManageMembers({ data, isCreator = false }: { data: FamilyView; isCreator?: boolean }) {
   const [adding, setAdding] = useState(false);
   const colors = memberColorTokens(data.members);

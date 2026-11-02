@@ -302,6 +302,40 @@ export const emailChangeAttempts = createFailureLimiter({
 /** What the email change answers, with status 429, past `EMAIL_CHANGE_MAX_ATTEMPTS`. */
 export const TOO_MANY_EMAIL_CHANGES = "You've tried to change your email a lot recently. Try again in an hour.";
 
+/** Account deletions allowed per user in `ACCOUNT_DELETION_WINDOW_MS`, counting every attempt. */
+export const ACCOUNT_DELETION_MAX_ATTEMPTS = 5;
+export const ACCOUNT_DELETION_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * `DELETE /api/account` and `DELETE /api/family/members/[id]/account` per user id (the caller: the
+ * account's owner, or the parent deleting a kid's account), together. Records every attempt (through
+ * `recordAttempt`): each one checks a password, so this also caps password guessing from a stolen
+ * session.
+ */
+export const accountDeletionAttempts = createFailureLimiter({
+  maxFailures: ACCOUNT_DELETION_MAX_ATTEMPTS,
+  windowMs: ACCOUNT_DELETION_WINDOW_MS,
+});
+
+/** What the deletion routes answer, with status 429, past `ACCOUNT_DELETION_MAX_ATTEMPTS`. */
+export const TOO_MANY_ACCOUNT_DELETIONS = "You've tried to delete an account a lot recently. Try again in an hour.";
+
+/** Data exports allowed per user in `DATA_EXPORT_WINDOW_MS`, counting every attempt. */
+export const DATA_EXPORT_MAX_ATTEMPTS = 5;
+export const DATA_EXPORT_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * `POST /api/account/export` per user id. Records every attempt (through `recordAttempt`): each one
+ * reads every table the user has rows in, far more than any other request.
+ */
+export const dataExportAttempts = createFailureLimiter({
+  maxFailures: DATA_EXPORT_MAX_ATTEMPTS,
+  windowMs: DATA_EXPORT_WINDOW_MS,
+});
+
+/** What the export answers, with status 429, past `DATA_EXPORT_MAX_ATTEMPTS`. */
+export const TOO_MANY_DATA_EXPORTS = "You've downloaded your data a lot recently. Try again in an hour.";
+
 /** CSP violation report requests allowed per client IP in `CSP_REPORT_WINDOW_MS`, counting every one. */
 export const CSP_REPORT_MAX_ATTEMPTS = 60;
 export const CSP_REPORT_WINDOW_MS = 60 * 1000;

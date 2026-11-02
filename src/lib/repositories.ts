@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { AccountDataRepository } from "@/lib/account/data-repository";
 import type { AccountRepository } from "@/lib/account/repository";
 import type { NoticeRepository } from "@/lib/account/notice-repository";
 import type { AiGateRepository } from "@/lib/ai/repository";
@@ -17,6 +18,7 @@ import type { NotificationSettingsRepository } from "@/lib/notifications/setting
 import type { ReminderRepository } from "@/lib/reminders/repository";
 import type { TodoRepository } from "@/lib/todos/repository";
 import { supabaseAccountRepository } from "@/lib/supabase/repositories/account";
+import { supabaseAccountDataRepository } from "@/lib/supabase/repositories/account-data";
 import { supabaseAiGateRepository } from "@/lib/supabase/repositories/ai";
 import { supabaseAvatarRepository } from "@/lib/supabase/repositories/avatars";
 import { supabaseCalendarFeedRepository } from "@/lib/supabase/repositories/calendar-feeds";
@@ -36,6 +38,7 @@ import { supabaseTodoRepository } from "@/lib/supabase/repositories/todos";
 /** Every repository the app uses. Each repository task adds its own key here. */
 export type Repositories = {
   account: AccountRepository;
+  accountData: AccountDataRepository;
   aiGate: AiGateRepository;
   avatars: AvatarRepository;
   calendar: CalendarRepository;
@@ -62,6 +65,7 @@ export type Repositories = {
 export function getRepositories(): Repositories {
   return {
     account: supabaseAccountRepository,
+    accountData: supabaseAccountDataRepository,
     aiGate: supabaseAiGateRepository,
     avatars: supabaseAvatarRepository,
     calendar: supabaseCalendarRepository,

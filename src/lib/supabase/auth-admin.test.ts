@@ -186,6 +186,40 @@ describe("Supabase AuthAdmin", () => {
       expect(admin.deleteUser).toHaveBeenCalledExactlyOnceWith(kid.id);
     });
 
+    it("deletes every file in the account's avatar folder first, and nobody else's", async () => {
+      const other = "20000000-0000-4000-8000-000000000001";
+      const objects = {
+        avatars: {
+          [`${kid.id}/11111111-1111-4111-8111-111111111111.webp`]: new Uint8Array([1]),
+          [`${kid.id}/22222222-2222-4222-8222-222222222222.webp`]: new Uint8Array([2]),
+          [`${other}/33333333-3333-4333-8333-333333333333.webp`]: new Uint8Array([3]),
+        },
+      };
+      const { admin, storageCalls } = useAdminClient([], {}, { objects });
+      admin.deleteUser.mockImplementation(async () => {
+        // The files are gone before the auth user is.
+        expect(Object.keys(objects.avatars)).toEqual([`${other}/33333333-3333-4333-8333-333333333333.webp`]);
+        return ok();
+      });
+
+      await createSupabaseAuthAdmin().deleteUser(kid.id);
+
+      expect(admin.deleteUser).toHaveBeenCalledExactlyOnceWith(kid.id);
+      expect(storageCalls.map((call) => `${call.operation}:${call.paths.length}`)).toEqual(["list:1", "remove:2"]);
+    });
+
+    it.each([
+      ["listing", 0],
+      ["removing", 1],
+    ])("doesn't delete the auth user when %s the avatar files fails", async (_, failingCall) => {
+      const objects = { avatars: { [`${kid.id}/11111111-1111-4111-8111-111111111111.webp`]: new Uint8Array([1]) } };
+      const { admin } = useAdminClient([], {}, { objects, failStorage: (_call, index) => index === failingCall });
+
+      await expect(createSupabaseAuthAdmin().deleteUser(kid.id)).rejects.toThrow(new Error("Unable to delete the account."));
+
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+    });
+
     it("reports an unknown account as not found", async () => {
       useAdminClient([], { deleteUser: fails("user_not_found") });
 

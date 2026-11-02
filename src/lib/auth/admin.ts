@@ -41,7 +41,14 @@ export interface AuthAdmin {
    * written, the new account is deleted again before the error is thrown.
    */
   createUser(input: CreateUserInput): Promise<CreatedUser>;
-  /** Deletes the account and, through the database's cascades, everything it owns. */
+  /**
+   * Deletes the account: first its profile picture files (its folder in Storage), then the auth user,
+   * which ends every session, refresh token and connected app of the account in the auth provider
+   * and, through the database's cascades, deletes its profile, its membership and anything else
+   * still pointing at it. A Storage failure throws before the auth user is touched, so a retry
+   * starts over. For account deletion (S13), `delete_my_data()` or `delete_managed_kid_data()`
+   * has already deleted the account's own data in one transaction.
+   */
   deleteUser(userId: string): Promise<void>;
   /** Sets the account's password without asking for the old one. */
   setPassword(userId: string, password: string): Promise<void>;

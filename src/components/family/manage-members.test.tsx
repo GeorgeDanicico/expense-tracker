@@ -92,6 +92,12 @@ describe("ManageMembers kid accounts", () => {
     expect(html).toContain("Reset password for Mara");
     expect(html).not.toContain("Reset password for Ana");
   });
+
+  it("offers Delete account for kids only", () => {
+    const html = render(<ManageMembers data={data} />);
+    expect(html).toContain("Delete Mara&#x27;s account");
+    expect(html).not.toContain("Delete Ana&#x27;s account");
+  });
 });
 
 describe("KidSignInDetails", () => {
