@@ -143,6 +143,11 @@ describe("redaction by value pattern", () => {
   it("redacts anything shaped like a JWT", () => {
     expect(redactString(`token ${JWT} expired`)).toBe(`token ${REDACTED} expired`);
     expect(redactString("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.")).toBe(REDACTED);
+    // A JWT cut short, or one of its parts on its own.
+    expect(redactString(`release ${JWT.slice(0, 40)}`)).toBe(`release ${REDACTED}.${REDACTED}`);
+    expect(redactString(`part ${JWT.split(".")[1]} end`)).toBe(`part ${REDACTED} end`);
+    // Too short to be one, and not at a word's start.
+    expect(redactString("eyJhbGciOi and keyJhbGciOiJIUzI1")).toBe("eyJhbGciOi and keyJhbGciOiJIUzI1");
   });
 
   it("redacts email addresses", () => {

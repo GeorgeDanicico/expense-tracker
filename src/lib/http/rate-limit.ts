@@ -130,7 +130,7 @@ const MINUTE_MS = 60 * 1000;
  * a script or a runaway client, and are to be tightened once real usage shows in the logs
  * (phase 15). All of them are per minute, in a sliding window, and a limited request gets 429 with
  * `Retry-After` and `{ error }`. (The sign-in, upload and token limits above, and the CSP report
- * limit below, are separate and stay.)
+ * and client log limits below, are separate and stay.)
  *
  * | Who                                                   | Limit      | Key              | Where                  |
  * | ----------------------------------------------------- | ---------- | ---------------- | ---------------------- |
@@ -141,6 +141,8 @@ const MINUTE_MS = 60 * 1000;
  * | MCP, before the token is read                         | 600 a min  | client IP        | `/api/mcp`             |
  * | MCP, a signed-in user                                 | 300 a min  | user id          | `/api/mcp`             |
  * | CSP reports                                           | 60 a min   | client IP        | `/api/csp-report`      |
+ * | Browser error and Web Vitals reports, per event       | 30 a min   | user id, else client IP | `/api/client-log` (as well as the anonymous limit) |
+ * | The same, the whole process, per event                | 600 a min  | —                | `/api/client-log`      |
  *
  * Not limited: `/health` (the deploy's check, no data) and the worker, which talks to the database
  * and never to the app's routes.
@@ -352,6 +354,39 @@ export const cspReportAttempts = createFailureLimiter({
 
 /** What the report endpoint answers, with status 429, past `CSP_REPORT_MAX_ATTEMPTS`. */
 export const TOO_MANY_CSP_REPORTS = "Too many reports. Try again in a minute.";
+
+/** Browser report events (errors and Web Vitals) allowed per client in `CLIENT_LOG_WINDOW_MS`, counting every event. */
+export const CLIENT_LOG_MAX_EVENTS_PER_CLIENT = 30;
+/** Browser report events logged by the whole process in `CLIENT_LOG_WINDOW_MS`; past it they're dropped. */
+export const CLIENT_LOG_MAX_EVENTS_PER_PROCESS = 600;
+export const CLIENT_LOG_WINDOW_MS = 60 * 1000;
+
+/**
+ * `POST /api/client-log` per signed-in user id, or per client IP (`clientKey`) when signed out.
+ * Records one attempt per event logged, not per request (a request carries up to ten), so a batch
+ * costs what it writes. The request itself also counts against `anonymousRequests`.
+ */
+export const clientLogAttempts = createFailureLimiter({
+  maxFailures: CLIENT_LOG_MAX_EVENTS_PER_CLIENT,
+  windowMs: CLIENT_LOG_WINDOW_MS,
+});
+
+/** The key {@link clientLogEvents} counts every event under. */
+export const CLIENT_LOG_PROCESS_KEY = "process";
+
+/**
+ * Every event `POST /api/client-log` logs, under the one key {@link CLIENT_LOG_PROCESS_KEY}: a cap on
+ * what all clients together can write, so many clients each under their own limit still can't flood
+ * the logs. Events past it are dropped, not refused, and counted in a `client_log_dropped` line.
+ */
+export const clientLogEvents = createFailureLimiter({
+  maxFailures: CLIENT_LOG_MAX_EVENTS_PER_PROCESS,
+  windowMs: CLIENT_LOG_WINDOW_MS,
+  maxKeys: 1,
+});
+
+/** What the client log answers, with status 429, past `CLIENT_LOG_MAX_EVENTS_PER_CLIENT`. */
+export const TOO_MANY_CLIENT_REPORTS = "Too many reports. Try again in a minute.";
 
 /** What a route answers, with status 429, to a key over its limit. */
 export const TOO_MANY_ATTEMPTS_MESSAGE = "Too many codes that didn't work. Try again in a few minutes.";

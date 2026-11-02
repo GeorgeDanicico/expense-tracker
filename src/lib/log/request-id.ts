@@ -43,7 +43,7 @@ export function isRequestId(value: string): boolean {
 /**
  * The id the proxy gave this request, or null when there's none to trust. The header counts only
  * when the proxy's marker header is on the request and the path is one the proxy runs on: on the
- * paths it skips (`/api/mcp`, `/api/csp-report`, the calendar feed, `/.well-known/…`) both headers
+ * paths it skips (`/api/mcp`, `/api/csp-report`, `/api/client-log`, the calendar feed, `/.well-known/…`) both headers
  * come straight from the client.
  */
 export function proxyRequestId(headers: Headers, pathname: string): string | null {

@@ -6,7 +6,7 @@
  * own copy as a string literal; `src/proxy.test.ts` checks the two are the same string.
  */
 export const PROXY_MATCHER =
-  "/((?!health(?:/|$)|api/mcp(?:/|$)|api/csp-report(?:/|$)|api/calendar/feed/|\\.well-known/|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)";
+  "/((?!health(?:/|$)|api/mcp(?:/|$)|api/csp-report(?:/|$)|api/client-log(?:/|$)|api/calendar/feed/|\\.well-known/|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)";
 
 // Next compiles the matcher with path-to-regexp; as a plain regular expression over the whole path
 // it means the same thing for this pattern.

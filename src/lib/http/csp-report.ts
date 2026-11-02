@@ -1,4 +1,5 @@
-import { redactPath } from "@/lib/log/redact-path";
+import { loggablePagePath, loggableResourcePath } from "@/lib/log/loggable-path";
+import { redactString } from "@/lib/log/redact";
 
 /**
  * Reading the CSP violation reports browsers send to `POST /api/csp-report` (security plan S7),
@@ -11,9 +12,13 @@ import { redactPath } from "@/lib/log/redact-path";
  *
  * SECURITY: a report is written by whoever sends it and lands in the logs, so only short, checked
  * values are kept. URLs lose their query string and fragment (they can hold tokens or invite
- * codes); the document is logged as a path only, with an invite link's code replaced; same-origin resources as paths and other origins as
- * origin plus path; `data:` and `blob:` as just the scheme. The `sample` (the start of the blocked
- * code) and anything else in the report are dropped.
+ * codes); the document is logged as a path only, through `loggablePagePath` (ids as in the request
+ * line's route template, an invite link's code replaced); same-origin resources as paths and other
+ * origins as origin plus path, through `loggableResourcePath`; `data:` and `blob:` as just the
+ * scheme. Every path segment that holds a secret is `[redacted]`. The paths go through the same
+ * helpers (`src/lib/log/loggable-path.ts`) as the browser's own reports (`POST /api/client-log`),
+ * so the two stay in line. The `sample` (the start of the blocked code) and anything else in the
+ * report are dropped.
  */
 
 /** The content types the endpoint accepts, by the format each one means. */
@@ -112,7 +117,7 @@ function toViolation(raw: RawViolation): CspViolation | null {
 
   const documentUrl = parseUrl(raw.document);
   const violation: CspViolation = { directive };
-  if (documentUrl) violation.document = clip(redactPath(documentUrl.pathname));
+  if (documentUrl) violation.document = loggablePagePath(documentUrl.pathname);
   const blocked = describeResource(raw.blocked, documentUrl);
   if (blocked) violation.blocked = blocked;
   const source = describeResource(raw.source, documentUrl);
@@ -135,8 +140,8 @@ function describeResource(value: unknown, documentUrl: URL | null): string | und
   const url = parseUrl(value);
   if (!url) return /^[a-z-]{1,40}$/.test(value) ? value : undefined;
   if (!["http:", "https:", "ws:", "wss:"].includes(url.protocol)) return url.protocol.slice(0, -1);
-  if (documentUrl && url.origin === documentUrl.origin) return clip(redactPath(url.pathname));
-  return clip(`${url.origin}${url.pathname}`);
+  if (documentUrl && url.origin === documentUrl.origin) return loggableResourcePath(url.pathname);
+  return clip(`${redactString(url.origin)}${loggableResourcePath(url.pathname)}`);
 }
 
 function parseUrl(value: unknown): URL | null {

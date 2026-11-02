@@ -46,13 +46,19 @@ describe("the proxy's matcher", () => {
     expect(runsOn("/api/csp-report")).toBe(false);
   });
 
+  it("leaves out the client log, which reads the session itself and needs no refresh or CSP", () => {
+    expect(runsOn("/api/client-log")).toBe(false);
+    expect(runsOn("/api/client-log/")).toBe(false);
+    expect(runsOn("/api/client-logs")).toBe(true);
+  });
+
   it("covers the offline page, so it carries the policy too", () => {
     expect(runsOn("/offline")).toBe(true);
   });
 
   it("is the same pattern the request id's trust rule checks", () => {
     expect(config.matcher[0]).toBe(PROXY_MATCHER);
-    for (const path of ["/", "/dashboard", "/api/account", "/api/mcp", "/api/csp-report", "/health", "/api/calendar/feed/x", "/.well-known/x"]) {
+    for (const path of ["/", "/dashboard", "/api/account", "/api/mcp", "/api/csp-report", "/api/client-log", "/health", "/api/calendar/feed/x", "/.well-known/x"]) {
       expect(proxyRunsOn(path), path).toBe(runsOn(path));
     }
   });
