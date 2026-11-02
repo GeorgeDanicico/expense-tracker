@@ -59,3 +59,8 @@ description = "False positive: TOKEN_ID in the MCP settings test is a token's da
 targetRules = ["generic-api-key"]
 paths = ['''^src/components/settings/mcp-settings\.test\.tsx$''']
 regexes = ['''^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$''']
+
+[[allowlists]]
+description = "Test value: the public jwt.io sample token (subject 1234567890) in the log redaction tests, there to prove JWTs are redacted (found in 4133e1f)"
+targetRules = ["jwt"]
+paths = ['''^src/lib/log/redact\.test\.ts$''']
