@@ -29,6 +29,14 @@ GIT_SHA="${GIT_SHA:-${GITHUB_SHA:-}}"
 IMAGE_SOURCE="${IMAGE_SOURCE:-build}"
 PULL_ATTEMPTS="${PULL_ATTEMPTS:-40}"
 PULL_INTERVAL_SECONDS="${PULL_INTERVAL_SECONDS:-15}"
+# Hardening (docs/security-plan.md, S12). Memory limits are a number plus b, k, m or g. A tmpfs lives
+# in RAM and counts against the container's memory limit, so keep the sizes small. The cache tmpfs
+# is owned by uid/gid 1000, the `node` user the image runs as.
+WEB_MEMORY_LIMIT="${WEB_MEMORY_LIMIT:-768m}"
+WORKER_MEMORY_LIMIT="${WORKER_MEMORY_LIMIT:-256m}"
+TMP_TMPFS_SIZE="${TMP_TMPFS_SIZE:-64m}"
+NEXT_CACHE_TMPFS_SIZE="${NEXT_CACHE_TMPFS_SIZE:-128m}"
+NEXT_CACHE_DIR="${NEXT_CACHE_DIR:-/app/.next/cache}"
 
 previous_container_renamed=false
 deployment_started=false
@@ -42,6 +50,29 @@ die() {
 
 container_exists() {
   docker container inspect "$1" >/dev/null 2>&1
+}
+
+require_memory_size() {
+  local name="$1"
+  local value="$2"
+
+  [[ "$value" =~ ^[1-9][0-9]*[bkmg]$ ]] || die "$name must be a number followed by b, k, m or g (for example 512m)"
+}
+
+# The flags both containers share: a read-only root filesystem, no extra privileges, no Linux
+# capabilities (a non-root process binding port 3000 needs none) and no swap. The only writable
+# places are two tmpfs mounts: /tmp, and Next's cache (the optimized-image cache lives in RAM, so
+# it starts empty after a restart). $1 is the memory limit; the flags land in HARDENING_FLAGS.
+set_hardening_flags() {
+  HARDENING_FLAGS=(
+    --read-only
+    --tmpfs "/tmp:rw,noexec,nosuid,nodev,size=${TMP_TMPFS_SIZE}"
+    --tmpfs "${NEXT_CACHE_DIR}:rw,noexec,nosuid,nodev,uid=1000,gid=1000,size=${NEXT_CACHE_TMPFS_SIZE}"
+    --security-opt no-new-privileges
+    --cap-drop ALL
+    --memory "$1"
+    --memory-swap "$1"
+  )
 }
 
 require_positive_integer() {
@@ -154,12 +185,14 @@ deploy_worker() {
   fi
 
   echo "Starting ${WORKER_CONTAINER_NAME}."
+  set_hardening_flags "$WORKER_MEMORY_LIMIT"
   if docker run \
     --detach \
     --name "$WORKER_CONTAINER_NAME" \
     --restart unless-stopped \
     --network expense-network \
     --env-file "$ENV_FILE" \
+    "${HARDENING_FLAGS[@]}" \
     --log-opt "max-size=${LOG_MAX_SIZE}" \
     --log-opt "max-file=${LOG_MAX_FILES}" \
     "${IMAGE_NAME}:${IMAGE_TAG}" \
@@ -203,6 +236,11 @@ require_positive_integer HEALTHCHECK_INTERVAL_SECONDS "$HEALTHCHECK_INTERVAL_SEC
 require_positive_integer WORKER_STARTUP_SECONDS "$WORKER_STARTUP_SECONDS"
 require_positive_integer PULL_ATTEMPTS "$PULL_ATTEMPTS"
 require_positive_integer PULL_INTERVAL_SECONDS "$PULL_INTERVAL_SECONDS"
+require_memory_size WEB_MEMORY_LIMIT "$WEB_MEMORY_LIMIT"
+require_memory_size WORKER_MEMORY_LIMIT "$WORKER_MEMORY_LIMIT"
+require_memory_size TMP_TMPFS_SIZE "$TMP_TMPFS_SIZE"
+require_memory_size NEXT_CACHE_TMPFS_SIZE "$NEXT_CACHE_TMPFS_SIZE"
+[[ "$NEXT_CACHE_DIR" =~ ^/[A-Za-z0-9_./-]+$ ]] || die "NEXT_CACHE_DIR must be an absolute path"
 
 [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || die "IMAGE_TAG contains unsupported characters"
 [[ "$GIT_SHA" =~ ^[A-Za-z0-9]{0,64}$ ]] || die "GIT_SHA must be a commit hash"
@@ -241,6 +279,7 @@ fi
 
 echo "Starting ${CONTAINER_NAME}."
 deployment_started=true
+set_hardening_flags "$WEB_MEMORY_LIMIT"
 docker run \
   --detach \
   --name "$CONTAINER_NAME" \
@@ -248,6 +287,7 @@ docker run \
   --network expense-network \
   --env-file "$ENV_FILE" \
   --publish "${BIND_ADDRESS}:${HOST_PORT}:${CONTAINER_PORT}" \
+  "${HARDENING_FLAGS[@]}" \
   --log-opt "max-size=${LOG_MAX_SIZE}" \
   --log-opt "max-file=${LOG_MAX_FILES}" \
   "${IMAGE_NAME}:${IMAGE_TAG}"
