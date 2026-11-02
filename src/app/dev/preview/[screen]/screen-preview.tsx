@@ -126,7 +126,7 @@ export function ScreenPreview({ screen }: { screen: PreviewScreen }) {
   );
   return (
     <SWRConfig value={{ use: [fixtures], dedupingInterval: 60_000, revalidateOnFocus: false }}>
-      {WITHOUT_SHELL.has(screen) ? content : <AppShell email="preview@example.com">{content}</AppShell>}
+      {WITHOUT_SHELL.has(screen) ? content : <AppShell signInName="preview@example.com">{content}</AppShell>}
     </SWRConfig>
   );
 }

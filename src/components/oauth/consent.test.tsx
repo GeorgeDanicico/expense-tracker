@@ -35,15 +35,14 @@ const ID = "auth_ABC-123";
 
 const consentDetails: ConsentDetails = {
   kind: "consent",
-  email: "ana@example.com",
-  app: { clientId: "client-1", name: "Claude Code (simple-ledger)", uri: null, logoUri: null },
+  signInName: "ana@example.com",
+  app: { clientId: "client-1", name: "Claude Code (simple-ledger)", uri: null },
   redirectUri: "http://localhost:4567/callback",
-  scopes: ["email"],
 };
 
 const refusedDetails: RefusedDetails = {
   kind: "refused",
-  email: "ana@example.com",
+  signInName: "ana@example.com",
   reason: "mcp_off",
   app: consentDetails.app,
 };

@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeCurrency } from "@/lib/utils/currency";
 
 /**
- * `AccountRepository` on the `profiles` table. Its errors stay plain `Error`s (500s), as before the
- * repository existed: no account query raises an expected Postgres error.
+ * `AccountRepository` on the `profiles` table. Database errors go through `translateDatabaseError`:
+ * no account query raises an expected Postgres error, so in practice they are 500s with the generic message.
  */
 export const supabaseAccountRepository: AccountRepository = {
   async getCurrency(userId) {
@@ -18,7 +18,7 @@ export const supabaseAccountRepository: AccountRepository = {
       .eq("id", userId)
       .maybeSingle();
 
-    if (error) throw new Error("Unable to load account settings.");
+    if (error) throw translateDatabaseError(error, "Unable to load account settings.");
     return normalizeCurrency(data?.currency);
   },
 
@@ -30,7 +30,7 @@ export const supabaseAccountRepository: AccountRepository = {
       { onConflict: "id" },
     );
 
-    if (error) throw new Error("The currency could not be saved. Please try again.");
+    if (error) throw translateDatabaseError(error, "The currency could not be saved. Please try again.");
   },
 
   /** A user without a profile row has never been asked to change their password. */
@@ -42,7 +42,7 @@ export const supabaseAccountRepository: AccountRepository = {
       .eq("id", userId)
       .maybeSingle();
 
-    if (error) throw new Error("Unable to load account settings.");
+    if (error) throw translateDatabaseError(error, "Unable to load account settings.");
     return data?.must_change_password === true;
   },
 

@@ -4,7 +4,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { StatusBadge } from "@/components/ui/status-badge";
-import type { FamilyData, FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView, FamilyView } from "@/lib/family/views";
 import { memberColorTokens } from "@/lib/family/member-colors";
 
 const joinedFormatter = new Intl.DateTimeFormat("en-US", {
@@ -20,7 +20,7 @@ export function joinedLabel(joinedAt: string): string {
   return Number.isNaN(date.getTime()) ? "" : `Joined ${joinedFormatter.format(date)}`;
 }
 
-function MemberRow({ member, color }: { member: FamilyMember; color: string | undefined }) {
+function MemberRow({ member, color }: { member: FamilyMemberView; color: string | undefined }) {
   const name = member.displayName ?? member.username ?? "Unnamed";
   const meta = [member.displayName && member.username ? `@${member.username}` : null, joinedLabel(member.joinedAt)]
     .filter(Boolean)
@@ -42,7 +42,7 @@ function MemberRow({ member, color }: { member: FamilyMember; color: string | un
   );
 }
 
-function MemberGroup({ title, members, colors }: { title: string; members: FamilyMember[]; colors: Map<string, string> }) {
+function MemberGroup({ title, members, colors }: { title: string; members: FamilyMemberView[]; colors: Map<string, string> }) {
   if (members.length === 0) return null;
   return (
     <Card>
@@ -59,7 +59,7 @@ function MemberGroup({ title, members, colors }: { title: string; members: Famil
 }
 
 /** The family's name and its members, grouped into parents and kids. */
-export function FamilyMembers({ data }: { data: FamilyData }) {
+export function FamilyMembers({ data }: { data: FamilyView }) {
   const parents = data.members.filter((member) => member.role === "parent");
   const kids = data.members.filter((member) => member.role === "kid");
   // The colours each member wears in the family's expense lists and charts.

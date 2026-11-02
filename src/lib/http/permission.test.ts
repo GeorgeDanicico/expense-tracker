@@ -5,7 +5,7 @@ vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
 import { getAuthenticatedUser } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
-import { withPermission } from "@/lib/http/permission";
+import { requirePermission, withParent, withPermission } from "@/lib/http/permission";
 import { json } from "@/lib/http/route";
 import { aKid, aParent } from "@/test/builders";
 import { forgetLastActive } from "@/lib/family/last-active";
@@ -111,5 +111,57 @@ describe("withPermission", () => {
     vi.spyOn(repositories.family, "getMembership").mockRejectedValue(new Error("boom"));
 
     await expect(withPermission("investments", "edit", handler)()).rejects.toThrow("boom");
+  });
+});
+
+describe("withParent", () => {
+  async function callAsParentOnly() {
+    const response = await withParent(handler, { failure: "Unable to do it." })();
+    return { status: response.status, body: await response.json() };
+  }
+
+  it("refuses a kid with the one forbidden message, without calling the handler", async () => {
+    repositories.family.membership = aKid();
+
+    expect(await callAsParentOnly()).toEqual({ status: 403, body: { error: "You don't have access to this." } });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("refuses a user without a family the same way", async () => {
+    expect(await callAsParentOnly()).toEqual({ status: 403, body: { error: "You don't have access to this." } });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 without reading the membership while the family flag is off", async () => {
+    vi.stubEnv("FAMILY_ENABLED", "false");
+    repositories.family.membership = aParent();
+
+    expect(await callAsParentOnly()).toEqual({ status: 404, body: { error: "Not found." } });
+    expect(repositories.family.calls).toEqual([]);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("runs the handler for a parent who isn't the creator, passing the membership", async () => {
+    const parent = aParent({ isCreator: false });
+    repositories.family.membership = parent;
+
+    expect(await callAsParentOnly()).toEqual({ status: 200, body: { ok: true } });
+    expect(handler).toHaveBeenCalledWith(undefined, user, undefined, parent);
+  });
+});
+
+describe("requirePermission", () => {
+  it("returns the membership it checked", async () => {
+    const kid = aKid();
+    repositories.family.membership = kid;
+
+    await expect(requirePermission("expenses", "edit")).resolves.toEqual(kid);
+  });
+
+  it("throws the one forbidden message for a kid without the module", async () => {
+    repositories.family.membership = aKid();
+
+    await expect(requirePermission("investments", "edit"))
+      .rejects.toEqual(new DomainError("You don't have access to this.", 403));
   });
 });

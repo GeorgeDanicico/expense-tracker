@@ -103,7 +103,6 @@ describe("FakeMcpTokenRepository", () => {
         name: "VPS",
         prefix: expect.stringMatching(/^sl_mcp_/),
         createdAt: start.toISOString(),
-        regeneratedAt: null,
         lastUsedAt: null,
         expiresAt,
       });
@@ -176,7 +175,6 @@ describe("FakeMcpTokenRepository", () => {
       expect(regenerated).toEqual({
         ...token,
         prefix: fresh.prefix,
-        regeneratedAt: now.toISOString(),
         lastUsedAt: null,
         expiresAt: null,
       });

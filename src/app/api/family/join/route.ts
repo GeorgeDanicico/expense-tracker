@@ -1,5 +1,6 @@
 import { DomainError } from "@/lib/errors";
 import { requireFamilyFeature } from "@/lib/family/feature";
+import { familyView } from "@/lib/family/views";
 import { hashInviteCode } from "@/lib/family/invite-code";
 import { TOO_MANY_ATTEMPTS_MESSAGE, inviteCodeAttempts } from "@/lib/http/rate-limit";
 import { json, parseBody, withUser } from "@/lib/http/route";
@@ -32,5 +33,5 @@ export const POST = withUser(async (request, user) => {
   const family = await repository.getFamily();
   if (!family) throw new Error(JOIN_FAILURE);
 
-  return json({ family }, 201);
+  return json({ family: familyView(family) }, 201);
 }, { failure: JOIN_FAILURE });

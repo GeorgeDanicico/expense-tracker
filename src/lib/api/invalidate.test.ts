@@ -167,6 +167,7 @@ describe("cache invalidation after mutations", () => {
     const clearFlag = passwordChange.calls[0].data as (current?: AccountData) => AccountData | undefined;
     const account: AccountData = {
       email: "kid@example.test",
+      signInName: "kid@example.test",
       currency: "RON",
       features: { family: true },
       membership: null,
@@ -185,6 +186,7 @@ describe("cache invalidation after mutations", () => {
     // `/change-password` mounts no account hook, so a plain revalidation would leave the stale flag behind.
     const account: AccountData = {
       email: "kid@example.test",
+      signInName: "kid@example.test",
       currency: "RON",
       features: { family: true },
       membership: null,

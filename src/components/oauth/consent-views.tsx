@@ -92,12 +92,12 @@ export function ConsentExpired() {
   );
 }
 
-function SignedInAs({ email }: { email: string }) {
+function SignedInAs({ signInName }: { signInName: string }) {
   return (
     <Text textStyle="caption">
       Signed in as{" "}
       <Text as="span" color="fg" fontWeight="medium">
-        {email}
+        {signInName}
       </Text>
     </Text>
   );
@@ -127,14 +127,14 @@ export function ConsentRequestCard({
   error,
   onDecide,
 }: DecisionProps & { details: ConsentDetails; onDecide: (decision: Decision) => void }) {
-  const { app, email, redirectUri } = details;
+  const { app, signInName, redirectUri } = details;
   return (
     <ConsentFrame>
       <Stack gap="1.5">
         <Heading as="h1" size="xl">
           {app.name} wants to use your {BRAND.name} account
         </Heading>
-        <SignedInAs email={email} />
+        <SignedInAs signInName={signInName} />
       </Stack>
 
       <Box borderWidth="1px" borderColor="border" borderRadius="control" bg="bg.subtle" px="3.5" py="3">
@@ -203,7 +203,7 @@ export function ConsentRefusedCard({
         <Heading as="h1" size="xl">
           {details.app ? `${details.app.name} can't use your account` : "AI assistants can't use your account"}
         </Heading>
-        <SignedInAs email={details.email} />
+        <SignedInAs signInName={details.signInName} />
       </Stack>
 
       <InlineAlert

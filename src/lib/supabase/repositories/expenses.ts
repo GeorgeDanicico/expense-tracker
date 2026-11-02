@@ -11,6 +11,7 @@ import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { Expense } from "@/lib/expenses/types";
 import { getMonthRange } from "@/lib/calendar";
 import { expenseTabMembershipFilter } from "@/lib/supabase/filters";
+import { translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import { applyExpensePatch, type ExpenseInput } from "@/lib/validation/expense";
 
@@ -66,7 +67,7 @@ function applyExpenseScope(query: ExpenseFilterQuery, options: ExpenseQuery) {
   return query;
 }
 
-type Page<Row> = { data: Row[] | null; error: unknown; count: number | null };
+type Page<Row> = { data: Row[] | null; error: DatabaseError | null; count: number | null };
 
 /** Reads every page, failing the whole read when any page errors or the total comes up short. */
 async function fetchAllPages<Row>(fetchPage: (from: number, to: number) => PromiseLike<Page<Row>>) {
@@ -74,7 +75,7 @@ async function fetchAllPages<Row>(fetchPage: (from: number, to: number) => Promi
   let offset = 0;
   while (true) {
     const { data, error, count } = await fetchPage(offset, offset + EXPENSE_PAGE_SIZE - 1);
-    if (error) throw new Error("Unable to load expenses.");
+    if (error) throw translateDatabaseError(error, "Unable to load expenses.");
     const page = data ?? [];
     if (!page.length) {
       if (count !== null && offset < count) throw new Error("Unable to load complete expenses.");
@@ -118,7 +119,8 @@ function toExpenseWrite(input: ExpenseInput) {
  * `ExpenseRepository` on the `expenses` table. Every table query filters by `user_id` itself instead
  * of relying on RLS, so the user's own pages stay theirs once parents may read family rows (F43).
  * The `get_expense_dashboard` RPC gets the same `userId` as `p_user_id`.
- * Its errors stay plain `Error`s (500s), as before the repository existed.
+ * Database errors go through `translateDatabaseError`: a known code is its status (a unique violation
+ * a 409) with the generic message, anything else a 500.
  */
 export const supabaseExpenseRepository: ExpenseRepository = {
   async listMonth(userId, month) {
@@ -191,7 +193,8 @@ export const supabaseExpenseRepository: ExpenseRepository = {
       .insert({ user_id: userId, ...toExpenseWrite(input) })
       .select(EXPENSE_COLUMNS)
       .single();
-    if (error || !data) throw new Error("The expense could not be saved.");
+    if (error) throw translateDatabaseError(error, "The expense could not be saved.");
+    if (!data) throw new Error("The expense could not be saved.");
     return toExpense(data);
   },
 
@@ -203,7 +206,7 @@ export const supabaseExpenseRepository: ExpenseRepository = {
       .eq("id", id)
       .eq("user_id", userId)
       .maybeSingle();
-    if (loadError) throw new Error("Unable to load expense.");
+    if (loadError) throw translateDatabaseError(loadError, "Unable to load expense.");
     if (!existing) return null;
 
     const validated = applyExpensePatch(toExpense(existing), patch);
@@ -214,7 +217,7 @@ export const supabaseExpenseRepository: ExpenseRepository = {
       .eq("user_id", userId)
       .select(EXPENSE_COLUMNS)
       .maybeSingle();
-    if (error) throw new Error("The expense could not be saved.");
+    if (error) throw translateDatabaseError(error, "The expense could not be saved.");
     return data ? toExpense(data) : null;
   },
 
@@ -226,7 +229,7 @@ export const supabaseExpenseRepository: ExpenseRepository = {
       .eq("id", id)
       .eq("user_id", userId)
       .select("id");
-    if (error) throw new Error("Unable to delete expense.");
+    if (error) throw translateDatabaseError(error, "Unable to delete expense.");
     return (data?.length ?? 0) > 0;
   },
 };

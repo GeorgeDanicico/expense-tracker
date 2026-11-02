@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { Database, Json } from "@/lib/database.types";
-import { DomainError } from "@/lib/errors";
 import type { FamilyMember } from "@/lib/family/repository";
 import {
   attendeeOutsideFamilyError,
@@ -12,7 +11,7 @@ import {
   type NewCalendarRow,
 } from "@/lib/family-calendar/repository";
 import { SERIES_REPEATS, type CalendarEvent, type SeriesRepeat } from "@/lib/family-calendar/types";
-import { translateDatabaseError } from "@/lib/supabase/errors";
+import { isUserFacing, translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
 import { supabaseFamilyRepository } from "@/lib/supabase/repositories/family";
 import { createClient } from "@/lib/supabase/server";
 
@@ -103,19 +102,15 @@ function editRowJson(edit: CalendarRowEdit): Json {
 }
 
 /**
- * A failed `create_calendar_events` or `update_calendar_events`:
- * - 23514 from the attendee guard: a member isn't in the family → a 422 with our own message. A
- *   table check (title, notes, the length of the event) also raises 23514, but its message isn't meant
- *   for users and validated input can't break one, so that stays a 500.
- * - 22023: the function's own message about its input ("Choose who the event is for.") → 422.
- * - Anything else as `translateDatabaseError` decides (42501 → 403, P0002 → 404 with the database's
- *   message, others → 500 with `fallback`).
+ * A failed `create_calendar_events` or `update_calendar_events`, through `translateDatabaseError`:
+ * - 23514 marked user-facing, which only the attendee guard raises: a member isn't in the family →
+ *   a 422 with our own message on `attendeeMemberIds`. A table check (title, notes, the length of the
+ *   event) raises 23514 without the marker, so it gets the generic 422.
+ * - Anything else as `translateDatabaseError` decides: our functions' marked messages ("Choose who
+ *   the event is for.", "That event wasn't found.") with their status, Postgres' own with `fallback`.
  */
-export function translateCalendarWriteError(error: { code?: string; message: string }, fallback: string): Error {
-  if (error.code === "23514") {
-    return /family/i.test(error.message) ? attendeeOutsideFamilyError() : new Error(fallback);
-  }
-  if (error.code === "22023") return new DomainError(error.message, 422);
+export function translateCalendarWriteError(error: DatabaseError, fallback: string): Error {
+  if (error.code === "23514" && isUserFacing(error)) return attendeeOutsideFamilyError();
   return translateDatabaseError(error, fallback);
 }
 
@@ -136,7 +131,7 @@ export const supabaseCalendarRepository: CalendarRepository = {
         .order("starts_at").order("id"),
     ]);
     if (!family) throw noFamilyError();
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return withSeriesLengths(supabase, data as unknown as EventRowWithAttendees[], family.members);
   },
 
@@ -146,7 +141,7 @@ export const supabaseCalendarRepository: CalendarRepository = {
       familyMembers(),
       supabase.from("calendar_events").select(WITH_ATTENDEES).eq("id", id).maybeSingle(),
     ]);
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     if (!data) return null;
     const [event] = await withSeriesLengths(supabase, [data as unknown as EventRowWithAttendees], members);
     return event;
@@ -158,7 +153,7 @@ export const supabaseCalendarRepository: CalendarRepository = {
       familyMembers(),
       supabase.from("calendar_events").select(WITH_ATTENDEES).eq("series_id", seriesId).order("series_index"),
     ]);
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     const rows = data as unknown as EventRowWithAttendees[];
     return rows.map((row) => toEvent(row, attendeeIds(row), members, rows.length));
   },
@@ -190,7 +185,7 @@ export const supabaseCalendarRepository: CalendarRepository = {
       supabase.from("calendar_events").select(WITH_ATTENDEES).in("id", data.map((row) => row.id))
         .order("series_id").order("series_index"),
     ]);
-    if (readError) throw new Error(SAVE_ERROR);
+    if (readError) throw translateDatabaseError(readError, SAVE_ERROR);
     return withSeriesLengths(supabase, events as unknown as EventRowWithAttendees[], members);
   },
 
@@ -198,7 +193,7 @@ export const supabaseCalendarRepository: CalendarRepository = {
     if (ids.length === 0) return [];
     const supabase = await createClient();
     const { data, error } = await supabase.from("calendar_events").delete().in("id", [...ids]).select("id");
-    if (error) throw new Error(DELETE_ERROR);
+    if (error) throw translateDatabaseError(error, DELETE_ERROR);
     return data.map((row) => row.id);
   },
 };
@@ -221,7 +216,7 @@ async function withSeriesLengths(
   for (let start = 0; start < repeating.length; start += SERIES_CHUNK) {
     const { data, error } = await supabase.from("calendar_events").select("series_id")
       .in("series_id", repeating.slice(start, start + SERIES_CHUNK));
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     for (const { series_id } of data) lengths.set(series_id, (lengths.get(series_id) ?? 0) + 1);
   }
   return rows.map((row) => toEvent(row, attendeeIds(row), members, lengths.get(row.series_id) ?? 1));

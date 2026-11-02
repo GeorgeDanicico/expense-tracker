@@ -271,7 +271,7 @@ All of these are `security definer`, granted only to `authenticated`, and identi
 - **Routes:** use `withUser`, `json`, `parseBody`, `parseId` and `HttpError` from `src/lib/http/route.ts`, and `DomainError` from `src/lib/errors.ts`. Routes stay thin:
   - validation goes in `src/lib/validation/`;
   - data goes through a service in `src/lib/<domain>/service.ts` when there's logic, otherwise `getRepositories()`; auth goes through `getAuth()` or `getAuthAdmin()`;
-  - every new route is added to `PROTECTED_ROUTES` in `src/app/api/protected-routes.test.ts`.
+  - every new route (method by method) and MCP tool is added to the one permission list, `src/test/permissions.ts`, with what it needs: a module through `withPermission` (or `defineTool`'s `module`), a parent through `withParent`, or a role the SQL checks. Every wrapper refusal is the one `FORBIDDEN_MESSAGE`.
 - **New data access:** when a task needs a new query or RPC call, add the method to the interface, the Supabase implementation and the in-memory fake, all in the same PR. Test the Supabase implementation with `src/test/fake-supabase.ts`. R02 adds a short "How to add a repository method" note right below this list; follow it.
 - **Route tests:** use `signedInAs` and `callRoute` from `src/test/route.ts`, the in-memory fakes in `src/test/fakes/`, and the builders in `src/test/builders.ts`. One behaviour per test, with sentence-style names.
 - **Frontend:**
@@ -287,7 +287,7 @@ All of these are `security definer`, granted only to `authenticated`, and identi
   - Functions use `set search_path = ''` and fully qualified names, and identify the caller with `app_private.current_user_id()`.
   - Private helpers live in `family_private` (or `app_private`), set up with the same revoke and grant pattern as `expense_classification_private` in `20261003112707_..._add_expense_merchant_classification.sql`.
   - For every public RPC, `revoke all ... from public, anon` and then `grant execute ... to authenticated`.
-  - Errors are raised with `raise exception ... using errcode = ...`: `'42501'` for forbidden, `'P0002'` for not found, `'23514'` for invalid input, `'23505'` for "already in a family".
+  - Errors are raised with `raise exception ... using errcode = ..., hint = 'user'`: `'42501'` for forbidden, `'P0002'` for not found, `'23514'` (or `'22023'`) for invalid input, `'23505'` for "already in a family", `'55000'` for the wrong state. The `hint = 'user'` marker is what lets `translateDatabaseError` pass the message to the client; without it the client gets the route's generic message, as it does for Postgres' own errors. `supabase/tests/security_definer.sql` fails on a raise without it.
 - **SQL tests:**
   - One pgTAP file per task in `supabase/tests/`, following `expense_tabs_rls.sql`: `begin; select plan(n);`, insert users into `auth.users`, act as a user with `set local role authenticated` plus `request.jwt.claims`, then `select * from finish(); rollback;`.
   - Use a UUID prefix unique to your file.

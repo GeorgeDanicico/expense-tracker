@@ -36,7 +36,6 @@ const token = {
   name: "VPS",
   prefix,
   createdAt: "2026-10-23T10:00:00Z",
-  regeneratedAt: null,
   lastUsedAt: null,
   expiresAt: "2027-01-23T10:00:00Z",
 };
@@ -119,7 +118,7 @@ describe("Supabase MCP token repository", () => {
 
     it("keeps the switch guard's message in a 403", async () => {
       const message = "A parent needs to turn on AI assistants for you.";
-      useRequestClient({ profiles: [{ id: user.id, mcp_enabled: false }] }, { fail: () => ({ code: "42501", message }) });
+      useRequestClient({ profiles: [{ id: user.id, mcp_enabled: false }] }, { fail: () => ({ code: "42501", message, hint: "user" }) });
 
       await expect(tokens.setEnabled(true)).rejects.toThrow(new DomainError(message, 403));
     });
@@ -182,7 +181,7 @@ describe("Supabase MCP token repository", () => {
 
       await tokens.list();
 
-      expect(selected).toEqual(["id, name, prefix, created_at, regenerated_at, last_used_at, expires_at"]);
+      expect(selected).toEqual(["id, name, prefix, created_at, last_used_at, expires_at"]);
     });
 
     it("hides a database error behind a generic message", async () => {
@@ -217,7 +216,6 @@ describe("Supabase MCP token repository", () => {
 
       expect(await tokens.regenerate(tokenId, { hash, prefix, expiry: "never" })).toEqual({
         ...token,
-        regeneratedAt: "2026-10-23T12:00:00Z",
         expiresAt: null,
       });
       expect(rpcs).toEqual([
@@ -226,7 +224,7 @@ describe("Supabase MCP token repository", () => {
     });
 
     it("translates an unknown, revoked or other user's token into a 404", async () => {
-      useRpc(() => ({ data: null, error: { code: "P0002", message: "Token not found." } }));
+      useRpc(() => ({ data: null, error: { code: "P0002", message: "Token not found.", hint: "user" } }));
 
       await expect(tokens.regenerate(tokenId, { hash, prefix, expiry: "3m" })).rejects.toThrow(new DomainError("Token not found.", 404));
     });
@@ -238,21 +236,21 @@ describe("Supabase MCP token repository", () => {
   ])("%s errors", (_, write) => {
     it("keeps the kid refusal's message in a 403", async () => {
       const message = "Kids connect AI assistants through the app's sign-in page, not with tokens.";
-      useRpc(() => ({ data: null, error: { code: "42501", message } }));
+      useRpc(() => ({ data: null, error: { code: "42501", message, hint: "user" } }));
 
       await expect(write()).rejects.toThrow(new DomainError(message, 403));
     });
 
     it("keeps the cap's message in a 409", async () => {
       const message = "You can have at most 10 personal tokens. Revoke one to create another.";
-      useRpc(() => ({ data: null, error: { code: "P0001", message } }));
+      useRpc(() => ({ data: null, error: { code: "P0001", message, hint: "user" } }));
 
       await expect(write()).rejects.toThrow(new DomainError(message, 409));
     });
 
     it("keeps the bad expiry's message in a 422", async () => {
       const message = "Choose an expiry: 1 month, 3 months, 6 months or never.";
-      useRpc(() => ({ data: null, error: { code: "22023", message } }));
+      useRpc(() => ({ data: null, error: { code: "22023", message, hint: "user" } }));
 
       await expect(write()).rejects.toThrow(new DomainError(message, 422));
     });
@@ -339,9 +337,9 @@ describe("Supabase MCP token repository", () => {
     });
 
     it("hides a database error behind a generic message", async () => {
-      useAdminRpc(() => ({ data: null, error: { code: "42501", message: "permission denied" } }));
+      useAdminRpc(() => ({ data: null, error: { code: "42501", message: "permission denied for function authenticate_mcp_token" } }));
 
-      await expect(tokens.check(hash)).rejects.toThrow(CHECK_ERROR);
+      await expect(tokens.check(hash)).rejects.toMatchObject({ status: 403, message: CHECK_ERROR.message });
     });
   });
 });

@@ -1,0 +1,344 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MCP > GET /api/account/mcp/apps 1`] = `
+{
+  "body": {
+    "apps": [
+      {
+        "clientId": "client-a",
+        "connectedAt": "2026-10-20T08:00:00.000Z",
+        "name": "Claude Code (simple-ledger)",
+        "uri": "https://claude.ai",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`MCP > GET /api/account/mcp: the switch, access, token list and connected apps 1`] = `
+{
+  "body": {
+    "access": {
+      "blockReason": null,
+      "personalTokens": true,
+      "status": "ok",
+    },
+    "apps": [
+      {
+        "clientId": "client-a",
+        "connectedAt": "2026-10-20T08:00:00.000Z",
+        "name": "Claude Code (simple-ledger)",
+        "uri": "https://claude.ai",
+      },
+    ],
+    "enabled": true,
+    "tokens": [
+      {
+        "createdAt": "2026-11-02T10:00:00.000Z",
+        "expiresAt": "2027-02-02T10:00:00.000Z",
+        "id": "<uuid>",
+        "lastUsedAt": null,
+        "name": "Home server",
+        "prefix": "<prefix>",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`MCP > POST /api/account/mcp/tokens: the one response with a secret 1`] = `
+{
+  "body": {
+    "secret": "<secret>",
+    "token": {
+      "createdAt": "2026-11-02T10:00:00.000Z",
+      "expiresAt": "2026-12-02T10:00:00.000Z",
+      "id": "<uuid>",
+      "lastUsedAt": null,
+      "name": "VPS",
+      "prefix": "<prefix>",
+    },
+  },
+  "status": 201,
+}
+`;
+
+exports[`OAuth > GET /api/oauth/authorizations/[id] asking for consent 1`] = `
+{
+  "body": {
+    "app": {
+      "clientId": "client-a",
+      "name": "Claude Code (ifam)",
+      "uri": "https://claude.ai",
+    },
+    "kind": "consent",
+    "redirectUri": "http://localhost:4567/callback",
+    "signInName": "owner@example.test",
+  },
+  "status": 200,
+}
+`;
+
+exports[`OAuth > GET /api/oauth/authorizations/[id] for an app the caller already allowed 1`] = `
+{
+  "body": {
+    "kind": "approved",
+    "redirectUrl": "http://localhost:4567/callback?code=code-2",
+  },
+  "status": 200,
+}
+`;
+
+exports[`OAuth > GET /api/oauth/authorizations/[id] refusing a kid with only the generated address 1`] = `
+{
+  "body": {
+    "app": {
+      "clientId": "client-a",
+      "name": "Claude Code (ifam)",
+      "uri": "https://claude.ai",
+    },
+    "kind": "refused",
+    "reason": "email_required",
+    "signInName": "teo",
+  },
+  "status": 200,
+}
+`;
+
+exports[`account > GET /api/account for a kid with only the generated address: no email, the username to show 1`] = `
+{
+  "body": {
+    "avatarUrl": null,
+    "currency": "EUR",
+    "email": null,
+    "features": {
+      "family": true,
+    },
+    "membership": {
+      "familyName": "The Smiths",
+      "isCreator": false,
+      "memberId": "<uuid>",
+      "permissions": {
+        "ai": "off",
+        "expenses": "edit",
+        "family_finance": "off",
+        "investments": "off",
+        "mcp": "off",
+        "net_worth": "off",
+      },
+      "role": "kid",
+    },
+    "mustChangePassword": true,
+    "signInName": "teo",
+  },
+  "status": 200,
+}
+`;
+
+exports[`account > GET /api/account for a parent 1`] = `
+{
+  "body": {
+    "avatarUrl": null,
+    "currency": "RON",
+    "email": "owner@example.test",
+    "features": {
+      "family": true,
+    },
+    "membership": {
+      "familyName": "The Smiths",
+      "isCreator": true,
+      "memberId": "<uuid>",
+      "permissions": {
+        "ai": "edit",
+        "expenses": "edit",
+        "family_finance": "view",
+        "investments": "edit",
+        "mcp": "edit",
+        "net_worth": "edit",
+      },
+      "role": "parent",
+    },
+    "mustChangePassword": false,
+    "signInName": "owner@example.test",
+  },
+  "status": 200,
+}
+`;
+
+exports[`family and members > GET /api/family for a kid 1`] = `
+{
+  "body": {
+    "family": {
+      "family": {
+        "name": "The Smiths",
+      },
+      "members": [
+        {
+          "avatarUrl": null,
+          "color": null,
+          "currency": "EUR",
+          "displayName": "owner",
+          "isCreator": true,
+          "joinedAt": "2026-10-01T09:00:00.000Z",
+          "memberId": "<uuid>",
+          "role": "parent",
+          "username": null,
+        },
+        {
+          "avatarUrl": "/api/avatars/<uuid>/<uuid>.webp",
+          "color": 3,
+          "currency": "EUR",
+          "displayName": "second-parent",
+          "isCreator": false,
+          "joinedAt": "2026-10-02T09:00:00.000Z",
+          "memberId": "<uuid>",
+          "role": "parent",
+          "username": null,
+        },
+        {
+          "avatarUrl": null,
+          "color": null,
+          "currency": "EUR",
+          "displayName": "Teo",
+          "isCreator": false,
+          "joinedAt": "2026-10-02T09:00:00.000Z",
+          "lastActiveAt": null,
+          "memberId": "<uuid>",
+          "permissions": {
+            "ai": "off",
+            "expenses": "edit",
+            "family_finance": "off",
+            "investments": "off",
+            "mcp": "off",
+            "net_worth": "off",
+          },
+          "role": "kid",
+          "username": "teo",
+        },
+      ],
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`family and members > GET /api/family for a parent 1`] = `
+{
+  "body": {
+    "family": {
+      "family": {
+        "name": "The Smiths",
+      },
+      "members": [
+        {
+          "avatarUrl": null,
+          "color": null,
+          "currency": "EUR",
+          "displayName": "owner",
+          "isCreator": true,
+          "joinedAt": "2026-10-01T09:00:00.000Z",
+          "lastActiveAt": null,
+          "memberId": "<uuid>",
+          "permissions": {
+            "ai": "edit",
+            "expenses": "edit",
+            "family_finance": "view",
+            "investments": "edit",
+            "mcp": "edit",
+            "net_worth": "edit",
+          },
+          "role": "parent",
+          "username": null,
+        },
+        {
+          "avatarUrl": "/api/avatars/<uuid>/<uuid>.webp",
+          "color": 3,
+          "currency": "EUR",
+          "displayName": "second-parent",
+          "isCreator": false,
+          "joinedAt": "2026-10-02T09:00:00.000Z",
+          "lastActiveAt": "2026-11-01T18:00:00.000Z",
+          "memberId": "<uuid>",
+          "permissions": {
+            "ai": "edit",
+            "expenses": "edit",
+            "family_finance": "view",
+            "investments": "edit",
+            "mcp": "edit",
+            "net_worth": "edit",
+          },
+          "role": "parent",
+          "username": null,
+        },
+        {
+          "avatarUrl": null,
+          "color": null,
+          "currency": "EUR",
+          "displayName": "Teo",
+          "isCreator": false,
+          "joinedAt": "2026-10-02T09:00:00.000Z",
+          "lastActiveAt": null,
+          "memberId": "<uuid>",
+          "permissions": {
+            "ai": "off",
+            "expenses": "edit",
+            "family_finance": "off",
+            "investments": "off",
+            "mcp": "off",
+            "net_worth": "off",
+          },
+          "role": "kid",
+          "username": "teo",
+        },
+      ],
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`invites > GET /api/family/invites 1`] = `
+{
+  "body": {
+    "invites": [
+      {
+        "createdByName": "owner",
+        "expiresAt": "2999-01-01T00:00:00.000Z",
+        "inviteId": "<uuid>",
+        "role": "parent",
+      },
+      {
+        "createdByName": "owner",
+        "expiresAt": "2999-01-01T00:00:00.000Z",
+        "inviteId": "<uuid>",
+        "role": "kid",
+      },
+    ],
+  },
+  "status": 200,
+}
+`;
+
+exports[`invites > POST /api/family/invites 1`] = `
+{
+  "body": {
+    "code": "<code>",
+    "expiresAt": "2026-11-09T10:00:00.000Z",
+    "url": "http://localhost/join/<code>",
+  },
+  "status": 201,
+}
+`;
+
+exports[`invites > POST /api/family/join/preview 1`] = `
+{
+  "body": {
+    "familyName": "The Smiths",
+    "inviterName": "owner",
+    "role": "kid",
+  },
+  "status": 200,
+}
+`;

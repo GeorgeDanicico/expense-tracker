@@ -57,7 +57,7 @@ describe("Supabase notice repository", () => {
     });
 
     it("translates an unknown notice into a 404", async () => {
-      useRpc(() => ({ data: null, error: { code: "P0002", message: "Notice not found." } }));
+      useRpc(() => ({ data: null, error: { code: "P0002", message: "Notice not found.", hint: "user" } }));
 
       await expect(notices.dismiss(noticeId)).rejects.toThrow(new DomainError("Notice not found.", 404));
     });

@@ -14,10 +14,10 @@ import { useApiForm } from "@/hooks/use-api-form";
 import { apiRequest } from "@/lib/api/client";
 import { afterFamilyJoined } from "@/lib/api/invalidate";
 import { FAMILY_JOIN_API_URL, FAMILY_JOIN_PREVIEW_API_URL, type FamilyResponse } from "@/lib/api/keys";
-import type { InvitePreview } from "@/lib/family/repository";
+import type { InvitePreviewView } from "@/lib/family/views";
 
 /** The confirmation text for a previewed invite: who invited you, to which family, as what. */
-export function joinSummary(preview: Pick<InvitePreview, "familyName" | "inviterName" | "role">) {
+export function joinSummary(preview: Pick<InvitePreviewView, "familyName" | "inviterName" | "role">) {
   const who = preview.inviterName ?? "A parent";
   return `${who} invited you to join ${preview.familyName} as a ${preview.role}.`;
 }
@@ -31,7 +31,7 @@ export function JoinFamilyForm({ initialCode = "", onJoined }: { initialCode?: s
   const previewForm = useApiForm();
   const joinForm = useApiForm();
   const [code, setCode] = useState(initialCode);
-  const [preview, setPreview] = useState<InvitePreview | null>(null);
+  const [preview, setPreview] = useState<InvitePreviewView | null>(null);
   const codeError = previewForm.fieldError("code");
 
   function check(event: FormEvent<HTMLFormElement>) {
@@ -39,7 +39,7 @@ export function JoinFamilyForm({ initialCode = "", onJoined }: { initialCode?: s
     if (previewForm.pending) return;
 
     void previewForm.submit(async () => {
-      const found = await apiRequest<InvitePreview>(FAMILY_JOIN_PREVIEW_API_URL, {
+      const found = await apiRequest<InvitePreviewView>(FAMILY_JOIN_PREVIEW_API_URL, {
         method: "POST",
         body: JSON.stringify({ code }),
       });

@@ -7,7 +7,6 @@ export type McpToken = {
   /** The token's first 13 characters (`sl_mcp_Ab3xQ9`), shown in the list. */
   prefix: string;
   createdAt: string;
-  regeneratedAt: string | null;
   lastUsedAt: string | null;
   /** Null when it never expires. */
   expiresAt: string | null;

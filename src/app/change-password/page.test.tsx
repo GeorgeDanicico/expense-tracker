@@ -17,6 +17,7 @@ import ChangePasswordPage from "./page";
 function render(mustChangePassword: boolean) {
   const account: AccountData = {
     email: "ana@kids.ifam.invalid",
+    signInName: "ana@kids.ifam.invalid",
     currency: "EUR",
     features: { family: true },
     membership: null,

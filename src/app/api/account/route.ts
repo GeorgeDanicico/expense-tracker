@@ -5,6 +5,7 @@ import type { AuthenticatedUser } from "@/lib/auth";
 import { avatarUrl } from "@/lib/avatars/paths";
 import { isFamilyEnabled } from "@/lib/features";
 import { getCurrentMember } from "@/lib/family/current-member";
+import { signInName, visibleEmail } from "@/lib/family/kid-account";
 import { HttpError, json, readJson, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { isSupportedCurrency } from "@/lib/utils/currency";
@@ -30,7 +31,8 @@ async function accountData(user: AuthenticatedUser, knownCurrency?: string): Pro
     avatars.getPath(user.id),
   ]);
   return {
-    email: user.email,
+    email: visibleEmail(user.email),
+    signInName: signInName(user.email),
     currency,
     features: { family: isFamilyEnabled() },
     membership,

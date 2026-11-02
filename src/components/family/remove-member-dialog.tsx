@@ -7,7 +7,7 @@ import { useApiForm } from "@/hooks/use-api-form";
 import { apiRequest } from "@/lib/api/client";
 import { afterMemberRemoved } from "@/lib/api/invalidate";
 import { familyMemberApiUrl } from "@/lib/api/keys";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 
 /** Ask the creator to confirm removing a member. Calls `DELETE /api/family/members/[id]`. */
 export function RemoveMemberDialog({
@@ -15,7 +15,7 @@ export function RemoveMemberDialog({
   open,
   onOpenChange,
 }: {
-  member: FamilyMember;
+  member: FamilyMemberView;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {

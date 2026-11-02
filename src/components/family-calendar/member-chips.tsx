@@ -6,10 +6,10 @@ import { useId } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import { isFilterOn, type CalendarMemberFilter } from "@/lib/family-calendar/filters";
 
-function memberLabel(member: FamilyMember) {
+function memberLabel(member: FamilyMemberView) {
   return member.displayName ?? member.username ?? "Unnamed";
 }
 
@@ -44,7 +44,7 @@ export function MemberChips({
 }: {
   filter: CalendarMemberFilter;
   /** The whole family; the caller is left out, since "Me" stands for them. */
-  members: readonly FamilyMember[];
+  members: readonly FamilyMemberView[];
   myMemberId: string | null;
   myAvatarUrl?: string | null;
   colorOf: (memberId: string | null | undefined) => string | undefined;

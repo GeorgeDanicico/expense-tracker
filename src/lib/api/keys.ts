@@ -3,14 +3,14 @@ import { resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { AccountNotice } from "@/lib/account/notice-repository";
-import type { ConnectedApp, OAuthApp } from "@/lib/auth/oauth-consent";
 import type { Expense } from "@/lib/expenses/types";
-import type { FamilyData, FamilyInvite } from "@/lib/family/repository";
+import type { FamilyInviteView, FamilyView } from "@/lib/family/views";
 import type { RecentImport } from "@/lib/imports/repository";
 import type { ImportBatch, ImportDraft } from "@/lib/imports/types";
 import { MEMBER_PARAM } from "@/lib/family/viewing";
 import type { AiProviderId } from "@/lib/ai/provider";
 import type { McpAccess, McpToken } from "@/lib/mcp/token-repository";
+import type { ConnectedAppView, OAuthAppView } from "@/lib/mcp/views";
 import type { NotificationSettings } from "@/lib/notifications/settings-repository";
 import type { ReminderCompletion, ReminderSummary } from "@/lib/reminders/repository";
 import type { ListedReminder } from "@/lib/reminders/list";
@@ -73,7 +73,7 @@ export const FAMILY_INVITES_API_KEY = "/api/family/invites";
 export function familyInviteApiUrl(id: string) {
   return `${FAMILY_INVITES_API_KEY}/${encodeURIComponent(id)}`;
 }
-/** POST only: `{ code }` → `InvitePreview` (`@/lib/family/repository`), or 404 for a code that can't be redeemed. */
+/** POST only: `{ code }` → `InvitePreviewView` (`@/lib/family/views`), or 404 for a code that can't be redeemed. */
 export const FAMILY_JOIN_PREVIEW_API_URL = "/api/family/join/preview";
 /** POST only: `{ code }` → {@link FamilyResponse} with the joined family (201). */
 export const FAMILY_JOIN_API_URL = "/api/family/join";
@@ -91,10 +91,10 @@ export function expenseTabsApiKey(member?: string | null) {
 }
 
 export type NoticesResponse = { notices: AccountNotice[] };
-export type InvitesResponse = { invites: FamilyInvite[] };
+export type InvitesResponse = { invites: FamilyInviteView[] };
 /** The only response that carries the plain code; it is never stored or listed again. */
-export type CreatedInvite = { inviteId: string; code: string; url: string; expiresAt: string };
-export type FamilyResponse = { family: FamilyData | null };
+export type CreatedInvite = { code: string; url: string; expiresAt: string };
+export type FamilyResponse = { family: FamilyView | null };
 export type TabsResponse = { tabs: ExpenseTab[] };
 export type SavedTabResponse = { tab: ExpenseTab };
 
@@ -200,10 +200,11 @@ export function oauthDenyApiUrl(authorizationId: string) {
  * allowed (only while their access is `ok`), or why they can't allow any app right now.
  */
 export type OAuthAuthorizationResponse =
-  | { kind: "consent"; email: string; app: OAuthApp; redirectUri: string; scopes: string[] }
+  /** `signInName` is the caller's email, or a kid's username (never their generated address). */
+  | { kind: "consent"; signInName: string; app: OAuthAppView; redirectUri: string }
   | { kind: "approved"; redirectUrl: string }
   /** `app` is null when Supabase already approved the request and sent no details. */
-  | { kind: "refused"; email: string; reason: Exclude<McpAccess["status"], "ok">; app: OAuthApp | null };
+  | { kind: "refused"; signInName: string; reason: Exclude<McpAccess["status"], "ok">; app: OAuthAppView | null };
 /** Where to send the browser next: back to the app, with a one-time code or `access_denied`. */
 export type OAuthDecisionResponse = { redirectUrl: string };
 
@@ -244,9 +245,9 @@ export type McpSettingsResponse = {
   /** Null when the caller can't hold personal tokens (kids). Never carries a secret. */
   tokens: McpToken[] | null;
   /** The same app can appear once per registration; each has its own client id. */
-  apps: ConnectedApp[];
+  apps: ConnectedAppView[];
 };
-export type McpAppsResponse = { apps: ConnectedApp[] };
+export type McpAppsResponse = { apps: ConnectedAppView[] };
 /** The only response that ever carries a token's secret: shown once, never stored or listed again. */
 export type CreatedMcpToken = { token: McpToken; secret: string };
 

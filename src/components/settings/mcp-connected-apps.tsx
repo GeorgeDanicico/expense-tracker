@@ -14,7 +14,7 @@ import { ListRow } from "@/components/ui/list-row";
 import { disconnectMcpApp } from "@/hooks/use-mcp-settings";
 import { useApiForm } from "@/hooks/use-api-form";
 import { MCP_SETTINGS_API_KEY } from "@/lib/api/keys";
-import type { ConnectedApp } from "@/lib/auth/oauth-consent";
+import type { ConnectedAppView } from "@/lib/mcp/views";
 import { formatDateTime } from "@/lib/calendar";
 
 /** Shown on both lists while the switch is off. */
@@ -22,7 +22,7 @@ export function McpOffNote({ children }: { children: string }) {
   return <InlineAlert status="neutral">{children}</InlineAlert>;
 }
 
-function ConnectedAppRow({ app }: { app: ConnectedApp }) {
+function ConnectedAppRow({ app }: { app: ConnectedAppView }) {
   const { mutate } = useSWRConfig();
   const form = useApiForm();
   const [confirming, setConfirming] = useState(false);
@@ -76,7 +76,7 @@ export function McpConnectedAppsCard({
   enabled,
   origin,
 }: {
-  apps: readonly ConnectedApp[];
+  apps: readonly ConnectedAppView[];
   enabled: boolean;
   origin: string;
 }) {

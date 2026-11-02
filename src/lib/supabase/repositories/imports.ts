@@ -1,15 +1,14 @@
 import "server-only";
 
 import type { Database, Json } from "@/lib/database.types";
-import { DomainError } from "@/lib/errors";
 import type { ExpenseCategory, ExpenseSubtype } from "@/lib/expenses/categories";
 import type { Expense } from "@/lib/expenses/types";
 import {
   IMPORT_ALREADY_EXISTS_MESSAGE,
   IMPORT_NOT_A_DRAFT_MESSAGE,
   IMPORT_NOT_CONFIRMED_MESSAGE,
+  IMPORT_NOT_FOUND_MESSAGE,
   IMPORT_ROWS_REFUSED_MESSAGE,
-  importNotFoundError,
   type ImportRepository,
   type RecentImport,
   type StoredImportRow,
@@ -23,7 +22,7 @@ import {
   type ImportSourceKind,
   type ImportStatus,
 } from "@/lib/imports/types";
-import { translateDatabaseError } from "@/lib/supabase/errors";
+import { translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
 const LOAD_ERROR = "Unable to load your imports.";
@@ -43,7 +42,6 @@ const LINK_PAGE_SIZE = 1000;
 
 type BatchRow = Omit<Database["public"]["Tables"]["import_batches"]["Row"], "user_id" | "content_hash">;
 type RowRow = Omit<Database["public"]["Tables"]["import_rows"]["Row"], "batch_id">;
-type DatabaseError = { code?: string; message: string };
 
 /** PostgREST answers instants as `+00:00` strings; the API speaks `Z` ISO strings. */
 function toIso(value: string): string;
@@ -125,8 +123,9 @@ function isExpiredDraft(row: Pick<BatchRow, "status" | "expires_at">, now: numbe
 }
 
 /**
- * A failed call of an import function or write, by the SQL codes of the contract at the top of
- * `20261029000100_create_statement_imports.sql`:
+ * A failed call of an import function or write, through `translateDatabaseError`, by the SQL codes
+ * of the contract at the top of `20261029000100_create_statement_imports.sql`. Every code the import
+ * functions raise gets a fixed message of ours, whatever the database said:
  * - P0002 → a 404, the same message whichever of missing, someone else's or expired it was.
  * - 55000 → a 409 with `notAvailable`, which says what the operation needed.
  * - 23505 → a 409: the caller already has this statement as a draft or a confirmed import.
@@ -134,26 +133,22 @@ function isExpiredDraft(row: Pick<BatchRow, "status" | "expires_at">, now: numbe
  * - Anything else as `translateDatabaseError` decides (42501 → 403, others → 500 with `fallback`).
  */
 export function translateImportError(error: DatabaseError, fallback: string, notAvailable: string): Error {
-  switch (error.code) {
-    case "P0002":
-      return importNotFoundError();
-    case "55000":
-      return new DomainError(notAvailable, 409);
-    case "23505":
-      return new DomainError(IMPORT_ALREADY_EXISTS_MESSAGE, 409);
-    case "22023":
-    case "23514":
-      return new DomainError(IMPORT_ROWS_REFUSED_MESSAGE, 422);
-    default:
-      return translateDatabaseError(error, fallback);
-  }
+  return translateDatabaseError(error, fallback, {
+    messages: {
+      P0002: IMPORT_NOT_FOUND_MESSAGE,
+      "55000": notAvailable,
+      "23505": IMPORT_ALREADY_EXISTS_MESSAGE,
+      "22023": IMPORT_ROWS_REFUSED_MESSAGE,
+      "23514": IMPORT_ROWS_REFUSED_MESSAGE,
+    },
+  });
 }
 
 /** The batch with this id, as the caller's RLS shows it; null when there is none (an expired draft is still returned). */
 async function selectBatch(id: string, fallback: string): Promise<BatchRow | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("import_batches").select(BATCH_COLUMNS).eq("id", id).maybeSingle();
-  if (error) throw new Error(fallback);
+  if (error) throw translateDatabaseError(error, fallback);
   return data;
 }
 
@@ -184,7 +179,7 @@ async function expenseCounts(batchIds: readonly string[]): Promise<Map<string, {
       .in("batch_id", [...batchIds])
       .order("expense_id")
       .range(offset, offset + LINK_PAGE_SIZE - 1);
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
 
     const page = (data ?? []) as unknown as LinkRow[];
     if (!page.length) {
@@ -229,7 +224,7 @@ export const supabaseImportRepository: ImportRepository = {
       .in("status", ["draft", "confirmed"])
       .limit(1)
       .maybeSingle();
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return data && !isExpiredDraft(data, Date.now()) ? toBatch(data) : null;
   },
 
@@ -239,7 +234,7 @@ export const supabaseImportRepository: ImportRepository = {
       selectBatch(id, LOAD_ERROR),
       supabase.from("import_rows").select(ROW_COLUMNS).eq("batch_id", id).order("position"),
     ]);
-    if (rows.error) throw new Error(LOAD_ERROR);
+    if (rows.error) throw translateDatabaseError(rows.error, LOAD_ERROR);
     if (!batch || batch.status !== "draft" || isExpiredDraft(batch, Date.now())) return null;
     return { batch: toBatch(batch), rows: rows.data.map(toStoredRow) };
   },
@@ -260,7 +255,8 @@ export const supabaseImportRepository: ImportRepository = {
       supabase.from("import_batches").select(BATCH_COLUMNS).in("status", ["confirmed", "undone"])
         .order("created_at", { ascending: false }).limit(limit),
     ]);
-    if (drafts.error || settled.error) throw new Error(LOAD_ERROR);
+    if (drafts.error) throw translateDatabaseError(drafts.error, LOAD_ERROR);
+    if (settled.error) throw translateDatabaseError(settled.error, LOAD_ERROR);
 
     const batches = [...drafts.data, ...settled.data]
       .filter((row) => !isExpiredDraft(row, now))
@@ -303,7 +299,7 @@ export const supabaseImportRepository: ImportRepository = {
       .eq("status", "draft")
       .select("id")
       .maybeSingle();
-    if (error) throw new Error(DISCARD_ERROR);
+    if (error) throw translateDatabaseError(error, DISCARD_ERROR);
     return data !== null;
   },
 };

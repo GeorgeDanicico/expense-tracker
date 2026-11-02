@@ -15,9 +15,9 @@ import { apiRequest } from "@/lib/api/client";
 import { afterInvitesChanged } from "@/lib/api/invalidate";
 import { FAMILY_INVITES_API_KEY, familyInviteApiUrl, type InvitesResponse } from "@/lib/api/keys";
 import { formatDateTime } from "@/lib/calendar";
-import type { FamilyInvite } from "@/lib/family/repository";
+import type { FamilyInviteView } from "@/lib/family/views";
 
-function InviteRow({ invite }: { invite: FamilyInvite }) {
+function InviteRow({ invite }: { invite: FamilyInviteView }) {
   const { mutate } = useSWRConfig();
   const form = useApiForm();
   const [revoking, setRevoking] = useState(false);

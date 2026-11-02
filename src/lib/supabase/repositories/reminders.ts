@@ -119,7 +119,8 @@ export const supabaseReminderRepository: ReminderRepository = {
       supabase.from("reminder_completions").select(COMPLETION_COLUMNS).gte("done_at", doneSince)
         .order("done_at", { ascending: false }),
     ]);
-    if (reminders.error || completions.error) throw new Error(LOAD_ERROR);
+    if (reminders.error) throw translateDatabaseError(reminders.error, LOAD_ERROR);
+    if (completions.error) throw translateDatabaseError(completions.error, LOAD_ERROR);
     return {
       reminders: reminders.data.map(toReminder),
       completions: completions.data.map(toCompletion),
@@ -130,7 +131,7 @@ export const supabaseReminderRepository: ReminderRepository = {
     const supabase = await createClient();
     const { data, error } = await supabase.from("reminders").select(REMINDER_COLUMNS).eq("id", id)
       .maybeSingle();
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return data ? toReminder(data) : null;
   },
 
@@ -138,7 +139,7 @@ export const supabaseReminderRepository: ReminderRepository = {
     const supabase = await createClient();
     const { data, error } = await supabase.from("reminder_completions").select("occurrence_on")
       .eq("reminder_id", id).order("occurrence_on", { ascending: false }).limit(1).maybeSingle();
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return data?.occurrence_on ?? null;
   },
 
@@ -209,7 +210,7 @@ export const supabaseReminderRepository: ReminderRepository = {
     const supabase = await createClient();
     // Every reminder (a user has few), counted in TS: the due day depends on each one's time zone.
     const { data, error } = await supabase.from("reminders").select("time_of_day, timezone, next_due_on, snoozed_until");
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return summarizeReminders(data.map((row) => ({
       timeOfDay: row.time_of_day.slice(0, 5),
       timezone: row.timezone,

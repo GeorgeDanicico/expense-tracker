@@ -1,5 +1,5 @@
 import { DomainError } from "@/lib/errors";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import type { Todo, TodoAssignee, TodoStatus } from "@/lib/todos/types";
 import type { TodoInput, TodoPatch } from "@/lib/validation/todo";
 
@@ -26,7 +26,7 @@ export function assigneeOutsideFamilyError(): DomainError {
  * needs one family read rather than one per card. A member missing from the list (it can't be, as
  * the trigger and `on delete set null` keep assignees in the family) still shows, without a name.
  */
-export function todoAssignee(members: readonly FamilyMember[], memberId: string | null): TodoAssignee | null {
+export function todoAssignee(members: readonly FamilyMemberView[], memberId: string | null): TodoAssignee | null {
   if (memberId === null) return null;
   const member = members.find((candidate) => candidate.memberId === memberId);
   return {

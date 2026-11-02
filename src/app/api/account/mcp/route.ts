@@ -1,6 +1,7 @@
 import { getOAuthConsent } from "@/lib/auth";
 import type { McpSettingsResponse } from "@/lib/api/keys";
 import { json, parseBody, withUser } from "@/lib/http/route";
+import { connectedAppView } from "@/lib/mcp/views";
 import { getRepositories } from "@/lib/repositories";
 import { mcpSwitchSchema } from "@/lib/validation/mcp";
 
@@ -13,7 +14,7 @@ async function loadSettings(): Promise<McpSettingsResponse> {
   const { mcpTokens } = getRepositories();
   const [access, apps] = await Promise.all([mcpTokens.access(), getOAuthConsent().listConnectedApps()]);
   const tokens = access.personalTokens ? await mcpTokens.list() : null;
-  return { enabled: access.status !== "mcp_off", access, tokens, apps };
+  return { enabled: access.status !== "mcp_off", access, tokens, apps: apps.map(connectedAppView) };
 }
 
 /** The switch, the caller's access, their personal tokens (null for kids) and their connected apps. */

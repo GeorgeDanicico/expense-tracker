@@ -1,5 +1,5 @@
 import { DomainError } from "@/lib/errors";
-import type { FamilyMember } from "@/lib/family/repository";
+import type { FamilyMemberView } from "@/lib/family/views";
 import type { CalendarAttendee, CalendarEvent, SeriesRepeat } from "@/lib/family-calendar/types";
 
 /** What a caller without a family gets from the methods that need one (routes check membership first). */
@@ -33,7 +33,7 @@ export function eventGoneError(): DomainError {
  * needs one family read rather than one per event. A member missing from the list (it can't be, as
  * the database removes an attendee with its member) still shows, without a name.
  */
-export function calendarAttendee(members: readonly FamilyMember[], memberId: string): CalendarAttendee {
+export function calendarAttendee(members: readonly FamilyMemberView[], memberId: string): CalendarAttendee {
   const member = members.find((candidate) => candidate.memberId === memberId);
   return {
     memberId,
@@ -47,7 +47,7 @@ export function calendarAttendee(members: readonly FamilyMember[], memberId: str
  * The attendees of an event as `CalendarEvent` lists them: in the order the family lists its members
  * (a stable order, whichever order the rows came in), a member the list doesn't know last.
  */
-export function calendarAttendees(members: readonly FamilyMember[], memberIds: readonly string[]): CalendarAttendee[] {
+export function calendarAttendees(members: readonly FamilyMemberView[], memberIds: readonly string[]): CalendarAttendee[] {
   const rank = (memberId: string) => {
     const index = members.findIndex((member) => member.memberId === memberId);
     return index < 0 ? members.length : index;

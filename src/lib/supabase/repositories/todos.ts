@@ -2,7 +2,7 @@ import "server-only";
 
 import type { Database } from "@/lib/database.types";
 import type { FamilyMember } from "@/lib/family/repository";
-import { translateDatabaseError } from "@/lib/supabase/errors";
+import { isUserFacing, translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
 import { supabaseFamilyRepository } from "@/lib/supabase/repositories/family";
 import { createClient } from "@/lib/supabase/server";
 import { positionBetween } from "@/lib/todos/position";
@@ -25,7 +25,6 @@ const TODO_COLUMNS =
   "id, title, notes, status, position, assignee_member_id, due_date, created_by, created_at, updated_at, completed_at, completed_by";
 
 type TodoRow = Omit<Database["public"]["Tables"]["todos"]["Row"], "family_id">;
-type DatabaseError = { code?: string; message: string };
 
 function toStatus(value: string): TodoStatus {
   if ((TODO_STATUSES as readonly string[]).includes(value)) return value as TodoStatus;
@@ -57,19 +56,16 @@ function compareTodos(a: Todo, b: Todo): number {
 }
 
 /**
- * A failed write on `todos`:
+ * A failed write on `todos`, through `translateDatabaseError`, with two domain errors of its own:
  * - 23505: the only unique key besides the id is `(family_id, status, position)`, so a racing write
- *   took the slot → `PositionTakenError`.
- * - 23514 from `todos_guard`: the assignee isn't in the card's family → a 422 with our own message.
- *   A table check constraint (title, notes, status) also raises 23514, but its message isn't meant
- *   for users and validated input can't break one, so that stays a 500.
- * - Anything else as `translateDatabaseError` decides (42501 → 403, others → 500 with `fallback`).
+ *   took the slot → `PositionTakenError` (a 409 the service retries).
+ * - 23514 marked user-facing, which only `todos_guard` raises: the assignee isn't in the card's
+ *   family → a 422 with our own message on `assigneeMemberId`. A table check constraint (title,
+ *   notes, status) raises 23514 without the marker, so it gets the generic 422.
  */
 export function translateTodoWriteError(error: DatabaseError, fallback: string): Error {
   if (error.code === "23505") return new PositionTakenError();
-  if (error.code === "23514") {
-    return /assigned/i.test(error.message) ? assigneeOutsideFamilyError() : new Error(fallback);
-  }
+  if (error.code === "23514" && isUserFacing(error)) return assigneeOutsideFamilyError();
   return translateDatabaseError(error, fallback);
 }
 
@@ -107,7 +103,8 @@ export const supabaseTodoRepository: TodoRepository = {
         .order("position"),
     ]);
     if (!family) throw noFamilyError();
-    if (open.error || done.error) throw new Error(LOAD_ERROR);
+    if (open.error) throw translateDatabaseError(open.error, LOAD_ERROR);
+    if (done.error) throw translateDatabaseError(done.error, LOAD_ERROR);
     return [...open.data, ...done.data].map((row) => toTodo(row, family.members)).sort(compareTodos);
   },
 
@@ -117,7 +114,7 @@ export const supabaseTodoRepository: TodoRepository = {
       familyMembers(),
       supabase.from("todos").select(TODO_COLUMNS).eq("id", id).maybeSingle(),
     ]);
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return data ? toTodo(data, members) : null;
   },
 
@@ -129,7 +126,7 @@ export const supabaseTodoRepository: TodoRepository = {
     const supabase = await createClient();
     const { data: top, error: topError } = await supabase.from("todos").select("position")
       .eq("family_id", family.family.id).eq("status", input.status).order("position").limit(1).maybeSingle();
-    if (topError) throw new Error(SAVE_ERROR);
+    if (topError) throw translateDatabaseError(topError, SAVE_ERROR);
 
     const { data, error } = await supabase.from("todos").insert({
       family_id: family.family.id,
@@ -161,7 +158,7 @@ export const supabaseTodoRepository: TodoRepository = {
   async delete(id) {
     const supabase = await createClient();
     const { data, error } = await supabase.from("todos").delete().eq("id", id).select("id").maybeSingle();
-    if (error) throw new Error(DELETE_ERROR);
+    if (error) throw translateDatabaseError(error, DELETE_ERROR);
     return data !== null;
   },
 
@@ -173,7 +170,7 @@ export const supabaseTodoRepository: TodoRepository = {
       if (id === null) return { found: true, position: null };
       const { data, error } = await supabase.from("todos").select("position")
         .eq("id", id).eq("status", status).maybeSingle();
-      if (error) throw new Error(MOVE_ERROR);
+      if (error) throw translateDatabaseError(error, MOVE_ERROR);
       return { found: data !== null, position: data?.position ?? null };
     };
     const [before, after] = await Promise.all([anchor(beforeId), anchor(afterId)]);
@@ -181,9 +178,10 @@ export const supabaseTodoRepository: TodoRepository = {
 
     // The keys next to the anchor, nearest first. Keys are unique in a column, so after leaving out
     // the anchor itself and the moving card, the first remaining row is the actual neighbour.
-    const nearest = async (query: PromiseLike<{ data: { id: string; position: string }[] | null; error: unknown }>) => {
+    const nearest = async (query: PromiseLike<{ data: { id: string; position: string }[] | null; error: DatabaseError | null }>) => {
       const { data, error } = await query;
-      if (error || !data) throw new Error(MOVE_ERROR);
+      if (error) throw translateDatabaseError(error, MOVE_ERROR);
+      if (!data) throw new Error(MOVE_ERROR);
       return data.find((row) => row.id !== beforeId && row.id !== movingId)?.position ?? null;
     };
     const column = () => supabase.from("todos").select("id, position").eq("status", status);

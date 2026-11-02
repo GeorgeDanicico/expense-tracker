@@ -44,7 +44,7 @@ export const supabaseAiGateRepository: AiGateRepository = {
   async isEnabled() {
     const supabase = await createClient();
     const { data, error } = await supabase.from("app_flags").select("value").eq("key", "ai_enabled").maybeSingle();
-    if (error) throw new Error(FLAG_ERROR);
+    if (error) throw translateDatabaseError(error, FLAG_ERROR);
     // A missing or odd flag counts as off.
     return data?.value === true;
   },
@@ -53,7 +53,8 @@ export const supabaseAiGateRepository: AiGateRepository = {
     await assertCaller(userId);
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("my_ai_access");
-    if (error || typeof data !== "string" || !ACCESS_STATUSES.includes(data)) throw new Error(ACCESS_ERROR);
+    if (error) throw translateDatabaseError(error, ACCESS_ERROR);
+    if (typeof data !== "string" || !ACCESS_STATUSES.includes(data)) throw new Error(ACCESS_ERROR);
     return data as AiAccess;
   },
 
@@ -74,13 +75,15 @@ export const supabaseAiGateRepository: AiGateRepository = {
     await assertCaller(userId);
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("ai_family_spend", { p_month_start: monthStart.toISOString() });
-    if (error || typeof data !== "number") throw new Error(SPEND_ERROR);
+    if (error) throw translateDatabaseError(error, SPEND_ERROR);
+    if (typeof data !== "number") throw new Error(SPEND_ERROR);
     return data;
   },
 
   async globalSpendMicros(monthStart) {
     const { data, error } = await createAdminClient().rpc("ai_global_spend", { p_month_start: monthStart.toISOString() });
-    if (error || typeof data !== "number") throw new Error(SPEND_ERROR);
+    if (error) throw translateDatabaseError(error, SPEND_ERROR);
+    if (typeof data !== "number") throw new Error(SPEND_ERROR);
     return data;
   },
 
@@ -88,7 +91,7 @@ export const supabaseAiGateRepository: AiGateRepository = {
   async insertUsage(record) {
     const admin = createAdminClient();
     const membership = await admin.from("family_members").select("family_id").eq("user_id", record.userId).maybeSingle();
-    if (membership.error) throw new Error(RECORD_ERROR);
+    if (membership.error) throw translateDatabaseError(membership.error, RECORD_ERROR);
 
     const { error } = await admin.from("ai_usage").insert({
       user_id: record.userId,
@@ -102,23 +105,23 @@ export const supabaseAiGateRepository: AiGateRepository = {
       cost_micros: record.costMicros,
       outcome: record.outcome,
     });
-    if (error) throw new Error(RECORD_ERROR);
+    if (error) throw translateDatabaseError(error, RECORD_ERROR);
   },
 
   async setEnabled(enabled) {
     const { error } = await createAdminClient().rpc("set_app_flag", { p_key: "ai_enabled", p_value: enabled });
-    if (error) throw new Error(SWITCH_ERROR);
+    if (error) throw translateDatabaseError(error, SWITCH_ERROR);
   },
 
   async budgetRecipients(userId) {
     const admin = createAdminClient();
     const membership = await admin.from("family_members").select("family_id").eq("user_id", userId).maybeSingle();
-    if (membership.error) throw new Error(RECIPIENTS_ERROR);
+    if (membership.error) throw translateDatabaseError(membership.error, RECIPIENTS_ERROR);
     const familyId = membership.data?.family_id ?? null;
     if (!familyId) return { familyId, userIds: [userId] };
 
     const parents = await admin.from("family_members").select("user_id").eq("family_id", familyId).eq("role", "parent");
-    if (parents.error) throw new Error(RECIPIENTS_ERROR);
+    if (parents.error) throw translateDatabaseError(parents.error, RECIPIENTS_ERROR);
     const userIds = parents.data.map((parent) => parent.user_id);
     // A family always has a parent; the user is told if it somehow has none.
     return { familyId, userIds: userIds.length > 0 ? userIds : [userId] };
@@ -130,6 +133,6 @@ export const supabaseAiGateRepository: AiGateRepository = {
       .insert({ user_id: userId, kind, payload, dedupe_key: dedupeKey });
     if (!error) return "queued";
     if (error.code === UNIQUE_VIOLATION) return "duplicate";
-    throw new Error(NOTIFY_ERROR);
+    throw translateDatabaseError(error, NOTIFY_ERROR);
   },
 };

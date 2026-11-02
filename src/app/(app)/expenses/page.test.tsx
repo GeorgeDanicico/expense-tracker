@@ -19,7 +19,7 @@ vi.mock("next/navigation", () => ({
 import ExpensesPage from "./page";
 
 function anAccount(membership: AccountMembership | null): AccountData {
-  return { email: "user@example.com", currency: "EUR", features: { family: true }, membership, mustChangePassword: false, avatarUrl: null };
+  return { email: "user@example.com", signInName: "user@example.com", currency: "EUR", features: { family: true }, membership, mustChangePassword: false, avatarUrl: null };
 }
 
 const kidId = "60000000-0000-4000-8000-000000000002";

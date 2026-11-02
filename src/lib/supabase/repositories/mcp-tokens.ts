@@ -1,10 +1,9 @@
 import "server-only";
 
 import { getAuthenticatedUser } from "@/lib/auth";
-import { DomainError } from "@/lib/errors";
 import type { McpAccess, McpToken, McpTokenCheck, McpTokenRepository } from "@/lib/mcp/token-repository";
 import { createAdminClient } from "@/lib/supabase/admin-client";
-import { translateDatabaseError } from "@/lib/supabase/errors";
+import { translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
 const ACCESS_ERROR = "Unable to load your AI assistant settings.";
@@ -17,7 +16,7 @@ const NAME_INVALID = "Give the token a name of 1 to 40 characters.";
 const TOKEN_INVALID = "That token isn't valid.";
 
 // Never `token_hash`: signed-in users aren't granted it.
-const TOKEN_COLUMNS = "id, name, prefix, created_at, regenerated_at, last_used_at, expires_at";
+const TOKEN_COLUMNS = "id, name, prefix, created_at, last_used_at, expires_at";
 
 const ACCESS_STATUSES: readonly string[] = ["ok", "mcp_off", "not_permitted", "email_required"];
 const BLOCK_REASONS: readonly unknown[] = [null, "not_permitted", "email_required"];
@@ -28,7 +27,6 @@ type TokenRow = {
   name: string;
   prefix: string;
   created_at: string;
-  regenerated_at: string | null;
   last_used_at: string | null;
   expires_at: string | null;
 };
@@ -39,25 +37,21 @@ function toToken(row: TokenRow): McpToken {
     name: row.name,
     prefix: row.prefix,
     createdAt: row.created_at,
-    regeneratedAt: row.regenerated_at,
     lastUsedAt: row.last_used_at,
     expiresAt: row.expires_at,
   };
 }
 
 /**
- * The token functions' own codes on top of `translateDatabaseError`: P0001 is the 10-token cap (409)
- * and 22023 a bad expiry (422), both with the database's message. A 23514 is a check constraint, whose
- * message isn't written for users, so it gets ours: the name's, or (a hash or prefix that isn't from
+ * A failed token function or write, through `translateDatabaseError`. The functions' own marked
+ * messages pass through: the 10-token cap (P0001, a 409 here), a bad expiry (22023, 422), "Token not
+ * found." (P0002, 404) and the kid refusal (42501, 403). A 23514 is a check constraint, whose message
+ * isn't written for users, so it gets ours: the name's, or (a hash or prefix that isn't from
  * `generateMcpToken`) a generic one.
  */
-function translateTokenError(error: { code?: string; message: string }): Error {
-  if (error.code === "P0001") return new DomainError(error.message, 409);
-  if (error.code === "22023") return new DomainError(error.message, 422);
-  if (error.code === "23514") {
-    return new DomainError(error.message.includes("mcp_tokens_name_valid") ? NAME_INVALID : TOKEN_INVALID, 422);
-  }
-  return translateDatabaseError(error, SAVE_ERROR);
+function translateTokenError(error: DatabaseError): Error {
+  const invalid = error.code === "23514" && error.message.includes("mcp_tokens_name_valid") ? NAME_INVALID : TOKEN_INVALID;
+  return translateDatabaseError(error, SAVE_ERROR, { statuses: { P0001: 409 }, messages: { "23514": invalid } });
 }
 
 function firstToken(data: TokenRow[] | null): McpToken {
@@ -165,7 +159,7 @@ export const supabaseMcpTokenRepository: McpTokenRepository = {
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("authenticate_mcp_token", { p_token_hash: hash });
 
-    if (error) throw new Error(CHECK_ERROR);
+    if (error) throw translateDatabaseError(error, CHECK_ERROR);
     const row = data?.[0];
     if (row?.status === "ok" && row.token_id && row.user_id && row.email) {
       return { status: "ok", tokenId: row.token_id, user: { id: row.user_id, email: row.email } };

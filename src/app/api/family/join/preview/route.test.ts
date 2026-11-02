@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hashInviteCode } from "@/lib/family/invite-code";
 import { forgetLastActive } from "@/lib/family/last-active";
 import { INVITE_CODE_WINDOW_MS, TOO_MANY_ATTEMPTS_MESSAGE, resetRateLimits } from "@/lib/http/rate-limit";
-import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
 import { aFamily, aParent, anInvite } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
@@ -65,18 +64,16 @@ describe("POST /api/family/join/preview", () => {
       familyName: "The Smiths",
       inviterName: "owner",
       role: "kid",
-      permissions: DEFAULT_KID_PERMISSIONS,
-      expiresAt: "2999-01-01T00:00:00.000Z",
     });
     expect(repositories.family.calls).toEqual(["touchLastActive", "previewInvite"]);
   });
 
-  it("shows a parent invite with null permissions", async () => {
+  it("shows a parent invite as a parent invite", async () => {
     repositories.family.invites = [anInvite({ codeHash: hashInviteCode(CODE), role: "parent", permissions: null })];
 
     const response = await preview({ code: CODE });
 
-    expect(response).toMatchObject({ status: 200, body: { role: "parent", permissions: null } });
+    expect(response).toMatchObject({ status: 200, body: { familyName: "The Smiths", inviterName: "owner", role: "parent" } });
   });
 
   it("accepts a code typed in lowercase with spaces and dashes", async () => {

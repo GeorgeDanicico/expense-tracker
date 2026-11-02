@@ -122,7 +122,7 @@ describe("GET /api/account/mcp", () => {
     const response = await settings();
 
     expect(Object.keys(response.body.tokens[0]).sort()).toEqual(
-      ["createdAt", "expiresAt", "id", "lastUsedAt", "name", "prefix", "regeneratedAt"],
+      ["createdAt", "expiresAt", "id", "lastUsedAt", "name", "prefix"],
     );
     expect(JSON.stringify(response.body)).not.toContain(created.body.secret);
     expect(JSON.stringify(response.body)).not.toContain(hashMcpToken(created.body.secret));
@@ -213,7 +213,6 @@ describe("POST /api/account/mcp/tokens", () => {
         name: "VPS",
         prefix: response.body.secret.slice(0, 13),
         createdAt: expect.any(String),
-        regeneratedAt: null,
         lastUsedAt: null,
         expiresAt: null,
       },
@@ -289,7 +288,7 @@ describe("POST /api/account/mcp/tokens/[id]/regenerate", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.body).toMatchObject({
-      token: { id: first.body.token.id, name: "VPS", regeneratedAt: expect.any(String), expiresAt: expect.any(String) },
+      token: { id: first.body.token.id, name: "VPS", expiresAt: expect.any(String) },
       secret: expect.stringMatching(SECRET),
     });
     expect(response.body.secret).not.toBe(oldSecret);

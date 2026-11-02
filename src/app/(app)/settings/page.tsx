@@ -17,7 +17,6 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { changeEmail } from "@/lib/api/account-requests";
 import { apiRequest } from "@/lib/api/client";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import { KID_EMAIL_DOMAIN } from "@/lib/family/kid-account";
 import type { AccountData } from "@/lib/account/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
 
@@ -73,9 +72,9 @@ export default function SettingsPage() {
       {status === "saved" ? <InlineAlert status="success">Your account currency was updated.</InlineAlert> : null}
       {status === "error" ? <InlineAlert status="error">{message}</InlineAlert> : null}
 
-      <AvatarCard email={data.email} avatarUrl={data.avatarUrl} />
+      <AvatarCard signInName={data.signInName} avatarUrl={data.avatarUrl} />
 
-      {data.email.toLowerCase().endsWith(`@${KID_EMAIL_DOMAIN}`) ? (
+      {data.email === null ? (
         <Card>
           <Card.Header
             title="Add an email address"

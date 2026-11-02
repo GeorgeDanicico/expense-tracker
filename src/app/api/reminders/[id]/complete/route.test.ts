@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getAuthenticatedUser } from "@/lib/auth";
 import { forgetLastActive } from "@/lib/family/last-active";
+import { aKid } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute } from "@/test/route";
 import { asKid, asOutsider, asParent, kidUser } from "@/test/todo-board";
@@ -26,6 +27,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
 
 function complete(id: string, body?: unknown) {
@@ -118,6 +120,26 @@ describe("POST /api/reminders/[id]/complete", () => {
 
       expect(await complete(reminder.id, { logExpense: true, amount: 640 }))
         .toMatchObject({ status: 200, body: { expense: { amount: 640 } } });
+    });
+
+    it("refuses a kid without expenses access with the one forbidden message, adding and marking nothing", async () => {
+      vi.stubEnv("FAMILY_ENABLED", "true");
+      repositories.family.membership = aKid({ permissions: { ...aKid().permissions, expenses: "off" } });
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+
+      const response = await complete(reminder.id, { logExpense: true });
+
+      expect(response).toMatchObject({ status: 403, body: { error: "You don't have access to this." } });
+      expect(kidExpenses()).toEqual([]);
+      expect(repositories.reminders.completions).toEqual([]);
+    });
+
+    it("still lets that kid mark the reminder done without logging the expense", async () => {
+      vi.stubEnv("FAMILY_ENABLED", "true");
+      repositories.family.membership = aKid({ permissions: { ...aKid().permissions, expenses: "off" } });
+      const reminder = repositories.reminders.seed({ expenseTemplate: rent });
+
+      expect(await complete(reminder.id)).toMatchObject({ status: 200, body: { reminder: { state: "done" } } });
     });
 
     it("only marks done without logExpense, even on a reminder with a template", async () => {

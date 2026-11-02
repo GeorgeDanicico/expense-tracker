@@ -61,13 +61,14 @@ describe("POST /api/family/join", () => {
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
       family: {
-        family: { id: familyId, name: "The Smiths", createdAt: "2026-10-01T09:00:00.000Z" },
+        family: { name: "The Smiths" },
         members: [
-          expect.objectContaining({ userId: user.id, role: "kid", isCreator: false, permissions: DEFAULT_KID_PERMISSIONS }),
+          expect.objectContaining({ role: "kid", isCreator: false, permissions: DEFAULT_KID_PERMISSIONS }),
         ],
       },
     });
     expect(repositories.family.membership).toMatchObject({ familyId, role: "kid" });
+    expect(repositories.family.family?.members[0].userId).toBe(user.id);
     expect(repositories.family.invites[0].usedAt).not.toBeNull();
     expect(repositories.family.calls).toEqual(["touchLastActive", "redeemInvite", "getFamily"]);
   });

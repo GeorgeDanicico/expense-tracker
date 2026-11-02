@@ -94,8 +94,8 @@ export class FakeMcpTokenRepository implements McpTokenRepository {
     return this.tokens.filter((token) => token.userId === userId && token.id !== exceptId && this.isLive(token)).length;
   }
 
-  private view({ id, name, prefix, createdAt, regeneratedAt, lastUsedAt, expiresAt }: FakeMcpToken): McpToken {
-    return { id, name, prefix, createdAt, regeneratedAt, lastUsedAt, expiresAt };
+  private view({ id, name, prefix, createdAt, lastUsedAt, expiresAt }: FakeMcpToken): McpToken {
+    return { id, name, prefix, createdAt, lastUsedAt, expiresAt };
   }
 
   async access(): Promise<McpAccess> {
@@ -139,7 +139,6 @@ export class FakeMcpTokenRepository implements McpTokenRepository {
       prefix,
       hash,
       createdAt: this.now().toISOString(),
-      regeneratedAt: null,
       lastUsedAt: null,
       expiresAt,
       revokedAt: null,
@@ -158,7 +157,7 @@ export class FakeMcpTokenRepository implements McpTokenRepository {
     if (this.liveCount(userId, id) >= MAX_LIVE_TOKENS) throw new DomainError(AT_CAP, 409);
     this.checkRow({ hash, prefix });
 
-    Object.assign(token, { hash, prefix, expiresAt, regeneratedAt: this.now().toISOString(), lastUsedAt: null });
+    Object.assign(token, { hash, prefix, expiresAt, lastUsedAt: null });
     return this.view(token);
   }
 

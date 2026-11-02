@@ -1,6 +1,8 @@
 import { getOAuthConsent } from "@/lib/auth";
 import type { OAuthAuthorizationResponse } from "@/lib/api/keys";
+import { signInName } from "@/lib/family/kid-account";
 import { json, notFound, withUser } from "@/lib/http/route";
+import { oauthAppView } from "@/lib/mcp/views";
 import { getRepositories } from "@/lib/repositories";
 import { AUTHORIZATION_NOT_FOUND, isAuthorizationId } from "@/lib/validation/oauth";
 
@@ -19,11 +21,12 @@ export const GET = withUser(async (_request, user, context: RouteContext<"/api/o
   const access = await getRepositories().mcpTokens.access();
   let body: OAuthAuthorizationResponse;
   if (access.status !== "ok") {
-    body = { kind: "refused", email: user.email, reason: access.status, app: request.kind === "needs_consent" ? request.app : null };
+    const app = request.kind === "needs_consent" ? oauthAppView(request.app) : null;
+    body = { kind: "refused", signInName: signInName(user.email), reason: access.status, app };
   } else if (request.kind === "already_approved") {
     body = { kind: "approved", redirectUrl: request.redirectUrl };
   } else {
-    body = { kind: "consent", email: user.email, app: request.app, redirectUri: request.redirectUri, scopes: request.scopes };
+    body = { kind: "consent", signInName: signInName(user.email), app: oauthAppView(request.app), redirectUri: request.redirectUri };
   }
   return json(body);
 }, { failure: "Unable to load the authorization request." });

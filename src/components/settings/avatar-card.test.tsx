@@ -24,7 +24,7 @@ function stubFetch(response: Response = new Response(JSON.stringify({ avatarUrl:
 function render(avatarUrl: string | null) {
   return renderToStaticMarkup(
     <ChakraProvider value={ledgerSystem}>
-      <AvatarCard email="ana.pop@example.com" avatarUrl={avatarUrl} />
+      <AvatarCard signInName="ana.pop@example.com" avatarUrl={avatarUrl} />
     </ChakraProvider>,
   );
 }

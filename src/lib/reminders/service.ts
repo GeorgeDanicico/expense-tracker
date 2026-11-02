@@ -2,9 +2,6 @@ import "server-only";
 
 import { DomainError } from "@/lib/errors";
 import type { Expense } from "@/lib/expenses/types";
-import { getCurrentMember } from "@/lib/family/current-member";
-import { FORBIDDEN_MESSAGE } from "@/lib/http/permission";
-import { can } from "@/lib/permissions";
 import {
   occurrenceAlreadyDoneError,
   type ReminderCompletion,
@@ -167,9 +164,10 @@ export async function completeReminder(
  * expense linked on its completion. `amount` replaces the template's amount when given.
  *
  * The order keeps a failure from leaving half of it done:
- * 1. Everything that can be checked first is: the caller may edit expenses (403), the reminder is
- *    theirs (404), still open and on `occurrenceOn` when given (409), has a template (422) in the
- *    account's currency (422). A refusal here changes nothing.
+ * 1. Everything that can be checked first is: the reminder is theirs (404), still open and on
+ *    `occurrenceOn` when given (409), has a template (422) in the account's currency (422). A refusal
+ *    here changes nothing. The caller's `expenses` permission is checked before this, by the route
+ *    (`requirePermission` in src/lib/http/permission.ts), like every other expense write.
  * 2. The expense is added. If that fails, nothing is marked done.
  * 3. The occurrence is marked done with the expense linked, guarded like `completeReminder`. If that
  *    fails (another tab marked it done first: 409), the expense is deleted again, so the caller
@@ -183,8 +181,6 @@ export async function completeReminderWithExpense(
   { occurrenceOn, amount }: Pick<CompleteReminderInput, "occurrenceOn" | "amount"> = {},
   now: Date = new Date(),
 ): Promise<{ reminder: ReminderWithState; expense: Expense }> {
-  if (!can(await getCurrentMember(), "expenses", "edit")) throw new DomainError(FORBIDDEN_MESSAGE, 403);
-
   const { reminders, expenses, account } = getRepositories();
   const current = await reminders.get(id);
   if (!current) throw notFound();

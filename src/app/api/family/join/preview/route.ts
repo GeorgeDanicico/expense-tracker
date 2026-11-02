@@ -1,12 +1,13 @@
 import { requireFamilyFeature } from "@/lib/family/feature";
 import { hashInviteCode } from "@/lib/family/invite-code";
+import { invitePreviewView } from "@/lib/family/views";
 import { TOO_MANY_ATTEMPTS_MESSAGE, inviteCodeAttempts } from "@/lib/http/rate-limit";
 import { json, notFound, parseBody, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { joinFamilySchema } from "@/lib/validation/family";
 
 /**
- * What a code invites the caller to: `{ familyName, inviterName, role, permissions, expiresAt }`, or
+ * What a code invites the caller to: `{ familyName, inviterName, role }`, or
  * 404 for any code that can't be redeemed, without saying why. A code that doesn't work counts toward
  * the caller's limit (shared with `POST /api/family/join`); over it, the answer is 429 without asking
  * the database. The code travels only in the body and is never logged.
@@ -22,5 +23,5 @@ export const POST = withUser(async (request, user) => {
     notFound("This code isn't valid anymore.");
   }
 
-  return json(preview);
+  return json(invitePreviewView(preview));
 }, { failure: "Unable to check the invite code." });

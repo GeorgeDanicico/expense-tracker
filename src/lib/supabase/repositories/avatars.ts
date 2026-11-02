@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { newAvatarPath } from "@/lib/avatars/paths";
 import type { AvatarRepository } from "@/lib/avatars/repository";
 import { type AdminClient, createAdminClient } from "@/lib/supabase/admin-client";
+import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
 const BUCKET = "avatars";
@@ -13,7 +14,7 @@ const REMOVE_ERROR = "Unable to remove your picture. Please try again.";
 
 async function currentPath(admin: AdminClient, userId: string, failure: string): Promise<string | null> {
   const { data, error } = await admin.from("profiles").select("avatar_path").eq("id", userId).maybeSingle();
-  if (error) throw new Error(failure);
+  if (error) throw translateDatabaseError(error, failure);
   return data?.avatar_path ?? null;
 }
 
@@ -43,7 +44,7 @@ export const supabaseAvatarRepository: AvatarRepository = {
   async getPath(userId) {
     const supabase = await createClient();
     const { data, error } = await supabase.from("profiles").select("avatar_path").eq("id", userId).maybeSingle();
-    if (error) throw new Error(LOAD_ERROR);
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return data?.avatar_path ?? null;
   },
 
@@ -69,6 +70,7 @@ export const supabaseAvatarRepository: AvatarRepository = {
     const { error: uploadError } = await admin.storage
       .from(BUCKET)
       .upload(path, webp, { contentType: "image/webp", upsert: false });
+    // A Storage error, not a database one: it has no Postgres code to translate.
     if (uploadError) throw new Error(SAVE_ERROR);
 
     // Upsert: a user may not have a profile row yet.
@@ -92,7 +94,7 @@ export const supabaseAvatarRepository: AvatarRepository = {
     if (!previous) return;
 
     const { error } = await admin.from("profiles").update({ avatar_path: null }).eq("id", userId);
-    if (error) throw new Error(REMOVE_ERROR);
+    if (error) throw translateDatabaseError(error, REMOVE_ERROR);
     await removeObject(admin, previous);
   },
 };

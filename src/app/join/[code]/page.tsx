@@ -52,7 +52,7 @@ export default function JoinLinkPage() {
           <>
             <JoinFamilyForm initialCode={code} onJoined={() => router.replace("/settings/family")} />
             <Text textStyle="xs" color="fg.muted" textAlign="center">
-              Signed in as {account.email}.
+              Signed in as {account.signInName}.
             </Text>
           </>
         )}

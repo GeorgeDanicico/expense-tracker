@@ -158,7 +158,7 @@ describe("Supabase to-do repository", () => {
     it("answers an assignee outside the family with a 422", async () => {
       useDatabase([], {
         fail: (query) => query.operation === "insert" &&
-          { code: "23514", message: "A to-do can only be assigned to a member of its family." },
+          { code: "23514", message: "A to-do can only be assigned to a member of its family.", hint: "user" },
       });
 
       await expect(todos.create(userId, input)).rejects.toMatchObject({
@@ -291,12 +291,13 @@ describe("Supabase to-do repository", () => {
   describe("translateTodoWriteError", () => {
     it("maps the database's codes", () => {
       expect(translateTodoWriteError({ code: "23505", message: "duplicate" }, "fallback")).toBeInstanceOf(PositionTakenError);
-      expect(translateTodoWriteError({ code: "23514", message: "A to-do can only be assigned to a member of its family." }, "fallback"))
+      expect(translateTodoWriteError({ code: "23514", message: "A to-do can only be assigned to a member of its family.", hint: "user" }, "fallback"))
         .toMatchObject({ status: 422 });
+      // A table check constraint carries no marker: the generic 422, never the constraint's text.
       const check = translateTodoWriteError({ code: "23514", message: "violates check constraint \"todos_title_check\"" }, "fallback");
-      expect(check).not.toBeInstanceOf(DomainError);
-      expect(check.message).toBe("fallback");
-      expect(translateTodoWriteError({ code: "42501", message: "A to-do can't move to another family." }, "fallback"))
+      expect(check).toBeInstanceOf(DomainError);
+      expect(check).toMatchObject({ status: 422, message: "fallback" });
+      expect(translateTodoWriteError({ code: "42501", message: "A to-do can't move to another family.", hint: "user" }, "fallback"))
         .toMatchObject({ status: 403 });
       expect(translateTodoWriteError({ message: "private" }, "fallback")).not.toBeInstanceOf(DomainError);
     });

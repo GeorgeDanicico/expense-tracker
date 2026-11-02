@@ -104,7 +104,7 @@ function personalToken(user: AuthenticatedUser, overrides: Partial<FakeMcpToken>
     prefix,
     hash,
     createdAt: new Date().toISOString(),
-    regeneratedAt: null,
+   
     lastUsedAt: null,
     expiresAt: null,
     revokedAt: null,

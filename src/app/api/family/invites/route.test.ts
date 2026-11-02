@@ -67,17 +67,13 @@ describe("GET /api/family/invites", () => {
         {
           inviteId: "80000000-0000-4000-8000-000000000002",
           role: "parent",
-          permissions: null,
           createdByName: "owner",
-          createdAt: "2026-10-02T09:00:00.000Z",
           expiresAt: "2999-01-01T00:00:00.000Z",
         },
         {
           inviteId: "80000000-0000-4000-8000-000000000001",
           role: "kid",
-          permissions: PERMISSION_PRESETS.young_kid,
           createdByName: "owner",
-          createdAt: "2026-10-01T09:00:00.000Z",
           expiresAt: "2999-01-01T00:00:00.000Z",
         },
       ],
@@ -149,7 +145,6 @@ describe("POST /api/family/invites", () => {
     expect(response.status).toBe(201);
     const [stored] = repositories.family.invites;
     expect(response.body).toEqual({
-      inviteId: stored.inviteId,
       code: expect.stringMatching(CODE_PATTERN),
       url: `http://localhost/join/${response.body.code}`,
       expiresAt: stored.expiresAt,
@@ -164,7 +159,7 @@ describe("POST /api/family/invites", () => {
 
     expect(response.status).toBe(201);
     expect(repositories.family.invites).toEqual([
-      expect.objectContaining({ inviteId: response.body.inviteId, role: "kid", permissions: PERMISSION_PRESETS.teen }),
+      expect.objectContaining({ role: "kid", permissions: PERMISSION_PRESETS.teen }),
     ]);
   });
 

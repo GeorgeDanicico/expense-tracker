@@ -43,7 +43,7 @@ function TabLabel({ children }: { children: string }) {
  * badge shows it on its icon; More carries the count of the badged items it holds (Reminders), so
  * what's due is visible without opening the sheet.
  */
-export function MobileTabBar({ email, avatarUrl = null }: { email: string; avatarUrl?: string | null }) {
+export function MobileTabBar({ signInName, avatarUrl = null }: { signInName: string; avatarUrl?: string | null }) {
   const pathname = usePathname();
   const { tabBarItems, moreItems } = useNavigation();
   const [open, setOpen] = useState(false);
@@ -80,7 +80,7 @@ export function MobileTabBar({ email, avatarUrl = null }: { email: string; avata
         );
       })}
       <MoreSheet
-        email={email}
+        signInName={signInName}
         avatarUrl={avatarUrl}
         open={open}
         onOpenChange={setOpen}
