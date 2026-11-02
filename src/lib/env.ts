@@ -2,6 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
+import { parseLogLevel } from "@/lib/log";
+
 /**
  * Every server environment variable, in one place. Server-only: it imports `server-only`, so a
  * client component that imports it fails the build.
@@ -130,6 +132,13 @@ export const serverEnvSchema = z.object({
   AI_FAMILY_MONTHLY_USD: optionalUsd(DEFAULT_FAMILY_MONTHLY_USD),
   AI_MONTHLY_BUDGET_USD: optionalUsd(DEFAULT_GLOBAL_MONTHLY_USD),
   APP_ADMIN_USER_IDS: optionalUserIds,
+
+  // Logging (src/lib/log).
+  /** The lowest level written: `debug`, `info`, `warn` or `error`. Anything else, or unset, is `info`. */
+  LOG_LEVEL: z
+    .string()
+    .optional()
+    .transform((value) => parseLogLevel(value)),
 
   // The worker.
   /** The build written with the worker's heartbeat; the package version when it's unset. */

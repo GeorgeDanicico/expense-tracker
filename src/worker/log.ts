@@ -1,19 +1,15 @@
-import type { LogFields, WorkerLog } from "@/lib/notifications/worker";
-
-type Write = (line: string) => void;
+import { createLogger } from "@/lib/log";
+import type { Write } from "@/lib/log";
+import type { WorkerLog } from "@/lib/notifications/worker";
 
 /**
- * A `WorkerLog` writing one JSON object per line: `{ time, level, event, ...fields }`. Info goes to
- * stdout and errors to stderr, which `docker logs` shows together.
+ * A `WorkerLog` writing one JSON object per line, `{ time, level, event, ...fields }`, through the
+ * shared logger (`src/lib/log`). `debug` and `info` go to stdout and `warn` and `error` to stderr,
+ * which `docker logs` shows together; `LOG_LEVEL` sets the lowest level written.
  */
 export function createJsonLog(
-  { out = (line) => process.stdout.write(line), err = (line) => process.stderr.write(line), now = () => new Date() }:
-  { out?: Write; err?: Write; now?: () => Date } = {},
+  { out, err, now }: { out?: Write; err?: Write; now?: () => Date } = {},
 ): WorkerLog {
-  const line = (level: "info" | "error", event: string, fields: LogFields = {}) =>
-    `${JSON.stringify({ time: now().toISOString(), level, event, ...fields })}\n`;
-  return {
-    info: (event, fields) => out(line("info", event, fields)),
-    error: (event, fields) => err(line("error", event, fields)),
-  };
+  const { debug, info, warn, error } = createLogger({ out, err, now });
+  return { debug, info, warn, error };
 }

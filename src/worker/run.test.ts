@@ -14,7 +14,12 @@ function fakeProcess() {
 
 function memoryLog() {
   const events: string[] = [];
-  const log: WorkerLog = { info: (event) => events.push(event), error: (event) => events.push(event) };
+  const log: WorkerLog = {
+    debug: (event) => events.push(event),
+    info: (event) => events.push(event),
+    warn: (event) => events.push(event),
+    error: (event) => events.push(event),
+  };
   return { log, events };
 }
 

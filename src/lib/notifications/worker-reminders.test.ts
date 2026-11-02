@@ -22,9 +22,11 @@ class FakePush implements PushSender {
 }
 
 function memoryLog() {
-  const lines: { level: "info" | "error"; event: string; fields?: LogFields }[] = [];
+  const lines: { level: "debug" | "info" | "warn" | "error"; event: string; fields?: LogFields }[] = [];
   const log: WorkerLog = {
+    debug: (event, fields) => lines.push({ level: "debug", event, fields }),
     info: (event, fields) => lines.push({ level: "info", event, fields }),
+    warn: (event, fields) => lines.push({ level: "warn", event, fields }),
     error: (event, fields) => lines.push({ level: "error", event, fields }),
   };
   return { log, lines };
