@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import { recordSpan, span } from "@/lib/log/span";
 import type { PushPayload, PushResult, PushSender, PushTarget } from "@/lib/notifications/push";
 import {
   ALL_DEVICES_GONE,
   CLEANUP_INTERVAL_MS,
   NO_DEVICES,
+  PUSHED_MEMORY_MAX,
+  PUSHED_MEMORY_MS,
+  SLOW_TICK_MS,
   createWorkerState,
   kindAllowed,
   outcomeOf,
@@ -15,6 +19,7 @@ import {
   type WorkerLog,
 } from "@/lib/notifications/worker";
 import { FakeWorkerStore } from "@/test/fakes/worker-store";
+import { createJsonLog } from "@/worker/log";
 
 const ANA = "10000000-0000-4000-8000-000000000001";
 const BOGDAN = "20000000-0000-4000-8000-000000000002";
@@ -99,6 +104,7 @@ describe("tick", () => {
         claimed: 0, sent: 0, skipped: 0, failed: 0, retried: 0, devicesRemoved: 0,
         remindersClaimed: 0, remindersQueued: 0, remindersDuplicate: 0, remindersChanged: 0,
         eventsClaimed: 0, eventsQueued: 0, eventsDuplicate: 0, eventsChanged: 0, ms: 100,
+        spans: [], dbMs: 0, dbCalls: 0,
       },
     });
   });
@@ -410,11 +416,11 @@ describe("tick", () => {
       expect(broken).toMatchObject({ status: "failed", lastError: "Invalid payload: it needs a title, body, url and tag." });
     });
 
-    it("logs a row it can't finish and goes on with the others", async () => {
+    it("logs a row it can't finish before any push and goes on with the others", async () => {
       const { store, lines, run } = setup();
-      store.addDevice(ANA);
+      store.addDevice(BOGDAN);
       const first = store.queue({ userId: ANA });
-      const second = store.queue({ userId: ANA });
+      const second = store.queue({ userId: BOGDAN });
       const finish = store.finishNotification.bind(store);
       store.finishNotification = async (id, outcome) => {
         if (id === first.id) throw new Error("Unable to update a notification: timeout");
@@ -423,6 +429,7 @@ describe("tick", () => {
 
       await run();
 
+      // Ana has no device, so nothing was pushed for the first row: the failure is the row's own.
       expect(lines).toContainEqual({ level: "error", event: "notification_failed", fields: { id: first.id, error: "Unable to update a notification: timeout" } });
       expect(first).toMatchObject({ status: "pending", lockedUntil: expect.any(Date) });
       expect(second.status).toBe("sent");
@@ -572,4 +579,253 @@ describe("pushPayload", () => {
       expect(pushPayload(payload)).toBeNull();
     },
   );
+});
+
+describe("tick: B9, the double send and the skipped tick", () => {
+  /** Makes every `finishNotification` of `id` throw, until `heal` is called. */
+  function breakFinish(store: FakeWorkerStore, id: string) {
+    const finish = store.finishNotification.bind(store);
+    let broken = true;
+    store.finishNotification = async (rowId, outcome) => {
+      if (broken && rowId === id) throw new Error("Unable to update a notification: timeout");
+      return finish(rowId, outcome);
+    };
+    return { heal: () => (broken = false) };
+  }
+
+  it("doesn't push a row again after its finish write failed: the next claim finishes it as sent", async () => {
+    const { clock, store, push, lines, run } = setup();
+    store.addDevice(ANA);
+    const row = store.queue({ userId: ANA });
+    const failing = breakFinish(store, row.id);
+
+    const first = await run();
+
+    // Pushed once, the finish was tried twice, and the row still counts as sent.
+    expect(push.sends).toHaveLength(1);
+    expect(first).toMatchObject({ delivery: { claimed: 1, sent: 1 } });
+    expect(lines).toContainEqual({ level: "error", event: "notification_bookkeeping_failed", fields: { id: row.id, write: "finishNotification", error: "Unable to update a notification: timeout" } });
+    expect(lines.map((line) => line.event)).not.toContain("notification_failed");
+    expect(row).toMatchObject({ status: "pending", lockedUntil: expect.any(Date) });
+
+    // The lease runs out and the row is claimed again; the database is back.
+    failing.heal();
+    clock.advance(2 * MINUTE + 1);
+    const second = await run();
+
+    expect(push.sends).toHaveLength(1);
+    expect(second).toMatchObject({ delivery: { claimed: 1, sent: 1 } });
+    expect(row).toMatchObject({ status: "sent", attempts: 1, lockedUntil: null });
+    expect(lines).toContainEqual({ level: "warn", event: "notification_resend_skipped", fields: { id: row.id, kind: "test" } });
+
+    // Finished for good: nothing is left to claim.
+    clock.advance(MINUTE);
+    expect(await run()).toMatchObject({ delivery: { claimed: 0 } });
+  });
+
+  it("retries finishNotification once and logs nothing at error when the retry works", async () => {
+    const { store, push, lines, run } = setup();
+    store.addDevice(ANA);
+    const row = store.queue({ userId: ANA });
+    const finish = store.finishNotification.bind(store);
+    let calls = 0;
+    store.finishNotification = async (id, outcome) => {
+      if (++calls === 1) throw new Error("Unable to update a notification: timeout");
+      return finish(id, outcome);
+    };
+
+    await run();
+
+    expect(calls).toBe(2);
+    expect(push.sends).toHaveLength(1);
+    expect(row.status).toBe("sent");
+    expect(lines.filter((line) => line.level === "error")).toEqual([]);
+    expect(lines).toContainEqual({ level: "warn", event: "notification_bookkeeping_retry", fields: { id: row.id, write: "finishNotification", error: "Unable to update a notification: timeout" } });
+  });
+
+  it("still finishes the row as sent when markDevicesDelivered throws", async () => {
+    const { store, push, lines, run } = setup();
+    const device = store.addDevice(ANA);
+    const row = store.queue({ userId: ANA });
+    store.markDevicesDelivered = async () => {
+      throw new Error("Unable to mark devices delivered: timeout");
+    };
+
+    const result = await run();
+
+    expect(push.sends).toHaveLength(1);
+    expect(row).toMatchObject({ status: "sent", attempts: 1, lockedUntil: null });
+    expect(result).toMatchObject({ delivery: { sent: 1 } });
+    expect(store.devices.find((d) => d.id === device.id)?.lastSuccessAt).toBeNull();
+    expect(lines).toContainEqual({ level: "error", event: "notification_bookkeeping_failed", fields: { id: row.id, write: "markDevicesDelivered", error: "Unable to mark devices delivered: timeout" } });
+    expect(lines.map((line) => line.event)).not.toContain("notification_failed");
+  });
+
+  it("doesn't skip the push of a row that was retried normally", async () => {
+    const { clock, store, push, run } = setup();
+    const device = store.addDevice(ANA);
+    push.answers.set(device.endpoint, SERVER_ERROR);
+    const row = store.queue({ userId: ANA });
+
+    await run();
+    clock.advance(MINUTE);
+    push.answers.clear();
+    await run();
+
+    // A retry's finish write succeeded, so nothing is remembered and the second push goes out.
+    expect(push.sends).toHaveLength(2);
+    expect(row).toMatchObject({ status: "sent", attempts: 2 });
+  });
+
+  it("forgets a pushed id after PUSHED_MEMORY_MS and caps the memory at PUSHED_MEMORY_MAX ids", async () => {
+    const { clock, store, push, deps, run } = setup();
+    store.addDevice(ANA);
+    const row = store.queue({ userId: ANA });
+    breakFinish(store, row.id);
+    await run();
+    expect(deps.state.pushed.has(row.id)).toBe(true);
+
+    // Past the memory the id no longer protects the row: it is pushed again.
+    clock.advance(PUSHED_MEMORY_MS + 1);
+    await run();
+    expect(push.sends).toHaveLength(2);
+
+    // Many rows whose finish fails: the oldest ids drop out.
+    const many = Array.from({ length: PUSHED_MEMORY_MAX + 5 }, () => store.queue({ userId: ANA }));
+    store.finishNotification = async () => {
+      throw new Error("Unable to update a notification: timeout");
+    };
+    for (let i = 0; i < Math.ceil(many.length / 50); i++) await run();
+    expect(deps.state.pushed.size).toBeLessThanOrEqual(PUSHED_MEMORY_MAX);
+    expect(deps.state.pushed.has(many.at(-1)!.id)).toBe(true);
+  });
+
+  it("logs a claim of due reminders that fails and still delivers the tick's outbox rows", async () => {
+    const { store, push, lines, run } = setup();
+    store.addDevice(ANA);
+    const row = store.queue({ userId: ANA });
+    store.failReminderClaimWith = new Error("Unable to claim reminders: connection reset");
+
+    const result = await run();
+
+    expect(lines).toContainEqual({ level: "error", event: "reminder_claim_failed", fields: { error: "Unable to claim reminders: connection reset" } });
+    expect(result).toMatchObject({ reminders: { claimed: 0 }, delivery: { claimed: 1, sent: 1 } });
+    expect(push.sends).toHaveLength(1);
+    expect(row.status).toBe("sent");
+    expect(lines.map((line) => line.event)).not.toContain("tick_failed");
+  });
+
+  it("logs a retried notification at warn and the other non-sent outcomes at info", async () => {
+    const { store, push, lines, run } = setup();
+    const device = store.addDevice(ANA);
+    push.answers.set(device.endpoint, SERVER_ERROR);
+    store.queue({ userId: ANA });
+    store.queue({ userId: BOGDAN });
+
+    await run();
+
+    const notifications = lines.filter((line) => line.event === "notification");
+    expect(notifications.map((line) => [line.level, line.fields?.status])).toEqual([["warn", "pending"], ["info", "skipped"]]);
+  });
+});
+
+describe("tick: context, spans and the tick line", () => {
+  /** The shared logger writing into arrays, parsed. */
+  function jsonLog() {
+    const lines: Record<string, unknown>[] = [];
+    const write = (line: string) => lines.push(JSON.parse(line));
+    return { lines, log: createJsonLog({ out: write, err: write }) };
+  }
+
+  it("gives every line of a tick the tick's request id, `tick-` and 12 characters", async () => {
+    const store = new FakeWorkerStore();
+    const { lines, log } = jsonLog();
+    const clock = manualClock();
+    const push = new FakePush();
+    store.now = clock.now;
+    store.addDevice(ANA);
+    store.queue({ userId: ANA });
+    store.queue({ userId: BOGDAN }); // skipped: no devices, an extra line
+    store.failReminderClaimWith = new Error("Unable to claim reminders: connection reset"); // an error line
+    const deps = { store, push, clock, log, version: "v1", state: createWorkerState() };
+
+    await tick(deps);
+    const firstIds = new Set(lines.map((line) => line.requestId));
+    await tick(deps);
+    const allIds = new Set(lines.map((line) => line.requestId));
+
+    expect(lines.length).toBeGreaterThan(3);
+    expect([...firstIds]).toHaveLength(1);
+    expect(allIds.size).toBe(2);
+    for (const id of allIds) expect(id).toMatch(/^tick-[A-Za-z0-9]{12}$/);
+  });
+
+  it("lists the tick's spans with dbMs and dbCalls on the tick line", async () => {
+    const { store, push, lines, run } = setup();
+    store.addDevice(ANA);
+    store.queue({ userId: ANA });
+    const claim = store.claimNotifications.bind(store);
+    store.claimNotifications = (batch) => span("rpc.claim_notifications", () => claim(batch));
+    const devices = store.listDevices.bind(store);
+    store.listDevices = (ids) => span("db.push_subscriptions.get", () => devices(ids));
+    const send = push.send.bind(push);
+    push.send = (target, payload) => span("push.send", () => send(target, payload), { deviceId: "d1" });
+
+    await run();
+
+    const line = lines.at(-1)!;
+    expect(line).toMatchObject({ level: "info", event: "tick" });
+    expect(line.fields?.spans).toEqual([
+      { name: "rpc.claim_notifications", ms: expect.any(Number) },
+      { name: "db.push_subscriptions.get", ms: expect.any(Number) },
+      { name: "push.send", ms: expect.any(Number), deviceId: "d1" },
+    ]);
+    // The two Supabase spans count; the push send doesn't.
+    expect(line.fields).toMatchObject({ dbCalls: 2, dbMs: expect.any(Number) });
+    expect(line.fields?.slow).toBeUndefined();
+    expect(line.fields?.slowestSpan).toBeUndefined();
+  });
+
+  it("doesn't leak spans from one tick into the next", async () => {
+    const { store, lines, run } = setup();
+    const heartbeat = store.writeHeartbeat.bind(store);
+    store.writeHeartbeat = (beat) => span("db.worker_heartbeat.upsert", () => heartbeat(beat));
+
+    await run();
+    await run();
+
+    const ticks = lines.filter((line) => line.event === "tick");
+    expect(ticks.map((line) => line.fields?.dbCalls)).toEqual([1, 1]);
+  });
+
+  it("logs a tick over 10 seconds at warn with slow: true and its slowest span", async () => {
+    const { clock, store, lines, run } = setup();
+    const claim = store.claimNotifications.bind(store);
+    store.claimNotifications = async (batch) => {
+      recordSpan("rpc.claim_notifications", 40);
+      clock.advance(SLOW_TICK_MS + 1);
+      return claim(batch);
+    };
+
+    await run();
+
+    expect(lines.at(-1)).toMatchObject({
+      level: "warn",
+      event: "tick",
+      fields: { slow: true, ms: SLOW_TICK_MS + 1, slowestSpan: { name: "rpc.claim_notifications", ms: 40 } },
+    });
+  });
+
+  it("keeps a tick of exactly 10 seconds at info", async () => {
+    const { clock, store, lines, run } = setup();
+    const claim = store.claimNotifications.bind(store);
+    store.claimNotifications = async (batch) => {
+      clock.advance(SLOW_TICK_MS);
+      return claim(batch);
+    };
+
+    await run();
+
+    expect(lines.at(-1)).toMatchObject({ level: "info", event: "tick" });
+  });
 });
