@@ -22,19 +22,10 @@ export const MAX_ITEMS = 50;
 /** Strings are cut to this before the patterns run, so a huge string costs no more than a long one. */
 const SCAN_LENGTH = 4_000;
 
-/** Field names (lowercase, without `_` and `-`) whose value is never written. */
-const SECRET_NAMES: ReadonlySet<string> = new Set([
-  "password",
-  "passcode",
-  "secret",
-  "token",
-  "accesstoken",
-  "refreshtoken",
-  "apikey",
-  "authorization",
-  "cookie",
-  "setcookie",
+/** Field names (lowercase, without `_` and `-`) that are redacted when they match exactly: too short or common to match as a substring. */
+const EXACT_SECRET_NAMES: ReadonlySet<string> = new Set([
   "email",
+  "emails",
   "code",
   "body",
   "payload",
@@ -42,6 +33,10 @@ const SECRET_NAMES: ReadonlySet<string> = new Set([
   "answer",
   "rows",
 ]);
+/** Redacted when the name contains one of these (`newPassword`, `clientSecret`, `sessionCookie`). */
+const SECRET_SUBSTRINGS: readonly string[] = ["password", "passcode", "secret", "cookie", "authorization", "apikey"];
+/** Redacted when the name ends with this (`idToken`, `refresh_token`), but not `inputTokens` or `tokenCount`. */
+const SECRET_SUFFIX = "token";
 
 /** What a `code` may look like and still be kept: error codes such as `unrecognised_layout` or `23505`. */
 const LOWERCASE_CODE = /^[a-z0-9_]{1,40}$/;
@@ -68,9 +63,22 @@ function normaliseName(name: string): string {
   return name.toLowerCase().replace(/[_-]/g, "");
 }
 
-/** Whether a field of this name is redacted whatever it holds (a `code` may be kept; see {@link redactedValue}). */
+/**
+ * Whether a field of this name is redacted whatever it holds (a `code` may be kept; see
+ * {@link redactedValue}). Case, `_` and `-` don't matter, and three rules apply:
+ * - the name contains `password`, `passcode`, `secret`, `cookie`, `authorization` or `apikey`;
+ * - the name ends with `token` (so `idToken` and `mcpToken`, but not the counts `inputTokens` and
+ *   `tokenCount`, nor `tokenId`);
+ * - the name is exactly `email`, `emails`, `code`, `body`, `payload`, `prompt`, `answer` or `rows`
+ *   (a substring there would catch `emailVerified`, `errorCode` and `rowCount`).
+ */
 export function isSecretName(name: string): boolean {
-  return SECRET_NAMES.has(normaliseName(name));
+  const normalised = normaliseName(name);
+  return (
+    EXACT_SECRET_NAMES.has(normalised) ||
+    normalised.endsWith(SECRET_SUFFIX) ||
+    SECRET_SUBSTRINGS.some((part) => normalised.includes(part))
+  );
 }
 
 /**

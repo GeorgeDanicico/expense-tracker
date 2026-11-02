@@ -56,13 +56,52 @@ describe("redaction by field name", () => {
     });
   });
 
-  it("matches the whole name, not part of it", () => {
-    expect(written({ tokenCount: 3, bodyLength: 10, emailed: true, requestId: "abc" })).toEqual({
+  it("redacts a name that contains password, passcode, secret, cookie, authorization or apikey", () => {
+    for (const name of [
+      "newPassword",
+      "currentPassword",
+      "passwordConfirm",
+      "kid_passcode",
+      "clientSecret",
+      "client_secret",
+      "sessionCookie",
+      "authorizationHeader",
+      "x-api-key",
+      "openaiApiKey",
+    ]) {
+      expect(written({ [name]: "Hunter 2!" }), name).toEqual({ [name]: REDACTED });
+    }
+  });
+
+  it("redacts a name that ends with token, but not tokens or other names that merely contain it", () => {
+    for (const name of ["token", "accessToken", "refresh_token", "idToken", "mcpToken", "csrf-token", "ID_TOKEN"]) {
+      expect(written({ [name]: "Hunter 2!" }), name).toEqual({ [name]: REDACTED });
+    }
+    expect(written({ inputTokens: 12, outputTokens: 34, tokenId: "abc", tokenCount: 3, tokens: 5 })).toEqual({
+      inputTokens: 12,
+      outputTokens: 34,
+      tokenId: "abc",
       tokenCount: 3,
+      tokens: 5,
+    });
+  });
+
+  it("matches email, emails, code, body, payload, prompt, answer and rows exactly, not as part of a name", () => {
+    expect(written({ emails: ["Hunter 2!"] })).toEqual({ emails: REDACTED });
+    expect(written({ bodyLength: 10, emailed: true, emailVerified: true, rowCount: 7, requestId: "abc", promptTokens: 4 })).toEqual({
       bodyLength: 10,
       emailed: true,
+      emailVerified: true,
+      rowCount: 7,
       requestId: "abc",
+      promptTokens: 4,
     });
+  });
+
+  it("treats errorCode as an ordinary field: the code rule doesn't apply, the value patterns do", () => {
+    expect(written({ errorCode: "AB23CD45" })).toEqual({ errorCode: "AB23CD45" });
+    expect(written({ errorCode: "unrecognised_layout" })).toEqual({ errorCode: "unrecognised_layout" });
+    expect(written({ errorCode: "a@b.co" })).toEqual({ errorCode: REDACTED });
   });
 
   it("redacts by name at any depth, in objects inside arrays", () => {
