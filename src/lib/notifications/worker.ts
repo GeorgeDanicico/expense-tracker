@@ -1,4 +1,5 @@
 import { APPLICATION_TIMEZONE } from "@/lib/calendar";
+import type { LogFields } from "@/lib/log";
 import type { PushPayload, PushResult, PushSender } from "@/lib/notifications/push";
 import { eventAddedPayload, eventDedupeKey, eventPayload } from "@/lib/family-calendar/notification";
 import { planReminderNotification } from "@/lib/reminders/notification";
@@ -61,11 +62,13 @@ const MAX_ERROR_LENGTH = 500;
 
 export type Clock = { now(): Date };
 
-/** Structured log fields: one flat object per line. */
-export type LogFields = Record<string, string | number | boolean | null>;
+/** Structured log fields (the shared logger's, `src/lib/log`). */
+export type { LogFields };
 
 export interface WorkerLog {
+  debug(event: string, fields?: LogFields): void;
   info(event: string, fields?: LogFields): void;
+  warn(event: string, fields?: LogFields): void;
   error(event: string, fields?: LogFields): void;
 }
 

@@ -186,6 +186,7 @@ describe("parseServerEnv", () => {
       AI_FAMILY_MONTHLY_USD: 3,
       AI_MONTHLY_BUDGET_USD: 10,
       APP_ADMIN_USER_IDS: [],
+      LOG_LEVEL: "info",
       GIT_SHA: undefined,
     });
   });
@@ -195,6 +196,15 @@ describe("parseServerEnv", () => {
     expect(env.VAPID_PUBLIC_KEY).toBe("key");
     expect(env.VAPID_SUBJECT).toBeUndefined();
     expect(env.SITE_URL).toBeUndefined();
+  });
+
+  it("reads LOG_LEVEL as one of the four levels in any case and falls back to info", () => {
+    expect(parseServerEnv({ LOG_LEVEL: "debug" }).LOG_LEVEL).toBe("debug");
+    expect(parseServerEnv({ LOG_LEVEL: " WARN " }).LOG_LEVEL).toBe("warn");
+    expect(parseServerEnv({ LOG_LEVEL: "error" }).LOG_LEVEL).toBe("error");
+    for (const bad of ["", "   ", "verbose", "trace", "10"]) {
+      expect(parseServerEnv({ LOG_LEVEL: bad }).LOG_LEVEL, bad).toBe("info");
+    }
   });
 
   it("reads TRUSTED_PROXY_HOPS as a whole number from 0 to 5 and falls back to one hop", () => {
