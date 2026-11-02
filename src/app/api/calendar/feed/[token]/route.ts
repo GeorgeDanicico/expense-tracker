@@ -1,5 +1,6 @@
 import { toICalendar } from "@/lib/family-calendar/ics";
 import { hashFeedToken, parseFeedToken } from "@/lib/family-calendar/feed-token";
+import { withAnonymousLimit } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 
 // node:crypto (the token's hash) needs the Node runtime.
@@ -17,9 +18,10 @@ function notFound() {
  * the database function, which only returns the token owner's own events, does the rest. 404 for a
  * malformed, unknown or revoked token; an empty calendar once the owner has left their family.
  * Not behind `requireFamilyFeature()`: a link that exists keeps working, and the data is gated by
- * what the database holds.
+ * what the database holds. Each client IP may fetch it 60 times a minute (`withAnonymousLimit`), far
+ * above a calendar app's refresh every 15 minutes or more.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
+export const GET = withAnonymousLimit(async (_request: Request, { params }: { params: Promise<{ token: string }> }) => {
   const token = parseFeedToken((await params).token);
   if (!token) return notFound();
 
@@ -41,4 +43,4 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
       "Cache-Control": "private, max-age=300",
     },
   });
-}
+});

@@ -2,10 +2,11 @@ import "server-only";
 
 import { PASSWORD_CHANGE_REQUIRED } from "@/lib/account/password-change";
 import { type AuthSession, getAuth, getAuthAdmin } from "@/lib/auth";
+import { UNKNOWN_CLIENT } from "@/lib/http/client-ip";
 import { createFailureLimiter, resetRateLimits } from "@/lib/http/rate-limit";
 import { MCP_REFUSALS } from "@/lib/mcp/refusals";
 import type { McpTokenCheck } from "@/lib/mcp/token-repository";
-import { hashMcpToken, hasMcpTokenPrefix, mcpTokenDisplayPrefix, parseMcpToken } from "@/lib/mcp/tokens";
+import { hashMcpToken, hasMcpTokenPrefix, parseMcpToken } from "@/lib/mcp/tokens";
 import { getRepositories } from "@/lib/repositories";
 
 /** What a request's `Authorization` header asks for (docs/mcp-access-plan.md, M6). */
@@ -17,7 +18,8 @@ export type McpAuthorization =
 export type McpAuthResult =
   | { status: "ok"; session: AuthSession }
   | { status: "unauthorized" }
-  | { status: "throttled" }
+  /** Too many bad tokens from this client; `retryAfterSeconds` is for the `Retry-After` header. */
+  | { status: "throttled"; retryAfterSeconds: number }
   /** `code` is set for the one refusal a client can tell apart: `password_change_required`. */
   | { status: "forbidden"; message: string; code?: string }
   /** The token is valid but no session could be opened (or the secret key is missing): retry later. */
@@ -25,6 +27,8 @@ export type McpAuthResult =
 
 const MAX_SESSIONS = 20;
 const MAX_FAILURES = 5;
+/** Bad app tokens allowed per client IP in `FAILURE_WINDOW_MS`: more than personal tokens, since a token that expired is a bad one and a client may retry a few calls at once. */
+const MAX_APP_TOKEN_FAILURES = 30;
 const FAILURE_WINDOW_MS = 15 * 60_000;
 
 /**
@@ -34,11 +38,19 @@ const FAILURE_WINDOW_MS = 15 * 60_000;
 const sessions = new Map<string, Promise<AuthSession | null>>();
 
 /**
- * Bad personal tokens, by `prefix:<display prefix>` and by `ip:<client IP>`: a key with
- * `MAX_FAILURES` in `FAILURE_WINDOW_MS` is throttled. The shared limiter, so the keys it remembers
- * are capped and each key's list is trimmed.
+ * Bad personal tokens by client IP (`clientIp`, the trusted one, or `UNKNOWN_CLIENT`): an IP with
+ * `MAX_FAILURES` in `FAILURE_WINDOW_MS` is throttled. Never keyed by anything the caller chooses,
+ * such as the token's display prefix, and no failure has a user to key by: a token that isn't known,
+ * revoked or expired doesn't name one. The shared limiter, so the keys it remembers are capped and
+ * each key's list is trimmed.
  */
 const tokenFailures = createFailureLimiter({ maxFailures: MAX_FAILURES, windowMs: FAILURE_WINDOW_MS });
+
+/**
+ * Bad OAuth app tokens by client IP, with the same window. Each one costs two calls to the auth
+ * provider (`verifyAppToken`), so it is counted too (audit P8).
+ */
+const appTokenFailures = createFailureLimiter({ maxFailures: MAX_APP_TOKEN_FAILURES, windowMs: FAILURE_WINDOW_MS });
 
 /**
  * Routes on the header: `Bearer sl_mcp_…` is a personal token, any other `Bearer` an OAuth app's
@@ -72,18 +84,6 @@ const passwordChangeRefusal: McpAuthResult = {
   message: MCP_PASSWORD_CHANGE_REQUIRED,
   code: PASSWORD_CHANGE_REQUIRED,
 };
-
-function failureKeys(key: string, clientIp: string | null) {
-  return clientIp ? [key, `ip:${clientIp}`] : [key];
-}
-
-function isThrottled(keys: string[]) {
-  return keys.some((key) => tokenFailures.isLimited(key));
-}
-
-function recordFailure(keys: string[]) {
-  for (const key of keys) tokenFailures.recordFailure(key);
-}
 
 function endSession(pending: Promise<AuthSession | null>) {
   return pending.then((session) => session?.end());
@@ -129,16 +129,16 @@ async function dropSession(key: string) {
 /**
  * A personal token: the throttle, then `check` with the secret key, then the cached session for the
  * token or a new one from `startSessionForUser`. Unknown, revoked, expired and malformed tokens count
- * toward the throttle; access refusals don't (they're settings to fix, not guesses). Any status but
- * `ok` drops and ends the token's cached session.
+ * toward the client's throttle; access refusals don't (they're settings to fix, not guesses). Any
+ * status but `ok` drops and ends the token's cached session.
  */
 export async function getMcpTokenSession(value: string, clientIp: string | null): Promise<McpAuthResult> {
-  const keys = failureKeys(`prefix:${mcpTokenDisplayPrefix(value)}`, clientIp);
-  if (isThrottled(keys)) return { status: "throttled" };
+  const ip = clientIp ?? UNKNOWN_CLIENT;
+  if (tokenFailures.isLimited(ip)) return { status: "throttled", retryAfterSeconds: tokenFailures.retryAfterSeconds(ip) };
 
   const token = parseMcpToken(value);
   if (!token) {
-    recordFailure(keys);
+    tokenFailures.recordFailure(ip);
     return { status: "unauthorized" };
   }
 
@@ -155,7 +155,7 @@ export async function getMcpTokenSession(value: string, clientIp: string | null)
   if (check.status !== "ok") {
     await dropSession(key);
     if (check.status === "unknown" || check.status === "revoked" || check.status === "expired") {
-      recordFailure(keys);
+      tokenFailures.recordFailure(ip);
       return { status: "unauthorized" };
     }
     return { status: "forbidden", message: MCP_REFUSALS[check.status] };
@@ -182,14 +182,24 @@ export async function getMcpTokenSession(value: string, clientIp: string | null)
 }
 
 /**
- * An OAuth app's access token: verified (and its session checked live) with the provider on every
- * request, then the user's access checked as that user. No audience check: Supabase sets
+ * An OAuth app's access token: the client's throttle, then verified (and its session checked live)
+ * with the provider on every request, then the user's access checked as that user. A bad token counts
+ * toward the client's throttle (`appTokenFailures`). No audience check: Supabase sets
  * `aud: "authenticated"` and ignores the `resource` parameter (P1 finding 1).
  */
-export async function getMcpAppSession(token: string): Promise<McpAuthResult> {
-  if (!token) return { status: "unauthorized" };
+export async function getMcpAppSession(token: string, clientIp: string | null): Promise<McpAuthResult> {
+  const ip = clientIp ?? UNKNOWN_CLIENT;
+  if (appTokenFailures.isLimited(ip)) return { status: "throttled", retryAfterSeconds: appTokenFailures.retryAfterSeconds(ip) };
+
+  if (!token) {
+    appTokenFailures.recordFailure(ip);
+    return { status: "unauthorized" };
+  }
   const auth = getAuth();
-  if (!(await auth.verifyAppToken(token))) return { status: "unauthorized" };
+  if (!(await auth.verifyAppToken(token))) {
+    appTokenFailures.recordFailure(ip);
+    return { status: "unauthorized" };
+  }
 
   const session = auth.sessionForAppToken(token);
   const access = await session.run(() => getRepositories().mcpTokens.access());
@@ -204,7 +214,7 @@ export function authenticateMcpRequest(authorization: McpAuthorization, clientIp
     case "personal":
       return getMcpTokenSession(authorization.token, clientIp);
     case "app":
-      return getMcpAppSession(authorization.token);
+      return getMcpAppSession(authorization.token, clientIp);
     case "none":
       return Promise.resolve({ status: "unauthorized" });
   }

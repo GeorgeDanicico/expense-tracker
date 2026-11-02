@@ -1,7 +1,9 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 
 import { getEnv } from "@/lib/env";
-import { json, PRIVATE_HEADERS } from "@/lib/http/route";
+import { clientKey } from "@/lib/http/client-ip";
+import { mcpIpRequests, mcpUserRequests, TOO_MANY_REQUESTS } from "@/lib/http/rate-limit";
+import { json, PRIVATE_HEADERS, tooManyRequests } from "@/lib/http/route";
 import { authenticateMcpRequest, readMcpAuthorization } from "@/lib/mcp/auth";
 import { mcpBearerChallenge, mcpResourceOrigin } from "@/lib/mcp/authorization-server";
 import { createMcpServer } from "@/lib/mcp/server";
@@ -30,11 +32,6 @@ function isAllowedOrigin(origin: string) {
   return LOCALHOST_NAMES.has(parsed.hostname) || parsed.hostname.endsWith(".localhost");
 }
 
-function clientIp(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwarded || request.headers.get("x-real-ip")?.trim() || null;
-}
-
 function withPrivateHeaders(response: Response) {
   try {
     for (const [key, value] of Object.entries(PRIVATE_HEADERS)) response.headers.set(key, value);
@@ -53,9 +50,15 @@ async function handle(request: Request) {
     return json({ error: "Forbidden" }, 403);
   }
 
-  const auth = await authenticateMcpRequest(readMcpAuthorization(request), clientIp(request));
+  // Every request counts per client IP before its token is looked at: a valid app token still costs
+  // the auth provider two calls. Bad tokens have their own, much lower limit in `authenticateMcpRequest`.
+  const ip = clientKey(request);
+  const ipWait = mcpIpRequests.take(ip);
+  if (ipWait > 0) return tooManyRequests(TOO_MANY_REQUESTS, ipWait);
+
+  const auth = await authenticateMcpRequest(readMcpAuthorization(request), ip);
   if (auth.status === "throttled") {
-    return json({ error: "Too many failed attempts. Try again later." }, 429);
+    return tooManyRequests("Too many failed attempts. Try again later.", auth.retryAfterSeconds);
   }
   if (auth.status === "forbidden") {
     return json(auth.code ? { error: auth.message, code: auth.code } : { error: auth.message }, 403);
@@ -86,6 +89,9 @@ async function handle(request: Request) {
   }
 
   const { session } = auth;
+  const userWait = mcpUserRequests.take(session.userId);
+  if (userWait > 0) return tooManyRequests(TOO_MANY_REQUESTS, userWait);
+
   const server = createMcpServer({ userId: session.userId, email: session.email });
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);

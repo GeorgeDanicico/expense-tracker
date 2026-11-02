@@ -174,6 +174,7 @@ describe("parseServerEnv", () => {
       SUPABASE_PUBLISHABLE_KEY: undefined,
       SUPABASE_SECRET_KEY: undefined,
       SITE_URL: undefined,
+      TRUSTED_PROXY_HOPS: 1,
       PRICE_SERVICE_URL: undefined,
       FAMILY_ENABLED: false,
       VAPID_PUBLIC_KEY: undefined,
@@ -194,6 +195,14 @@ describe("parseServerEnv", () => {
     expect(env.VAPID_PUBLIC_KEY).toBe("key");
     expect(env.VAPID_SUBJECT).toBeUndefined();
     expect(env.SITE_URL).toBeUndefined();
+  });
+
+  it("reads TRUSTED_PROXY_HOPS as a whole number from 0 to 5 and falls back to one hop", () => {
+    expect(parseServerEnv({ TRUSTED_PROXY_HOPS: "2" }).TRUSTED_PROXY_HOPS).toBe(2);
+    expect(parseServerEnv({ TRUSTED_PROXY_HOPS: " 0 " }).TRUSTED_PROXY_HOPS).toBe(0);
+    for (const bad of ["", "  ", "-1", "1.5", "many", "6", "1e1"]) {
+      expect(parseServerEnv({ TRUSTED_PROXY_HOPS: bad }).TRUSTED_PROXY_HOPS, bad).toBe(1);
+    }
   });
 
   it("turns the family module on only for exactly true", () => {
