@@ -133,6 +133,22 @@ describe("POST /api/csp-report", () => {
     expect(violations().map((line) => line.document)).toEqual(["/join/:code", "/oauth/consent"]);
   });
 
+  it("redacts paths the same way as the browser's own reports: ids replaced, secret segments redacted", async () => {
+    const email = ["ann", "kin.test"].join("@");
+    await post([
+      reportingApiReport({
+        documentURL: "https://ledger.tailnet.ts.net/expenses/6c3f4a8e-2b1d-4c5e-9f70-1a2b3c4d5e6f",
+        blockedURL: `https://cdn.example/${encodeURIComponent(email)}/x.js`,
+        sourceFile: `https://ledger.tailnet.ts.net/people/${email}/a.js`,
+      }),
+    ], { contentType: "application/reports+json" });
+
+    expect(violations()).toEqual([
+      expect.objectContaining({ document: "/expenses/:id", blocked: "https://cdn.example/[redacted]/x.js", source: "/people/[redacted]/a.js" }),
+    ]);
+    expect(requestLog.join("")).not.toContain("ann");
+  });
+
   it("accepts a content type with parameters", async () => {
     expect((await post(LEGACY_REPORT, { contentType: "application/csp-report; charset=utf-8" })).status).toBe(204);
   });

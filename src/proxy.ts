@@ -45,9 +45,14 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
+// The matcher skips `/api/client-log` (logging plan, L6) as well as the CSP reports: a browser report
+// needs neither the CSP headers nor a refreshed session, and while the project's JWTs are signed
+// with a shared secret (its JWKS is empty) every `getClaims()` with a session is a round trip to
+// Supabase Auth, so refreshing here would cost a second Auth call per signed-in report. The route
+// reads the user itself, through `getAuthenticatedUser`, and refreshes an expired session there.
 export const config = {
   // Must stay the same string as `PROXY_MATCHER` (src/lib/http/proxy-matcher.ts); Next needs a literal here.
   matcher: [
-    "/((?!health(?:/|$)|api/mcp(?:/|$)|api/csp-report(?:/|$)|api/calendar/feed/|\\.well-known/|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!health(?:/|$)|api/mcp(?:/|$)|api/csp-report(?:/|$)|api/client-log(?:/|$)|api/calendar/feed/|\\.well-known/|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

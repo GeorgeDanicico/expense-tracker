@@ -48,6 +48,7 @@ describe("proxyRequestId", () => {
     for (const path of [
       "/api/mcp",
       "/api/csp-report",
+      "/api/client-log",
       "/api/calendar/feed/sl_cal_token.ics",
       "/.well-known/oauth-protected-resource/api/mcp",
       "/health",

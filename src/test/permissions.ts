@@ -74,6 +74,7 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   "POST /api/calendar/feed-link": familyMember("create_calendar_feed"),
   "DELETE /api/calendar/feed-link": familyMember("revoke_calendar_feed"),
   "GET /api/calendar/feed/[token]": { access: "public", reason: "A calendar app fetches it with no session; the token is the credential." },
+  "POST /api/client-log": { access: "public", reason: "Browser errors and Web Vitals, signed out too; a session only adds the user id." },
   "POST /api/csp-report": { access: "public", reason: "Browsers send CSP reports without credentials." },
   "GET /api/dashboard": expenses,
   "GET /api/expense-tabs": expenses,

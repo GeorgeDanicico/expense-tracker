@@ -54,6 +54,8 @@ const SECRET_PATTERNS: readonly RegExp[] = [
   /sb_(?:secret|publishable)_[A-Za-z0-9_-]*/g,
   /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi,
   /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g,
+  // A piece of a JWT on its own (one cut short to fit a field): base64url JSON starts with `eyJ`.
+  /\beyJ[A-Za-z0-9_-]{12,}/g,
   /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g,
 ];
 const LONG_RUN = /[A-Za-z0-9_-]{32,}/g;
@@ -83,8 +85,8 @@ export function isSecretName(name: string): boolean {
 
 /**
  * Redacts the secrets in a string and clips it to {@link MAX_STRING_LENGTH}. Anything shaped like a
- * Supabase key, a `Bearer` credential, a JWT, an email address or a run of 32 or more base64url
- * characters is replaced by `[redacted]`; UUIDs and commit hashes are ids, not secrets, and stay.
+ * Supabase key, a `Bearer` credential, a JWT or a piece of one (base64url JSON, `eyJ…`), an email
+ * address or a run of 32 or more base64url characters is replaced by `[redacted]`; UUIDs and commit hashes are ids, not secrets, and stay.
  */
 export function redactString(text: string): string {
   let result = text.length > SCAN_LENGTH ? text.slice(0, SCAN_LENGTH) : text;
