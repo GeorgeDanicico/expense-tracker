@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DomainError } from "@/lib/errors";
 import { fakeSupabase, type FakeSupabaseOptions } from "@/test/fake-supabase";
+import { loggedLines } from "@/test/log-lines";
+
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 
 const mocks = vi.hoisted(() => {
   // config.ts reads the URL when it is first imported; the secret key is read on each use.
@@ -165,15 +169,16 @@ describe("Supabase AuthAdmin", () => {
     });
 
     it("still throws the profile error when the clean-up fails too", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      logged.length = 0;
       const { admin } = useAdminClient([], { deleteUser: fails(undefined) }, { fail: () => ({ code: "23505", message: "duplicate" }) });
 
       await expect(createSupabaseAuthAdmin().createUser(input)).rejects.toThrow("That username is taken.");
 
       expect(admin.deleteUser).toHaveBeenCalledExactlyOnceWith(kid.id);
-      expect(consoleError).toHaveBeenCalledOnce();
-      expect(JSON.stringify(consoleError.mock.calls)).not.toContain(input.password);
-      expect(JSON.stringify(consoleError.mock.calls)).not.toContain(SECRET_KEY);
+      expect(loggedLines(logged, "auth_user_cleanup_failed")).toEqual([expect.objectContaining({ level: "error", userId: kid.id })]);
+      expect(logged.join("")).not.toContain(input.password);
+      expect(logged.join("")).not.toContain(SECRET_KEY);
+      expect(logged.join("")).not.toContain(kid.email);
     });
   });
 

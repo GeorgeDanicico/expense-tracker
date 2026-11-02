@@ -5,7 +5,11 @@ import { PARENT_PERMISSIONS, type FamilyData } from "@/lib/family/repository";
 import { aFamily, aFamilyMember, aKid, aParent } from "@/test/builders";
 import { FakeAuth, FakeAuthAdmin } from "@/test/fakes/auth";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
+import { loggedLines } from "@/test/log-lines";
 import { callRoute, signedInAs } from "@/test/route";
+
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 
 let auth: FakeAuth;
 let admin: FakeAuthAdmin;
@@ -150,15 +154,17 @@ describe("POST /api/family/members/[id]/password", () => {
   });
 
   it("still answers success when the kid can't be signed out, since the password and the flag are set", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    logged.length = 0;
     admin.fail("signOutEverywhere", new Error("private auth failure"));
 
     const response = await resetPassword(kidMemberId, { password: newPassword });
 
     expect(response).toMatchObject({ status: 200, body: { success: true } });
     expect(admin.profiles.get(kidUserId)?.mustChangePassword).toBe(true);
-    expect(error).toHaveBeenCalledOnce();
-    expect(JSON.stringify(error.mock.calls)).not.toContain(newPassword);
+    expect(loggedLines(logged, "kid_sessions_signout_failed")).toEqual([
+      expect.objectContaining({ level: "error", memberId: kidMemberId, error: expect.objectContaining({ message: "private auth failure" }) }),
+    ]);
+    expect(logged.join("")).not.toContain(newPassword);
   });
 
   it("never returns the password", async () => {

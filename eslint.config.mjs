@@ -154,6 +154,17 @@ const workerBoundary = {
   },
 };
 
+/**
+ * Server logs go through the shared logger (`src/lib/log`, logging plan L3), so a stray `console.*`
+ * can't bypass its redaction, levels and request ids. Tests may use `console` (to spy on it or
+ * silence it), and the statement eval is a command-line script that prints its report to a terminal.
+ */
+const noConsole = {
+  files: ["src/**/*.{ts,tsx}"],
+  ignores: ["src/**/*.test.{ts,tsx}", "src/lib/imports/ai/__eval__/**"],
+  rules: { "no-console": "error" },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -161,6 +172,7 @@ const eslintConfig = defineConfig([
   uiGuardrails,
   supabaseBoundary,
   workerBoundary,
+  noConsole,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

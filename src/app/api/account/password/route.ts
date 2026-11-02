@@ -2,6 +2,7 @@ import { WRONG_CURRENT_PASSWORD } from "@/lib/account/password-change";
 import { getAuth } from "@/lib/auth";
 import { passwordChangeAttempts, TOO_MANY_PASSWORD_CHANGES } from "@/lib/http/rate-limit";
 import { HttpError, noContent, parseBody, tooManyRequests, withUser } from "@/lib/http/route";
+import { log } from "@/lib/log";
 import { getRepositories } from "@/lib/repositories";
 import { changePasswordSchema } from "@/lib/validation/password";
 
@@ -41,7 +42,7 @@ export const POST = withUser(async (request, user) => {
   // The password has changed: a failure here mustn't read as if it hadn't. Supabase Auth also ends
   // the other sessions itself on a password change; this makes sure of it.
   const others = await auth.signOut("others");
-  if (!others.ok) console.error("Password changed, but the other sessions could not be signed out.");
+  if (!others.ok) log.error("password_change_signout_failed", { userId: user.id, reason: others.reason });
 
   return noContent();
 }, { failure: "Unable to change your password. Please try again.", allowPasswordChangeRequired: true });

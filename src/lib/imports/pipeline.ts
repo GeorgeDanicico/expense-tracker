@@ -28,6 +28,7 @@ import {
   type ParsedRow,
   type ParsedStatement,
 } from "@/lib/imports/types";
+import { log as sharedLog, type LogFields } from "@/lib/log";
 
 /**
  * Turns an uploaded statement into draft rows, in memory (docs/statement-import-plan.md, tasks I4
@@ -74,7 +75,7 @@ export type StatementDraft = {
 export type BuildDraftOptions = {
   /** Present when the user has turned AI reading on. Without it nothing here calls a model or reads their history. */
   ai?: StatementAi | null;
-  /** One line per model-assisted step: modes, counts and outcomes, never a prompt, an answer or a row. Defaults to `console.info`. */
+  /** One line per model-assisted step: modes, counts and outcomes, never a prompt, an answer or a row. Defaults to the shared logger's `statement_import_step` line. */
   log?: (line: Record<string, unknown>) => void;
 };
 
@@ -208,7 +209,7 @@ async function readWithModel(
   log({
     mode: "read",
     outcome: "ok",
-    rows: verified.rows.length,
+    rowCount: verified.rows.length,
     warnings: verified.warnings.length,
     ...(verified.dropped.length > 0 ? { dropped: verified.dropped } : {}),
   });
@@ -311,7 +312,7 @@ export async function buildDraft(
   options: BuildDraftOptions = {},
 ): Promise<StatementDraft> {
   const ai = options.ai ?? null;
-  const log = options.log ?? ((line: Record<string, unknown>) => console.info("Statement import", line));
+  const log = options.log ?? ((line: Record<string, unknown>) => sharedLog.info("statement_import_step", line as LogFields));
 
   let source: StatementSource;
   try {

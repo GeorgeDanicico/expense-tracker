@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn() }));
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
 import { getAuthenticatedUser } from "@/lib/auth";
-import { forgetLastActive, MAX_REMEMBERED, TOUCH_INTERVAL_MS } from "@/lib/family/last-active";
+import { forgetLastActive, MAX_REMEMBERED, TOUCH_INTERVAL_MS, touchLastActiveInBackground } from "@/lib/family/last-active";
 import { json, withUser } from "@/lib/http/route";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
+import { loggedLines } from "@/test/log-lines";
 import { signedInAs, testUser } from "@/test/route";
 
 const otherUser = { id: "10000000-0000-4000-8000-000000000341", email: "other@example.test" };
@@ -22,6 +25,7 @@ async function call() {
 const touches = () => repositories.family.calls.filter((name) => name === "touchLastActive").length;
 
 beforeEach(() => {
+  logged.length = 0;
   vi.useFakeTimers();
   repositories = resetFakeRepositories();
   forgetLastActive();
@@ -117,5 +121,57 @@ describe("withUser last activity", () => {
     signedInAs(testUser);
     await call();
     expect(touches()).toBe(MAX_REMEMBERED + 2);
+  });
+});
+
+describe("touchLastActiveInBackground", () => {
+  it("hands the touch to the scheduler and doesn't run it itself", async () => {
+    const tasks: (() => Promise<void>)[] = [];
+
+    touchLastActiveInBackground(testUser.id, (task) => void tasks.push(task));
+
+    expect(tasks).toHaveLength(1);
+    expect(touches()).toBe(0);
+    await tasks[0]();
+    expect(touches()).toBe(1);
+  });
+
+  it("logs a failed touch as last_active_failed at debug, with the error and no row data", async () => {
+    vi.spyOn(repositories.family, "touchLastActive").mockRejectedValue(new Error("database down"));
+    const tasks: (() => Promise<void>)[] = [];
+
+    touchLastActiveInBackground(testUser.id, (task) => void tasks.push(task));
+    await expect(tasks[0]()).resolves.toBeUndefined();
+
+    expect(loggedLines(logged)).toEqual([
+      expect.objectContaining({
+        level: "debug",
+        event: "last_active_failed",
+        userId: testUser.id,
+        error: expect.objectContaining({ name: "Error", message: "database down" }),
+      }),
+    ]);
+    expect(logged.join("")).not.toContain(testUser.email);
+  });
+
+  it("logs a scheduler that throws at debug too, and doesn't throw", () => {
+    const schedule = () => {
+      throw new Error("after() outside a request");
+    };
+
+    expect(() => touchLastActiveInBackground(testUser.id, schedule)).not.toThrow();
+
+    expect(loggedLines(logged, "last_active_failed")).toHaveLength(1);
+  });
+
+  it("doesn't schedule anything while the family flag is off, or within the 5 minutes", () => {
+    const schedule = vi.fn();
+    vi.stubEnv("FAMILY_ENABLED", "false");
+    touchLastActiveInBackground(testUser.id, schedule);
+    vi.stubEnv("FAMILY_ENABLED", "true");
+    touchLastActiveInBackground(testUser.id, schedule);
+    touchLastActiveInBackground(testUser.id, schedule);
+
+    expect(schedule).toHaveBeenCalledTimes(1);
   });
 });

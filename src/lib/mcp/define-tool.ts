@@ -3,7 +3,11 @@ import { z } from "zod";
 
 import { DomainError } from "@/lib/errors";
 import { getCurrentMember } from "@/lib/family/current-member";
+import { HttpError } from "@/lib/http/errors";
 import { FORBIDDEN_MESSAGE } from "@/lib/http/permission";
+import { ImportError } from "@/lib/imports/types";
+import { errorFields, log } from "@/lib/log";
+import { addRequestFields } from "@/lib/log/request-context";
 import { can, type ModuleKey } from "@/lib/permissions";
 
 export type ToolContext = { userId: string; email: string };
@@ -42,11 +46,14 @@ function toolError(error: unknown, name: string): CallToolResult {
     const { formErrors, fieldErrors } = z.flattenError(error);
     return result({ error: formErrors[0] ?? "Check the highlighted fields and try again.", fieldErrors }, true);
   }
-  if (error instanceof DomainError) {
-    return result({ error: error.message, fieldErrors: error.fieldErrors }, true);
+  // The three expected refusals (D3) answer with their own message, as their REST routes do, and
+  // are logged as `info`, not as crashes.
+  if (error instanceof DomainError || error instanceof HttpError || error instanceof ImportError) {
+    log.info("mcp_tool_refused", { tool: name, status: error.status, errorCode: error instanceof ImportError ? error.code : undefined });
+    return result({ error: error.message, fieldErrors: error instanceof ImportError ? undefined : error.fieldErrors }, true);
   }
   // Log only the tool name and error; arguments and credentials stay out of the server log.
-  console.error(`MCP tool ${name} failed`, error);
+  log.error("mcp_tool_failed", { tool: name, ...errorFields(error) });
   return result({ error: "The request could not be completed. Try again later." }, true);
 }
 
@@ -66,6 +73,7 @@ export function defineTool<S extends z.ZodType>(tool: ToolDefinition<S>): ToolRe
       inputSchema: z.object(shape),
       annotations: tool.annotations,
     }, async (args) => {
+      addRequestFields({ mcpTool: tool.name });
       try {
         // Runs inside the MCP session's `run`, so getCurrentMember() reads the session user's membership.
         if (tool.module && !can(await getCurrentMember(), tool.module, "edit")) {

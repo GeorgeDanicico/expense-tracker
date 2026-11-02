@@ -1,3 +1,5 @@
+import type { Instrumentation } from "next";
+
 /**
  * Runs once when the Next.js server starts, before it answers a request (see "instrumentation.js"
  * in the Next.js docs). It checks the environment, so a missing required variable stops the
@@ -13,3 +15,15 @@ export async function register() {
     checkWebEnvironment();
   }
 }
+
+/**
+ * Called by Next for every server error it catches (logging plan, L3): one `server_render_failed`
+ * line, so a Server Component that throws shows up in the logs with its digest and request id.
+ * Node.js runtime only, like `register`, and it must be awaited.
+ */
+export const onRequestError: Instrumentation.onRequestError = async (err, request, context) => {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { logRequestError } = await import("./instrumentation-node");
+    logRequestError(err, request, context);
+  }
+};

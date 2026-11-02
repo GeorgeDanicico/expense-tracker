@@ -16,9 +16,13 @@ import { REQUEST_ID_HEADER } from "@/lib/log/request-id";
 const LINE_KEYS: ReadonlySet<string> = new Set(["requestId", "method", "route", "status", "ms", "userId", "slow", "spans"]);
 
 // Errors already written as `request_failed`, so a wrapper that rethrows one doesn't write it twice.
-const loggedFailures = new WeakSet<object>();
+// One set per process even if a bundler loads this module more than once: `onRequestError` in
+// `src/instrumentation.ts` is bundled apart from the route handlers and has to see their marks.
+const FAILURES_KEY = Symbol.for("expense-tracker.logged-request-failures");
+const globalFailures = globalThis as typeof globalThis & { [FAILURES_KEY]?: WeakSet<object> };
+const loggedFailures = (globalFailures[FAILURES_KEY] ??= new WeakSet<object>());
 
-/** Whether `error` was already logged as a request's `request_failed` line (L3's `onRequestError` skips those). */
+/** Whether `error` was already logged as a request's `request_failed` line (`onRequestError` skips those). */
 export function isLoggedRequestFailure(error: unknown): boolean {
   return typeof error === "object" && error !== null && loggedFailures.has(error);
 }

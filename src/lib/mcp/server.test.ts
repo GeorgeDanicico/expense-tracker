@@ -2,12 +2,19 @@ import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport } from "@modelcontextprotocol/server";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
+import { DomainError } from "@/lib/errors";
 import type { ExpenseRepository } from "@/lib/expenses/repository";
+import { HttpError } from "@/lib/http/errors";
+import { IMPORT_ERROR_MESSAGES, ImportError } from "@/lib/imports/types";
+import { createRequestContext, runWithRequestContext } from "@/lib/log/request-context";
 import { createMcpServer } from "@/lib/mcp/server";
 import { aKid, aManualItem, aParent, aTab, aTransaction, anExpense } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
+import { loggedLines } from "@/test/log-lines";
 
 const ID = "8d0f7c2e-4b1a-4c3d-9e5f-1a2b3c4d5e6f";
 const stored = anExpense({ id: ID, description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel", expenseDate: "2026-10-04" });
@@ -35,7 +42,7 @@ describe("MCP server", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    logged.length = 0;
     repositories = resetFakeRepositories();
     expenses = {
       create: vi.spyOn(repositories.expenses, "create"),
@@ -250,7 +257,43 @@ describe("MCP server", () => {
     expect(result.isError).toBe(true);
     expect(result.body.error).toBe("The request could not be completed. Try again later.");
     expect(JSON.stringify(result)).not.toContain("leaked");
-    expect(console.error).toHaveBeenCalled();
+    expect(loggedLines(logged, "mcp_tool_failed")).toEqual([
+      expect.objectContaining({ level: "error", tool: "list_expenses", error: expect.objectContaining({ name: "Error" }) }),
+    ]);
+    expect(loggedLines(logged, "mcp_tool_refused")).toEqual([]);
+  });
+
+  it.each([
+    ["an HttpError", new HttpError(404, "Member not found."), "Member not found.", 404, undefined],
+    ["a DomainError", new DomainError("That name is taken.", 409), "That name is taken.", 409, undefined],
+    ["an ImportError", new ImportError("unverified_statement"), IMPORT_ERROR_MESSAGES.unverified_statement, 422, "unverified_statement"],
+  ])("answers %s with its message and logs a refusal, not a failure", async (_name, refusal, message, status, errorCode) => {
+    expenses.listMonth.mockRejectedValue(refusal);
+
+    const result = await call("list_expenses", { month: "2026-09" });
+
+    expect(result.isError).toBe(true);
+    expect(result.body.error).toBe(message);
+    expect(loggedLines(logged, "mcp_tool_refused")).toEqual([
+      expect.objectContaining({ level: "info", tool: "list_expenses", status, ...(errorCode && { errorCode }) }),
+    ]);
+    expect(loggedLines(logged, "mcp_tool_failed")).toEqual([]);
+  });
+
+  it("passes an HttpError's field errors on, as a DomainError's", async () => {
+    expenses.listMonth.mockRejectedValue(new HttpError(422, "Check the month.", { month: ["Not a month."] }));
+
+    const result = await call("list_expenses", { month: "2026-09" });
+
+    expect(result.body).toEqual({ error: "Check the month.", fieldErrors: { month: ["Not a month."] } });
+  });
+
+  it("adds the tool's name to the request line", async () => {
+    const context = createRequestContext(undefined);
+
+    await runWithRequestContext(context, () => call("list_expenses", { month: "2026-09" }));
+
+    expect(context.fields).toEqual({ mcpTool: "list_expenses" });
   });
 
   it("passes domain mutation messages through", async () => {
@@ -331,7 +374,7 @@ describe("MCP family permissions", () => {
   let repositories: FakeRepositories;
 
   beforeEach(() => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    logged.length = 0;
     repositories = resetFakeRepositories();
     vi.stubEnv("FAMILY_ENABLED", "true");
   });

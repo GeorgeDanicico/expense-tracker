@@ -1,11 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
+const lines = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), lines));
 
 import { AI_FEATURES, estimateInputTokens, structured, type StructuredDependencies, type StructuredInput } from "@/lib/ai";
 import type { AiGateDependencies } from "@/lib/ai/gate";
 import type { PricingTable } from "@/lib/ai/pricing";
 import { FakeProvider } from "@/lib/ai/providers/fake";
 import { FakeAiGateRepository } from "@/test/fakes/ai";
+import { loggedLines } from "@/test/log-lines";
 
 const mum = "10000000-0000-4000-8000-000000000151";
 const dad = "10000000-0000-4000-8000-000000000152";
@@ -107,6 +111,29 @@ describe("structured", () => {
     expect(logged).toEqual([
       { feature: "statements", provider: "fake", model: "fake-model", outcome: "ok", inputTokens: 1000, outputTokens: 200, cachedInputTokens: 400, costMicros: 2640 },
     ]);
+  });
+
+  it("writes an ai_call line through the shared logger when the caller gives no log, without the prompt or the answer", async () => {
+    lines.length = 0;
+    provider.willReturn(answer, { inputTokens: 1000, outputTokens: 200, cachedInputTokens: 400 });
+
+    await structured(input(), dependencies({ log: undefined }));
+
+    expect(loggedLines(lines, "ai_call")).toEqual([
+      expect.objectContaining({
+        level: "info",
+        feature: "statements",
+        provider: "fake",
+        model: "fake-model",
+        outcome: "ok",
+        inputTokens: 1000,
+        outputTokens: 200,
+        cachedInputTokens: 400,
+        costMicros: 2640,
+      }),
+    ]);
+    expect(lines.join("")).not.toContain("LIDL");
+    expect(lines.join("")).not.toContain("food");
   });
 
   it("rounds a cost up to a whole micro, so a call is never recorded as free", async () => {

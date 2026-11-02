@@ -2,10 +2,11 @@ import "server-only";
 
 import { z } from "zod";
 
-import { reserveBudget, settleUsage, AiGateError, type AiGateDependencies, type AiGateReason, type BudgetReservation } from "@/lib/ai/gate";
+import { logFollowupFailure, reserveBudget, settleUsage, AiGateError, type AiGateDependencies, type AiGateReason, type BudgetReservation } from "@/lib/ai/gate";
 import { findPrice, usageCostMicros, worstCaseMicros, PRICING, type PricingTable } from "@/lib/ai/pricing";
 import type { AiProvider, AiProviderId, AiUsage, StructuredRequest, StructuredResult } from "@/lib/ai/provider";
 import { getAiEnv } from "@/lib/env";
+import { log as sharedLog, type LogFields } from "@/lib/log";
 
 /**
  * The only entry point features use to call a model (docs/statement-import-plan.md, I15; roadmap
@@ -102,7 +103,7 @@ export type StructuredDependencies = {
   pricing?: PricingTable;
   env?: Record<string, string | undefined>;
   gate?: AiGateDependencies;
-  /** One line per call: feature, provider, model, tokens, cost and outcome. Never a prompt or an answer. */
+  /** One line per call: feature, provider, model, tokens, cost and outcome. Never a prompt or an answer. Defaults to the shared logger's `ai_call` line. */
   log?: (line: Record<string, unknown>) => void;
 };
 
@@ -139,7 +140,7 @@ export async function structured<T>(request: StructuredInput<T>, dependencies: S
   if (!Number.isSafeInteger(request.maxOutputTokens) || request.maxOutputTokens < 1) throw new TypeError("maxOutputTokens must be a positive whole number.");
 
   const env = dependencies.env ?? getAiEnv();
-  const log = dependencies.log ?? ((line) => console.info("AI call", line));
+  const log = dependencies.log ?? ((line) => sharedLog.info("ai_call", line as LogFields));
 
   if (request.maxOutputTokens > feature.maxOutputTokens) {
     return refused("output_too_large", "This request asks the model for more than it may write.");
@@ -192,8 +193,7 @@ export async function structured<T>(request: StructuredInput<T>, dependencies: S
   } catch (error) {
     // Nothing came back to price, so the reservation is released (settled at zero) and the error
     // goes on. If that fails too, the reservation keeps counting its worst case: too much, never too little.
-    const logFailure = dependencies.gate?.log
-      ?? ((message: string, failure: unknown) => console.error(message, failure instanceof Error ? failure.message : failure));
+    const logFailure = dependencies.gate?.log ?? logFollowupFailure;
     await settleUsage({ reservationId: reservation.reservationId, userId: request.userId, outcome: "provider_error" }, dependencies.gate)
       .catch((releaseError: unknown) => logFailure("AI call: could not release the reservation.", releaseError));
     throw error;

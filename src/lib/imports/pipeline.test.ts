@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const lines = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), lines));
+
 import type { StructuredOutcome } from "@/lib/ai";
 import type { StatementAi } from "@/lib/imports/ai/reader";
 import { statementHash } from "@/lib/imports/hash";
@@ -12,6 +15,7 @@ import {
   IMPORT_NOTES_MAX_LENGTH,
   ImportError,
 } from "@/lib/imports/types";
+import { loggedLines } from "@/test/log-lines";
 import { buildTextPdf } from "@/test/pdf";
 
 const encode = (value: string) => new TextEncoder().encode(value);
@@ -317,6 +321,19 @@ describe("buildDraft", () => {
           ["2026-09-01", "Corner Cafe", 4.5, "entertainment", "ai"],
           ["2026-09-02", "Fresh Market", 123.4, "groceries", "ai"],
         ]);
+      });
+
+      it("writes each step as a statement_import_step line when no log is given, with counts and no row text", async () => {
+        lines.length = 0;
+        const { options } = setUp({ reading: answered(reading()) });
+
+        await buildDraft({ kind: "pdf", bytes: pdfFile() }, { ai: options.ai });
+
+        expect(loggedLines(lines, "statement_import_step")).toContainEqual(
+          expect.objectContaining({ level: "info", mode: "read", outcome: "ok", rowCount: 2, warnings: 0 }),
+        );
+        expect(lines.join("")).not.toContain("Corner Cafe");
+        expect(lines.join("")).not.toContain("Fresh Market");
       });
 
       it("gives the merchant rule and the user's history their say before the model's category", async () => {

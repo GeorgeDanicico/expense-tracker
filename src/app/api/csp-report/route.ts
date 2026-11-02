@@ -13,6 +13,7 @@ import { HttpError } from "@/lib/http/errors";
 import { cspReportAttempts, TOO_MANY_CSP_REPORTS } from "@/lib/http/rate-limit";
 import { logRequest } from "@/lib/http/request-log";
 import { BODY_TOO_LARGE, json, noContent, tooManyRequests } from "@/lib/http/route";
+import { log } from "@/lib/log";
 
 /**
  * Where browsers send Content Security Policy violations (security plan S7): the policy's
@@ -53,7 +54,7 @@ async function receive(request: NextRequest) {
   if (!violations) return json({ error: NOT_A_CSP_REPORT }, 400);
 
   for (const violation of violations) {
-    console.warn(JSON.stringify({ event: "csp_violation", ...violation }));
+    log.warn("csp_violation", { ...violation });
   }
   return noContent();
 }

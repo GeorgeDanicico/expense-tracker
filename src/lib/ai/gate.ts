@@ -4,6 +4,7 @@ import { getAdminUserIds, getAiLimits, MICROS_PER_USD, type AiLimits } from "@/l
 import { aiMonthAt, formatResetDay, type AiMonth } from "@/lib/ai/month";
 import type { AiGateRepository, AiOutcome } from "@/lib/ai/repository";
 import { DomainError } from "@/lib/errors";
+import { errorFields, log as sharedLog } from "@/lib/log";
 import type { NewNotification } from "@/lib/notifications/worker-store";
 import { getRepositories } from "@/lib/repositories";
 
@@ -72,7 +73,7 @@ export type AiGateDependencies = {
   /** Who is told when the global budget turns AI off. Defaults to `APP_ADMIN_USER_IDS`. */
   adminUserIds?: readonly string[];
   now?: () => Date;
-  /** Where follow-up failures are reported. Defaults to `console.error`. */
+  /** Where follow-up failures are reported. Defaults to an `ai_followup_failed` line. */
   log?: (message: string, error: unknown) => void;
 };
 
@@ -110,12 +111,17 @@ function assertMicros(name: string, value: number) {
   if (!Number.isSafeInteger(value) || value < 0) throw new TypeError(`${name} must be a whole number of micros, zero or more.`);
 }
 
+/** The default for `AiGateDependencies.log`: the step that failed is the fixed `message`, never a value. */
+export function logFollowupFailure(message: string, error: unknown): void {
+  sharedLog.error("ai_followup_failed", { step: message, ...errorFields(error) });
+}
+
 function resolve(dependencies: AiGateDependencies) {
   return {
     repository: dependencies.repository ?? getRepositories().aiGate,
     limits: dependencies.limits ?? getAiLimits(),
     now: dependencies.now ?? (() => new Date()),
-    log: dependencies.log ?? ((message: string, error: unknown) => console.error(message, error instanceof Error ? error.message : error)),
+    log: dependencies.log ?? logFollowupFailure,
   };
 }
 

@@ -3,6 +3,7 @@ import "server-only";
 import { WRONG_CURRENT_PASSWORD } from "@/lib/account/password-change";
 import { getAuth, getAuthAdmin, type AuthenticatedUser } from "@/lib/auth";
 import { HttpError } from "@/lib/http/errors";
+import { log } from "@/lib/log";
 import { getRepositories } from "@/lib/repositories";
 
 /** The 422 message for a deletion form with a wrong field (the password, or a confirmation the browser let through). */
@@ -42,7 +43,7 @@ export async function deleteOwnAccount(user: AuthenticatedUser, input: { current
   await getAuthAdmin().deleteUser(user.id);
 
   const signedOut = await getAuth().signOut("local");
-  if (!signedOut.ok) console.error("Account deleted, but this browser's session cookies could not be cleared.");
+  if (!signedOut.ok) log.error("account_deleted_cookie_clear_failed", { userId: user.id, reason: signedOut.reason });
 }
 
 /**

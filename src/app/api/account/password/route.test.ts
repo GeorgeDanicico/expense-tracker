@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PASSWORD_CHANGE_MAX_ATTEMPTS, PASSWORD_CHANGE_WINDOW_MS, resetRateLimits } from "@/lib/http/rate-limit";
 import { FakeAuth } from "@/test/fakes/auth";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
+import { loggedLines } from "@/test/log-lines";
 import { callRoute, signedInAs } from "@/test/route";
+
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 
 let auth: FakeAuth;
 vi.mock("@/lib/auth", () => ({ getAuth: () => auth, getAuthenticatedUser: vi.fn() }));
@@ -18,6 +22,7 @@ let repositories: FakeRepositories;
 let user: ReturnType<typeof signedInAs>;
 
 beforeEach(() => {
+  logged.length = 0;
   resetRateLimits();
   auth = new FakeAuth();
   repositories = resetFakeRepositories();
@@ -95,7 +100,6 @@ describe("POST /api/account/password", () => {
   });
 
   it("still answers 204 when the other sessions can't be signed out, since the password did change", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     auth.fail("signOut");
 
     const response = await change();
@@ -103,9 +107,11 @@ describe("POST /api/account/password", () => {
     expect(response.status).toBe(204);
     expect(storedPassword()).toBe(NEW_PASSWORD);
     expect(auth.signOutScopes).toEqual(["others"]);
-    expect(error).toHaveBeenCalledOnce();
-    expect(JSON.stringify(error.mock.calls)).not.toContain(NEW_PASSWORD);
-    error.mockRestore();
+    expect(loggedLines(logged, "password_change_signout_failed")).toEqual([
+      expect.objectContaining({ level: "error", userId: user.id, reason: expect.any(String) }),
+    ]);
+    expect(logged.join("")).not.toContain(NEW_PASSWORD);
+    expect(logged.join("")).not.toContain("kid@kids.ifam.invalid");
   });
 
   it("lets a user without the flag change their password too", async () => {

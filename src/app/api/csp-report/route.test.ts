@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CSP_REPORT_MAX_BYTES, CSP_REPORT_MAX_VIOLATIONS, NOT_A_CSP_REPORT, NOT_A_CSP_REPORT_TYPE } from "@/lib/http/csp-report";
 import { REQUEST_GUARD_EXEMPTIONS } from "@/lib/http/guard";
@@ -10,7 +10,7 @@ import { loggedLines as loggerLines } from "@/test/log-lines";
 
 import { POST } from "./route";
 
-// The request lines (debug) go to `requestLog` instead of stdout.
+// Every line the route writes (`csp_violation` and the debug `request` line) goes to `requestLog` instead of stdout.
 const requestLog = vi.hoisted(() => [] as string[]);
 vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), requestLog));
 
@@ -64,25 +64,21 @@ function post(body: unknown, { contentType = "application/csp-report", ip = "203
   );
 }
 
-/** The JSON objects logged, one per `console.warn` call. */
-function loggedLines(spy: MockInstance) {
-  return spy.mock.calls.map(([line]) => {
-    expect(typeof line).toBe("string");
-    expect(line).not.toContain("\n");
-    return JSON.parse(line as string);
+/** The `csp_violation` lines logged, without what every line carries (time, level, request id). */
+function violations() {
+  return loggerLines(requestLog, "csp_violation").map((line) => {
+    const { time, level, requestId, ...fields } = line;
+    expect(typeof time).toBe("string");
+    expect(level).toBe("warn");
+    expect(requestId).toMatch(/^[A-Za-z0-9]{12}$/);
+    return fields;
   });
 }
 
 describe("POST /api/csp-report", () => {
-  let warn: MockInstance;
-
   beforeEach(() => {
     resetRateLimits();
-    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    warn.mockRestore();
+    requestLog.length = 0;
   });
 
   it("logs a report-uri report as one JSON line and answers 204", async () => {
@@ -90,7 +86,7 @@ describe("POST /api/csp-report", () => {
 
     expect(response.status).toBe(204);
     expect(await response.text()).toBe("");
-    expect(loggedLines(warn)).toEqual([
+    expect(violations()).toEqual([
       {
         event: "csp_violation",
         directive: "script-src-elem",
@@ -114,7 +110,7 @@ describe("POST /api/csp-report", () => {
     const response = await post(batch, { contentType: "application/reports+json" });
 
     expect(response.status).toBe(204);
-    expect(loggedLines(warn)).toEqual([
+    expect(violations()).toEqual([
       { event: "csp_violation", directive: "img-src", document: "/settings", blocked: "https://tracker.example/pixel.gif", disposition: "report" },
       { event: "csp_violation", directive: "script-src-elem", document: "/settings", blocked: "inline", source: "/login", line: 1, disposition: "report" },
       { event: "csp_violation", directive: "img-src", document: "/settings", blocked: "data", disposition: "report" },
@@ -130,11 +126,11 @@ describe("POST /api/csp-report", () => {
       contentType: "application/reports+json",
     });
 
-    const logged = warn.mock.calls.map(([line]) => String(line)).join("\n");
+    const logged = requestLog.join("");
     for (const secret of ["?", "#", "token=secret", "session=abc", "uid=42", "K7Q2", "authorization_id", "alert(", "secret sample", "session-cookie", "Mozilla"]) {
       expect(logged).not.toContain(secret);
     }
-    expect(loggedLines(warn).map((line) => line.document)).toEqual(["/join/:code", "/oauth/consent"]);
+    expect(violations().map((line) => line.document)).toEqual(["/join/:code", "/oauth/consent"]);
   });
 
   it("accepts a content type with parameters", async () => {
@@ -147,7 +143,7 @@ describe("POST /api/csp-report", () => {
       expect(response.status, contentType).toBe(415);
       expect(await response.json()).toEqual({ error: NOT_A_CSP_REPORT_TYPE });
     }
-    expect(warn).not.toHaveBeenCalled();
+    expect(violations()).toEqual([]);
   });
 
   it("refuses a body over the size limit with 413", async () => {
@@ -156,7 +152,7 @@ describe("POST /api/csp-report", () => {
 
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error: BODY_TOO_LARGE });
-    expect(warn).not.toHaveBeenCalled();
+    expect(violations()).toEqual([]);
   });
 
   it("answers 400 to a body that isn't a report", async () => {
@@ -170,13 +166,13 @@ describe("POST /api/csp-report", () => {
       expect(response.status, JSON.stringify(body)).toBe(400);
       expect(await response.json()).toEqual({ error: NOT_A_CSP_REPORT });
     }
-    expect(warn).not.toHaveBeenCalled();
+    expect(violations()).toEqual([]);
   });
 
   it("logs at most a fixed number of violations from one batch", async () => {
     const batch = Array.from({ length: CSP_REPORT_MAX_VIOLATIONS + 5 }, () => reportingApiReport({}));
     await post(batch, { contentType: "application/reports+json" });
-    expect(warn).toHaveBeenCalledTimes(CSP_REPORT_MAX_VIOLATIONS);
+    expect(violations()).toHaveLength(CSP_REPORT_MAX_VIOLATIONS);
   });
 
   it("limits each client IP, counting every request, and answers 429 with Retry-After", async () => {
@@ -204,11 +200,6 @@ describe("POST /api/csp-report's request line", () => {
   beforeEach(() => {
     resetRateLimits();
     requestLog.length = 0;
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it("writes one debug line and an x-request-id for every answer, 204, 415 and 429 alike", async () => {
