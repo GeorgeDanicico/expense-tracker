@@ -168,7 +168,8 @@ describe("structured", () => {
   describe("refuses, without calling the provider or recording anything", () => {
     afterEach(() => {
       expect(provider.requests).toEqual([]);
-      expect(repository.calls).not.toContain("insertUsage");
+      expect(repository.usage.filter((row) => row.outcome === "reserved")).toEqual([]);
+      expect(repository.calls).not.toContain("settle");
     });
 
     it("over the feature's input cap, by the provider's count", async () => {
@@ -313,11 +314,34 @@ describe("structured", () => {
     expect(repository.usage.map((row) => [row.outcome, row.costMicros])).toEqual([["invalid_output", 1000]]);
   });
 
-  it("throws, rather than returns, when the ledger row can't be written", async () => {
+  it("throws, rather than returns, when the ledger row can't be settled", async () => {
     provider.willReturn(answer);
-    repository.failing.add("insertUsage");
+    repository.failing.add("settle");
 
-    await expect(structured(input(), dependencies())).rejects.toThrow("insertUsage");
+    await expect(structured(input(), dependencies())).rejects.toThrow("settle");
+  });
+
+  it("reserves the worst case before the call and settles it to the real cost after", async () => {
+    let duringTheCall: unknown[] = [];
+    const call = provider.structured.bind(provider);
+    provider.structured = async (request) => {
+      duringTheCall = repository.usage.map((row) => [row.outcome, row.costMicros]);
+      return call(request);
+    };
+    provider.willReturn(answer, { inputTokens: 1000, outputTokens: 200, cachedInputTokens: 0 });
+
+    await structured(input(), dependencies());
+
+    // 1000 input tokens at a micro and the full 1000 output tokens at ten.
+    expect(duringTheCall).toEqual([["reserved", 11_000]]);
+    expect(repository.usage.map((row) => [row.outcome, row.costMicros])).toEqual([["ok", 3000]]);
+  });
+
+  it("releases the reservation when the provider throws, and throws on", async () => {
+    // Nothing scripted: the fake provider throws.
+    await expect(structured(input(), dependencies())).rejects.toThrow("nothing scripted");
+
+    expect(repository.usage).toMatchObject([{ outcome: "provider_error", costMicros: 0 }]);
   });
 
   it("throws for programming errors", async () => {

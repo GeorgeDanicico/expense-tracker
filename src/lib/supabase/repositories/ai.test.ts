@@ -143,89 +143,112 @@ describe("Supabase AI gate repository", () => {
     });
   });
 
-  describe("spend", () => {
-    it("asks ai_family_spend for the month, as the caller", async () => {
-      const { rpcs } = useRequestClient({}, { rpc: () => ({ data: 1_750_000, error: null }) });
-
-      expect(await ai.familySpendMicros(user, monthStart)).toBe(1_750_000);
-      expect(rpcs).toEqual([{ fn: "ai_family_spend", args: { p_month_start: "2026-09-30T21:00:00.000Z" } }]);
-      expect(mocks.createAdminClient).not.toHaveBeenCalled();
-    });
-
-    it("reads the family's spend only for the signed-in user", async () => {
-      useRequestClient({}, { rpc: () => ({ data: 5, error: null }) });
-
-      await expect(ai.familySpendMicros(kid, monthStart)).rejects.toThrow("The AI gate can only act for the signed-in user.");
-    });
-
-    it("asks ai_global_spend with the admin client", async () => {
-      const { rpcs } = useAdminClient({}, { rpc: () => ({ data: 4_550_000, error: null }) });
-
-      expect(await ai.globalSpendMicros(monthStart)).toBe(4_550_000);
-      expect(rpcs).toEqual([{ fn: "ai_global_spend", args: { p_month_start: "2026-09-30T21:00:00.000Z" } }]);
-      expect(mocks.createClient).not.toHaveBeenCalled();
-    });
-
-    it("fails with a message of ours when a sum is missing or the call fails", async () => {
-      useRequestClient({}, { rpc: () => ({ data: null, error: null }) });
-      await expect(ai.familySpendMicros(user, monthStart)).rejects.toThrow("Unable to check this month's AI spend.");
-
-      useAdminClient({}, { rpc: () => ({ data: null, error: { message: "private" } }) });
-      await expect(ai.globalSpendMicros(monthStart)).rejects.toThrow("Unable to check this month's AI spend.");
-    });
-  });
-
-  describe("insertUsage", () => {
-    const record = {
-      userId: kid,
+  describe("reserve", () => {
+    const request = {
+      userId: user,
       feature: "statements",
       provider: "openai",
       model: "gpt-5.6-luna",
+      estimatedMicros: 52_000,
+      monthStart,
+      familyLimitMicros: 3_000_000,
+      globalLimitMicros: 10_000_000,
+    };
+    const answer = (row: Record<string, unknown>) => ({ rpc: () => ({ data: [row], error: null }) });
+
+    it("asks ai_reserve_budget with the admin client, for the signed-in user", async () => {
+      const { rpcs } = useAdminClient({}, answer({ status: "ok", reservation_id: "r1", family_spent_micros: 1_750_000, global_spent_micros: 4_550_000 }));
+
+      expect(await ai.reserve(request)).toEqual({ status: "ok", reservationId: "r1", familySpentMicros: 1_750_000, globalSpentMicros: 4_550_000 });
+      expect(rpcs).toEqual([{
+        fn: "ai_reserve_budget",
+        args: {
+          p_user_id: user,
+          p_feature: "statements",
+          p_provider: "openai",
+          p_model: "gpt-5.6-luna",
+          p_estimated_micros: 52_000,
+          p_month_start: "2026-09-30T21:00:00.000Z",
+          p_family_limit_micros: 3_000_000,
+          p_global_limit_micros: 10_000_000,
+        },
+      }]);
+      expect(mocks.createClient).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [{ status: "flag_off", reservation_id: null, family_spent_micros: null, global_spent_micros: null }, { status: "flag_off" }],
+      [{ status: "ai_off", reservation_id: null, family_spent_micros: null, global_spent_micros: null }, { status: "ai_off" }],
+      [{ status: "not_permitted", reservation_id: null, family_spent_micros: null, global_spent_micros: null }, { status: "not_permitted" }],
+      [{ status: "family_budget", reservation_id: null, family_spent_micros: 3_000_000, global_spent_micros: null }, { status: "family_budget", familySpentMicros: 3_000_000 }],
+      [
+        { status: "global_budget", reservation_id: null, family_spent_micros: 0, global_spent_micros: 10_000_000 },
+        { status: "global_budget", familySpentMicros: 0, globalSpentMicros: 10_000_000 },
+      ],
+    ])("reads a refusal %j", async (row, reservation) => {
+      useAdminClient({}, answer(row));
+
+      expect(await ai.reserve(request)).toEqual(reservation);
+    });
+
+    it("reserves only for the signed-in user", async () => {
+      const { rpcs } = useAdminClient({}, answer({ status: "ok", reservation_id: "r1", family_spent_micros: 0, global_spent_micros: 0 }));
+
+      await expect(ai.reserve({ ...request, userId: kid })).rejects.toThrow("The AI gate can only act for the signed-in user.");
+      expect(rpcs).toEqual([]);
+    });
+
+    it.each([
+      ["an unknown status", answer({ status: "maybe", reservation_id: null, family_spent_micros: null, global_spent_micros: null })],
+      ["an ok without a reservation", answer({ status: "ok", reservation_id: null, family_spent_micros: 0, global_spent_micros: 0 })],
+      ["a refusal without its spend", answer({ status: "family_budget", reservation_id: null, family_spent_micros: null, global_spent_micros: null })],
+      ["no row", { rpc: () => ({ data: [], error: null }) }],
+      ["a failed call", { rpc: () => ({ data: null, error: { message: "private" } }) }],
+    ])("fails with a message of ours for %s", async (_name, options) => {
+      useAdminClient({}, options);
+
+      await expect(ai.reserve(request)).rejects.toThrow("Unable to check this month's AI budget.");
+    });
+  });
+
+  describe("settle", () => {
+    const settlement = {
+      reservationId: "r1",
+      userId: kid,
       inputTokens: 6000,
       outputTokens: 5000,
       cachedInputTokens: 4000,
       costMicros: 7200,
       outcome: "ok" as const,
+      monthStart,
     };
 
-    it("inserts the ledger row with the admin client, stamped with the user's family at that moment", async () => {
-      const { queries, tables } = useAdminClient({ family_members: members(), ai_usage: [] });
+    it("asks ai_settle_usage with the admin client and returns the month's spend", async () => {
+      const { rpcs } = useAdminClient({}, { rpc: () => ({ data: [{ family_spent_micros: 1_007_200, global_spent_micros: 4_007_200 }], error: null }) });
 
-      await ai.insertUsage(record);
-
-      expect(tables.ai_usage).toMatchObject([
-        {
-          user_id: kid,
-          family_id: family,
-          feature: "statements",
-          provider: "openai",
-          model: "gpt-5.6-luna",
-          input_tokens: 6000,
-          output_tokens: 5000,
-          cached_input_tokens: 4000,
-          cost_micros: 7200,
-          outcome: "ok",
+      expect(await ai.settle(settlement)).toEqual({ familySpentMicros: 1_007_200, globalSpentMicros: 4_007_200 });
+      expect(rpcs).toEqual([{
+        fn: "ai_settle_usage",
+        args: {
+          p_reservation_id: "r1",
+          p_user_id: kid,
+          p_input_tokens: 6000,
+          p_output_tokens: 5000,
+          p_cached_input_tokens: 4000,
+          p_cost_micros: 7200,
+          p_outcome: "ok",
+          p_month_start: "2026-09-30T21:00:00.000Z",
         },
-      ]);
-      expect(queries.map((query) => [query.table, query.operation])).toEqual([["family_members", "select"], ["ai_usage", "insert"]]);
-      expect(queries[0].filters).toEqual([["eq", "user_id", kid]]);
+      }]);
       expect(mocks.createClient).not.toHaveBeenCalled();
     });
 
-    it("leaves the family empty for a user without one", async () => {
-      const { tables } = useAdminClient({ family_members: members() });
+    it("fails with a message of ours when the reservation can't be settled or the answer is odd", async () => {
+      useAdminClient({}, { rpc: () => ({ data: null, error: { code: "P0002", message: "That AI reservation wasn't found or was already settled.", hint: "user" } }) });
+      await expect(ai.settle(settlement)).rejects.toThrow(new Error("Unable to record the AI usage."));
 
-      await ai.insertUsage({ ...record, userId: "10000000-0000-4000-8000-0000000000ff", outcome: "timeout", costMicros: 0 });
-
-      expect(tables.ai_usage).toMatchObject([{ family_id: null, outcome: "timeout", cost_micros: 0 }]);
-    });
-
-    it("fails with a message of ours when either query fails", async () => {
-      useAdminClient({ family_members: members() }, { fail: (query) => query.table === "family_members" });
-      await expect(ai.insertUsage(record)).rejects.toThrow("Unable to record the AI usage.");
-
-      useAdminClient({ family_members: members() }, { fail: (query) => query.table === "ai_usage" });
-      await expect(ai.insertUsage(record)).rejects.toThrow("Unable to record the AI usage.");
+      useAdminClient({}, { rpc: () => ({ data: [], error: null }) });
+      await expect(ai.settle(settlement)).rejects.toThrow("Unable to record the AI usage.");
     });
   });
 

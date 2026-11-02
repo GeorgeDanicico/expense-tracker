@@ -325,8 +325,7 @@ describe("MCP family permissions", () => {
   const kidWithNothing = () => aKid({ permissions: { expenses: "off", investments: "off", net_worth: "off", family_finance: "off", mcp: "off", ai: "off" } });
 
   const investmentMethods = [
-    "listAccountsWithTransactions", "getAssetHistory", "listAssetTransactions", "getOrCreateAccount",
-    "findTransaction", "createTransaction", "deleteTransaction",
+    "listAccountsWithTransactions", "getAssetHistory", "getOrCreateAccount", "createTransaction", "deleteTransaction",
   ] as const;
 
   let repositories: FakeRepositories;

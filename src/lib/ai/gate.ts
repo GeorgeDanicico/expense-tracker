@@ -2,7 +2,7 @@ import "server-only";
 
 import { getAdminUserIds, getAiLimits, MICROS_PER_USD, type AiLimits } from "@/lib/ai/config";
 import { aiMonthAt, formatResetDay, type AiMonth } from "@/lib/ai/month";
-import type { AiGateRepository, AiOutcome, AiUsageRecord } from "@/lib/ai/repository";
+import type { AiGateRepository, AiOutcome } from "@/lib/ai/repository";
 import { DomainError } from "@/lib/errors";
 import type { NewNotification } from "@/lib/notifications/worker-store";
 import { getRepositories } from "@/lib/repositories";
@@ -10,7 +10,7 @@ import { getRepositories } from "@/lib/repositories";
 /**
  * The AI gate (docs/statement-import-plan.md, I14; roadmap 8.1): the checks every model call passes
  * before it is made, and the ledger entry after it. No model and no SDK in here; the entry point
- * that calls a provider (I15) wraps `checkBudget` and `recordUsage` around the call.
+ * that calls a provider (I15) wraps `reserveBudget` and `settleUsage` around the call.
  *
  * The kill switch is `app_flags.ai_enabled`. A call needs the switch on, the user's opt-in
  * (`profiles.ai_enabled`, and for a kid the `ai` permission), and room in two budgets: the user's
@@ -18,8 +18,11 @@ import { getRepositories } from "@/lib/repositories";
  * a family is a family of one) and everyone's month (`AI_MONTHLY_BUDGET_USD`, default $10). Money is
  * counted in micros, millionths of a dollar.
  *
- * Two calls from one family at the same moment can both pass the check. The overshoot is at most one
- * call's worst case, and the next check sees it. That is accepted rather than locking.
+ * The check and the call's worst case are written to the ledger together, as a reservation, before
+ * the call (S10). The database does both under a lock on the family's month and one on everyone's,
+ * so two calls at the same moment are checked one after the other and the second counts the first:
+ * parallel uploads can't all pass the same check. After the call, the reservation is settled to what
+ * the call really cost.
  */
 
 /** Why the gate refused. */
@@ -73,22 +76,29 @@ export type AiGateDependencies = {
   log?: (message: string, error: unknown) => void;
 };
 
-export type CheckBudgetInput = {
+export type ReserveBudgetInput = {
   userId: string;
   /** A short lowercase key for what the call is for, such as `statements`. */
   feature: string;
+  /** The provider and model the call will use, recorded on the reservation. */
+  provider: string;
+  model: string;
   /** The worst case the call could cost: its input plus its full output cap at the output price. */
   estimatedMicros: number;
 };
 
-/** What `checkBudget` found, for a caller that wants to show or log it. */
+/** What `reserveBudget` found, for a caller that wants to show or log it. */
 export type BudgetCheck = {
   month: AiMonth;
+  /** The month's spend before this call. */
   familySpentMicros: number;
   familyLimitMicros: number;
   globalSpentMicros: number;
   globalLimitMicros: number;
 };
+
+/** A reservation the call must be settled against with `settleUsage`. */
+export type BudgetReservation = BudgetCheck & { reservationId: string };
 
 const FEATURE_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -113,52 +123,60 @@ function resolve(dependencies: AiGateDependencies) {
  * Refuses (throws an {@link AiGateError}) unless the call may go ahead: the kill switch is on, the
  * user has opted in (and a kid has the permission), and `estimatedMicros` fits what is left of the
  * user's family's month and of everyone's month. A spend that has reached a limit refuses even a
- * free call. Reads nothing after the first reason to refuse.
+ * free call. When it may go ahead, its worst case is already counted in both months: settle it with
+ * `settleUsage` after the call, whatever happens to the call.
  *
- * The user must be the signed-in caller: the opt-in and the family's total are read as them.
+ * One round trip, checked and reserved atomically. The user must be the signed-in caller.
  */
-export async function checkBudget(input: CheckBudgetInput, dependencies: AiGateDependencies = {}): Promise<BudgetCheck> {
-  const { userId, feature, estimatedMicros } = input;
-  if (!userId) throw new TypeError("checkBudget needs a user.");
+export async function reserveBudget(input: ReserveBudgetInput, dependencies: AiGateDependencies = {}): Promise<BudgetReservation> {
+  const { userId, feature, provider, model, estimatedMicros } = input;
+  if (!userId) throw new TypeError("reserveBudget needs a user.");
   if (!FEATURE_PATTERN.test(feature)) throw new TypeError("A feature is a short lowercase key.");
   assertMicros("estimatedMicros", estimatedMicros);
 
   const { repository, limits, now } = resolve(dependencies);
   const month = aiMonthAt(now());
 
-  if (!(await repository.isEnabled())) {
-    throw new AiGateError("flag_off", "AI features are paused for everyone right now.");
-  }
+  const reservation = await repository.reserve({
+    userId,
+    feature,
+    provider,
+    model,
+    estimatedMicros,
+    monthStart: month.start,
+    familyLimitMicros: limits.familyMonthlyMicros,
+    globalLimitMicros: limits.globalMonthlyMicros,
+  });
 
-  const access = await repository.access(userId);
-  if (access === "not_permitted") throw new AiGateError("not_permitted", "A parent needs to turn on AI features for you.");
-  if (access !== "ok") throw new AiGateError("not_opted_in", "Turn on AI features in Settings to use this.");
-
-  const familySpentMicros = await repository.familySpendMicros(userId, month.start);
-  if (familySpentMicros >= limits.familyMonthlyMicros || familySpentMicros + estimatedMicros > limits.familyMonthlyMicros) {
-    throw new AiGateError("family_budget", budgetMessage("This month's AI budget", limits.familyMonthlyMicros, familySpentMicros, month), {
-      limit: "family",
-      limitMicros: limits.familyMonthlyMicros,
-      spentMicros: familySpentMicros,
-      resetsAt: month.resetsAt,
-    });
-  }
-
-  const globalSpentMicros = await repository.globalSpendMicros(month.start);
-  if (globalSpentMicros >= limits.globalMonthlyMicros || globalSpentMicros + estimatedMicros > limits.globalMonthlyMicros) {
-    throw new AiGateError("global_budget", budgetMessage("The app's AI budget for this month", limits.globalMonthlyMicros, globalSpentMicros, month), {
-      limit: "global",
-      limitMicros: limits.globalMonthlyMicros,
-      spentMicros: globalSpentMicros,
-      resetsAt: month.resetsAt,
-    });
+  switch (reservation.status) {
+    case "flag_off":
+      throw new AiGateError("flag_off", "AI features are paused for everyone right now.");
+    case "not_permitted":
+      throw new AiGateError("not_permitted", "A parent needs to turn on AI features for you.");
+    case "ai_off":
+      throw new AiGateError("not_opted_in", "Turn on AI features in Settings to use this.");
+    case "family_budget":
+      throw new AiGateError("family_budget", budgetMessage("This month's AI budget", limits.familyMonthlyMicros, reservation.familySpentMicros, month), {
+        limit: "family",
+        limitMicros: limits.familyMonthlyMicros,
+        spentMicros: reservation.familySpentMicros,
+        resetsAt: month.resetsAt,
+      });
+    case "global_budget":
+      throw new AiGateError("global_budget", budgetMessage("The app's AI budget for this month", limits.globalMonthlyMicros, reservation.globalSpentMicros, month), {
+        limit: "global",
+        limitMicros: limits.globalMonthlyMicros,
+        spentMicros: reservation.globalSpentMicros,
+        resetsAt: month.resetsAt,
+      });
   }
 
   return {
+    reservationId: reservation.reservationId,
     month,
-    familySpentMicros,
+    familySpentMicros: reservation.familySpentMicros,
     familyLimitMicros: limits.familyMonthlyMicros,
-    globalSpentMicros,
+    globalSpentMicros: reservation.globalSpentMicros,
     globalLimitMicros: limits.globalMonthlyMicros,
   };
 }
@@ -169,12 +187,14 @@ function budgetMessage(what: string, limitMicros: number, spentMicros: number, m
   return `${what} has ${usd(limitMicros - spentMicros)} of ${usd(limitMicros)} left, which isn't enough for this request. ${reset}`;
 }
 
-export type RecordUsageInput = {
+export type SettleUsageInput = {
+  /** From `reserveBudget`. */
+  reservationId: string;
   userId: string;
-  feature: string;
-  provider: string;
-  model: string;
-  /** `ok`, or how the call failed. Failed and refused calls are recorded too: the provider may still have billed them. */
+  /**
+   * `ok`, or how the call failed. Failed and refused calls are settled too: the provider may still
+   * have billed them. A call that never reached the provider is settled as `provider_error` at zero.
+   */
   outcome: AiOutcome;
   /** Zero when the provider billed nothing or reported nothing. */
   inputTokens?: number;
@@ -184,11 +204,11 @@ export type RecordUsageInput = {
   costMicros?: number;
 };
 
-/** What `recordUsage` did after writing the ledger row. */
+/** What `settleUsage` did after settling the ledger row. */
 export type UsageRecorded = {
-  /** The family's spend this month, this call included; null when nothing was read (a free call). */
-  familySpentMicros: number | null;
-  globalSpentMicros: number | null;
+  /** The family's spend this month, this call included. */
+  familySpentMicros: number;
+  globalSpentMicros: number;
   /** The warning queued for the family's parents (or the user alone): 80 or 100, else null. */
   warned: 80 | 100 | null;
   /** The call took everyone's month to the backstop and turned the kill switch off. */
@@ -196,63 +216,56 @@ export type UsageRecorded = {
 };
 
 /**
- * Writes the ledger row for a finished call, the real tokens and cost, whatever its outcome. A
- * failure to write it throws: the spend would otherwise go uncounted.
+ * Settles a reservation to the finished call's real tokens and cost, whatever its outcome. A failure
+ * to settle it throws: the ledger would otherwise keep the worst case, or miss a real cost above it.
  *
- * Then, only when the call cost something, it looks at the month. When the family's month has
- * reached 80% or 100% of its limit it queues a notification to the family's parents (the user
- * alone without a family), once per month and level (a dedupe key). When everyone's month has
- * reached the backstop it turns `app_flags.ai_enabled` off and notifies the admins in
- * `APP_ADMIN_USER_IDS`. A failure in that follow-up is logged and not thrown: the call already
- * happened and is recorded, and the next `checkBudget` refuses on the spend itself.
- *
- * The user must be the signed-in caller.
+ * Then, only when the call cost something, it looks at the month the settlement returned. When the
+ * family's month has reached 80% or 100% of its limit it queues a notification to the family's
+ * parents (the user alone without a family), once per month and level (a dedupe key). When
+ * everyone's month has reached the backstop it turns `app_flags.ai_enabled` off and notifies the
+ * admins in `APP_ADMIN_USER_IDS`. A failure in that follow-up is logged and not thrown: the call
+ * already happened and is recorded, and the next `reserveBudget` refuses on the spend itself.
  */
-export async function recordUsage(input: RecordUsageInput, dependencies: AiGateDependencies = {}): Promise<UsageRecorded> {
+export async function settleUsage(input: SettleUsageInput, dependencies: AiGateDependencies = {}): Promise<UsageRecorded> {
   const inputTokens = input.inputTokens ?? 0;
   const outputTokens = input.outputTokens ?? 0;
   const cachedInputTokens = input.cachedInputTokens ?? 0;
   const costMicros = input.costMicros ?? 0;
-  if (!input.userId) throw new TypeError("recordUsage needs a user.");
-  if (!FEATURE_PATTERN.test(input.feature)) throw new TypeError("A feature is a short lowercase key.");
+  if (!input.reservationId) throw new TypeError("settleUsage needs a reservation.");
+  if (!input.userId) throw new TypeError("settleUsage needs a user.");
   assertMicros("inputTokens", inputTokens);
   assertMicros("outputTokens", outputTokens);
   assertMicros("cachedInputTokens", cachedInputTokens);
   assertMicros("costMicros", costMicros);
 
   const { repository, limits, now, log } = resolve(dependencies);
-  const record: AiUsageRecord = {
+  const month = aiMonthAt(now());
+  const spend = await repository.settle({
+    reservationId: input.reservationId,
     userId: input.userId,
-    feature: input.feature,
-    provider: input.provider,
-    model: input.model,
     inputTokens,
     outputTokens,
     cachedInputTokens,
     costMicros,
     outcome: input.outcome,
-  };
-  await repository.insertUsage(record);
+    monthStart: month.start,
+  });
 
-  const result: UsageRecorded = { familySpentMicros: null, globalSpentMicros: null, warned: null, switchedOff: false };
+  const result: UsageRecorded = { ...spend, warned: null, switchedOff: false };
   if (costMicros === 0) return result;
 
-  const month = aiMonthAt(now());
-
   try {
-    result.familySpentMicros = await repository.familySpendMicros(input.userId, month.start);
-    const level = warningLevel(result.familySpentMicros, limits.familyMonthlyMicros);
+    const level = warningLevel(spend.familySpentMicros, limits.familyMonthlyMicros);
     if (level) {
-      await warnFamily(repository, input.userId, level, result.familySpentMicros, limits.familyMonthlyMicros, month);
+      await warnFamily(repository, input.userId, level, spend.familySpentMicros, limits.familyMonthlyMicros, month);
       result.warned = level;
     }
   } catch (error) {
-    log("AI gate: could not check the family's budget after a call.", error);
+    log("AI gate: could not warn the family about its budget after a call.", error);
   }
 
   try {
-    result.globalSpentMicros = await repository.globalSpendMicros(month.start);
-    if (result.globalSpentMicros >= limits.globalMonthlyMicros) {
+    if (spend.globalSpentMicros >= limits.globalMonthlyMicros) {
       if (await repository.isEnabled()) {
         await repository.setEnabled(false);
         result.switchedOff = true;

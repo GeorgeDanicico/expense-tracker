@@ -34,10 +34,6 @@ function transactionRow(overrides: Record<string, unknown> = {}) {
 const transactionFor = (overrides: Partial<ReturnType<typeof aTransaction>> = {}) =>
   aTransaction({ id: "30000000-0000-4000-8000-000000000001", investmentAccountId: ACCOUNT_ID, ...overrides });
 
-/** A transaction row embedding its owning account, as the owner-filtered transaction queries read it. */
-const ownedTransactionRow = (owner: string, overrides: Record<string, unknown> = {}) =>
-  ({ ...transactionRow(overrides), investment_accounts: { user_id: owner } });
-
 function useDatabase(tables: Record<string, Record<string, unknown>[]>, options?: FakeSupabaseOptions) {
   const database = fakeSupabase(tables, options);
   mocks.createClient.mockResolvedValue(database.client);
@@ -139,42 +135,6 @@ describe("Supabase investment repository", () => {
     });
   });
 
-  describe("listAssetTransactions", () => {
-    it("reads one asset's transactions oldest first, filtered by the owner through the account", async () => {
-      const later = ownedTransactionRow(userId, { id: "30000000-0000-4000-8000-000000000002", executed_at: "2026-02-01T10:00:00Z" });
-      const { queries } = useDatabase({ investment_transactions: [later, ownedTransactionRow(userId)] });
-
-      const transactions = await investments.listAssetTransactions(userId, asset, 5_000);
-
-      expect(transactions).toEqual([transactionFor(), transactionFor({ id: later.id, executedAt: later.executed_at })]);
-      expect(queries[0]).toMatchObject({
-        table: "investment_transactions",
-        filters: [
-          ["eq", "investment_account_id", ACCOUNT_ID],
-          ["eq", "investment_accounts.user_id", userId],
-          ["eq", "instrument", "VWCE.DE"],
-          ["eq", "currency", "EUR"],
-        ],
-        orders: ["executed_at", "id"],
-        limits: ["5000"],
-      });
-    });
-
-    it("returns nothing from another user's account", async () => {
-      useDatabase({ investment_transactions: [ownedTransactionRow(otherUserId)] });
-
-      expect(await investments.listAssetTransactions(userId, asset, 5_000)).toEqual([]);
-    });
-
-    it("hides a database error behind a generic message", async () => {
-      useDatabase({}, { fail: () => true });
-
-      await expect(investments.listAssetTransactions(userId, asset, 5_000)).rejects.toThrow(
-        new Error("Unable to load investment history."),
-      );
-    });
-  });
-
   describe("getOrCreateAccount", () => {
     it("returns the user's existing account at the broker", async () => {
       const { queries } = useDatabase({
@@ -230,45 +190,56 @@ describe("Supabase investment repository", () => {
     });
   });
 
-  describe("findTransaction", () => {
-    it("reads the transaction filtered by the owner through the account", async () => {
-      const { queries } = useDatabase({ investment_transactions: [ownedTransactionRow(userId)] });
-
-      expect(await investments.findTransaction(userId, transactionFor().id)).toEqual(transactionFor());
-      expect(queries[0]).toMatchObject({
-        table: "investment_transactions",
-        filters: [["eq", "id", transactionFor().id], ["eq", "investment_accounts.user_id", userId]],
-      });
-    });
-
-    it("returns null for another user's transaction", async () => {
-      useDatabase({ investment_transactions: [ownedTransactionRow(otherUserId)] });
-
-      expect(await investments.findTransaction(userId, transactionFor().id)).toBeNull();
-    });
-
-    it("hides a database error behind a generic message", async () => {
-      useDatabase({}, { fail: () => true });
-
-      await expect(investments.findTransaction(userId, transactionFor().id)).rejects.toThrow(
-        new Error("Unable to load investment order."),
-      );
-    });
-  });
-
   describe("createTransaction", () => {
-    it("stores the transaction in its account", async () => {
-      const { tables } = useDatabase({ investment_transactions: [] });
+    it("records the order through record_investment_order", async () => {
+      const { rpcs, queries } = useDatabase({});
 
       await investments.createTransaction(userId, transactionFor());
 
-      expect(tables.investment_transactions).toEqual([{
-        ...transactionRow(), amount: "150", quantity: "1.5", unit_price: "100",
+      expect(rpcs).toEqual([{
+        fn: "record_investment_order",
+        args: {
+          p_id: "30000000-0000-4000-8000-000000000001",
+          p_account_id: ACCOUNT_ID,
+          p_instrument: "VWCE.DE",
+          p_currency: "EUR",
+          p_side: "buy",
+          p_amount: "150",
+          p_quantity: "1.5",
+          p_unit_price: "100",
+          p_executed_at: "2026-01-01T10:00:00Z",
+        },
       }]);
+      expect(queries).toEqual([]);
+    });
+
+    it("turns the function's oversell refusal into a quantity error", async () => {
+      const message = "Sell quantity exceeds the available VWCE.DE position.";
+      useDatabase({}, { rpc: () => ({ data: null, error: { code: "23514", message, hint: "user" } }) });
+
+      await expect(investments.createTransaction(userId, transactionFor({ side: "sell" }))).rejects.toMatchObject({
+        name: "DomainError", message, status: 422, fieldErrors: { quantity: [message] },
+      });
+    });
+
+    it("keeps a table check's own message private", async () => {
+      useDatabase({}, { rpc: () => ({ data: null, error: { code: "23514", message: "violates check constraint \"amount_positive\"" } }) });
+
+      await expect(investments.createTransaction(userId, transactionFor())).rejects.toMatchObject({
+        name: "DomainError", message: "The investment order could not be saved.", status: 422, fieldErrors: undefined,
+      });
+    });
+
+    it("reports an account that isn't the user's as not found", async () => {
+      useDatabase({}, { rpc: () => ({ data: null, error: { code: "P0002", message: "That investment account wasn't found.", hint: "user" } }) });
+
+      await expect(investments.createTransaction(userId, transactionFor())).rejects.toMatchObject({
+        message: "That investment account wasn't found.", status: 404,
+      });
     });
 
     it("hides a database error behind a generic message", async () => {
-      useDatabase({}, { fail: () => true });
+      useDatabase({}, { rpc: () => ({ data: null, error: { message: "private" } }) });
 
       await expect(investments.createTransaction(userId, transactionFor())).rejects.toThrow(
         new Error("The investment order could not be saved."),
@@ -277,23 +248,32 @@ describe("Supabase investment repository", () => {
   });
 
   describe("deleteTransaction", () => {
-    it("deletes only the transaction in the account it was read from", async () => {
-      const elsewhere = transactionRow({ investment_account_id: "other-account" });
-      const { tables, queries } = useDatabase({ investment_transactions: [transactionRow(), elsewhere] });
+    it("deletes the order through delete_investment_order", async () => {
+      const { rpcs } = useDatabase({}, { rpc: () => ({ data: true, error: null }) });
 
-      await investments.deleteTransaction(userId, transactionFor());
+      expect(await investments.deleteTransaction(userId, transactionFor().id)).toBe(true);
+      expect(rpcs).toEqual([{ fn: "delete_investment_order", args: { p_transaction_id: transactionFor().id } }]);
+    });
 
-      expect(queries[0]).toMatchObject({
-        operation: "delete",
-        filters: [["eq", "id", transactionFor().id], ["eq", "investment_account_id", ACCOUNT_ID]],
+    it("returns false when the user has no such order", async () => {
+      useDatabase({}, { rpc: () => ({ data: false, error: null }) });
+
+      expect(await investments.deleteTransaction(userId, transactionFor().id)).toBe(false);
+    });
+
+    it("turns the function's refusal into a quantity error", async () => {
+      const message = "This order cannot be removed because it would invalidate the later history: Sell quantity exceeds the available VWCE.DE position.";
+      useDatabase({}, { rpc: () => ({ data: null, error: { code: "23514", message, hint: "user" } }) });
+
+      await expect(investments.deleteTransaction(userId, transactionFor().id)).rejects.toMatchObject({
+        message, status: 422, fieldErrors: { quantity: [message] },
       });
-      expect(tables.investment_transactions).toEqual([elsewhere]);
     });
 
     it("hides a database error behind a generic message", async () => {
-      useDatabase({}, { fail: () => true });
+      useDatabase({}, { rpc: () => ({ data: null, error: { message: "private" } }) });
 
-      await expect(investments.deleteTransaction(userId, transactionFor())).rejects.toThrow(
+      await expect(investments.deleteTransaction(userId, transactionFor().id)).rejects.toThrow(
         new Error("Unable to remove investment order."),
       );
     });

@@ -4,7 +4,9 @@ import type { DateRange, ExpenseRepository } from "@/lib/expenses/repository";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { Expense } from "@/lib/expenses/types";
 import { getMonthRange } from "@/lib/calendar";
-import { applyExpensePatch, type ExpenseInput, type ExpensePatch } from "@/lib/validation/expense";
+import { SUBTYPE_CATEGORIES } from "@/lib/expenses/categories";
+import { DomainError } from "@/lib/errors";
+import { SUBTYPE_CATEGORY_MESSAGE, validateExpensePatch, type ExpenseInput, type ExpensePatch } from "@/lib/validation/expense";
 
 const inRange = (expense: Expense, { start, endExclusive }: Partial<DateRange>) =>
   (!start || expense.expenseDate >= start) && (!endExclusive || expense.expenseDate < endExclusive);
@@ -78,10 +80,17 @@ export class FakeExpenseRepository implements ExpenseRepository {
     return expense;
   }
 
+  /** Like `update_expense`: only the patch's fields change, and the subtype follows the category. */
   async update(userId: string, id: string, patch: ExpensePatch) {
+    const changes = validateExpensePatch(patch);
     const existing = this.owned(userId).find((expense) => expense.id === id);
     if (!existing) return null;
-    const expense = stored(id, applyExpensePatch(existing, patch));
+    const category = changes.category ?? existing.category;
+    const subtype = changes.subtype !== undefined ? changes.subtype : category === existing.category ? existing.subtype : null;
+    if (subtype && SUBTYPE_CATEGORIES[subtype] !== category) {
+      throw new DomainError(SUBTYPE_CATEGORY_MESSAGE, 422, { subtype: [SUBTYPE_CATEGORY_MESSAGE] });
+    }
+    const expense: Expense = { ...existing, ...changes, category, subtype };
     this.expenses.set(userId, this.owned(userId).map((other) => (other.id === id ? expense : other)));
     return expense;
   }

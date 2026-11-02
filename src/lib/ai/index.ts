@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { checkBudget, recordUsage, AiGateError, type AiGateDependencies, type AiGateReason } from "@/lib/ai/gate";
+import { reserveBudget, settleUsage, AiGateError, type AiGateDependencies, type AiGateReason, type BudgetReservation } from "@/lib/ai/gate";
 import { findPrice, usageCostMicros, worstCaseMicros, PRICING, type PricingTable } from "@/lib/ai/pricing";
 import type { AiProvider, AiProviderId, AiUsage, StructuredRequest, StructuredResult } from "@/lib/ai/provider";
 import { getAiEnv } from "@/lib/env";
@@ -10,13 +10,15 @@ import { getAiEnv } from "@/lib/env";
 /**
  * The only entry point features use to call a model (docs/statement-import-plan.md, I15; roadmap
  * 8.2). A feature names itself, the user and what to ask; this picks the provider and model from the
- * environment, refuses what is too big or unpriced, passes the gate (`checkBudget` with the worst
- * case the call could cost), calls the provider, and records the real tokens and cost in the ledger
- * whether the call worked or not. A feature never imports a provider's SDK.
+ * environment, refuses what is too big or unpriced, passes the gate (`reserveBudget`, which counts
+ * the worst case the call could cost before it is made), calls the provider, and settles the
+ * reservation to the real tokens and cost whether the call worked or not. A feature never imports a
+ * provider's SDK.
  *
  * It returns, it doesn't throw, for everything expected: a refusal before the call and every way a
- * call can fail. It throws for programming errors (a feature or schema name that isn't valid), and
- * when the ledger row can't be written, since the spend would otherwise go uncounted.
+ * call can fail. It throws for programming errors (a feature or schema name that isn't valid), when
+ * the provider itself throws (after releasing the reservation), and when the ledger row can't be
+ * settled, since the spend would otherwise be counted wrong.
  */
 
 /** What a feature may ask for. A new feature is a row here plus its model in the environment. */
@@ -167,9 +169,16 @@ export async function structured<T>(request: StructuredInput<T>, dependencies: S
     return refused("input_too_large", "This is too long for the AI to read in one go.");
   }
 
+  let reservation: BudgetReservation;
   try {
-    await checkBudget(
-      { userId: request.userId, feature: request.feature, estimatedMicros: worstCaseMicros(price, inputTokens, request.maxOutputTokens) },
+    reservation = await reserveBudget(
+      {
+        userId: request.userId,
+        feature: request.feature,
+        provider: provider.id,
+        model,
+        estimatedMicros: worstCaseMicros(price, inputTokens, request.maxOutputTokens),
+      },
       dependencies.gate,
     );
   } catch (error) {
@@ -177,17 +186,26 @@ export async function structured<T>(request: StructuredInput<T>, dependencies: S
     throw error;
   }
 
-  const result = await provider.structured(providerRequest);
+  let result: StructuredResult<T>;
+  try {
+    result = await provider.structured(providerRequest);
+  } catch (error) {
+    // Nothing came back to price, so the reservation is released (settled at zero) and the error
+    // goes on. If that fails too, the reservation keeps counting its worst case: too much, never too little.
+    const logFailure = dependencies.gate?.log
+      ?? ((message: string, failure: unknown) => console.error(message, failure instanceof Error ? failure.message : failure));
+    await settleUsage({ reservationId: reservation.reservationId, userId: request.userId, outcome: "provider_error" }, dependencies.gate)
+      .catch((releaseError: unknown) => logFailure("AI call: could not release the reservation.", releaseError));
+    throw error;
+  }
   const usage = result.usage;
   const costMicros = usage ? usageCostMicros(price, usage) : 0;
   const outcome = result.ok ? "ok" : result.reason;
 
-  await recordUsage(
+  await settleUsage(
     {
+      reservationId: reservation.reservationId,
       userId: request.userId,
-      feature: request.feature,
-      provider: provider.id,
-      model,
       outcome,
       inputTokens: usage?.inputTokens ?? 0,
       outputTokens: usage?.outputTokens ?? 0,

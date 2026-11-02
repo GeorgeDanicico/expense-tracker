@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { expenseClassificationLabel, subtypesForCategory, subtypeForCategory } from "@/lib/expenses/categories";
-import { expenseSchema } from "@/lib/validation/expense";
+import { expenseSchema, validateExpensePatch } from "@/lib/validation/expense";
 
 const input = { description: "Car service", amount: "12.50", category: "car", expenseDate: "2026-09-01" };
 
@@ -119,4 +119,23 @@ describe("expense amounts (two decimal places)", () => {
       expect(errors?.length).toBeGreaterThan(0);
     },
   );
+});
+
+describe("validateExpensePatch", () => {
+  it("keeps only the fields the patch names, checked and normalised", () => {
+    expect(validateExpensePatch({ amount: "12.50" })).toEqual({ amount: 12.5 });
+    expect(validateExpensePatch({ description: " Fuel ", notes: "  " })).toEqual({ description: "Fuel", notes: null });
+    expect(validateExpensePatch({ subtype: null, expenseDate: "2026-09-02" })).toEqual({ subtype: null, expenseDate: "2026-09-02" });
+  });
+
+  it("checks a subtype against a category named with it, and leaves one named alone to the database", () => {
+    expect(() => validateExpensePatch({ category: "transport", subtype: "car_fuel" })).toThrow("Choose a subtype belonging to the selected category.");
+    expect(validateExpensePatch({ category: "car", subtype: "car_fuel" })).toEqual({ category: "car", subtype: "car_fuel" });
+    expect(validateExpensePatch({ subtype: "car_fuel" })).toEqual({ subtype: "car_fuel" });
+  });
+
+  it("rejects an invalid field with expenseSchema's message", () => {
+    expect(() => validateExpensePatch({ amount: "1.005" })).toThrow("Use at most two decimal places.");
+    expect(() => validateExpensePatch({ description: "  " })).toThrow("Enter a description.");
+  });
 });

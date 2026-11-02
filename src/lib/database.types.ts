@@ -744,6 +744,40 @@ export type Database = {
         Args: { p_month_start: string };
         Returns: number;
       };
+      ai_reserve_budget: {
+        Args: {
+          p_estimated_micros: number;
+          p_family_limit_micros: number;
+          p_feature: string;
+          p_global_limit_micros: number;
+          p_model: string;
+          p_month_start: string;
+          p_provider: string;
+          p_user_id: string;
+        };
+        Returns: {
+          family_spent_micros: number | null;
+          global_spent_micros: number | null;
+          reservation_id: string | null;
+          status: string;
+        }[];
+      };
+      ai_settle_usage: {
+        Args: {
+          p_cached_input_tokens: number;
+          p_cost_micros: number;
+          p_input_tokens: number;
+          p_month_start: string;
+          p_outcome: string;
+          p_output_tokens: number;
+          p_reservation_id: string;
+          p_user_id: string;
+        };
+        Returns: {
+          family_spent_micros: number;
+          global_spent_micros: number;
+        }[];
+      };
       authenticate_mcp_token: {
         Args: { p_token_hash: string };
         Returns: {
@@ -867,6 +901,10 @@ export type Database = {
         Args: { p_confirm_name: string };
         Returns: undefined;
       };
+      delete_investment_order: {
+        Args: { p_transaction_id: string };
+        Returns: boolean;
+      };
       dismiss_notice: {
         Args: { p_notice_id: string };
         Returns: undefined;
@@ -937,6 +975,20 @@ export type Database = {
       purge_expired_import_batches: {
         Args: never;
         Returns: number;
+      };
+      record_investment_order: {
+        Args: {
+          p_account_id: string;
+          p_amount: number | string;
+          p_currency: string;
+          p_executed_at: string;
+          p_id: string;
+          p_instrument: string;
+          p_quantity: number | string;
+          p_side: string;
+          p_unit_price: number | string;
+        };
+        Returns: undefined;
       };
       redeem_family_invite: {
         Args: { p_code_hash: string };
@@ -1027,6 +1079,18 @@ export type Database = {
       update_calendar_events: {
         Args: { p_member_ids: string[] | null; p_rows: Json };
         Returns: Database["public"]["Tables"]["calendar_events"]["Row"][];
+      };
+      update_expense: {
+        Args: { p_id: string; p_patch: Json };
+        Returns: {
+          amount: number;
+          category: string;
+          description: string;
+          expense_date: string;
+          id: string;
+          notes: string | null;
+          subtype: string | null;
+        }[];
       };
     };
     Enums: { Role: "USER" | "ADMIN" };

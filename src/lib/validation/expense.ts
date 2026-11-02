@@ -4,11 +4,9 @@ import {
   EXPENSE_CATEGORIES,
   EXPENSE_SUBTYPES,
   SUBTYPE_CATEGORIES,
-  subtypeForCategory,
   type ExpenseCategory,
   type ExpenseSubtype,
 } from "@/lib/expenses/categories";
-import type { Expense } from "@/lib/expenses/types";
 
 const AMOUNT_FORMAT_MESSAGE = "Enter an amount like 12.50.";
 const AMOUNT_DECIMALS_MESSAGE = "Use at most two decimal places.";
@@ -65,6 +63,9 @@ export const expenseAmountSchema = expenseAmountInput
   })
   .pipe(z.coerce.number<string | number>().positive("Amount must be greater than zero.").max(9_999_999_999.99, "Amount must be at most 9,999,999,999.99."));
 
+/** The message for a subtype that doesn't belong to the expense's category; the SQL's update_expense uses it too. */
+export const SUBTYPE_CATEGORY_MESSAGE = "Choose a subtype belonging to the selected category.";
+
 export const expenseSchema = z.object({
   description: z.string().trim().min(1, "Enter a description.").max(120),
   amount: expenseAmountSchema,
@@ -74,14 +75,14 @@ export const expenseSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 }).superRefine((expense, context) => {
   if (expense.subtype && SUBTYPE_CATEGORIES[expense.subtype] !== expense.category) {
-    context.addIssue({ code: "custom", path: ["subtype"], message: "Choose a subtype belonging to the selected category." });
+    context.addIssue({ code: "custom", path: ["subtype"], message: SUBTYPE_CATEGORY_MESSAGE });
   }
 });
 
 /** A validated expense, ready to store. */
 export type ExpenseInput = z.output<typeof expenseSchema>;
 
-/** A partial change to a stored expense; `applyExpensePatch` validates the merged result. */
+/** A partial change to a stored expense, as a caller sends it; `validateExpensePatch` checks it. */
 export type ExpensePatch = Partial<{
   description: string;
   amount: number | string;
@@ -91,23 +92,47 @@ export type ExpensePatch = Partial<{
   notes: string | null;
 }>;
 
+/** A checked patch: only the fields it names, each valid, ready to store. Cleared notes are null. */
+export type ExpenseChanges = Partial<{
+  description: string;
+  amount: number;
+  category: ExpenseCategory;
+  subtype: ExpenseSubtype | null;
+  expenseDate: string;
+  notes: string | null;
+}>;
+
+const fields = expenseSchema.shape;
+
+const expensePatchSchema = z.object({
+  description: fields.description.optional(),
+  amount: fields.amount.optional(),
+  category: fields.category.optional(),
+  subtype: z.enum(EXPENSE_SUBTYPES).nullable().optional(),
+  expenseDate: fields.expenseDate.optional(),
+  notes: z.string().trim().max(500).nullable().optional(),
+}).superRefine((patch, context) => {
+  if (patch.subtype && patch.category !== undefined && SUBTYPE_CATEGORIES[patch.subtype] !== patch.category) {
+    context.addIssue({ code: "custom", path: ["subtype"], message: SUBTYPE_CATEGORY_MESSAGE });
+  }
+});
+
 /**
- * Merges the patch into the stored expense and re-validates the whole expense with `expenseSchema`,
- * throwing its ZodError for an invalid result. A category change without an explicit subtype keeps
- * the stored subtype only when it still belongs.
+ * Checks each field the patch names with `expenseSchema`'s rules, and a subtype against a category
+ * named with it, throwing a ZodError with the same field messages. Fields the patch doesn't name are
+ * left out, so only the changed fields are written (S10: two edits to different fields both stick).
+ * The rules that need the stored expense are the database's (`update_expense`): a new category
+ * drops a subtype that doesn't belong to it, and a subtype named alone must belong to the stored
+ * category.
  */
-export function applyExpensePatch(current: Expense, patch: ExpensePatch): ExpenseInput {
-  const category = patch.category ?? current.category;
-  const subtype = patch.subtype !== undefined
-    ? patch.subtype
-    : patch.category !== undefined ? subtypeForCategory(category, current.subtype) : current.subtype;
-  const notes = patch.notes !== undefined ? patch.notes ?? "" : current.notes ?? undefined;
-  return expenseSchema.parse({
-    description: patch.description ?? current.description,
-    amount: patch.amount ?? current.amount,
-    category,
-    subtype,
-    expenseDate: patch.expenseDate ?? current.expenseDate,
-    notes,
-  });
+export function validateExpensePatch(patch: ExpensePatch): ExpenseChanges {
+  const parsed = expensePatchSchema.parse(patch);
+  const changes: ExpenseChanges = {};
+  if (parsed.description !== undefined) changes.description = parsed.description;
+  if (parsed.amount !== undefined) changes.amount = parsed.amount;
+  if (parsed.category !== undefined) changes.category = parsed.category;
+  if (parsed.subtype !== undefined) changes.subtype = parsed.subtype;
+  if (parsed.expenseDate !== undefined) changes.expenseDate = parsed.expenseDate;
+  if (parsed.notes !== undefined) changes.notes = parsed.notes || null;
+  return changes;
 }
