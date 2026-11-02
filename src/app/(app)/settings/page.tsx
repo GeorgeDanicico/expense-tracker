@@ -5,6 +5,8 @@ import { Mail, Save } from "lucide-react";
 import { FormEvent, useState } from "react";
 
 import { AvatarCard } from "@/components/settings/avatar-card";
+import { DeleteAccountCard } from "@/components/settings/delete-account-card";
+import { DownloadDataCard } from "@/components/settings/download-data-card";
 import { SignOutEverywhereCard } from "@/components/settings/sign-out-everywhere-card";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { Card } from "@/components/ui/card";
@@ -175,6 +177,10 @@ export default function SettingsPage() {
       </Card>
 
       <SignOutEverywhereCard />
+
+      <DownloadDataCard />
+
+      <DeleteAccountCard membership={data.membership} />
     </Stack>
   );
 }

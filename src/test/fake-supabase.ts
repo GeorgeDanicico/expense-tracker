@@ -29,9 +29,10 @@ export type RecordedRpc = { fn: string; args: Row };
 /** One Storage call: `upload` and `download` name one path, `remove` names a list. */
 export type RecordedStorageCall = {
   bucket: string;
-  operation: "upload" | "download" | "remove";
+  operation: "upload" | "download" | "remove" | "list";
+  /** The paths, or for `list` the folder. */
   paths: string[];
-  /** The `upload` options, such as `{ contentType, upsert }`. */
+  /** The `upload` or `list` options, such as `{ contentType, upsert }` or `{ limit }`. */
   options?: Row;
 };
 
@@ -274,7 +275,7 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
   }
 
   /**
-   * `storage.from(bucket)`, covering `upload`, `download` and `remove`. Like Storage, an upload without
+   * `storage.from(bucket)`, covering `upload`, `download`, `list` and `remove`. Like Storage, an upload without
    * `upsert: true` fails on an existing path, a download of a missing path fails, and `remove` skips
    * missing paths and returns the objects it deleted.
    */
@@ -293,6 +294,16 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
         if (error) return { data: null, error };
         const body = files[path];
         return body ? { data: new Blob([body.slice()]), error: null } : { data: null, error: NOT_FOUND };
+      },
+      /** The objects directly in `folder`, by name, up to `limit` (Storage's default 100). */
+      async list(folder: string, listOptions: { limit?: number } = {}) {
+        const error = storageCall({ bucket: name, operation: "list", paths: [folder], options: listOptions });
+        if (error) return { data: null, error };
+        const names = Object.keys(files)
+          .filter((path) => path.startsWith(`${folder}/`) && !path.slice(folder.length + 1).includes("/"))
+          .map((path) => path.slice(folder.length + 1))
+          .sort();
+        return { data: names.slice(0, listOptions.limit ?? 100).map((file) => ({ name: file })), error: null };
       },
       async remove(paths: string[]) {
         const error = storageCall({ bucket: name, operation: "remove", paths });

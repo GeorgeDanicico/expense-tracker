@@ -301,13 +301,21 @@ export class FakeAuthAdmin implements AuthAdmin {
     return user;
   }
 
+  /** Like the provider: removes the account, so it can't sign in again, and ends every session it had. */
   async deleteUser(userId: string): Promise<void> {
+    this.calls.push("deleteUser");
     this.throwFailure("deleteUser");
     this.deletedUserIds.push(userId);
     const index = this.auth.accounts.findIndex((account) => account.id === userId);
     if (index < 0) throw new DomainError("That account doesn't exist.", 404);
     this.auth.accounts.splice(index, 1);
     this.profiles.delete(userId);
+    for (const session of this.auth.sessions) {
+      if (session.userId === userId) {
+        session.active = false;
+        session.ended = true;
+      }
+    }
   }
 
   async setPassword(userId: string, password: string): Promise<void> {

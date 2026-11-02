@@ -31,8 +31,14 @@ export function withMember(url: string, member?: string | null) {
 // Each key notes the response type its GET returns. Types owned by a domain
 // module are referenced there; wrapper shapes that only exist on the wire live here.
 
-/** GET → `AccountData` (`@/lib/account/types`); PATCH returns the updated `AccountData`. */
+/**
+ * GET → `AccountData` (`@/lib/account/types`); PATCH returns the updated `AccountData`.
+ * DELETE `{ currentPassword, confirm: "delete my account" }` → 204: the account and everything in it
+ * are deleted and this browser is signed out.
+ */
 export const ACCOUNT_API_KEY = "/api/account";
+/** POST only → a ZIP (`application/zip`) of everything the signed-in user owns. Not fetched with SWR. */
+export const ACCOUNT_EXPORT_API_URL = "/api/account/export";
 /**
  * POST only: `{ currentPassword, password }` → 204, and every other session is signed out. A wrong
  * current password is 422 on `currentPassword`. Not fetched with SWR; refresh `ACCOUNT_API_KEY` afterwards.
@@ -175,6 +181,14 @@ export const FAMILY_KIDS_API_URL = "/api/family/kids";
 /** POST only: `{ password }` → `{ success: true }`. A parent sets a kid's temporary password; the kid must change it at next sign-in. */
 export function familyMemberPasswordApiUrl(memberId: string) {
   return `/api/family/members/${encodeURIComponent(memberId)}/password`;
+}
+
+/**
+ * DELETE only: `{ currentPassword, confirmName }` (the parent's password and the kid's name) →
+ * {@link FamilyResponse}. A parent deletes a kid account made for their family.
+ */
+export function familyMemberAccountApiUrl(memberId: string) {
+  return `/api/family/members/${encodeURIComponent(memberId)}/account`;
 }
 
 /**
