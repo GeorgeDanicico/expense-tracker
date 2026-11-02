@@ -175,7 +175,9 @@ describe("POST /api/auth", () => {
     expect(unknownUsername).toMatchObject(signInFailed);
     expect(unknownUsername.status).toBe(wrongPassword.status);
     expect(unknownUsername.body).toEqual(wrongPassword.body);
-    expect([...unknownUsername.headers]).toEqual([...wrongPassword.headers]);
+    // Every response has its own request id; every other header must be the same.
+    const withoutRequestId = (headers: Headers) => [...headers].filter(([name]) => name !== "x-request-id");
+    expect(withoutRequestId(unknownUsername.headers)).toEqual(withoutRequestId(wrongPassword.headers));
     expect(auth.currentUser).toBeNull();
   });
 

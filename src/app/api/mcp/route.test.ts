@@ -17,6 +17,9 @@ vi.mock("@/lib/auth", () => ({
   getOAuthIssuer: () => ISSUER,
 }));
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
+// The request lines go to `requestLog` instead of stdout.
+const requestLog = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), requestLog));
 
 import { DELETE, GET, POST } from "@/app/api/mcp/route";
 import type { AuthenticatedUser } from "@/lib/auth";
@@ -25,6 +28,7 @@ import { generateMcpToken } from "@/lib/mcp/tokens";
 import { anExpense } from "@/test/builders";
 import type { FakeMcpToken, FakeMcpUser } from "@/test/fakes/mcp-tokens";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
+import { loggedLines } from "@/test/log-lines";
 
 const PASSWORD = "correct-horse";
 const BEARER_CHALLENGE = 'Bearer resource_metadata="https://expenses.example.com/.well-known/oauth-protected-resource/api/mcp"';
@@ -142,6 +146,34 @@ describe("/api/mcp", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  describe("request lines", () => {
+    beforeEach(() => {
+      requestLog.length = 0;
+    });
+
+    it("writes one line for a refused call, with an x-request-id the client didn't choose", async () => {
+      const response = await POST(rpc(initialize, { "x-request-id": "Forged123456", "x-request-id-source": "proxy" }));
+
+      expect(response.status).toBe(401);
+      const lines = loggedLines(requestLog, "request");
+      expect(lines).toEqual([expect.objectContaining({ level: "info", method: "POST", route: "/api/mcp", status: 401 })]);
+      expect(lines[0]).not.toHaveProperty("userId");
+      expect(response.headers.get("x-request-id")).toBe(lines[0].requestId);
+      expect(response.headers.get("x-request-id")).not.toBe("Forged123456");
+    });
+
+    it("writes one line with the token's user for a tool call", async () => {
+      const { token } = personalToken(userA);
+      const response = await POST(rpc(listExpenses, bearer(token)));
+      await response.text();
+
+      const lines = loggedLines(requestLog, "request");
+      expect(lines).toEqual([expect.objectContaining({ level: "info", route: "/api/mcp", status: 200, userId: userA.id })]);
+      expect(response.headers.get("x-request-id")).toBe(lines[0].requestId);
+      expect(JSON.stringify(lines)).not.toContain(token);
+    });
   });
 
   describe("with no credentials", () => {

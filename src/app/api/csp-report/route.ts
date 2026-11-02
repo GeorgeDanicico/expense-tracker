@@ -11,6 +11,7 @@ import {
 } from "@/lib/http/csp-report";
 import { HttpError } from "@/lib/http/errors";
 import { cspReportAttempts, TOO_MANY_CSP_REPORTS } from "@/lib/http/rate-limit";
+import { logRequest } from "@/lib/http/request-log";
 import { BODY_TOO_LARGE, json, noContent, tooManyRequests } from "@/lib/http/route";
 
 /**
@@ -23,8 +24,14 @@ import { BODY_TOO_LARGE, json, noContent, tooManyRequests } from "@/lib/http/rou
  * nothing but the logs, so it is exempt from the request guard (`REQUEST_GUARD_EXEMPTIONS`).
  * Instead every request counts against a per-IP limit (429 past it), the body is limited to
  * `CSP_REPORT_MAX_BYTES` (413), and only the two report content types are read (415).
+ *
+ * Its `request` line is written at `debug` (`quiet`), so a flood of reports doesn't drown real traffic.
  */
 export async function POST(request: NextRequest) {
+  return logRequest(request, () => receive(request), { quiet: true });
+}
+
+async function receive(request: NextRequest) {
   const ip = clientKey(request);
   if (cspReportAttempts.isLimited(ip)) {
     return tooManyRequests(TOO_MANY_CSP_REPORTS, cspReportAttempts.retryAfterSeconds(ip));

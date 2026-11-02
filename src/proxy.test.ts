@@ -9,6 +9,7 @@ vi.mock("@/lib/supabase/proxy", async (importOriginal) => ({
 
 import { getScriptNonceFromHeader } from "next/dist/server/app-render/get-script-nonce-from-header";
 
+import { PROXY_MATCHER, proxyRunsOn } from "@/lib/http/proxy-matcher";
 import { config, proxy } from "@/proxy";
 
 // Next compiles the matcher with path-to-regexp; as a plain regular expression over the whole path
@@ -47,6 +48,18 @@ describe("the proxy's matcher", () => {
 
   it("covers the offline page, so it carries the policy too", () => {
     expect(runsOn("/offline")).toBe(true);
+  });
+
+  it("is the same pattern the request id's trust rule checks", () => {
+    expect(config.matcher[0]).toBe(PROXY_MATCHER);
+    for (const path of ["/", "/dashboard", "/api/account", "/api/mcp", "/api/csp-report", "/health", "/api/calendar/feed/x", "/.well-known/x"]) {
+      expect(proxyRunsOn(path), path).toBe(runsOn(path));
+    }
+  });
+
+  it("doesn't count a percent-encoded path that decodes to one it skips", () => {
+    expect(proxyRunsOn("/api/%6dcp")).toBe(false);
+    expect(proxyRunsOn("/api/%E0%A4%A")).toBe(true);
   });
 });
 
@@ -114,6 +127,31 @@ describe("the proxy's security headers", () => {
     await proxy(new NextRequest("http://localhost/settings"));
     expect(mocks.updateSession).toHaveBeenCalledOnce();
     expect(mocks.updateSession.mock.calls[0][1]).toHaveProperty("x-nonce");
+  });
+
+  it("gives every request a new id, on the forwarded request with the proxy's marker and on the response", async () => {
+    const first = await proxy(new NextRequest("http://localhost/api/expenses"));
+    const second = await proxy(new NextRequest("http://localhost/api/expenses"));
+
+    const id = first.headers.get("x-request-id");
+    expect(id).toMatch(/^[A-Za-z0-9]{12}$/);
+    expect(second.headers.get("x-request-id")).not.toBe(id);
+    const forwarded = forwardedRequestHeaders(first);
+    expect(forwarded["x-request-id"]).toBe(id);
+    expect(forwarded["x-request-id-source"]).toBe("proxy");
+    expect(mocks.updateSession.mock.calls[0][1]).toMatchObject({ "x-request-id": id, "x-request-id-source": "proxy" });
+  });
+
+  it.each(["/dashboard", "/offline"])("replaces the id and marker a client sent to %s", async (path) => {
+    const response = await proxy(
+      new NextRequest(`http://localhost${path}`, { headers: { "x-request-id": "Chosen123456", "x-request-id-source": "client" } }),
+    );
+
+    const forwarded = forwardedRequestHeaders(response);
+    expect(forwarded["x-request-id"]).not.toBe("Chosen123456");
+    expect(forwarded["x-request-id"]).toBe(response.headers.get("x-request-id"));
+    expect(forwarded["x-request-id-source"]).toBe("proxy");
+    expect(response.headers.get("x-request-id")).toMatch(/^[A-Za-z0-9]{12}$/);
   });
 
   it("gives the offline page its headers without touching the session", async () => {

@@ -19,7 +19,9 @@ import {
   userWriteRequests,
   type RequestLimiter,
 } from "@/lib/http/rate-limit";
+import { logRequest, logRequestFailure } from "@/lib/http/request-log";
 import { ImportError } from "@/lib/imports/types";
+import { addRequestFields, currentRequest, setRequestUser } from "@/lib/log/request-context";
 import { getRepositories } from "@/lib/repositories";
 import { idSchema } from "@/lib/validation/primitives";
 
@@ -131,21 +133,37 @@ function refuseOverLimit(limiter: RequestLimiter, key: string) {
  * handler. For the public routes that don't use `withRequestGuard` (the calendar feed, the OAuth and
  * email-link redirects, the OAuth metadata). A request with no `request` is a test calling a handler
  * directly.
+ *
+ * Like every wrapper here, it runs the request inside its own request context and writes one
+ * `request` line with an `x-request-id` header on the response (`logRequest`).
  */
 export function withAnonymousLimit<Req extends Request = Request, Ctx = unknown>(
   handler: (request: Req, context: Ctx) => Promise<Response>,
 ): RouteHandler<Req, Ctx> {
-  return async (request?: Req, context?: Ctx): Promise<Response> => {
-    const refused = refuseOverLimit(anonymousRequests, clientKey(request));
-    if (refused) return refused;
-    return handler(request as Req, context as Ctx);
-  };
+  return async (request?: Req, context?: Ctx): Promise<Response> =>
+    logRequest(request, async () => {
+      const refused = refuseOverLimit(anonymousRequests, clientKey(request));
+      if (refused) return refused;
+      return handler(request as Req, context as Ctx);
+    });
 }
 
 function errorResponse(error: HttpError | DomainError | ImportError) {
   // A refused statement carries the `code` the import screen tells refusals apart by, and no field errors.
-  if (error instanceof ImportError) return json({ error: error.message, code: error.code }, error.status);
+  if (error instanceof ImportError) {
+    addRequestFields({ errorCode: error.code });
+    return json({ error: error.message, code: error.code }, error.status);
+  }
   return json({ error: error.message, fieldErrors: error.fieldErrors }, error.status);
+}
+
+/**
+ * The 500 for an unexpected error: `{ error: failure, requestId }`, after the error is logged as
+ * `request_failed`. The id is what the user can quote to find the request in the logs.
+ */
+function failureResponse(failure: string, error: unknown) {
+  logRequestFailure(error);
+  return json({ error: failure, requestId: currentRequest()?.requestId }, 500);
 }
 
 /**
@@ -157,18 +175,19 @@ function errorResponse(error: HttpError | DomainError | ImportError) {
 export function withRequestGuard<Req extends Request = Request, Ctx = unknown>(
   handler: (request: Req, context: Ctx) => Promise<Response>,
 ): RouteHandler<Req, Ctx> {
-  return async (request?: Req, context?: Ctx): Promise<Response> => {
-    const refused = refuseForeignRequest(request);
-    if (refused) return errorResponse(refused);
-    const overLimit = refuseOverLimit(anonymousRequests, clientKey(request));
-    if (overLimit) return overLimit;
-    try {
-      return await handler(request as Req, context as Ctx);
-    } catch (error) {
-      if (error instanceof HttpError) return errorResponse(error);
-      throw error;
-    }
-  };
+  return async (request?: Req, context?: Ctx): Promise<Response> =>
+    logRequest(request, async () => {
+      const refused = refuseForeignRequest(request);
+      if (refused) return errorResponse(refused);
+      const overLimit = refuseOverLimit(anonymousRequests, clientKey(request));
+      if (overLimit) return overLimit;
+      try {
+        return await handler(request as Req, context as Ctx);
+      } catch (error) {
+        if (error instanceof HttpError) return errorResponse(error);
+        throw error;
+      }
+    });
 }
 
 export type WithUserOptions = {
@@ -188,8 +207,10 @@ export type WithUserOptions = {
  * request limit (`userReadRequests` for `GET`/`HEAD`/`OPTIONS`, `userWriteRequests` for the rest) →
  * 429 with `Retry-After` before anything else runs, an account that must choose a new password → 403 `password_change_required`
  * (unless `allowPasswordChangeRequired`), `HttpError`/`DomainError` → their status, `ImportError` →
- * its status with `{ error, code }`, anything else → 500 with `failure`.
- * Without `failure`, unexpected errors propagate to Next's default error response.
+ * its status with `{ error, code }`, anything else → 500 with `{ error: failure, requestId }`.
+ * Without `failure`, unexpected errors propagate to Next's default error response. Either way an
+ * unexpected error is logged as `request_failed` first, and every request writes one `request` line
+ * with the caller's id once they're known (`logRequest`).
  * While the family flag is on, it also records the user's last activity in the background
  * (`touchLastActiveInBackground`), which never delays or changes the response.
  *
@@ -201,25 +222,28 @@ export function withUser<Req extends Request = Request, Ctx = unknown>(
   handler: (request: Req, user: AuthenticatedUser, context: Ctx) => Promise<Response>,
   options: WithUserOptions = {},
 ): RouteHandler<Req, Ctx> {
-  return async (request?: Req, context?: Ctx): Promise<Response> => {
-    const refused = refuseForeignRequest(request);
-    if (refused) return errorResponse(refused);
+  return async (request?: Req, context?: Ctx): Promise<Response> =>
+    logRequest(request, async () => {
+      const refused = refuseForeignRequest(request);
+      if (refused) return errorResponse(refused);
 
-    const user = await getAuthenticatedUser();
-    if (!user) return refuseOverLimit(signedOutRequests, clientKey(request)) ?? unauthorized();
-    const overLimit = refuseOverLimit(READ_METHODS.has(request?.method.toUpperCase() ?? "GET") ? userReadRequests : userWriteRequests, user.id);
-    if (overLimit) return overLimit;
-    touchLastActiveInBackground(user.id);
+      const user = await getAuthenticatedUser();
+      if (!user) return refuseOverLimit(signedOutRequests, clientKey(request)) ?? unauthorized();
+      setRequestUser(user.id);
+      const overLimit = refuseOverLimit(READ_METHODS.has(request?.method.toUpperCase() ?? "GET") ? userReadRequests : userWriteRequests, user.id);
+      if (overLimit) return overLimit;
+      touchLastActiveInBackground(user.id);
 
-    try {
-      if (!options.allowPasswordChangeRequired && (await getRepositories().account.getMustChangePassword(user.id))) {
-        return passwordChangeRequired();
+      try {
+        if (!options.allowPasswordChangeRequired && (await getRepositories().account.getMustChangePassword(user.id))) {
+          addRequestFields({ errorCode: PASSWORD_CHANGE_REQUIRED });
+          return passwordChangeRequired();
+        }
+        return await handler(request as Req, user, context as Ctx);
+      } catch (error) {
+        if (error instanceof HttpError || error instanceof DomainError || error instanceof ImportError) return errorResponse(error);
+        if (options.failure === undefined) throw error;
+        return failureResponse(options.failure, error);
       }
-      return await handler(request as Req, user, context as Ctx);
-    } catch (error) {
-      if (error instanceof HttpError || error instanceof DomainError || error instanceof ImportError) return errorResponse(error);
-      if (options.failure === undefined) throw error;
-      return json({ error: options.failure }, 500);
-    }
-  };
+    });
 }
