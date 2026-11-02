@@ -1,5 +1,8 @@
 import { APPLICATION_TIMEZONE } from "@/lib/calendar";
 import type { LogFields } from "@/lib/log";
+import { runWithRequestContext, type RequestContext } from "@/lib/log/request-context";
+import { createRequestId } from "@/lib/log/request-id";
+import { spanSummary } from "@/lib/log/span";
 import type { PushPayload, PushResult, PushSender } from "@/lib/notifications/push";
 import { eventAddedPayload, eventDedupeKey, eventPayload } from "@/lib/family-calendar/notification";
 import { planReminderNotification } from "@/lib/reminders/notification";
@@ -7,6 +10,7 @@ import { utcToZoned } from "@/lib/time-zone";
 import type {
   ClaimedEvent,
   ClaimedNotification,
+  ClaimedReminder,
   DeviceSubscription,
   DueCounts,
   DueTodo,
@@ -36,6 +40,19 @@ export const EVENT_BATCH = 50;
  * after its first, second and third send: 1, 5 and 30 minutes. A fourth failure marks it `failed`.
  */
 export const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000] as const;
+
+/** A tick that takes longer than this is logged at `warn` with `slow: true`. */
+export const SLOW_TICK_MS = 10_000;
+
+/**
+ * How long the worker remembers a notification it pushed but couldn't mark finished (B9): the
+ * lease is 2 minutes and a lapsed row is claimed again on the next tick, so this covers the lease,
+ * several ticks after it and a slow tick.
+ */
+export const PUSHED_MEMORY_MS = 10 * 60_000;
+
+/** The most notification ids that memory holds; past it the oldest are forgotten first. */
+export const PUSHED_MEMORY_MAX = 1000;
 
 /** `sent` and `skipped` rows older than this are deleted, once a day. */
 export const NOTIFICATION_RETENTION_MS = 30 * 24 * 60 * 60_000;
@@ -82,10 +99,32 @@ export type WorkerState = {
   lastImportPurgeAt: Date | null;
   /** The Bucharest date whose "Due today" to-do notifications were all queued. */
   lastTodoDueOn: string | null;
+  /**
+   * Outbox rows whose push reached a device but whose outcome couldn't be written, by id, with when
+   * they were pushed (oldest first). A row claimed again while it's here is finished as `sent`
+   * instead of being pushed a second time (see {@link rememberPushed}).
+   */
+  pushed: Map<string, number>;
 };
 
 export function createWorkerState(): WorkerState {
-  return { lastCleanupAt: null, lastImportPurgeAt: null, lastTodoDueOn: null };
+  return { lastCleanupAt: null, lastImportPurgeAt: null, lastTodoDueOn: null, pushed: new Map() };
+}
+
+/** Remembers that `id` was pushed at `now` and its outcome wasn't saved; forgets expired ids and, past the cap, the oldest. */
+function rememberPushed(state: WorkerState, id: string, now: Date) {
+  state.pushed.delete(id);
+  state.pushed.set(id, now.getTime());
+  for (const [oldId, at] of state.pushed) {
+    if (state.pushed.size <= PUSHED_MEMORY_MAX && now.getTime() - at < PUSHED_MEMORY_MS) break;
+    state.pushed.delete(oldId);
+  }
+}
+
+/** Whether `id` is remembered as pushed within {@link PUSHED_MEMORY_MS}. */
+function wasPushed(state: WorkerState, id: string, now: Date) {
+  const at = state.pushed.get(id);
+  return at !== undefined && now.getTime() - at < PUSHED_MEMORY_MS;
 }
 
 export type TickDependencies = {
@@ -252,15 +291,45 @@ export function outcomeOf(row: Pick<ClaimedNotification, "attempts">, results: r
 
 type Deliveries = { settings: Map<string, RecipientSettings>; devices: Map<string, DeviceSubscription[]> };
 
+/**
+ * Writes the outcome of a row that reached a device. The push can't be taken back, so a failure
+ * here must not fail the row (B9): the write is tried once more, and if that fails too it's logged
+ * as `notification_bookkeeping_failed` and the id is remembered in `state.pushed`, so the claim
+ * that follows the lease finishes the row instead of pushing it again. A write that succeeds
+ * forgets the id.
+ */
+async function finishAfterPush(row: ClaimedNotification, outcome: NotificationOutcome, { store, clock, log, state }: TickDependencies) {
+  try {
+    await store.finishNotification(row.id, outcome);
+  } catch (firstError) {
+    log.warn("notification_bookkeeping_retry", { id: row.id, write: "finishNotification", error: errorMessage(firstError) });
+    try {
+      await store.finishNotification(row.id, outcome);
+    } catch (error) {
+      log.error("notification_bookkeeping_failed", { id: row.id, write: "finishNotification", error: errorMessage(error) });
+      rememberPushed(state, row.id, clock.now());
+      return;
+    }
+  }
+  state.pushed.delete(row.id);
+}
+
 /** Sends one claimed row (or skips it) and writes its outcome. Counts into `counts`. */
 async function deliver(row: ClaimedNotification, { settings, devices }: Deliveries, deps: TickDependencies & { push: PushSender }, counts: DeliveryCounts) {
-  const { store, push, clock, log } = deps;
+  const { store, push, clock, log, state } = deps;
   const recipient = settings.get(row.userId) ?? DEFAULT_SETTINGS;
   const allowed = kindAllowed(row.kind, recipient);
   const payload = payloadFor(row.kind, row.payload, clock.now());
 
   let outcome: NotificationOutcome;
-  if (allowed === null) {
+  // Whether at least one device received the push: from then on a failed write must not fail the row.
+  let pushed = false;
+  if (wasPushed(state, row.id, clock.now())) {
+    // An earlier tick pushed this row but couldn't save that: finish it without pushing again.
+    pushed = true;
+    outcome = { status: "sent", attempts: row.attempts + 1, sentAt: clock.now(), lastError: null };
+    log.warn("notification_resend_skipped", { id: row.id, kind: truncate(row.kind) });
+  } else if (allowed === null) {
     outcome = { status: "failed", attempts: row.attempts, lastError: `Unknown notification kind "${truncate(row.kind)}".` };
   } else if (!allowed) {
     outcome = { status: "skipped", attempts: row.attempts, lastError: skippedBecause(row.kind, recipient) };
@@ -282,15 +351,31 @@ async function deliver(row: ClaimedNotification, { settings, devices }: Deliveri
     }
     // Later rows for this user this tick don't try the deleted devices again.
     if (gone.length > 0) devices.set(row.userId, targets.filter((device) => !gone.includes(device)));
-    if (delivered.length > 0) await store.markDevicesDelivered(delivered, at);
+    if (delivered.length > 0) {
+      pushed = true;
+      try {
+        await store.markDevicesDelivered(delivered, at);
+      } catch (error) {
+        // Only the devices' last-success time is lost; the row is still finished below.
+        log.error("notification_bookkeeping_failed", { id: row.id, write: "markDevicesDelivered", error: errorMessage(error) });
+      }
+    }
     outcome = outcomeOf(row, results, at);
   }
 
-  await store.finishNotification(row.id, outcome);
+  if (pushed) await finishAfterPush(row, outcome, deps);
+  else await store.finishNotification(row.id, outcome);
   if (outcome.status === "pending") counts.retried++;
   else counts[outcome.status]++;
   if (outcome.status !== "sent") {
-    log.info("notification", { id: row.id, kind: truncate(row.kind), status: outcome.status, attempts: outcome.attempts, error: outcome.lastError });
+    // A retried row is an expected, temporary failure: `warn`, not `info`.
+    log[outcome.status === "pending" ? "warn" : "info"]("notification", {
+      id: row.id,
+      kind: truncate(row.kind),
+      status: outcome.status,
+      attempts: outcome.attempts,
+      error: outcome.lastError,
+    });
   }
 }
 
@@ -324,11 +409,20 @@ async function deliverDue(deps: TickDependencies & { push: PushSender }): Promis
  * leaves `next_notify_at` as it was, and the re-run after the lease queues the same dedupe key,
  * which is a no-op, so a notification is never lost nor sent twice. The advance only applies to a
  * reminder that hasn't changed since the claim. A failure on one reminder is logged and the rest
- * go on; its lease runs out and it's claimed again.
+ * go on; its lease runs out and it's claimed again. A claim that fails as a whole is logged as
+ * `reminder_claim_failed` and counts as no reminders, so the events, to-dos and deliveries still
+ * run, as with `event_claim_failed`.
  */
 async function queueDueReminders({ store, clock, log }: TickDependencies): Promise<ReminderCounts> {
   const counts: ReminderCounts = { claimed: 0, queued: 0, duplicates: 0, changed: 0 };
-  const reminders = await store.claimDueReminders(REMINDER_BATCH);
+  let reminders: ClaimedReminder[];
+  try {
+    reminders = await store.claimDueReminders(REMINDER_BATCH);
+  } catch (error) {
+    // A database error may be momentary and must not skip the tick's deliveries (B9).
+    log.error("reminder_claim_failed", { error: errorMessage(error) });
+    return counts;
+  }
   counts.claimed = reminders.length;
 
   for (const reminder of reminders) {
@@ -494,8 +588,27 @@ async function purgeImportDrafts({ store, clock, log, state }: TickDependencies)
  * either, and once the keys are set each reminder sends only its latest missed notify time (an
  * event whose end passed meanwhile sends nothing).
  * It never throws: a failure is logged as one `tick_failed` line and the next tick tries again.
+ *
+ * The tick runs in a context of its own, `{ requestId: "tick-<12 characters>", route: "worker.tick" }`
+ * (see `src/lib/log/request-context.ts`), so every line it writes has that `requestId`, and the
+ * `tick` line lists its `spans` (each Supabase call and push send), the `dbMs` and `dbCalls` they add
+ * up to and, over {@link SLOW_TICK_MS}, `slow: true` at `warn` with the `slowestSpan`.
  */
 export async function tick(deps: TickDependencies): Promise<TickResult> {
+  // The same kind of context a request gets (logging plan, L5): every line this tick writes carries
+  // its id, and the Supabase calls and push sends are timed into its spans for the `tick` line.
+  const context: RequestContext = {
+    requestId: `tick-${createRequestId()}`,
+    method: "TICK",
+    route: "worker.tick",
+    startedAt: performance.now(),
+    spans: [],
+    fields: {},
+  };
+  return runWithRequestContext(context, () => runTick(deps, context));
+}
+
+async function runTick(deps: TickDependencies, context: RequestContext): Promise<TickResult> {
   const { store, push, clock, log, version } = deps;
   const startedAt = clock.now();
   try {
@@ -520,7 +633,9 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
     const reminders = await queueDueReminders(deps);
     const events = await queueDueEvents(deps);
     const delivery = await deliverDue({ ...deps, push });
-    log.info("tick", {
+    const ms = clock.now().getTime() - startedAt.getTime();
+    const slow = ms > SLOW_TICK_MS;
+    log[slow ? "warn" : "info"]("tick", {
       ...delivery,
       remindersClaimed: reminders.claimed,
       remindersQueued: reminders.queued,
@@ -530,7 +645,10 @@ export async function tick(deps: TickDependencies): Promise<TickResult> {
       eventsQueued: events.queued,
       eventsDuplicate: events.duplicates,
       eventsChanged: events.changed,
-      ms: clock.now().getTime() - startedAt.getTime(),
+      ms,
+      slow: slow || undefined,
+      spans: context.spans,
+      ...spanSummary(context, slow),
     });
     return { pushConfigured: true, reminders, events, delivery, cleaned, importsPurged, todosDue };
   } catch (error) {

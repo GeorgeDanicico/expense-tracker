@@ -96,6 +96,8 @@ export class FakeWorkerStore implements WorkerStore {
   failWith: Error | null = null;
   /** Makes only `claimDueCalendarEvents` reject (the claim function missing, or a database error). */
   failEventClaimWith: Error | null = null;
+  /** Makes only `claimDueReminders` reject (a database error). */
+  failReminderClaimWith: Error | null = null;
   beforeAdvance: ((reminder: ClaimedReminder) => void) | null = null;
   /** Runs inside `markEventNotified` before it checks the event (an edit racing the worker). */
   beforeMarkEvent: ((event: ClaimedEvent) => void) | null = null;
@@ -327,6 +329,7 @@ export class FakeWorkerStore implements WorkerStore {
 
   async claimDueReminders(batch: number): Promise<ClaimedReminder[]> {
     this.check();
+    if (this.failReminderClaimWith) throw this.failReminderClaimWith;
     const now = this.now();
     const claimed = this.reminders
       .filter((reminder) => reminder.nextNotifyAt !== null && reminder.nextNotifyAt <= now && !reminder.notificationsMuted)
