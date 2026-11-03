@@ -1,13 +1,14 @@
 import "server-only";
 
 import { structured, type StructuredDependencies } from "@/lib/ai";
-import { addDays, APPLICATION_TIMEZONE, getBucharestToday } from "@/lib/calendar";
+import { addDays, getBucharestToday } from "@/lib/calendar";
 import { DomainError } from "@/lib/errors";
 import type { Expense } from "@/lib/expenses/types";
 import { buildHistory, historySince } from "@/lib/imports/ai/categories";
 import type { StatementAi } from "@/lib/imports/ai/reader";
 import { flagDuplicates } from "@/lib/imports/duplicates";
 import { buildDraft } from "@/lib/imports/pipeline";
+import { formatInstantDay } from "@/lib/imports/recent";
 import {
   IMPORT_NOT_A_DRAFT_MESSAGE,
   importNotFoundError,
@@ -47,17 +48,6 @@ export type CreatedDraft = {
   /** Notes for the review screen (a description cut short, say). Not stored: a reopened draft has none. */
   warnings: string[];
 };
-
-/** "3 October", with the year when it isn't `now`'s: the day the confirmed import happened, in the app's time zone. */
-function importDay(iso: string, now: Date): string {
-  const parts = (instant: Date) =>
-    new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: APPLICATION_TIMEZONE })
-      .formatToParts(instant);
-  const value = (list: Intl.DateTimeFormatPart[], type: string) => list.find((part) => part.type === type)?.value ?? "";
-  const then = parts(new Date(iso));
-  const day = `${value(then, "day")} ${value(then, "month")}`;
-  return value(then, "year") === value(parts(now), "year") ? day : `${day} ${value(then, "year")}`;
-}
 
 /** What `createDraft` can be given in place of the real model: tests pass a fake provider and a price list. */
 export type CreateDraftDependencies = {
@@ -112,7 +102,7 @@ export async function createDraft(
   const existing = await imports.findLiveByHash(draft.batch.content_hash);
   if (existing?.status === "draft") return { batch: existing, reopened: true, warnings: [] };
   if (existing?.status === "confirmed") {
-    const when = existing.confirmedAt ? ` on ${importDay(existing.confirmedAt, now)}` : "";
+    const when = existing.confirmedAt ? ` on ${formatInstantDay(existing.confirmedAt, { now, long: true })}` : "";
     throw new ImportError(
       "already_imported",
       `You imported this statement${when}. Undo that import to import it again.`,

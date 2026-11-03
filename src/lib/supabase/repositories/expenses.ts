@@ -59,7 +59,7 @@ function selectOwnedExpensePage(supabase: SupabaseClient<Database>, userId: stri
 function applyExpenseScope(query: ExpenseFilterQuery, options: ExpenseQuery) {
   if (options.tab) {
     // Throws for a key outside the category and subtype catalogue: nothing unchecked reaches `.or()`.
-    // eslint-disable-next-line no-restricted-syntax -- the string comes from expenseTabMembershipFilter, which checks every key
+    // eslint-disable-next-line local/postgrest-filter-string -- the string comes from expenseTabMembershipFilter, which checks every key
     query = query.or(expenseTabMembershipFilter(options.tab.categoryKeys, options.tab.subtypeKeys));
   }
   if (options.start) query = query.gte("expense_date", options.start);

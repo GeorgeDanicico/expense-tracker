@@ -18,6 +18,7 @@ import {
   daysInMonth,
   formatDate,
   formatMonth,
+  formatMonthLabel,
   getBucharestMonth,
   getMonthRange,
   isValidDate,
@@ -385,10 +386,7 @@ export function analyticsFromSummary(
       ? [{ key: range.start, label: formatDate(range.start), total }]
       : monthKeysBetween(range.start, range.endExclusive).map((key) => ({
           key,
-          label: new Intl.DateTimeFormat("en-US", {
-            month: "short",
-            year: range.monthCount > 12 ? "2-digit" : undefined,
-          }).format(new Date(`${key}-01T12:00:00`)),
+          label: formatMonthLabel(key, range.monthCount > 12),
           total: monthMap.get(key) ?? 0,
         }));
 

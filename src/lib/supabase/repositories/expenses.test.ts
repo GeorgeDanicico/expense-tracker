@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_EXPENSE_TAB_FILTERS, type ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { Expense } from "@/lib/expenses/types";
+import { fieldErrorsOf } from "@/lib/validation/field-errors";
 import { aTab, anExpense } from "@/test/builders";
 import { fakeSupabase, type FakeSupabaseOptions } from "@/test/fake-supabase";
 
@@ -81,7 +82,7 @@ describe("update", () => {
     const error = await repository.update("owner", "fuel", patch).catch((caught) => caught);
 
     expect(error).toBeInstanceOf(ZodError);
-    expect((error as ZodError).flatten().fieldErrors).toHaveProperty(field);
+    expect(fieldErrorsOf(error as ZodError)).toHaveProperty(field);
     expect(rpcs).toEqual([]);
   });
 

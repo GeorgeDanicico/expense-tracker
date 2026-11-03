@@ -8,6 +8,7 @@ import { decodeStatementText } from "@/lib/imports/decode";
 import { flagDuplicates } from "@/lib/imports/duplicates";
 import { parseStatement } from "@/lib/imports/parser";
 import { maskAccountNumbers } from "@/lib/imports/redact";
+import { formatInstantDay } from "@/lib/imports/recent";
 import type { RecentImport } from "@/lib/imports/repository";
 import {
   ImportError,
@@ -317,10 +318,6 @@ function draftRows(rows: ReturnType<typeof previewDraft>["rows"]): StoredRow[] {
   });
 }
 
-function importDay(iso: string) {
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long" }).format(new Date(iso));
-}
-
 function liveDraft(id: string): StoredImport {
   const stored = imports().get(id);
   if (!stored) throw notFound();
@@ -383,7 +380,7 @@ export const previewImportApi: ImportApi = {
     if (same?.batch.status === "draft") return { batch: same.batch, reopened: true, warnings: [] };
     if (same) {
       throw new ApiError(
-        `You imported this statement on ${importDay(same.batch.confirmedAt ?? new Date().toISOString())}. Undo that import to import it again.`,
+        `You imported this statement on ${formatInstantDay(same.batch.confirmedAt ?? new Date().toISOString(), { now: new Date(), long: true })}. Undo that import to import it again.`,
         409,
       );
     }

@@ -4,7 +4,7 @@ import { Box, chakra, Flex, Stack, Text, VisuallyHidden } from "@chakra-ui/react
 import { useState, type ReactNode } from "react";
 
 import { useMemberColors } from "@/hooks/use-member-colors";
-import { formatMonth } from "@/lib/calendar";
+import { formatMonth, formatMonthLabel } from "@/lib/calendar";
 import { categoryBars, trendColumns, type Segment } from "@/lib/expenses/family-charts";
 import type { FamilyDashboardMember } from "@/lib/expenses/types";
 import { formatCurrency } from "@/lib/utils/currency";
@@ -131,10 +131,6 @@ function DataTable({ caption, columns, rows }: { caption: string; columns: strin
   );
 }
 
-function shortMonth(key: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(new Date(`${key}-01T12:00:00Z`));
-}
-
 /** Stacked columns: one per month (the last completed months, then this one), one segment per member. */
 export function MonthlyTrendChart({ members, currency, selected, onSelect, currentMonth }: ChartProps & { currentMonth: string }) {
   const [active, setActive] = useState<string | null>(null);
@@ -145,7 +141,7 @@ export function MonthlyTrendChart({ members, currency, selected, onSelect, curre
     <Stack gap="3">
       <Flex gap="3" align="stretch" role="group" aria-label="Spending by month, split by member">
         {columns.map((column, columnIndex) => {
-          const label = column.key === currentMonth ? "This month" : shortMonth(column.key);
+          const label = column.key === currentMonth ? "This month" : formatMonthLabel(column.key);
           const segments = column.segments.filter((segment) => segment.total > 0);
           const align = alignAt(columns.length > 1 ? columnIndex / (columns.length - 1) : 0.5);
           return (

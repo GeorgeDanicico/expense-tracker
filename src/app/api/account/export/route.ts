@@ -1,5 +1,6 @@
 import { exportArchiveStream } from "@/lib/account/export";
 import type { ExportSection } from "@/lib/account/data-repository";
+import { getBucharestToday } from "@/lib/calendar";
 import { dataExportAttempts, TOO_MANY_DATA_EXPORTS } from "@/lib/http/rate-limit";
 import { PRIVATE_HEADERS, tooManyRequests, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
@@ -36,7 +37,7 @@ export const POST = withUser(async (_request, user) => {
     picture: picture ? new Uint8Array(picture) : null,
   });
 
-  const day = new Date().toISOString().slice(0, 10);
+  const day = getBucharestToday();
   return new Response(stream, {
     status: 200,
     headers: {

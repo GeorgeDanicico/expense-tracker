@@ -135,7 +135,7 @@ export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSu
     neq(column: string, value: unknown) { return this.filter("neq", column, value); }
     is(column: string, value: null) { return this.filter("is", column, value); }
     /** Only `not(column, "is", null)`. */
-    // eslint-disable-next-line no-restricted-syntax -- the test fake's own filter recorder, not PostgREST; the operator is the literal "is"
+    // eslint-disable-next-line local/postgrest-filter-string -- the test fake's own filter recorder, not PostgREST; the operator is the literal "is"
     not(column: string, operator: "is", value: null) { return this.filter(`not.${operator}`, column, value); }
     in(column: string, values: unknown[]) { return this.filter("in", column, values); }
     gt(column: string, value: string) { return this.filter("gt", column, value); }

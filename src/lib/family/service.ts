@@ -1,7 +1,5 @@
 import "server-only";
 
-import type { z } from "zod";
-
 import { getAuthAdmin } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
 import { kidAccountEmail } from "@/lib/family/kid-account";
@@ -9,6 +7,7 @@ import type { CurrentMember } from "@/lib/family/repository";
 import { errorFields, log } from "@/lib/log";
 import { getRepositories } from "@/lib/repositories";
 import { createKidSchema } from "@/lib/validation/family";
+import { fieldErrorsOf } from "@/lib/validation/field-errors";
 
 export type CreatedKid = {
   /** The new account's user id. */
@@ -18,11 +17,6 @@ export type CreatedKid = {
 };
 
 const INVALID_KID = "Check the kid's details and try again.";
-
-function fieldErrors(error: z.ZodError): Record<string, string[]> {
-  const entries = Object.entries(error.flatten().fieldErrors as Record<string, string[] | undefined>);
-  return Object.fromEntries(entries.filter((entry): entry is [string, string[]] => entry[1] !== undefined));
-}
 
 /**
  * Creates a kid account for `parent`'s family and adds it as a kid with the given permissions.
@@ -38,7 +32,7 @@ function fieldErrors(error: z.ZodError): Record<string, string[]> {
  */
 export async function createKidAccount(parent: CurrentMember, input: unknown): Promise<CreatedKid> {
   const parsed = createKidSchema.safeParse(input);
-  if (!parsed.success) throw new DomainError(INVALID_KID, 422, fieldErrors(parsed.error));
+  if (!parsed.success) throw new DomainError(INVALID_KID, 422, fieldErrorsOf(parsed.error));
   const { displayName, username, password, permissions } = parsed.data;
 
   // Only after the route's parent check: the admin client bypasses every database rule.

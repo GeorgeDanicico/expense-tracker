@@ -23,14 +23,13 @@ import { logRequest, logRequestFailure } from "@/lib/http/request-log";
 import { ImportError } from "@/lib/imports/types";
 import { addRequestFields, currentRequest, setRequestUser } from "@/lib/log/request-context";
 import { getRepositories } from "@/lib/repositories";
+import { fieldErrorsOf } from "@/lib/validation/field-errors";
 import { idSchema } from "@/lib/validation/primitives";
 
 /** Every API response is per-user data and must never be cached by browsers or proxies. */
 export const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" } as const;
 
 export { HttpError };
-
-type FieldErrors = Record<string, string[] | undefined>;
 
 /** JSON response that always carries the private no-store header. */
 export function json(body: unknown, init: number | ResponseInit = {}) {
@@ -71,7 +70,7 @@ export function parseId(id: string, message: string) {
 /** Validates already-read input, throwing a 422 with `message` and the schema's field errors. */
 export function parseInput<S extends z.ZodType>(input: unknown, schema: S, message: string): z.output<S> {
   const parsed = schema.safeParse(input);
-  if (!parsed.success) throw new HttpError(422, message, parsed.error.flatten().fieldErrors as FieldErrors);
+  if (!parsed.success) throw new HttpError(422, message, fieldErrorsOf(parsed.error));
   return parsed.data;
 }
 

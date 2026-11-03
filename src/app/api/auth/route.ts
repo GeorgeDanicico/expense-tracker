@@ -13,6 +13,7 @@ import {
   TOO_MANY_SIGN_UPS,
 } from "@/lib/http/rate-limit";
 import { json, readJson, tooManyRequests, withRequestGuard } from "@/lib/http/route";
+import { fieldErrorsOf } from "@/lib/validation/field-errors";
 import { usernameSchema } from "@/lib/validation/family";
 
 const emailSchema = z.email("Enter a valid email address.");
@@ -58,7 +59,7 @@ function invalidBody(error: z.ZodError) {
   return json(
     {
       error: "Check the highlighted details and try again.",
-      fieldErrors: error.flatten().fieldErrors,
+      fieldErrors: fieldErrorsOf(error),
     },
     422,
   );

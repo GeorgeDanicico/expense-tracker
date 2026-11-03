@@ -4,20 +4,14 @@ import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { StatusBadge } from "@/components/ui/status-badge";
-import type { FamilyMemberView, FamilyView } from "@/lib/family/views";
+import { formatUtcDay } from "@/lib/calendar";
 import { memberColorTokens } from "@/lib/family/member-colors";
-
-const joinedFormatter = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
+import type { FamilyMemberView, FamilyView } from "@/lib/family/views";
 
 /** "Joined 12 Oct 2026", or an empty string when the date can't be read. */
 export function joinedLabel(joinedAt: string): string {
   const date = new Date(joinedAt);
-  return Number.isNaN(date.getTime()) ? "" : `Joined ${joinedFormatter.format(date)}`;
+  return Number.isNaN(date.getTime()) ? "" : `Joined ${formatUtcDay(date)}`;
 }
 
 function MemberRow({ member, color }: { member: FamilyMemberView; color: string | undefined }) {

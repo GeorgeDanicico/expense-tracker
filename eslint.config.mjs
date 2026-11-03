@@ -2,43 +2,62 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
-const COLOR_PROPS = "/^(color|bg|bgColor|background|backgroundColor|borderColor|fill|stroke)$/";
-const HEX = "/^#[0-9a-fA-F]{3,8}$/";
-const THEME_PALETTES = "/^(brand|neutral|danger|success|warning|info)$/";
-const CONTROLS = "/^(Button|IconButton|Input|Textarea)$/";
-const MEMBER_CONTROLS =
-  "JSXOpeningElement[name.type='JSXMemberExpression'][name.object.name=/^(NativeSelect|Dialog|Tabs)$/][name.property.name=/^(Field|Content|Trigger)$/]";
-
-const FILTER_CALL = "CallExpression[callee.type='MemberExpression']";
-const FILTER_MESSAGE =
-  "Don't build a PostgREST filter from a string: it can inject operators and clauses. Pass values as arguments (.eq, .in, .gte), " +
-  "or check each part against a catalogue first (see src/lib/supabase/filters.ts). A reviewed constant may use " +
-  "// eslint-disable-next-line no-restricted-syntax -- <reason>.";
+import local from "./eslint-rules/index.mjs";
 
 /**
- * Injection guard (security plan S8): the string given to `.or()` and `.filter()` is parsed by
- * PostgREST, so `,` `(` `)` and `.` in it change the query. A template literal or `+` there is
- * refused, and so is any `.or()` argument that isn't a plain string literal (for example a joined
- * array). Where the string is built from a catalogue or is a constant, add a reviewed disable comment.
+ * The project's own rules (eslint-rules/, explained in docs/lint-rules.md). Every rule is its own
+ * name, so a block for some files can't replace another block's options the way a second
+ * `no-restricted-syntax` does. A new rule is added to the plugin, to a block here and to
+ * docs/lint-rules.md; a test checks all three.
  */
-const injectionRestrictions = [
-  {
-    selector: `${FILTER_CALL}[callee.property.name=/^(or|filter)$/] > TemplateLiteral.arguments:first-child`,
-    message: FILTER_MESSAGE,
-  },
-  {
-    selector: `${FILTER_CALL}[callee.property.name=/^(or|filter)$/] > BinaryExpression[operator='+'].arguments:first-child`,
-    message: FILTER_MESSAGE,
-  },
-  {
-    selector: `${FILTER_CALL}[callee.property.name='or'] > :not(:matches(Literal, TemplateLiteral, BinaryExpression[operator='+'])).arguments:first-child`,
-    message: FILTER_MESSAGE,
-  },
+const localPlugin = { plugins: { local } };
+
+/**
+ * Modules whose components no longer call `fetch` or `apiRequest` (their requests live in an API
+ * object and hooks, like src/components/todos). Add a module's folders when it is converted, for
+ * example "src/components/expenses" and "src/app/(app)/expenses" (U8 to U11 in docs/ui-plan.md).
+ */
+const CONVERTED_MODULES = [];
+
+/**
+ * The modules that are the app's date formatters: the rule against `Intl.DateTimeFormat` and
+ * `toLocale*String` exempts them, since they are where those calls belong. The general formatter
+ * is src/lib/calendar.ts; the others format one domain's dates in one place each.
+ */
+const DATE_FORMATTER_MODULES = [
+  "src/lib/calendar.ts",
+  "src/lib/time-zone.ts",
+  "src/lib/ai/month.ts",
+  "src/lib/family/last-active-label.ts",
+  "src/lib/family-calendar/view.ts",
+  "src/lib/imports/recent.ts",
+  "src/lib/imports/review.ts",
+  "src/lib/reminders/format.ts",
 ];
 
-const injectionGuard = {
+const localRules = {
   files: ["src/**/*.{ts,tsx}"],
-  rules: { "no-restricted-syntax": ["error", ...injectionRestrictions] },
+  rules: {
+    // Injection guard (security plan S8): string-built PostgREST filters.
+    "local/postgrest-filter-string": "error",
+    "local/no-iso-date-slice": "error",
+    "local/no-redundant-swr-fetcher": "error",
+    "local/no-window-confirm": "error",
+    "local/no-zod-flatten": "error",
+  },
+};
+
+const dateFormatting = {
+  files: ["src/**/*.{ts,tsx}"],
+  ignores: DATE_FORMATTER_MODULES,
+  rules: { "local/no-locale-date-without-zone": "error" },
+};
+
+/** Requests belong to a converted module's API object, not to its components or pages. */
+const noFetchInComponents = {
+  files: ["src/components/**/*.{ts,tsx}", "src/app/**/*.{ts,tsx}"],
+  ignores: ["src/app/api/**"],
+  rules: { "local/no-fetch-in-components": ["error", { modules: CONVERTED_MODULES }] },
 };
 
 /**
@@ -49,41 +68,21 @@ const uiGuardrails = {
   files: ["src/**/*.{ts,tsx}"],
   ignores: ["src/components/ui/**"],
   rules: {
-    // Replaces injectionGuard's options for these files, so they are repeated at the end.
-    "no-restricted-syntax": [
-      "error",
-      {
-        selector: `JSXAttribute[name.name=${COLOR_PROPS}] Literal[value=${HEX}]`,
-        message: "Use a colour token (e.g. fg.muted, status.warning.fg) instead of a hex value.",
-      },
-      ...[
-        `JSXAttribute[name.name="colorPalette"] > Literal`,
-        `JSXAttribute[name.name="colorPalette"] > JSXExpressionContainer > Literal`,
-        `JSXAttribute[name.name="colorPalette"] ConditionalExpression > Literal.consequent`,
-        `JSXAttribute[name.name="colorPalette"] ConditionalExpression > Literal.alternate`,
-      ].map((literal) => ({
-        selector: `${literal}:not([value=${THEME_PALETTES}])`,
-        message: "Use a theme palette: brand, neutral, danger, success, warning or info.",
-      })),
-      {
-        selector: `JSXOpeningElement[name.name=${CONTROLS}] > JSXAttribute[name.name=/^(borderRadius|rounded)$/]`,
-        message: "Control radius comes from the theme recipe; remove borderRadius.",
-      },
-      {
-        selector: `${MEMBER_CONTROLS} > JSXAttribute[name.name=/^(borderRadius|rounded)$/]`,
-        message: "Control and dialog radius comes from the theme recipe; remove borderRadius.",
-      },
-      {
-        selector: `JSXOpeningElement[name.name=${CONTROLS}] > JSXAttribute[name.name=/^(minH|minHeight)$/][value.value=/^(11|14)$/]`,
-        message: "Controls use theme sizes (xs/sm/md); don't force 44px minimum heights.",
-      },
-      {
-        selector: `${MEMBER_CONTROLS} > JSXAttribute[name.name=/^(minH|minHeight)$/][value.value=/^(11|14)$/]`,
-        message: "Controls use theme sizes (xs/sm/md); don't force 44px minimum heights.",
-      },
-      ...injectionRestrictions,
-    ],
+    "local/theme-colors": "error",
+    "local/theme-radius": "error",
+    "local/theme-control-size": "error",
+    "local/no-raw-dialog": "error",
   },
+};
+
+/**
+ * Motion comes from the theme's tokens. No tokens exist yet (U4 in docs/ui-plan.md adds them), so
+ * the few literal durations in components are warnings until then; see docs/lint-rules.md.
+ */
+const motion = {
+  files: ["src/**/*.{ts,tsx}"],
+  ignores: ["src/components/ui/theme/**"],
+  rules: { "local/motion-tokens": "warn" },
 };
 
 /**
@@ -168,8 +167,12 @@ const noConsole = {
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  injectionGuard,
+  localPlugin,
+  localRules,
+  dateFormatting,
+  noFetchInComponents,
   uiGuardrails,
+  motion,
   supabaseBoundary,
   workerBoundary,
   noConsole,

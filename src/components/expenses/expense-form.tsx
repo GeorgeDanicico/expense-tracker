@@ -12,7 +12,7 @@ import { apiRequest } from "@/lib/api/client";
 import { afterExpenseCreated } from "@/lib/api/invalidate";
 import { subtypeForCategory, type ExpenseCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
 import type { Expense } from "@/lib/expenses/types";
-import { getMonthRange } from "@/lib/calendar";
+import { getMonthRange, lastDayOfMonth } from "@/lib/calendar";
 
 /** Add-expense form body. Submits to `/api/expenses` and updates the SWR caches. */
 export function ExpenseForm({
@@ -33,9 +33,7 @@ export function ExpenseForm({
   const [category, setCategory] = useState<ExpenseCategory>("groceries");
   const [subtype, setSubtype] = useState<ExpenseSubtype | null>(null);
   const range = getMonthRange(selectedMonth);
-  const endDate = new Date(`${range.endExclusive}T12:00:00`);
-  endDate.setDate(endDate.getDate() - 1);
-  const maxDate = endDate.toISOString().slice(0, 10);
+  const maxDate = lastDayOfMonth(range.month);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

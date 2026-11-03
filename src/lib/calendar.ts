@@ -183,3 +183,34 @@ export function formatDateTime(date: string, locale = "en-US") {
     timeStyle: "short",
   }).format(new Date(date));
 }
+
+/** The day of an instant (an ISO timestamp) in the viewer's zone, in `locale`: "12 Oct 2026". */
+export function formatInstantDate(iso: string, locale = "en-GB") {
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso));
+}
+
+const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const shortDateWithYearFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** "Oct 12", or "Oct 12, 2026" with `withYear`: a `YYYY-MM-DD` date, never shifted by a time zone. */
+export function formatShortDate(date: string, withYear = false) {
+  return (withYear ? shortDateWithYearFormatter : shortDateFormatter).format(new Date(`${date}T12:00:00Z`));
+}
+
+/** "Oct 12, 2026": the UTC day of an instant, for a date stored as a timestamp (a join date, say). */
+export function formatUtcDay(instant: Date) {
+  return shortDateWithYearFormatter.format(instant);
+}
+
+const monthLabelFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
+const monthLabelWithYearFormatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" });
+
+/** "Oct", or "Oct 26" with `withYear`: an axis label for a `YYYY-MM` month. */
+export function formatMonthLabel(month: string, withYear = false) {
+  return (withYear ? monthLabelWithYearFormatter : monthLabelFormatter).format(new Date(`${month}-01T12:00:00`));
+}
