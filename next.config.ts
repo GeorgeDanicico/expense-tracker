@@ -8,7 +8,16 @@ const allowedDevOrigins = Object.values(networkInterfaces())
   .filter((address) => address.family === "IPv4" && !address.internal)
   .map((address) => address.address);
 
+/**
+ * The commit this build is from, for the browser to send with its error reports (logging plan, L7) so
+ * a stack can be matched to a build. `GIT_SHA` is set by CI and `scripts/deploy.sh` (see the
+ * Dockerfile); only a commit hash is passed on, anything else (or nothing) becomes empty. It's public
+ * by design: it goes into the bundle every visitor downloads.
+ */
+const release = /^[A-Za-z0-9]{1,64}$/.test(process.env.GIT_SHA ?? "") ? (process.env.GIT_SHA as string) : "";
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_RELEASE: release },
   allowedDevOrigins,
   poweredByHeader: false,
   output: "standalone",

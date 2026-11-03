@@ -11,3 +11,19 @@ import { z } from "zod";
  * keeps the fast path: no CSP applies there.
  */
 z.config({ jitless: true });
+
+/**
+ * Errors nothing caught, sent to the server's logs through `src/lib/client-log.ts` (logging plan,
+ * L7): an uncaught error, and a promise rejected with no handler (an `ApiError` among them, which
+ * carries the `requestId` of the failed request). Errors an error boundary catches are reported by
+ * the boundary.
+ *
+ * The reporter is loaded when the first error happens, not imported here: it builds Zod schemas when
+ * it loads, and an import is evaluated before the `z.config` call above.
+ */
+window.addEventListener("error", (event) => {
+  void import("@/lib/client-log").then((log) => log.handleWindowError(event)).catch(() => {});
+});
+window.addEventListener("unhandledrejection", (event) => {
+  void import("@/lib/client-log").then((log) => log.handleUnhandledRejection(event)).catch(() => {});
+});
