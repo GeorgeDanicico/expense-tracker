@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { z } from "zod";
 
 import { PERMISSION_PRESETS } from "@/lib/permissions";
 import {
@@ -11,6 +12,11 @@ import {
   permissionsSchema,
   usernameSchema,
 } from "@/lib/validation/family";
+import { fieldErrorsOf } from "@/lib/validation/field-errors";
+
+function fieldErrorsOfParse(result: z.ZodSafeParseResult<unknown>) {
+  return result.success ? undefined : fieldErrorsOf(result.error);
+}
 
 function messages(result: { success: boolean; error?: { issues: { message: string }[] } }) {
   return result.error?.issues.map((issue) => issue.message) ?? [];
@@ -143,14 +149,14 @@ describe("createInviteSchema", () => {
   });
 
   it("requires permissions for a kid invite", () => {
-    expect(createInviteSchema.safeParse({ role: "kid" }).error?.flatten().fieldErrors).toEqual({
+    expect(fieldErrorsOfParse(createInviteSchema.safeParse({ role: "kid" }))).toEqual({
       permissions: ["Choose what the kid can use."],
     });
   });
 
   it("refuses permissions on a parent invite", () => {
     expect(
-      createInviteSchema.safeParse({ role: "parent", permissions: PERMISSION_PRESETS.teen }).error?.flatten().fieldErrors,
+      fieldErrorsOfParse(createInviteSchema.safeParse({ role: "parent", permissions: PERMISSION_PRESETS.teen })),
     ).toEqual({ permissions: ["Parents always have full access."] });
   });
 
@@ -176,6 +182,6 @@ describe("joinFamilySchema", () => {
     const result = joinFamilySchema.safeParse(body);
 
     expect(result.success).toBe(false);
-    expect(result.error?.flatten().fieldErrors).toEqual({ code: ["Enter the 8-character invite code."] });
+    expect(fieldErrorsOfParse(result)).toEqual({ code: ["Enter the 8-character invite code."] });
   });
 });

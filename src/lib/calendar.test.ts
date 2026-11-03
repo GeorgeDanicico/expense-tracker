@@ -7,7 +7,11 @@ import {
   APPLICATION_TIMEZONE,
   dateInMonth,
   daysInMonth,
+  formatInstantDate,
   formatMonth,
+  formatMonthLabel,
+  formatShortDate,
+  formatUtcDay,
   getMonthRange,
   lastDayOfMonth,
   monthKeysBetween,
@@ -145,5 +149,26 @@ describe("the application clock", () => {
     vi.setSystemTime(new Date("2026-12-31T21:59:59Z"));
     expect(getMonthRange("").month).toBe("2026-12");
     expect(shiftMonth("bad", 1)).toBe("2027-01");
+  });
+});
+
+describe("date formatters", () => {
+  it("formats a calendar date without shifting it by a time zone", () => {
+    expect(formatShortDate("2026-10-25")).toBe("Oct 25");
+    expect(formatShortDate("2027-01-01", true)).toBe("Jan 1, 2027");
+  });
+
+  it("formats the UTC day of an instant", () => {
+    expect(formatUtcDay(new Date("2026-10-12T23:30:00Z"))).toBe("Oct 12, 2026");
+  });
+
+  it("abbreviates a month, with a two-digit year when asked", () => {
+    expect(formatMonthLabel("2026-10")).toBe("Oct");
+    expect(formatMonthLabel("2026-10", true)).toBe("Oct 26");
+  });
+
+  it("formats the day of a timestamp in the chosen locale", () => {
+    expect(formatInstantDate("2026-10-12T12:00:00Z")).toBe("12 Oct 2026");
+    expect(formatInstantDate("2026-10-12T12:00:00Z", "en-US")).toBe("Oct 12, 2026");
   });
 });

@@ -16,7 +16,6 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { Stat } from "@/components/ui/stat";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useViewing } from "@/hooks/use-viewing";
-import { apiFetcher } from "@/lib/api/client";
 import { investmentTransactionsApiKey } from "@/lib/api/keys";
 import type {
   InvestmentBrokerId,
@@ -72,7 +71,7 @@ export function AssetDetail({
   const viewing = useViewing();
   const member = ownerMember ?? viewing.member;
   const key = investmentTransactionsApiKey({ accountId, instrument: asset.instrument, currency: asset.currency, member });
-  const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentTransactionsResponse>(key, apiFetcher);
+  const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentTransactionsResponse>(key);
   const unrealized = getInvestmentGainPresentation(asset.unrealizedGain, asset.currency);
   const realized = getInvestmentGainPresentation(asset.realizedGain, asset.currency);
 

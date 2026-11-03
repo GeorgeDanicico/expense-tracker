@@ -28,11 +28,11 @@ import {
   withAllDay,
   withStart,
   type EventDraft,
-  type FieldErrors,
 } from "@/lib/family-calendar/form";
 import { MAX_SERIES_LENGTH, MIN_REPEAT_COUNT, type CalendarEvent, type EditScope, type SeriesRepeat } from "@/lib/family-calendar/types";
 import { dayHeading } from "@/lib/family-calendar/view";
 import type { CalendarEventEdit, CalendarEventInput } from "@/lib/validation/calendar-event";
+import type { FieldErrors } from "@/lib/validation/field-errors";
 
 export type EventDialogMode =
   | {

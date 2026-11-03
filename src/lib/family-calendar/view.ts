@@ -1,4 +1,4 @@
-import { addDays, addMonths, daysInMonth, isValidDate, toIsoDate } from "@/lib/calendar";
+import { addDays, addMonths, daysInMonth, formatShortDate, isValidDate, toIsoDate } from "@/lib/calendar";
 import { DEFAULT_EVENT_TIMEZONE } from "@/lib/family-calendar/types";
 import { zonedTimeToUtc } from "@/lib/time-zone";
 
@@ -173,20 +173,11 @@ export function neighbourRanges(view: CalendarView, date: string, weekLength = W
   ];
 }
 
-function shortDate(date: string, withYear: boolean) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    ...(withYear ? { year: "numeric" } : {}),
-    timeZone: "UTC",
-  }).format(new Date(`${date}T12:00:00Z`));
-}
-
 /** "Oct 26 – Nov 1, 2026", or "Dec 28, 2026 – Jan 3, 2027" across a year. */
 function spanTitle(first: string, last: string) {
   return first.slice(0, 4) === last.slice(0, 4)
-    ? `${shortDate(first, false)} – ${shortDate(last, true)}`
-    : `${shortDate(first, true)} – ${shortDate(last, true)}`;
+    ? `${formatShortDate(first, false)} – ${formatShortDate(last, true)}`
+    : `${formatShortDate(first, true)} – ${formatShortDate(last, true)}`;
 }
 
 /**

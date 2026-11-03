@@ -19,7 +19,7 @@ import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { useApiForm } from "@/hooks/use-api-form";
 import { createMcpToken, regenerateMcpToken, revokeMcpToken } from "@/hooks/use-mcp-settings";
 import { MCP_SETTINGS_API_KEY, type CreatedMcpToken } from "@/lib/api/keys";
-import { formatDateTime } from "@/lib/calendar";
+import { formatDateTime, formatInstantDate } from "@/lib/calendar";
 import {
   DEFAULT_MCP_TOKEN_EXPIRY,
   MCP_TOKEN_EXPIRIES,
@@ -52,15 +52,11 @@ export function tokenDisplayPrefix(token: Pick<McpToken, "prefix">) {
   return `${token.prefix}…`;
 }
 
-function formatDay(iso: string) {
-  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
-}
-
 /** The token list's two caption lines: prefix and created, then last used ("Never" when unused). */
 export function tokenMeta(token: McpToken) {
   const lastUsed = token.lastUsedAt ? formatDateTime(token.lastUsedAt, "en-GB") : "Never";
   return {
-    meta: `${tokenDisplayPrefix(token)} · Created ${formatDay(token.createdAt)}`,
+    meta: `${tokenDisplayPrefix(token)} · Created ${formatInstantDate(token.createdAt)}`,
     detail: `Last used: ${lastUsed}`,
   };
 }

@@ -303,7 +303,7 @@ The Chakra theme in `src/components/ui/theme/` is the single source of styling (
 - **Colour:** use semantic tokens (`bg.surface`, `fg.muted`, `border`, `status.warning.fg`, `category.<key>.fg`) and the palettes `brand`, `neutral`, `danger`, `success`, `warning`, `info`. No hex values in components.
 - **Actions:** one primary action per view (`variant="solid" colorPalette="brand"`); everything else is `outline` (the default) or `ghost`.
 - **Building blocks:** `Avatar`, `Card`, `PageHeader`, `SectionHeader`, `AppDialog`, `ConfirmDialog`, `FormField`/`FormRow`, `FormActions`, `Stat`/`StatGroup`, `Amount`, `ListRow`, `EmptyState`, `InlineAlert`, `StatusBadge`/`CategoryBadge`, `SegmentedControl`, `Toolbar`, `IconButton` and the `ICON` sizes.
-- **Guardrails:** `npm run lint` rejects hex colours, unknown colour palettes, radius overrides on controls and forced 44px minimum heights outside `src/components/ui/`.
+- **Guardrails:** `npm run lint` rejects hex colours, unknown colour palettes, radius overrides on controls and forced 44px minimum heights outside `src/components/ui/`. These and the other project rules (dates, SWR fetchers, dialogs, motion, zod errors) are a local ESLint plugin in `eslint-rules/`, and each is explained, with how to disable it, in [docs/lint-rules.md](docs/lint-rules.md). A problem a review finds that a machine can spot gets a rule there.
 
 In development, `/dev/ui` shows every primitive, size, tone and token, and `/dev/preview/<screen>` (`dashboard`, `expenses`, `investments`, `net-worth`, `settings`, `todos`, `reminders`, `notifications`) renders the real screens with fixture data so they can be reviewed without signing in. Both routes return 404 in production builds.
 

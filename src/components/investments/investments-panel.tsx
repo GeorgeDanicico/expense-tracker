@@ -20,7 +20,6 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useViewing } from "@/hooks/use-viewing";
-import { apiFetcher } from "@/lib/api/client";
 import { investmentsApiKey } from "@/lib/api/keys";
 import { familyInvestmentTotals } from "@/lib/investments/family-totals";
 import { investmentAssetKey } from "@/lib/investments/identity";
@@ -44,7 +43,7 @@ function CalculationIssues({ overview }: { overview: InvestmentsOverview }) {
 function SingleInvestmentsPanel() {
   useDocumentTitle("Investments");
   const { member, readOnly, name } = useViewing();
-  const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentsOverview>(investmentsApiKey(member), apiFetcher);
+  const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentsOverview>(investmentsApiKey(member));
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   if (isLoading && !data) return <DataLoading label="Loading your investments…" />;
@@ -140,7 +139,7 @@ function FamilyTotals({ data }: { data: FamilyInvestmentsOverview }) {
 /** The family view: one section per member, using the same broker sections, read-only. */
 function FamilyInvestmentsPanel() {
   useDocumentTitle("Investments");
-  const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyInvestmentsOverview>(investmentsApiKey("all"), apiFetcher);
+  const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyInvestmentsOverview>(investmentsApiKey("all"));
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   if (isLoading && !data) return <DataLoading label="Loading the family's investments…" />;

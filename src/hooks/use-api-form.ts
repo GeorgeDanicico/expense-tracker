@@ -3,8 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { ApiError } from "@/lib/api/client";
-
-type FieldErrors = Record<string, string[]>;
+import type { FieldErrors } from "@/lib/validation/field-errors";
 
 export type ApiFormState = {
   /** The `action` of the submit in flight, or `null` when idle. */

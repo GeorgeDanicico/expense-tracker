@@ -6,6 +6,7 @@ import { getExpenseTabLedger } from "@/lib/expenses/service";
 import { resolveViewedUserFor } from "@/lib/family/viewed-user";
 import { withPermission } from "@/lib/http/permission";
 import { HttpError, json, notFound, parseId } from "@/lib/http/route";
+import { fieldErrorsOf } from "@/lib/validation/field-errors";
 
 type TabRouteContext = { params: Promise<{ id: string }> };
 
@@ -14,7 +15,7 @@ export const GET = withPermission("expenses", "edit", async (request: NextReques
   const id = parseId((await context.params).id, "Invalid tab identifier.");
   const parsed = parseExpenseTabFilters(request.nextUrl.searchParams);
   if (!parsed.success) {
-    throw new HttpError(422, "Check the expense filters and try again.", parsed.error.flatten().fieldErrors);
+    throw new HttpError(422, "Check the expense filters and try again.", fieldErrorsOf(parsed.error));
   }
   const ledger: ExpenseTabLedgerData =
     await getExpenseTabLedger(userId, id, parsed.data) ?? notFound("Expense tab not found.");

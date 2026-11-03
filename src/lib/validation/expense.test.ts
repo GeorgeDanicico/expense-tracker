@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { expenseClassificationLabel, subtypesForCategory, subtypeForCategory } from "@/lib/expenses/categories";
 import { expenseSchema, validateExpensePatch } from "@/lib/validation/expense";
+import { fieldErrorsOf } from "@/lib/validation/field-errors";
 
 const input = { description: "Car service", amount: "12.50", category: "car", expenseDate: "2026-09-01" };
 
@@ -19,7 +20,7 @@ describe("expense classifications", () => {
     for (const data of [{ ...input, category: "transport", subtype: "car_fuel" }, { ...input, subtype: "fuel" }]) {
       const result = expenseSchema.safeParse(data);
       expect(result.success).toBe(false);
-      if (!result.success) expect(result.error.flatten().fieldErrors.subtype).toHaveLength(1);
+      if (!result.success) expect(fieldErrorsOf(result.error).subtype).toHaveLength(1);
     }
   });
 
@@ -40,7 +41,7 @@ describe("expense amounts (two decimal places)", () => {
   const amountOf = (amount: unknown) => expenseSchema.safeParse({ ...input, amount });
   const errorOf = (amount: unknown) => {
     const result = amountOf(amount);
-    return result.success ? undefined : result.error.flatten().fieldErrors.amount;
+    return result.success ? undefined : fieldErrorsOf(result.error).amount;
   };
 
   it.each([

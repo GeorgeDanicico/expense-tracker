@@ -7,19 +7,14 @@ import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { useMemberColors } from "@/hooks/use-member-colors";
-import { getBucharestToday } from "@/lib/calendar";
+import { formatShortDate, getBucharestToday } from "@/lib/calendar";
 import { isOverdue } from "@/lib/todos/filters";
 import type { Todo } from "@/lib/todos/types";
 
 /** "Oct 25" this year, "Oct 25, 2027" in another. */
 export function formatDueDate(date: string, now = new Date()) {
   const sameYear = date.slice(0, 4) === getBucharestToday(now).slice(0, 4);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-    timeZone: "UTC",
-  }).format(new Date(`${date}T12:00:00Z`));
+  return formatShortDate(date, !sameYear);
 }
 
 /** The assignee's name as the card shows it. */

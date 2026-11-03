@@ -20,7 +20,6 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { PageHeader } from "@/components/ui/page-header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useViewing } from "@/hooks/use-viewing";
-import { apiFetcher } from "@/lib/api/client";
 import { netWorthApiKey } from "@/lib/api/keys";
 import type { FamilyNetWorthOverview, NetWorthEntry, NetWorthOverview } from "@/lib/net-worth/types";
 
@@ -51,7 +50,7 @@ function groupedEntries(entries: NetWorthEntry[]) {
 function SingleNetWorthPanel() {
   useDocumentTitle("Net worth");
   const { member, currency, readOnly, name } = useViewing();
-  const { data, error, isLoading, isValidating, mutate } = useSWR<NetWorthOverview>(netWorthApiKey(member), apiFetcher);
+  const { data, error, isLoading, isValidating, mutate } = useSWR<NetWorthOverview>(netWorthApiKey(member));
   const grouped = useMemo(() => groupedEntries(data?.entries ?? []), [data?.entries]);
 
   if (isLoading && !data) return <DataLoading label="Loading your net worth…" />;
@@ -107,7 +106,7 @@ function SingleNetWorthPanel() {
 /** The family view: the members' totals added per currency, then each member's balance sheet, read-only. */
 function FamilyNetWorthPanel() {
   useDocumentTitle("Net worth");
-  const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyNetWorthOverview>(netWorthApiKey("all"), apiFetcher);
+  const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyNetWorthOverview>(netWorthApiKey("all"));
 
   if (isLoading && !data) return <DataLoading label="Loading the family's net worth…" />;
   if (error && !data) return <DataError retry={() => void mutate()} />;

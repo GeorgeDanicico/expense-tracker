@@ -5,7 +5,7 @@ import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories"
  *
  * `.or()` and `.filter()` take a string that PostgREST parses itself, so a `,` `(` `)` or `.` in a
  * value would change the query. Values passed to `.eq()`, `.in()` and the like are encoded by
- * supabase-js and are safe. Anything string-built goes through this file, and the `no-restricted-syntax`
+ * supabase-js and are safe. Anything string-built goes through this file, and the `local/postgrest-filter-string`
  * rule in eslint.config.mjs refuses template literals and `+` in those calls.
  */
 

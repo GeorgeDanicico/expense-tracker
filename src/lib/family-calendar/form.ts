@@ -14,6 +14,7 @@ import {
   type CalendarEventEdit,
   type CalendarEventInput,
 } from "@/lib/validation/calendar-event";
+import { fieldErrorsOf, type FieldErrors } from "@/lib/validation/field-errors";
 
 /**
  * The event form's state and how it maps to the API: a draft (every field a string or a plain
@@ -174,7 +175,6 @@ export function toCreatePayload(draft: EventDraft) {
   };
 }
 
-export type FieldErrors = Record<string, string[]>;
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; fieldErrors: FieldErrors };
 
@@ -192,7 +192,7 @@ export function parseNewEvent(draft: EventDraft): Parsed<CalendarEventInput> {
   const parsed = calendarEventSchema.safeParse({ ...toCreatePayload(draft), attendeeMemberIds: standIn(draft.attendeeMemberIds) });
   return parsed.success
     ? { ok: true, value: { ...parsed.data, attendeeMemberIds: unique(draft.attendeeMemberIds) } }
-    : { ok: false, fieldErrors: parsed.error.flatten().fieldErrors as FieldErrors };
+    : { ok: false, fieldErrors: fieldErrorsOf(parsed.error) };
 }
 
 const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id) => b.includes(id));
@@ -231,7 +231,7 @@ export function parseEdit(event: CalendarEvent, draft: EventDraft, scope: EditSc
   if (!payload) return null;
   const going = payload.attendeeMemberIds as string[] | undefined;
   const parsed = calendarEventEditSchema.safeParse(going ? { ...payload, attendeeMemberIds: standIn(going) } : payload);
-  if (!parsed.success) return { ok: false, fieldErrors: parsed.error.flatten().fieldErrors as FieldErrors };
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsOf(parsed.error) };
 
   // The edit schema checks dates and times against each other only when it gets both; the form
   // always knows both, so check the whole event the way creating it would.
