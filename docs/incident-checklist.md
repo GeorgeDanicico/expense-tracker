@@ -25,6 +25,8 @@ python3 scripts/deploy.py --app expense-tracker --force
 
 or use **Actions → Sync applications and deploy production → Run workflow** in the vps-apps repo
 with the force option. Then check `docker logs expense-tracker-web` and `docker logs expense-tracker-worker`.
+Logs are JSON lines kept for 5 days in the host's journal; [logging.md](logging.md) has the events and
+query recipes (for example, everything that happened for one request id).
 
 ## 1. A key leaked
 
@@ -76,7 +78,7 @@ mistake you can fix with a query.
    will be missing, and its owner can upload a new one.
 5. **Start the containers again**: `docker start expense-tracker-web expense-tracker-worker`, or
    force a deploy. Open the app, sign in, check recent expenses and the notifications worker's
-   heartbeat in the logs.
+   heartbeat in the logs (`tick` lines, see [logging.md](logging.md)).
 6. **Tell people** what the restore lost: everything after the backup's time.
 7. If the restore went wrong, don't try it again on the live project from memory. Restore the same
    backup into a separate project first (see `docs/backups.md`, "Option 2") and compare.

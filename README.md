@@ -167,11 +167,14 @@ docker run -d --name expense-tracker \
   --tmpfs /app/.next/cache:rw,noexec,nosuid,nodev,uid=1000,gid=1000,size=128m \
   --security-opt no-new-privileges --cap-drop ALL \
   --memory 768m --memory-swap 768m \
-  --log-opt max-size=10m --log-opt max-file=3 \
+  --log-driver journald --log-opt 'tag=expense-tracker/{{.Name}}' \
   expense-tracker:latest
 ```
 
-The hardening flags are the ones `scripts/deploy.sh` uses (see "Hardened containers" below).
+The hardening and logging flags are the ones `scripts/deploy.sh` uses (see "Hardened containers"
+below). Logs go to the host's journald, which keeps them for 5 days; a host without journald uses
+`--log-opt max-size=10m --log-opt max-file=3` instead, or `LOG_DRIVER=json-file` with the script.
+How to read the logs, the events and the retention setup are in [docs/logging.md](docs/logging.md).
 
 The same image also holds the notifications worker (`worker.js`, bundled by
 `npm run build:worker`). It needs `SUPABASE_URL` and `SUPABASE_SECRET_KEY`, has no port, and
@@ -188,7 +191,7 @@ docker run -d --name expense-tracker-worker \
   --tmpfs /app/.next/cache:rw,noexec,nosuid,nodev,uid=1000,gid=1000,size=128m \
   --security-opt no-new-privileges --cap-drop ALL \
   --memory 256m --memory-swap 256m \
-  --log-opt max-size=10m --log-opt max-file=3 \
+  --log-driver journald --log-opt 'tag=expense-tracker/{{.Name}}' \
   expense-tracker:latest node worker.js
 ```
 
@@ -260,9 +263,10 @@ on `127.0.0.1:3000` by default, matching the Docker command above.
 
 The sizes can be changed with environment variables (set them in `/etc/vps-apps/expense-tracker.sh`
 on the VPS; the script sources it): `WEB_MEMORY_LIMIT` (default `768m`), `WORKER_MEMORY_LIMIT`
-(`256m`), `TMP_TMPFS_SIZE` (`64m`) and `NEXT_CACHE_TMPFS_SIZE` (`128m`). Production runs this
-script through the vps-apps adapter, so a change to the flags here is a change to production, and
-nothing has to change in vps-apps.
+(`256m`), `TMP_TMPFS_SIZE` (`64m`) and `NEXT_CACHE_TMPFS_SIZE` (`128m`). `LOG_DRIVER` (`journald`, or
+`json-file` for a host without it; `LOG_MAX_SIZE` and `LOG_MAX_FILES` then apply) picks the log
+driver. Production runs this script through the vps-apps adapter, so a change to the flags here is a
+change to production, and nothing has to change in vps-apps.
 
 If something breaks after a deploy, see [docs/incident-checklist.md](docs/incident-checklist.md).
 What Supabase backs up, and how to rehearse a restore, is in [docs/backups.md](docs/backups.md).
