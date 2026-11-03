@@ -16,6 +16,10 @@ CONTAINER_PORT="${CONTAINER_PORT:-3000}"
 STOP_TIMEOUT_SECONDS="${STOP_TIMEOUT_SECONDS:-30}"
 HEALTHCHECK_ATTEMPTS="${HEALTHCHECK_ATTEMPTS:-30}"
 HEALTHCHECK_INTERVAL_SECONDS="${HEALTHCHECK_INTERVAL_SECONDS:-2}"
+# Logs (docs/logging.md, L8). journald keeps them for the time the host's journald drop-in says (5
+# days); json-file is for a host without journald, and keeps them by size: LOG_MAX_SIZE and
+# LOG_MAX_FILES apply to json-file only.
+LOG_DRIVER="${LOG_DRIVER:-journald}"
 LOG_MAX_SIZE="${LOG_MAX_SIZE:-10m}"
 LOG_MAX_FILES="${LOG_MAX_FILES:-3}"
 PREVIOUS_CONTAINER="${CONTAINER_NAME}-previous"
@@ -73,6 +77,51 @@ set_hardening_flags() {
     --memory "$1"
     --memory-swap "$1"
   )
+}
+
+# The logging flags both containers share, built once from LOG_DRIVER into LOG_FLAGS. journald tags
+# every line expense-tracker/<container name>, so `journalctl -t` and CONTAINER_NAME find it; the
+# size options only exist for json-file. A running container keeps the driver it was started with,
+# so a rollback never needs these.
+set_log_flags() {
+  case "$LOG_DRIVER" in
+    journald)
+      LOG_FLAGS=(
+        --log-driver journald
+        --log-opt 'tag=expense-tracker/{{.Name}}'
+      )
+      ;;
+    json-file)
+      LOG_FLAGS=(
+        --log-driver json-file
+        --log-opt "max-size=${LOG_MAX_SIZE}"
+        --log-opt "max-file=${LOG_MAX_FILES}"
+      )
+      ;;
+    *)
+      die "LOG_DRIVER must be journald or json-file"
+      ;;
+  esac
+}
+
+# Starts a throwaway container with the journald driver before anything running is touched: a host
+# without journald (or without its socket) fails here, with a clear message, instead of after the
+# current containers were stopped. It runs `node -e 0` from the image just pulled or built (the
+# image has no `true`-style entrypoint to rely on) with no network and no capabilities.
+check_journald_driver() {
+  local output
+
+  echo "Checking that the journald log driver works."
+  if ! output="$(docker run --rm \
+    --network none \
+    --cap-drop ALL \
+    "${LOG_FLAGS[@]}" \
+    --entrypoint node \
+    "${IMAGE_NAME}:${IMAGE_TAG}" \
+    -e 0 2>&1)"; then
+    echo "$output" >&2
+    die "the journald log driver does not work on this host (see above). Fix journald, or set LOG_DRIVER=json-file in /etc/vps-apps/expense-tracker.sh. Nothing was stopped."
+  fi
 }
 
 require_positive_integer() {
@@ -193,8 +242,7 @@ deploy_worker() {
     --network expense-network \
     --env-file "$ENV_FILE" \
     "${HARDENING_FLAGS[@]}" \
-    --log-opt "max-size=${LOG_MAX_SIZE}" \
-    --log-opt "max-file=${LOG_MAX_FILES}" \
+    "${LOG_FLAGS[@]}" \
     "${IMAGE_NAME}:${IMAGE_TAG}" \
     node worker.js >/dev/null && worker_is_running; then
     echo "Worker is running."
@@ -240,6 +288,8 @@ require_memory_size WEB_MEMORY_LIMIT "$WEB_MEMORY_LIMIT"
 require_memory_size WORKER_MEMORY_LIMIT "$WORKER_MEMORY_LIMIT"
 require_memory_size TMP_TMPFS_SIZE "$TMP_TMPFS_SIZE"
 require_memory_size NEXT_CACHE_TMPFS_SIZE "$NEXT_CACHE_TMPFS_SIZE"
+[[ "$LOG_DRIVER" == journald || "$LOG_DRIVER" == json-file ]] || die "LOG_DRIVER must be journald or json-file"
+set_log_flags
 [[ "$NEXT_CACHE_DIR" =~ ^/[A-Za-z0-9_./-]+$ ]] || die "NEXT_CACHE_DIR must be an absolute path"
 
 [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || die "IMAGE_TAG contains unsupported characters"
@@ -257,6 +307,11 @@ else
     --tag "${IMAGE_NAME}:${IMAGE_TAG}" \
     --tag "${IMAGE_NAME}:latest" \
     "$PROJECT_DIR"
+fi
+
+# The image is here now and nothing running has been touched yet.
+if [[ "$LOG_DRIVER" == journald ]]; then
+  check_journald_driver
 fi
 
 if container_exists "$PREVIOUS_CONTAINER"; then
@@ -288,8 +343,7 @@ docker run \
   --env-file "$ENV_FILE" \
   --publish "${BIND_ADDRESS}:${HOST_PORT}:${CONTAINER_PORT}" \
   "${HARDENING_FLAGS[@]}" \
-  --log-opt "max-size=${LOG_MAX_SIZE}" \
-  --log-opt "max-file=${LOG_MAX_FILES}" \
+  "${LOG_FLAGS[@]}" \
   "${IMAGE_NAME}:${IMAGE_TAG}"
 
 wait_for_app
