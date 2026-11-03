@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 
 import { PwaRegistration } from "@/components/pwa/pwa-registration";
 import { Provider } from "@/components/ui/provider";
+import { WebVitals } from "@/components/web-vitals";
 import { BRAND } from "@/lib/brand";
 import { NONCE_HEADER } from "@/lib/http/csp";
 
@@ -58,6 +59,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body>
         <Provider nonce={nonce}>{children}</Provider>
         <PwaRegistration />
+        <WebVitals />
       </body>
     </html>
   );

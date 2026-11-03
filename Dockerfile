@@ -14,6 +14,11 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM base AS builder
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
+# The commit this image is built from, which next.config.ts puts in the browser bundle as
+# NEXT_PUBLIC_RELEASE (it is inlined at build time, so it has to be here and not in the runner).
+# It is a commit hash, public by nature. Empty for a build outside CI and deploy.sh.
+ARG GIT_SHA=""
+ENV GIT_SHA=${GIT_SHA}
 RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
 RUN npm run build:worker
