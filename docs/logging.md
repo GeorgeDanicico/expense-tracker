@@ -56,7 +56,7 @@ stderr. Docker's `journald` driver hands those lines to the host's journal, whic
 | `avatar_delete_failed` | error | Removing a profile picture from storage failed (the file is left behind; harmless). |
 | `account_deleted_cookie_clear_failed` | error | An account was deleted but clearing the browser's session cookie failed. |
 
-### Worker (container `expense-tracker-web-worker`, see "Container names" below)
+### Worker (container `expense-tracker-worker`, see "Container names" below)
 
 The worker's lines have no `method`. Each tick runs under its own id, `tick-<12 characters>`.
 
@@ -144,7 +144,7 @@ the host's own logs share the 300 MB. Without the drop-in, the journal may be ke
 **Check it** (any of these should look right after a deploy):
 
 ```bash
-docker inspect -f '{{.HostConfig.LogConfig.Type}}' expense-tracker-web expense-tracker-web-worker   # journald
+docker inspect -f '{{.HostConfig.LogConfig.Type}}' expense-tracker-web expense-tracker-worker   # journald
 journalctl --disk-usage                                                    # well under 300 MB
 journalctl CONTAINER_NAME=expense-tracker-web --since "5 days ago" | head  # the oldest line is under 5 days old
 journalctl -t expense-tracker/expense-tracker-web -n 5 -o cat              # the tag works too
@@ -173,9 +173,10 @@ message, before touching the running containers, if that fails.
 
 `scripts/deploy.sh` names the web container `CONTAINER_NAME` (default `expense-tracker`) and the
 worker `WORKER_CONTAINER_NAME` (default `${CONTAINER_NAME}-worker`). The vps-apps adapter sets
-`CONTAINER_NAME=expense-tracker-web`, so unless `/etc/vps-apps/expense-tracker.sh` overrides
-`WORKER_CONTAINER_NAME`, the worker is `expense-tracker-web-worker`. The recipes below use those two
-names; check yours with `docker ps --format '{{.Names}}'`.
+`CONTAINER_NAME=expense-tracker-web`, and in production the worker is `expense-tracker-worker`
+(checked with `docker ps` on 3 November 2026; the host config sets `WORKER_CONTAINER_NAME`, since the
+script's default would be `expense-tracker-web-worker`). The recipes below use those two names; check
+yours with `docker ps --format '{{.Names}}'`.
 
 ## Recipes
 
@@ -206,7 +207,7 @@ journalctl CONTAINER_NAME=expense-tracker-web --since "-15min" -o cat \
 Warnings and errors from both containers over the last day:
 
 ```bash
-journalctl CONTAINER_NAME=expense-tracker-web CONTAINER_NAME=expense-tracker-web-worker --since "-1day" -o cat \
+journalctl CONTAINER_NAME=expense-tracker-web CONTAINER_NAME=expense-tracker-worker --since "-1day" -o cat \
   | jq -c 'select(.level == "warn" or .level == "error")'
 ```
 
@@ -227,7 +228,7 @@ journalctl CONTAINER_NAME=expense-tracker-web --since today -o cat \
 Is the worker alive? The latest ticks:
 
 ```bash
-docker logs --tail 200 expense-tracker-web-worker 2>&1 | jq -c 'select(.event == "tick" or .event == "tick_failed")' | tail -3
+docker logs --tail 200 expense-tracker-worker 2>&1 | jq -c 'select(.event == "tick" or .event == "tick_failed")' | tail -3
 ```
 
 Browser errors and poor Web Vitals today:
