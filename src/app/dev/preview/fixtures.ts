@@ -19,6 +19,7 @@ import { groupByCurrency } from "@/lib/expenses/family";
 import { suggestExpenses } from "@/lib/expenses/suggestions";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
 import { ALL_MEMBERS, type Viewing } from "@/lib/family/viewing";
+import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
 import type { FamilyInvestmentsOverview } from "@/lib/investments/types";
 import type { FamilyNetWorthOverview } from "@/lib/net-worth/types";
 
@@ -374,13 +375,17 @@ function previewsNoFamily() {
 }
 
 /**
- * The account: `?noFamily=1` without a family, `?kidEmail=1` a kid's generated address (Settings then
+ * The account: `?noFamily=1` without a family, `?kidNoExpenses=1` a kid whose parent turned expenses off
+ * (Home without its spending blocks), `?kidEmail=1` a kid's generated address (Settings then
  * shows "Add an email address"), `?mustChange=1` an account that must choose a new password (the
  * change-password screen then asks for the temporary one).
  */
 function previewAccount(): AccountData {
   const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
   let account: AccountData = previewsNoFamily() ? { ...ACCOUNT, membership: null } : ACCOUNT;
+  if (params.has("kidNoExpenses") && account.membership) {
+    account = { ...account, membership: { ...account.membership, role: "kid", isCreator: false, permissions: { ...DEFAULT_KID_PERMISSIONS, expenses: "off" } } };
+  }
   if (params.has("kidEmail")) account = { ...account, email: null, signInName: "ana" };
   if (params.has("mustChange")) account = { ...account, mustChangePassword: true };
   return account;

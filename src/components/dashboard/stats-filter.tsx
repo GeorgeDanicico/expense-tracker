@@ -7,6 +7,7 @@ import { FormEvent, useState, useTransition } from "react";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Toolbar } from "@/components/ui/toolbar";
 import { getBucharestMonth, getBucharestToday } from "@/lib/calendar";
+import { INSIGHTS_PATH } from "@/lib/expenses/url-state";
 import type { AnalyticsPeriod, CustomGranularity } from "@/lib/expenses/types";
 
 const PERIODS = [
@@ -44,7 +45,7 @@ export function StatsFilter({
       params.set("date", customDate);
     }
 
-    startTransition(() => router.push(`/dashboard?${params.toString()}`));
+    startTransition(() => router.push(`${INSIGHTS_PATH}?${params.toString()}`));
   }
 
   function changeGranularity(value: CustomGranularity) {

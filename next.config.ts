@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { networkInterfaces } from "node:os";
 
+import { legacyRedirects } from "./src/lib/http/legacy-redirects";
 import { COOP_EXEMPTIONS, STATIC_SECURITY_HEADERS } from "./src/lib/http/security-headers";
 
 const allowedDevOrigins = Object.values(networkInterfaces())
@@ -24,6 +25,9 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
   experimental: {
     optimizePackageImports: ["@chakra-ui/react", "lucide-react"],
+  },
+  async redirects() {
+    return legacyRedirects();
   },
   async headers() {
     // Evaluated once, at build time: what depends on the request or on runtime env (the CSP and

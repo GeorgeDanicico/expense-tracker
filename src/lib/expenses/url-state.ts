@@ -11,6 +11,9 @@ import type {
   CustomGranularity,
 } from "@/lib/expenses/types";
 
+/** Where the Summary, Monthly and History dashboards live (Money → Insights); `/dashboard` is Home. */
+export const INSIGHTS_PATH = "/insights";
+
 export type DashboardView = "summary" | "monthly" | "history";
 type Params = { get(name: string): string | null };
 
@@ -40,7 +43,7 @@ export function dashboardHref(
 ) {
   const next = new URLSearchParams(params);
   for (const [key, value] of Object.entries(changes)) next.set(key, value);
-  return `/dashboard?${next}`;
+  return `${INSIGHTS_PATH}?${next}`;
 }
 
 export function parseAnalyticsFilters(params: Params): AnalyticsFilters {

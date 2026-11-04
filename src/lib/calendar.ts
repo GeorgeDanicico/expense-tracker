@@ -211,6 +211,13 @@ export function formatShortDate(date: string, withYear = false) {
   return (withYear ? shortDateWithYearFormatter : shortDateFormatter).format(new Date(`${date}T12:00:00Z`));
 }
 
+const longDayFormatter = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+
+/** "Wednesday 4 November": a `YYYY-MM-DD` date, never shifted by a time zone. */
+export function formatLongDay(date: string) {
+  return longDayFormatter.format(new Date(`${date}T12:00:00Z`)).replace(",", "");
+}
+
 /** "Oct 12, 2026": the UTC day of an instant, for a date stored as a timestamp (a join date, say). */
 export function formatUtcDay(instant: Date) {
   return shortDateWithYearFormatter.format(instant);
