@@ -8,6 +8,7 @@ import {
   dateInMonth,
   daysInMonth,
   formatDate,
+  formatDateTime,
   formatInstantDate,
   formatMonth,
   formatMonthLabel,
@@ -171,6 +172,18 @@ describe("date formatters", () => {
   it("formats the day of a timestamp in the chosen locale", () => {
     expect(formatInstantDate("2026-10-12T12:00:00Z")).toBe("12 Oct 2026");
     expect(formatInstantDate("2026-10-12T12:00:00Z", "en-US")).toBe("Oct 12, 2026");
+  });
+
+  // Audit D9: an instant reads the same wherever the device is.
+  it("shows an instant on the application's clock, not the viewer's", () => {
+    // 21:30 UTC is already the next day in Bucharest (UTC+3 in October).
+    expect(formatInstantDate("2026-10-12T21:30:00Z")).toBe("13 Oct 2026");
+    expect(formatInstantDate("2026-10-12T21:30:00Z", "en-GB", "UTC")).toBe("12 Oct 2026");
+    // Newer ICU puts a narrow no-break space before PM.
+    const plain = (text: string) => text.replace(/\s/g, " ");
+    expect(plain(formatDateTime("2026-10-12T12:30:00Z"))).toBe("Oct 12, 2026, 3:30 PM");
+    expect(plain(formatDateTime("2026-12-12T12:30:00Z"))).toBe("Dec 12, 2026, 2:30 PM");
+    expect(plain(formatDateTime("2026-10-12T12:30:00Z", "en-US", "America/New_York"))).toBe("Oct 12, 2026, 8:30 AM");
   });
 });
 

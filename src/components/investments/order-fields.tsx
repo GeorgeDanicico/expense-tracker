@@ -2,20 +2,48 @@
 
 import { Input } from "@chakra-ui/react";
 
+import type { InvestmentOrderInput } from "@/components/investments/investment-api";
 import { FormField, FormRow } from "@/components/ui/form-field";
-import { apiRequest } from "@/lib/api/client";
-import type { InvestmentTransactionMutationResponse } from "@/lib/investments/types";
+import { APPLICATION_TIMEZONE } from "@/lib/calendar";
+import { utcToZoned, zonedTimeToUtc } from "@/lib/time-zone";
 
-function localDateTimeValue() {
-  const now = new Date();
-  const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return localTime.toISOString().slice(0, 16);
+/** Now as a `datetime-local` value on the application's clock (audit D9), the one order times are shown in. */
+export function defaultExecutedAt(now = new Date()) {
+  const { date, time } = utcToZoned(now, APPLICATION_TIMEZONE);
+  return `${date}T${time}`;
 }
 
-function formTimestamp(value: FormDataEntryValue | null) {
-  if (typeof value !== "string" || !value) return value;
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : date.toISOString();
+/** The instant a `datetime-local` value means on the application's clock; anything else is sent as typed. */
+export function executedAtInstant(value: string) {
+  const [date, time] = value.split("T");
+  try {
+    return zonedTimeToUtc(date, time ?? "", APPLICATION_TIMEZONE).toISOString();
+  } catch {
+    return value;
+  }
+}
+
+/** A text field of a form, empty when absent. */
+export const formText = (formData: FormData, name: string) => {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : "";
+};
+
+/**
+ * The order a form describes. The dialogs differ only in where the fixed values come from: a new
+ * investment reads them from its form, an existing asset supplies them.
+ */
+export function orderInput(
+  order: Pick<InvestmentOrderInput, "brokerId" | "instrument" | "currency" | "side">,
+  formData: FormData,
+): InvestmentOrderInput {
+  return {
+    ...order,
+    amount: formText(formData, "amount"),
+    quantity: formText(formData, "quantity"),
+    unitPrice: formText(formData, "unitPrice"),
+    executedAt: executedAtInstant(formText(formData, "executedAt")),
+  };
 }
 
 /** Quantity, unit price, amount and execution time — the fields every order records. */
@@ -43,37 +71,9 @@ export function OrderFields({
         <Input name="amount" type="number" inputMode="decimal" min="0.0000000001" step="any" placeholder="0.00" required />
       </FormField>
 
-      <FormField label="Execution date and time" error={fieldError("executedAt")}>
-        <Input name="executedAt" type="datetime-local" defaultValue={localDateTimeValue()} required />
+      <FormField label="Execution date and time" error={fieldError("executedAt")} hint="Bucharest time, like the rest of the app.">
+        <Input name="executedAt" type="datetime-local" defaultValue={defaultExecutedAt()} required />
       </FormField>
     </>
   );
-}
-
-/**
- * Records one order. The dialogs differ only in where the fixed values come
- * from: a new investment reads them from its form, an existing asset supplies them.
- */
-export function submitInvestmentOrder(
-  order: {
-    brokerId: FormDataEntryValue | null;
-    instrument: FormDataEntryValue | null;
-    currency: FormDataEntryValue | null;
-    side: FormDataEntryValue | null;
-  },
-  formData: FormData,
-) {
-  return apiRequest<InvestmentTransactionMutationResponse>("/api/investment-transactions", {
-    method: "POST",
-    body: JSON.stringify({
-      brokerId: order.brokerId,
-      instrument: order.instrument,
-      currency: order.currency,
-      side: order.side,
-      amount: formData.get("amount"),
-      quantity: formData.get("quantity"),
-      unitPrice: formData.get("unitPrice"),
-      executedAt: formTimestamp(formData.get("executedAt")),
-    }),
-  });
 }

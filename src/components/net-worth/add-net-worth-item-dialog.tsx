@@ -3,48 +3,28 @@
 import { Button, Input, NativeSelect, Stack, Text } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { FormEvent, useId, useState } from "react";
-import { useSWRConfig } from "swr";
 
 import { NetWorthItemFields } from "@/components/net-worth/net-worth-item-fields";
+import { useNetWorthWrites } from "@/components/net-worth/use-net-worth-writes";
+import { AmountInput } from "@/components/ui/amount-input";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { FormField, FormRow } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterNetWorthChange } from "@/lib/api/invalidate";
 import { getBucharestToday } from "@/lib/calendar";
 import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
-import { type NetWorthItemKind } from "@/lib/net-worth/types";
+import { netWorthCategoryOptions, type NetWorthItemKind } from "@/lib/net-worth/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
 
-function categoryOptions(kind: NetWorthItemKind) {
-  return kind === "liability"
-    ? [
-        { value: "debt", label: "Debt or mortgage" },
-        { value: "custom", label: "Custom category" },
-      ]
-    : [
-        { value: "cash", label: "Cash" },
-        { value: "property", label: "Property" },
-        { value: "jewelry", label: "Jewelry" },
-        { value: "custom", label: "Custom category" },
-      ];
-}
-
-export function AddNetWorthItemDialog({
-  defaultCurrency,
-  onSuccess,
-}: {
-  defaultCurrency: string;
-  onSuccess: () => void;
-}) {
-  const { mutate } = useSWRConfig();
+export function AddNetWorthItemDialog({ defaultCurrency }: { defaultCurrency: string }) {
+  const writes = useNetWorthWrites();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<NetWorthItemKind>("asset");
   const [category, setCategory] = useState("cash");
   const [customCategory, setCustomCategory] = useState("");
+  const [currency, setCurrency] = useState(defaultCurrency);
   const form = useApiForm();
   const formId = useId();
 
@@ -52,6 +32,7 @@ export function AddNetWorthItemDialog({
     setKind("asset");
     setCategory("cash");
     setCustomCategory("");
+    setCurrency(defaultCurrency);
     form.reset();
   }
 
@@ -67,23 +48,16 @@ export function AddNetWorthItemDialog({
     const formData = new FormData(event.currentTarget);
     const selectedCategory = category === "custom" ? customCategory : category;
     void form.submit(async () => {
-      await apiRequest<{ itemId: string }>("/api/net-worth/items", {
-        method: "POST",
-        body: JSON.stringify({
-          name: formData.get("name"),
-          kind,
-          category: selectedCategory,
-          currency: formData.get("currency"),
-          purchaseAmount: purchaseAmountAllowed(kind, category)
-            ? formData.get("purchaseAmount") || null
-            : null,
-          value: formData.get("value"),
-          valuedOn: formData.get("valuedOn"),
-        }),
+      await writes.createItem({
+        name: String(formData.get("name") ?? ""),
+        kind,
+        category: selectedCategory,
+        currency: String(formData.get("currency") ?? ""),
+        purchaseAmount: purchaseAmountAllowed(kind, category) ? String(formData.get("purchaseAmount") || "") || null : null,
+        value: String(formData.get("value") ?? ""),
+        valuedOn: String(formData.get("valuedOn") ?? ""),
       });
-      await afterNetWorthChange(mutate);
       setOpen(false);
-      onSuccess();
     }, { fallback: "The item could not be saved." });
   }
 
@@ -99,7 +73,7 @@ export function AddNetWorthItemDialog({
       title="Add a net-worth item"
       description="Record one native-currency balance, estimate or debt. You can add another dated value later."
       trigger={
-        <Button variant="solid" colorPalette="brand" size={{ base: "md", sm: "sm" }} flex={{ base: "1", sm: "initial" }}>
+        <Button variant="solid" colorPalette="brand" size="sm">
           <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add item
         </Button>
       }
@@ -111,7 +85,7 @@ export function AddNetWorthItemDialog({
             kind={kind}
             category={category}
             onCategoryChange={setCategory}
-            categoryOptions={categoryOptions(kind)}
+            categoryOptions={netWorthCategoryOptions(kind)}
             customCategory={customCategory}
             onCustomCategoryChange={setCustomCategory}
             fieldError={fieldError}
@@ -138,7 +112,7 @@ export function AddNetWorthItemDialog({
                 hint="Net Worth keeps each currency separate; it does not convert values."
               >
                 <NativeSelect.Root>
-                  <NativeSelect.Field name="currency" defaultValue={defaultCurrency}>
+                  <NativeSelect.Field name="currency" value={currency} onChange={(event) => setCurrency(event.target.value)}>
                     {CURRENCY_OPTIONS.map((option) => (
                       <option key={option.code} value={option.code}>{option.code} · {option.label}</option>
                     ))}
@@ -151,7 +125,7 @@ export function AddNetWorthItemDialog({
 
           <FormRow>
             <FormField flex="1" label={kind === "liability" ? "Current amount owed" : "Current value"} error={fieldError("value")}>
-              <Input name="value" type="number" inputMode="decimal" min="0" step="any" placeholder="0.00" required />
+              <AmountInput name="value" currency={currency} required />
             </FormField>
             <FormField flex="1" label="Valued on" error={fieldError("valuedOn")}>
               <Input name="valuedOn" type="date" defaultValue={getBucharestToday()} required />

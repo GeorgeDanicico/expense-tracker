@@ -12,31 +12,32 @@ function failsWrites() {
   return typeof window !== "undefined" && new URLSearchParams(window.location.search).has("failWrites");
 }
 
-async function answer() {
+/** Waits a moment and, with `?failWrites=1`, refuses: how every preview write answers. */
+export async function previewAnswer() {
   await new Promise((resolve) => setTimeout(resolve, 400));
   if (failsWrites()) throw new ApiError("Couldn't save. Try again.", 503);
 }
 
 export const previewExpenseApi: ExpenseApi = {
   async create(input) {
-    await answer();
+    await previewAnswer();
     counter += 1;
     return { id: `preview-expense-${counter}`, ...input, notes: input.notes || null };
   },
   async update(id, input) {
-    await answer();
+    await previewAnswer();
     return { id, ...input, notes: input.notes || null };
   },
   async remove() {
-    await answer();
+    await previewAnswer();
   },
   async saveTab(input, id) {
-    await answer();
+    await previewAnswer();
     counter += 1;
     const now = new Date().toISOString();
     return { id: id ?? `preview-tab-${counter}`, ...input, createdAt: now, updatedAt: now };
   },
   async removeTab() {
-    await answer();
+    await previewAnswer();
   },
 };

@@ -5,8 +5,6 @@ import {
   afterFamilyDeleted,
   afterFamilyJoined,
   afterMemberRemoved,
-  afterInvestmentChange,
-  afterNetWorthChange,
   afterPasswordChange,
   afterSignIn,
   afterSignOut,
@@ -45,25 +43,7 @@ function recorder() {
 const NO_REVALIDATE = { revalidate: false };
 
 describe("cache invalidation after mutations", () => {
-  it("afterInvestmentChange refreshes investments, net worth and the optional transactions key", async () => {
-    const withDetail = recorder();
-    await afterInvestmentChange(withDetail.mutate, "/api/investment-transactions?accountId=a");
-    expect(withDetail.calls.map((call) => call.keys)).toEqual([
-      ["/api/investments"],
-      ["/api/net-worth"],
-      ["/api/investment-transactions?accountId=a"],
-    ]);
-
-    const without = recorder();
-    await afterInvestmentChange(without.mutate);
-    expect(without.calls.map((call) => call.keys)).toEqual([["/api/investments"], ["/api/net-worth"]]);
-  });
-
   it("single-key helpers revalidate their key; sign-out clears everything without refetching", async () => {
-    const netWorth = recorder();
-    await afterNetWorthChange(netWorth.mutate);
-    expect(netWorth.calls.map((call) => call.keys)).toEqual([["/api/net-worth"]]);
-
     const signIn = recorder();
     await afterSignIn(signIn.mutate);
     expect(signIn.calls.map((call) => call.keys)).toEqual([["/api/account"]]);

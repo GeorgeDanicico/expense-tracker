@@ -5,8 +5,6 @@ import {
   ACCOUNT_NOTICES_API_KEY,
   FAMILY_API_KEY,
   FAMILY_INVITES_API_KEY,
-  INVESTMENTS_API_KEY,
-  NET_WORTH_API_KEY,
   type FamilyResponse,
   type NoticesResponse,
 } from "@/lib/api/keys";
@@ -14,19 +12,8 @@ import type { AccountData } from "@/lib/account/types";
 
 // What to refresh after each mutation of the modules not yet on an API object and hooks. Every helper
 // takes the global `mutate` from `useSWRConfig()`. Retry buttons keep calling their own bound
-// `mutate()`. Expenses, saved tabs and imports moved out in U8: `src/components/expenses/expense-cache.ts`
-// and `useExpenseWrites`.
-
-/** Refreshes investments, net worth and, when given, the asset's transaction list. */
-export function afterInvestmentChange(mutate: ScopedMutator, transactionsKey?: string) {
-  const keys = [INVESTMENTS_API_KEY, NET_WORTH_API_KEY];
-  if (transactionsKey) keys.push(transactionsKey);
-  return Promise.allSettled(keys.map((key) => mutate(key)));
-}
-
-export function afterNetWorthChange(mutate: ScopedMutator) {
-  return mutate(NET_WORTH_API_KEY);
-}
+// `mutate()`. Expenses, saved tabs and imports moved out in U8 (`expense-cache.ts`, `useExpenseWrites`),
+// investments and net worth in U9 (`useInvestmentWrites`, `useNetWorthWrites`).
 
 export function afterSignIn(mutate: ScopedMutator) {
   return mutate(ACCOUNT_API_KEY);

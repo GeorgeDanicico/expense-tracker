@@ -21,7 +21,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useViewing } from "@/hooks/use-viewing";
 import { netWorthApiKey } from "@/lib/api/keys";
-import type { FamilyNetWorthOverview, NetWorthEntry, NetWorthOverview } from "@/lib/net-worth/types";
+import { netWorthCategoryRank, type FamilyNetWorthOverview, type NetWorthEntry, type NetWorthOverview } from "@/lib/net-worth/types";
 
 function groupedEntries(entries: NetWorthEntry[]) {
   const groups = new Map<string, NetWorthEntry[]>();
@@ -31,16 +31,8 @@ function groupedEntries(entries: NetWorthEntry[]) {
     else groups.set(entry.category, [entry]);
   }
 
-  const categoryOrder = ["investments", "cash", "property", "jewelry", "debt"];
   return [...groups.entries()]
-    .sort(([left], [right]) => {
-      const leftIndex = categoryOrder.indexOf(left);
-      const rightIndex = categoryOrder.indexOf(right);
-      if (leftIndex === -1 && rightIndex === -1) return left.localeCompare(right);
-      if (leftIndex === -1) return 1;
-      if (rightIndex === -1) return -1;
-      return leftIndex - rightIndex;
-    })
+    .sort(([left], [right]) => netWorthCategoryRank(left) - netWorthCategoryRank(right) || left.localeCompare(right))
     .map(([category, categoryEntries]) => ({
       category,
       entries: categoryEntries.toSorted((left, right) => left.name.localeCompare(right.name)),
@@ -59,12 +51,7 @@ function SingleNetWorthPanel() {
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>
-      <PageHeader title="Net worth" actions={
-          <WriteOnly>
-            <AddNetWorthItemDialog defaultCurrency={currency} onSuccess={() => undefined} />
-          </WriteOnly>
-        }
-      />
+      <PageHeader title="Net worth" inline actions={<WriteOnly><AddNetWorthItemDialog defaultCurrency={currency} /></WriteOnly>} />
       <ViewingControls noun="net worth" family />
       <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
 

@@ -3,16 +3,15 @@
 import { Button, Input, NativeSelect, Stack, Text } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { FormEvent, useId, useState } from "react";
-import { useSWRConfig } from "swr";
 
-import { OrderFields, submitInvestmentOrder } from "@/components/investments/order-fields";
+import { formText, OrderFields, orderInput } from "@/components/investments/order-fields";
+import { useInvestmentWrites } from "@/components/investments/use-investment-writes";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm, type ApiForm } from "@/hooks/use-api-form";
-import { afterInvestmentChange } from "@/lib/api/invalidate";
 import { INVESTMENT_BROKER_IDS, INVESTMENT_BROKER_LABELS } from "@/lib/investments/types";
 import { CURRENCY_OPTIONS } from "@/lib/utils/currency";
 
@@ -25,23 +24,22 @@ function InvestmentForm({
   form: ApiForm;
   onSuccess: () => void;
 }) {
-  const { mutate } = useSWRConfig();
+  const writes = useInvestmentWrites();
   const [instrument, setInstrument] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     void form.submit(async () => {
-      await submitInvestmentOrder(
+      await writes.createOrder(orderInput(
         {
-          brokerId: formData.get("brokerId"),
-          instrument: formData.get("instrument"),
-          currency: formData.get("currency"),
+          brokerId: formText(formData, "brokerId"),
+          instrument: formText(formData, "instrument"),
+          currency: formText(formData, "currency"),
           side: "buy",
         },
         formData,
-      );
-      await afterInvestmentChange(mutate);
+      ));
       onSuccess();
     }, { fallback: "The investment could not be saved." });
   }
@@ -127,7 +125,7 @@ export function AddInvestmentDialog() {
       title="Add investment"
       description="The first recorded order creates the investment under its broker."
       trigger={
-        <Button variant="solid" colorPalette="brand" size={{ base: "md", sm: "sm" }} flex={{ base: "1", sm: "initial" }}>
+        <Button variant="solid" colorPalette="brand" size="sm">
           <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add investment
         </Button>
       }

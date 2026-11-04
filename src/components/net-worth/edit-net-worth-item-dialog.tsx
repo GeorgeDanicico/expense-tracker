@@ -3,34 +3,33 @@
 import { Button, Stack, Text } from "@chakra-ui/react";
 import { Archive } from "lucide-react";
 import { FormEvent, useId, useState } from "react";
-import { useSWRConfig } from "swr";
 
 import { NetWorthItemFields } from "@/components/net-worth/net-worth-item-fields";
+import { useNetWorthWrites } from "@/components/net-worth/use-net-worth-writes";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterNetWorthChange } from "@/lib/api/invalidate";
 import { purchaseAmountAllowed } from "@/lib/net-worth/rules";
-import { NET_WORTH_SUGGESTED_CATEGORIES, type NetWorthEntry } from "@/lib/net-worth/types";
+import { NET_WORTH_CATEGORIES, netWorthCategoryOptions, type NetWorthEntry } from "@/lib/net-worth/types";
 
 function initialCategory(entry: NetWorthEntry) {
-  return NET_WORTH_SUGGESTED_CATEGORIES.includes(entry.category as (typeof NET_WORTH_SUGGESTED_CATEGORIES)[number])
-    ? entry.category
-    : "custom";
+  const known = NET_WORTH_CATEGORIES.some((category) => category.key === entry.category && category.kind === entry.kind && !("automatic" in category));
+  return known ? entry.category : "custom";
 }
 
+/** An item's name, category and purchase amount, and Archive, in a sheet opened from its row's actions. */
 export function EditNetWorthItemDialog({
   entry,
-  onSuccess,
+  open,
+  onOpenChange,
 }: {
   entry: NetWorthEntry;
-  onSuccess: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const { mutate } = useSWRConfig();
-  const [open, setOpen] = useState(false);
+  const writes = useNetWorthWrites();
   const [category, setCategory] = useState(initialCategory(entry));
   const [customCategory, setCustomCategory] = useState(entry.category);
   const form = useApiForm();
@@ -41,51 +40,34 @@ export function EditNetWorthItemDialog({
   const saving = form.pendingAction === "save";
   const archiving = form.pendingAction === "archive";
 
-  const suggestedCategories = entry.kind === "liability"
-    ? ["debt"]
-    : ["cash", "property", "jewelry"];
-
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const formData = new FormData(event.currentTarget);
     const selectedCategory = category === "custom" ? customCategory : category;
     void form.submit(async () => {
-      await apiRequest<{ success: true }>(`/api/net-worth/items/${encodeURIComponent(itemId)}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: formData.get("name"),
-          category: selectedCategory,
-          purchaseAmount: purchaseAmountAllowed(entry.kind, category)
-            ? formData.get("purchaseAmount") || null
-            : null,
-        }),
+      await writes.updateItem(itemId, {
+        name: String(formData.get("name") ?? ""),
+        category: selectedCategory,
+        purchaseAmount: purchaseAmountAllowed(entry.kind, category) ? String(formData.get("purchaseAmount") || "") || null : null,
       });
-      await afterNetWorthChange(mutate);
-      setOpen(false);
-      onSuccess();
+      onOpenChange(false);
     }, { fallback: "The item could not be updated.", action: "save" });
   }
 
   function archive() {
     void form.submit(async () => {
-      await apiRequest<{ success: true }>(`/api/net-worth/items/${encodeURIComponent(itemId)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ archived: true }),
-      });
-      await afterNetWorthChange(mutate);
-      setOpen(false);
-      onSuccess();
+      await writes.updateItem(itemId, { archived: true });
+      onOpenChange(false);
     }, { fallback: "The item could not be archived.", action: "archive" });
   }
 
   return (
     <AppDialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={onOpenChange}
       title={`Edit ${entry.name}`}
       description={`Keep the item in ${entry.currency}; add a new dated value from its row when the balance changes.`}
-      trigger={<Button type="button" size="xs" variant="ghost">Edit details</Button>}
       footer={
         <FormActions
           form={formId}
@@ -115,10 +97,7 @@ export function EditNetWorthItemDialog({
             kind={entry.kind}
             category={category}
             onCategoryChange={setCategory}
-            categoryOptions={[
-              ...suggestedCategories.map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) })),
-              { value: "custom", label: "Custom category" },
-            ]}
+            categoryOptions={netWorthCategoryOptions(entry.kind)}
             customCategory={customCategory}
             onCustomCategoryChange={setCustomCategory}
             fieldError={form.fieldError}

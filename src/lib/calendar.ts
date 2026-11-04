@@ -6,8 +6,8 @@ import type { AnalyticsPeriod } from "@/lib/expenses/types";
  * Every "now" — the current month and today, on server and client — reads the
  * Europe/Bucharest application calendar: `getBucharestMonth`, `getBucharestToday`.
  * Month and day arithmetic is pure string/UTC math and never depends on the process time zone.
- * Calendar dates are formatted at noon UTC in UTC, so they read the same day in every zone; only
- * `formatDateTime` and `formatInstantDate`, which show an instant, use the viewer's zone.
+ * Calendar dates are formatted at noon UTC in UTC, so they read the same day in every zone; an
+ * instant (`formatDateTime`, `formatInstantDate`) is shown on the application's clock too.
  */
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -185,16 +185,22 @@ export function formatDate(date: string, locale = "en-US") {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-export function formatDateTime(date: string, locale = "en-US") {
+/**
+ * An instant as "Oct 12, 2026, 3:30 PM" on the application's clock (audit D9), so a member abroad
+ * reads order times and expiries in the same zone as "today" and the months. Pass `timeZone` to show
+ * another.
+ */
+export function formatDateTime(date: string, locale = "en-US", timeZone = APPLICATION_TIMEZONE) {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone,
   }).format(new Date(date));
 }
 
-/** The day of an instant (an ISO timestamp) in the viewer's zone, in `locale`: "12 Oct 2026". */
-export function formatInstantDate(iso: string, locale = "en-GB") {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso));
+/** The day of an instant (an ISO timestamp) on the application's clock, in `locale`: "12 Oct 2026". */
+export function formatInstantDate(iso: string, locale = "en-GB", timeZone = APPLICATION_TIMEZONE) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone }).format(new Date(iso));
 }
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });

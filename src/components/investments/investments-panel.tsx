@@ -69,7 +69,7 @@ function SingleInvestmentsPanel() {
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>
-      <PageHeader title="Investments" actions={<WriteOnly><AddInvestmentDialog /></WriteOnly>} />
+      <PageHeader title="Investments" inline actions={<WriteOnly><AddInvestmentDialog /></WriteOnly>} />
       <ViewingControls noun="investments" family />
       <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
 

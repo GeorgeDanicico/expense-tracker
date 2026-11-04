@@ -3,13 +3,34 @@ import type { InvestmentCalculationIssue } from "@/lib/investments/types";
 export const NET_WORTH_ITEM_KINDS = ["asset", "liability"] as const;
 export type NetWorthItemKind = (typeof NET_WORTH_ITEM_KINDS)[number];
 
-export const NET_WORTH_SUGGESTED_CATEGORIES = [
-  "cash",
-  "property",
-  "jewelry",
-  "debt",
-] as const;
-export type NetWorthSuggestedCategory = (typeof NET_WORTH_SUGGESTED_CATEGORIES)[number];
+/**
+ * The balance sheet's own categories, in the order its groups show. `automatic` ones are filled from
+ * elsewhere (Investments, from the positions) and aren't offered when adding an item; any other label
+ * is a custom category, shown after these. `label` names the group, `optionLabel` the choice in a form.
+ */
+export const NET_WORTH_CATEGORIES = [
+  { key: "investments", kind: "asset", label: "Investments", automatic: true },
+  { key: "cash", kind: "asset", label: "Cash" },
+  { key: "property", kind: "asset", label: "Property" },
+  { key: "jewelry", kind: "asset", label: "Jewelry" },
+  { key: "debt", kind: "liability", label: "Debts", optionLabel: "Debt or mortgage" },
+] as const satisfies readonly { key: string; kind: NetWorthItemKind; label: string; optionLabel?: string; automatic?: true }[];
+
+/** The categories a form offers for `kind`, then "Custom category" (the value `custom`). */
+export function netWorthCategoryOptions(kind: NetWorthItemKind) {
+  return [
+    ...NET_WORTH_CATEGORIES
+      .filter((category) => category.kind === kind && !("automatic" in category))
+      .map((category) => ({ value: category.key, label: "optionLabel" in category ? category.optionLabel : category.label })),
+    { value: "custom", label: "Custom category" },
+  ];
+}
+
+/** Where a category's group sits: its place in the table, custom ones after it. */
+export function netWorthCategoryRank(category: string) {
+  const index = NET_WORTH_CATEGORIES.findIndex((known) => known.key === category);
+  return index === -1 ? NET_WORTH_CATEGORIES.length : index;
+}
 
 export type NetWorthEntryStatus =
   | "current"
@@ -110,15 +131,7 @@ export type NetWorthManualItemSource = {
 };
 
 export function netWorthCategoryLabel(category: string) {
-  const labels: Record<string, string> = {
-    cash: "Cash",
-    property: "Property",
-    jewelry: "Jewelry",
-    debt: "Debts",
-    investments: "Investments",
-  };
-
-  return labels[category] ?? category
+  return NET_WORTH_CATEGORIES.find((known) => known.key === category)?.label ?? category
     .split(/[-_]/g)
     .filter(Boolean)
     .map((word) => word[0].toUpperCase() + word.slice(1))
