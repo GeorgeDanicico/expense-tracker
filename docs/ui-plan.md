@@ -484,6 +484,8 @@ and D9, D10, B4, B5 and B10 are closed.
 
 Screenshots: `docs/ui-styling/screenshots/u8-*.jpg`.
 
+**Signed off (George, 4 November 2026);** it goes out with U9 in one PR.
+
 ### U9: Investments and Net worth
 
 **Files:** `src/app/(app)/{investments,net-worth}/**`, `src/components/{investments,net-worth}/**`,
