@@ -1,7 +1,7 @@
 # Phase 17 update, 4 November 2026 (cloud session)
 
 Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-session-rk7uoj`.
-**PR #213 (U3, U4 and U5), PR #214 (U6), PR #215 (U7), PR #216 (U8 and U9) and PR #217 (U10) merged on 4 November.** U11 is done on the same branch, awaiting sign-off.
+**PR #213 (U3, U4 and U5), PR #214 (U6), PR #215 (U7), PR #216 (U8 and U9) and PR #217 (U10) merged on 4 November.** U11 is done and signed off on the same branch.
 
 ## Where the tasks stand
 
@@ -17,7 +17,7 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U8 Expenses** | **Done. George signed it off on 4 November; merged in #216.** |
 | **U9 Investments and Net worth** | **Done. George signed it off on 4 November; merged in #216.** |
 | **U10 Planning** | **Done. George signed it off on 4 November; merged in #217.** |
-| **U11 Settings and the family pages** | **Done. Awaiting George's sign-off.** |
+| **U11 Settings and the family pages** | **Done. George signed it off on 4 November.** |
 | U12 onwards | Not started. |
 
 ## What U3 added
