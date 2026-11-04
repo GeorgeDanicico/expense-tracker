@@ -1,0 +1,251 @@
+"use client";
+
+/**
+ * Pieces only the mockups need, on the real theme. The primitives U4 built (AppDialog as a sheet,
+ * ActionBar, UndoToast, AmountInput, ToggleChip, Disclosure, Collapse, IconTile, RowActions) are
+ * imported from src/components/ui; what's left here is for later tasks (the save check for U6, swipes
+ * for U12) or for the mockups' fixtures.
+ */
+
+import { Box, Button, chakra, Flex, Menu, Portal, Text } from "@chakra-ui/react";
+import { Check } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
+
+import { ICON, ToggleChip } from "@/components/ui";
+import { DURATION_MS, transition } from "@/components/ui/theme/motion";
+import { rowRecipe } from "@/components/ui/theme/recipes/misc";
+
+import { useMotionDelay } from "./motion-scope";
+
+/** A primary button that turns into a check for a moment once saved. */
+export function SaveButton({ saved, onClick, children }: { saved: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <Button variant="solid" colorPalette={saved ? "success" : "brand"} size="md" flex="1" onClick={onClick} aria-live="polite">
+      {saved ? (
+        <Box
+          as="span"
+          display="inline-flex"
+          animationName="scale-in, fade-in"
+          animationDuration="slow"
+          animationTimingFunction="enter"
+          animationFillMode="both"
+        >
+          <Check size={ICON.nav} aria-hidden="true" />
+        </Box>
+      ) : null}
+      {saved ? "Saved" : children}
+    </Button>
+  );
+}
+
+/** Saves, shows the check for a moment, then calls `done`. */
+export function useSaveCheck(done: () => void) {
+  const [saved, setSaved] = useState(false);
+  const later = useMotionDelay();
+  const save = () => {
+    if (saved) return;
+    setSaved(true);
+    later(DURATION_MS.countUp, () => {
+      setSaved(false);
+      done();
+    });
+  };
+  return { saved, save };
+}
+
+/** A chip that opens a menu of choices: "Today ▾", "Me ▾". */
+export function ChipMenu({
+  label,
+  items,
+  onSelect,
+  selected = true,
+}: {
+  label: ReactNode;
+  items: { value: string; label: string }[];
+  onSelect?: (value: string) => void;
+  selected?: boolean;
+}) {
+  return (
+    <Menu.Root positioning={{ placement: "bottom-start" }} onSelect={({ value }) => onSelect?.(value)}>
+      <Menu.Trigger asChild>
+        <ToggleChip selected={selected}>
+          {label}
+          <Text as="span" aria-hidden="true" color="fg.subtle">
+            ▾
+          </Text>
+        </ToggleChip>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <Menu.Content minW="44">
+            {items.map((item) => (
+              <Menu.Item key={item.value} value={item.value}>
+                {item.label}
+              </Menu.Item>
+            ))}
+          </Menu.Content>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+}
+
+/** A sideways-scrolling row of chips that bleeds to the screen edge on phones. */
+export function ChipRow({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <Flex
+      role="group"
+      aria-label={label}
+      gap="2"
+      overflowX="auto"
+      mx={{ base: "-4", md: "0" }}
+      px={{ base: "4", md: "0" }}
+      py="1"
+      css={{ scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}
+    >
+      {children}
+    </Flex>
+  );
+}
+
+const Row = chakra("div", rowRecipe);
+
+/** A list row on the theme's row recipe: leading tile, title and meta, trailing amount or buttons. */
+export function MockRow({
+  leading,
+  title,
+  meta,
+  trailing,
+  metaTone,
+}: {
+  leading?: ReactNode;
+  title: ReactNode;
+  meta?: ReactNode;
+  trailing?: ReactNode;
+  metaTone?: "error";
+}) {
+  return (
+    <Row bg="bg.surface">
+      {leading}
+      <Box flex="1" minW="0">
+        <Text textStyle="body" fontWeight="medium" lineClamp={2}>
+          {title}
+        </Text>
+        {meta ? (
+          <Text textStyle="bodySm" color={metaTone === "error" ? "fg.error" : "fg.muted"} fontWeight={metaTone ? "medium" : undefined} truncate>
+            {meta}
+          </Text>
+        ) : null}
+      </Box>
+      {trailing ? (
+        <Flex align="center" gap="1.5" flexShrink="0">
+          {trailing}
+        </Flex>
+      ) : null}
+    </Row>
+  );
+}
+
+type SwipeSide = { label: string; tone: "positive" | "negative" | "warning"; commit?: boolean };
+const SWIPE_TONES = {
+  positive: { bg: "bg.success", color: "fg.success" },
+  negative: { bg: "bg.error", color: "fg.error" },
+  warning: { bg: "bg.warning", color: "fg.warning" },
+};
+
+/**
+ * Swipe sideways to act (U12 builds the real one on U4's RowActions). Moving 10 px sideways before
+ * moving vertically starts a swipe; past 80 px it acts. A `commit` side flies the row out first.
+ */
+export function SwipeRow({
+  left,
+  right,
+  onSwipe,
+  gone = false,
+  children,
+}: {
+  left?: SwipeSide;
+  right?: SwipeSide;
+  onSwipe: (side: "left" | "right") => void;
+  gone?: boolean;
+  children: ReactNode;
+}) {
+  const [dx, setDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [wasGone, setWasGone] = useState(gone);
+  const gesture = useRef({ x: 0, y: 0, active: false, decided: false });
+  const later = useMotionDelay();
+  if (gone !== wasGone) {
+    setWasGone(gone);
+    if (!gone) setDx(0);
+  }
+
+  const end = () => {
+    const { decided } = gesture.current;
+    gesture.current.active = false;
+    setDragging(false);
+    if (!decided) return;
+    const side = dx <= -80 && left ? "left" : dx >= 80 && right ? "right" : null;
+    const config = side === "left" ? left : side === "right" ? right : null;
+    if (!side || !config) return setDx(0);
+    if (config.commit) {
+      setDx(side === "left" ? -480 : 480);
+      later(180, () => onSwipe(side));
+    } else {
+      setDx(0);
+      onSwipe(side);
+    }
+  };
+
+  const showing = dx < 0 ? left : dx > 0 ? right : undefined;
+  return (
+    <Box position="relative" overflow="hidden" borderRadius="control">
+      {showing ? (
+        <Flex
+          position="absolute"
+          inset="0"
+          align="center"
+          justify={dx < 0 ? "flex-end" : "flex-start"}
+          px="5"
+          textStyle="bodySm"
+          fontWeight="semibold"
+          {...SWIPE_TONES[showing.tone]}
+          aria-hidden="true"
+        >
+          {showing.label}
+        </Flex>
+      ) : null}
+      <Box
+        position="relative"
+        touchAction="pan-y"
+        userSelect="none"
+        transform={`translateX(${dx}px)`}
+        transition={dragging ? "none" : transition("transform", "moderate")}
+        onPointerDown={(event) => {
+          gesture.current = { x: event.clientX, y: event.clientY, active: true, decided: false };
+        }}
+        onPointerMove={(event) => {
+          const g = gesture.current;
+          if (!g.active) return;
+          const mx = event.clientX - g.x;
+          const my = event.clientY - g.y;
+          if (!g.decided) {
+            if (Math.abs(my) > 10 && Math.abs(my) > Math.abs(mx)) {
+              g.active = false;
+              return;
+            }
+            if (Math.abs(mx) <= 10) return;
+            g.decided = true;
+            setDragging(true);
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }
+          setDx((!left && mx < 0) || (!right && mx > 0) ? 0 : mx);
+        }}
+        onPointerUp={end}
+        onPointerCancel={end}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+}

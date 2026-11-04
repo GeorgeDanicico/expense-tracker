@@ -47,7 +47,7 @@ describe("badgeText", () => {
 
 describe("the Reminders nav badge", () => {
   it("shows due + overdue, with the count in the link's accessible name", () => {
-    const html = render(<NavItem item={NAV_ITEMS.reminders} compact />, { due: 2, overdue: 1 });
+    const html = render(<NavItem item={NAV_ITEMS.reminders} />, { due: 2, overdue: 1 });
     expect(badge(html)).toBe("3");
     expect(accessibleName(html)).toBe("Reminders, 3 due");
   });

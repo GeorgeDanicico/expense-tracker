@@ -23,11 +23,11 @@ Run them with `npm run lint`.
 | [`no-zod-flatten`](#no-zod-flatten) | error | 15 fixed (6 in code, 9 in tests) | U1 |
 | [`no-raw-dialog`](#no-raw-dialog) | error | none | U1 |
 | [`no-window-confirm`](#no-window-confirm) | error | none | U1 |
-| [`motion-tokens`](#motion-tokens) | **warn** | **5 left** (see its section) | U1 |
+| [`motion-tokens`](#motion-tokens) | error | 5 fixed in U4 (a `warn` until the tokens existed) | U1 |
+| [`no-reduced-motion-query`](#no-reduced-motion-query) | error | 1 fixed | U4 |
 
 A rule that would need more than about 40 fixes outside the screen's own files lands as `warn`
-with its count here, and turns to `error` once the count reaches zero. `motion-tokens` is a `warn`
-for a different reason: the tokens it asks for don't exist until U4.
+with its count here, and turns to `error` once the count reaches zero.
 
 ## Why a plugin
 
@@ -244,13 +244,33 @@ variable (dnd-kit's `transition`) isn't a literal and passes.
 `prefers-reduced-motion` block can turn all of the app's motion off and the feel is tuned in one
 place ("The look" in [ui-plan.md](ui-plan.md)).
 
-**Added by:** U1. **Severity: `warn` until U4.** There are no motion tokens yet (U4 adds
-`durations`, `easings` and `keyframes`), so the 5 literal transitions in components can't be moved
-to tokens without inventing them here. **Existing cases: 5 left**: `nav-item.tsx`,
-`reminder-row.tsx`, `asset-selector.tsx`, `family-summary-dashboard.tsx` and
-`family-spending-charts.tsx`. U4 converts them with the tokens and turns the rule to `error`.
+The tokens are in `src/components/ui/theme/motion.ts`: durations `press`, `fast`, `moderate`,
+`slow` (and `countUp`, for JavaScript), easings `standard`, `enter` and `exit`, and the keyframes
+`sheet-in`, `sheet-out`, `pop-in` and `pop-out` beside Chakra's. Write them as props
+(`transitionDuration="fast" transitionTimingFunction="standard"`) or inside a value
+(`transition="opacity {durations.fast} {easings.standard}"`, or `transition("opacity", "fast")`
+from the theme's `motion.ts`).
+
+**Added by:** U1, as a `warn` until U4 added the tokens. **Existing cases:** 5, fixed in U4
+(`nav-item.tsx`, `reminder-row.tsx`, `asset-selector.tsx`, `family-summary-dashboard.tsx`,
+`family-spending-charts.tsx`); the rule is an `error` since.
 
 **Disable:** `// eslint-disable-next-line local/motion-tokens -- <reason>`.
+
+### `no-reduced-motion-query`
+
+**Catches:** `matchMedia("(prefers-reduced-motion…)")` (a string or template literal) outside
+`src/hooks/use-reduced-motion.ts`.
+
+**Why:** reduced motion is handled in one place. CSS motion needs nothing: the theme's one
+`@media (prefers-reduced-motion: reduce)` block in `global-css.ts` turns every animation and
+transition off. JavaScript-timed motion (a count-up, a delayed hand-off, a smooth scroll) asks
+`useReducedMotion()`, or `prefersReducedMotion()` outside a component, which also honour the
+previews' "Simulate reduced motion" switch.
+
+**Added by:** U4 (the audit's candidate). **Existing cases:** 1, fixed (`reminders-screen.tsx`).
+
+**Disable:** `// eslint-disable-next-line local/no-reduced-motion-query -- <reason>`.
 
 ## Conventions
 

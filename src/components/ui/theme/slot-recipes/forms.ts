@@ -19,7 +19,7 @@ export const nativeSelectSlotRecipe = defineSlotRecipe({
     },
     size: {
       xs: {
-        root: { "--select-field-height": "sizes.7" },
+        root: { "--select-field-height": "sizes.7", ...mobileFieldHeight("--select-field-height") },
         field: { textStyle: "xs", ps: "2", pe: "6" },
         indicator: { textStyle: "sm", insetEnd: "1.5" },
       },
@@ -29,7 +29,7 @@ export const nativeSelectSlotRecipe = defineSlotRecipe({
         indicator: { textStyle: "md", insetEnd: "2" },
       },
       md: {
-        root: { "--select-field-height": "sizes.9" },
+        root: { "--select-field-height": "sizes.9", ...mobileFieldHeight("--select-field-height") },
         field: { textStyle: "md", ps: "3", pe: "8" },
         indicator: { textStyle: "md", insetEnd: "2.5" },
       },
@@ -66,13 +66,17 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
     },
     indicator: {
       boxShadow: "0 0 0 1px {colors.border}, {shadows.xs}",
+      // Zag moves the indicator by `left` and `width`; it slides with the motion tokens.
+      "--transition-duration": "durations.moderate",
+      "--transition-timing-function": "easings.standard",
     },
   },
   variants: {
     size: {
-      xs: { item: { textStyle: "xs", px: "2.5", gap: "1", height: "6" } },
-      sm: { item: { textStyle: "sm", px: "3", gap: "1.5", height: "7" } },
-      md: { item: { textStyle: "sm", px: "3.5", gap: "2", height: "8" } },
+      // Below `md` the items are touch targets (40px; the group's padding makes it 44).
+      xs: { item: { textStyle: "xs", px: "2.5", gap: "1", height: { base: "9", md: "6" } } },
+      sm: { item: { textStyle: "sm", px: "3", gap: "1.5", height: { base: "10", md: "7" } } },
+      md: { item: { textStyle: "sm", px: "3.5", gap: "2", height: { base: "10", md: "8" } } },
     },
   },
   defaultVariants: { size: "sm" },

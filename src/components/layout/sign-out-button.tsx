@@ -55,7 +55,7 @@ function useSignOut() {
   return { open: () => setConfirming(true), dialog };
 }
 
-/** Full-width sign-out row (More sheet). */
+/** Full-width sign-out row (the More page). */
 export function SignOutButton() {
   const { open, dialog } = useSignOut();
   return (

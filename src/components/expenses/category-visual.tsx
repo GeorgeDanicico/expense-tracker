@@ -17,7 +17,7 @@ import {
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import type { ExpenseCategory } from "@/lib/expenses/categories";
 
-const CATEGORY_ICONS: Record<ExpenseCategory, LucideIcon> = {
+export const CATEGORY_ICONS: Record<ExpenseCategory, LucideIcon> = {
   housing: House,
   groceries: ShoppingBasket,
   transport: BusFront,

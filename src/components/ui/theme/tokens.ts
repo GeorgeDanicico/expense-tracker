@@ -1,5 +1,7 @@
 import { defineTokens } from "@chakra-ui/react";
 
+import { durations, easings } from "./motion";
+
 /**
  * Raw design tokens. Components never reference these directly; they use the
  * semantic tokens in `semantic-tokens.ts`, which point back here.
@@ -27,7 +29,9 @@ export const tokens = defineTokens({
       orangeBg: { value: "#FDEFE4" },
       orangeLine: { value: "#F3D3BC" },
     },
-    status: {
+    // Named `signal`, not `status`: the semantic `status.<tone>.bg` tokens would otherwise compile to
+    // the same CSS variable as a raw `status.<tone>Bg`, which then refers to itself and the fill is lost.
+    signal: {
       positive: { value: "#37634A" },
       positiveBg: { value: "#EAF1EC" },
       positiveLine: { value: "#C9DDD0" },
@@ -65,10 +69,19 @@ export const tokens = defineTokens({
     extrabold: { value: 600 },
     black: { value: 600 },
   },
+  /** Four steps, the same at every breakpoint ("The look" in docs/ui-direction.md); `badge` is the small status badge. */
   radii: {
     badge: { value: "0.25rem" },
-    control: { value: "0.375rem" },
-    card: { value: "0.625rem" },
-    dialog: { value: "0.75rem" },
+    /** Buttons, inputs, selects, segmented controls, sidebar links, icon tiles, rows. */
+    control: { value: "0.625rem" },
+    /** Cards, grouped lists, toasts, desktop dialogs. */
+    card: { value: "1rem" },
+    dialog: { value: "{radii.card}" },
+    /** The top corners of a phone's bottom sheet. */
+    sheet: { value: "1.375rem" },
+    /** Chips, deltas, indicators. */
+    pill: { value: "9999px" },
   },
+  durations,
+  easings,
 });

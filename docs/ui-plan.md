@@ -201,7 +201,7 @@ and add lint rules as described above.
 | U1 | Local ESLint plugin, `RuleTester`, `docs/lint-rules.md`, existing guardrails moved, the known rules | — | D2, D6, D9 (rules) | — | **sonnet** | Precise rules with tests; fixing existing violations is mechanical but wide. |
 | U2 | Screen audit: what each screen shows and does, tap counts, `find-simpler-ways` per module | 17.1 | — | — | **opus** | Judgement about what to hide, merge or move, across every screen. |
 | U3 | Design direction and 390/1280 mockups in `/dev/preview` | 17.2 | — | U2 | **opus** | The design decisions everything else follows. |
-| — | **Checkpoint:** George signs off the direction and mockups | | | U3 | George | Nothing is built until then. |
+| — | **Checkpoint:** George signs off the direction and mockups | | | U3 | George | Nothing is built until then. **Passed 4 November 2026** (recommended answers to every open question; see [ui-direction.md](ui-direction.md), "Decisions"). |
 | U4 | Theme refresh (radii, spacing, motion tokens, reduced motion) and mobile primitives: bottom sheet, sticky action bar, row actions, undo toast, amount input, touch sizes | 17.2 | — | U3 | **opus** | Changes how every screen looks and moves at once; focus, keyboard, safe-area and reduced-motion handling are easy to get subtly wrong. |
 | U5 | Navigation: Home, Money, +, Planning, More; the sidebar to match; Settings as one list | 17.3 | — | U4 | **sonnet** | Rewrites `nav-items.ts` and the shell to a signed-off mockup. |
 | U6 | The quick-add sheet and the fast expense form, with suggestions and the category guess | — | B1, B8 | U5 | **opus** | Expense writes from every screen, cache updates across screens, and a new suggestions endpoint. |
@@ -286,7 +286,12 @@ only, no API), `docs/ui-styling/screenshots/` (390 and 1280 px).
   plain stand-ins for the U4 ones. Phone first; desktop for each.
 - Each mockup lists its tap counts against the table's targets.
 
+**Direction, mockups and decisions:** [ui-direction.md](ui-direction.md).
+
 **Done when** George signs off the direction and the mockups (the checkpoint).
+
+**Checkpoint passed (George, 4 November 2026):** direction and mockups signed off, with the
+recommended answer to every open question ("Decisions" in [ui-direction.md](ui-direction.md)).
 
 ### U4: Theme refresh and mobile primitives
 
@@ -329,6 +334,21 @@ gallery shows every new primitive and the motion section.
 the whole app has the new radii, spacing and motion with the same colours, and George has signed
 off the gallery and screenshots at 390 and 1280 px.
 
+**Signed off by George on 4 November 2026 (screenshots at 390 and 1280 px).**
+
+**Built (4 November 2026):** the theme (`theme/motion.ts`,
+`theme/layout.ts`, the radii in `tokens.ts`, touch sizes and press feedback in the recipes, the
+reduced-motion block in `global-css.ts`), the responsive `AppDialog` (plus `pending` and `dirty`),
+`ActionBar`, `RowActions` with `useRowActions()`, `UndoToast` with `useUndo()`, `AmountInput`,
+`ToggleChip`, `Disclosure` and `Collapse`, `IconTile`, `useReducedMotion()`, and
+`local/no-reduced-motion-query`; `local/motion-tokens` is an error. Screenshots:
+`docs/ui-styling/screenshots/u4-{gallery-motion,gallery-mobile,gallery-sheet,dashboard,expenses,expenses-add-dialog,reminders,reminder-dialog}-{390,1280}.jpg`,
+and the U3 mockups re-shot on the real theme (`u3-*.jpg`). One sheet for every width below `md`
+comes from the dialog recipe (Chakra's `Dialog`, not `Drawer`), so a rotating phone never remounts
+a form. Left for later: `AppDialog`'s `pending` replaces the 15 hand-written guards (and
+`local/no-dialog-pending-guard`), the chips in 6 files move to `ToggleChip` (and
+`local/no-raw-toggle-button`), and `DataGate`; the screen tasks that rebuild those files do it.
+
 ### U5: Navigation
 
 **Files:** `src/components/layout/*`, `src/components/settings/settings-nav.tsx`,
@@ -351,6 +371,11 @@ permission); the active state for every route; the segmented control's URLs.
 
 **Done when** screenshots at 320, 390 and 1280 px are signed off and every page is reachable in
 at most two taps from Home.
+
+**Built (4 November 2026), waiting for George's sign-off:** the bottom bar and sidebar from one
+`navigationFor` table, `SectionNav` (the segmented control, rendered by the shell so no route
+moves), the quick-add placeholder, `/more`, and Settings as a grouped list. Screenshots:
+`docs/ui-styling/screenshots/u5-*.jpg`. Insights (a fourth Money segment) waits for U7.
 
 ### U6: Quick add and the fast expense form
 

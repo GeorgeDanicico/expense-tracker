@@ -7,7 +7,7 @@ import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { InlineAlert } from "@/components/ui/inline-alert";
 
-/** Confirmation for destructive or irreversible actions. */
+/** Confirmation for destructive or irreversible actions: a bottom sheet on a phone, centred above. */
 export function ConfirmDialog({
   title,
   description,
@@ -45,8 +45,8 @@ export function ConfirmDialog({
       open={open}
       onOpenChange={onOpenChange}
       size="sm"
-      placement="center"
       role="alertdialog"
+      pending={pending}
       footer={
         <FormActions
           submitLabel={confirmLabel}

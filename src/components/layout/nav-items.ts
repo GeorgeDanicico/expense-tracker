@@ -3,10 +3,13 @@ import {
   CalendarDays,
   CreditCard,
   House,
+  LayoutGrid,
+  MoreHorizontal,
   Scale,
   Settings2,
   SquareKanban,
   TrendingUp,
+  WalletCards,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,7 +30,14 @@ export type NavItemConfig = {
   /** A count shown next to the label (see `NavBadge`): `reminders` is what's due or overdue. */
   badge?: "reminders";
 };
-export type NavSection = { label: string; items: NavItemConfig[] };
+
+export type SectionKey = "home" | "money" | "planning" | "more";
+
+/**
+ * One of the five places in the bottom bar (the + sits between Money and Planning) and one group
+ * in the sidebar. `href` is where its tab goes when it isn't its first item.
+ */
+export type NavSection = { key: SectionKey; label: string; icon: LucideIcon; items: NavItemConfig[]; href?: string };
 
 export const NAV_ITEMS = {
   home: { href: "/dashboard", label: "Home", icon: House },
@@ -41,52 +51,55 @@ export const NAV_ITEMS = {
 } satisfies Record<string, NavItemConfig>;
 
 /**
- * Grouped destinations between Home and Settings. New modules add a section here; a section only
- * appears once it has items. Planning holds the personal Reminders, which everyone reaches, then
- * the family-only To-dos and Calendar last, so a user without a family keeps the section with
- * Reminders alone.
+ * The navigation by frequency ("How the app becomes mobile first", point 5). Money and Planning
+ * switch between their pages with a segmented control; More is the settings list on a phone, so its
+ * tab goes to `/more` while the sidebar links Settings directly. Planning holds the personal
+ * Reminders, which everyone reaches, then the family-only To-dos and Calendar, so a user without a
+ * family keeps the section with Reminders alone.
  */
 export const NAV_SECTIONS: NavSection[] = [
-  { label: "Finance", items: [NAV_ITEMS.expenses, NAV_ITEMS.investments, NAV_ITEMS.netWorth] },
-  { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] },
+  { key: "home", label: "Home", icon: House, items: [NAV_ITEMS.home] },
+  { key: "money", label: "Money", icon: WalletCards, items: [NAV_ITEMS.expenses, NAV_ITEMS.investments, NAV_ITEMS.netWorth] },
+  { key: "planning", label: "Planning", icon: LayoutGrid, items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] },
+  { key: "more", label: "More", icon: MoreHorizontal, items: [NAV_ITEMS.settings], href: "/more" },
 ];
 
-/**
- * Shown in the mobile tab bar; everything else lives in the More sheet. Only destinations every user
- * reaches belong here (To-dos and Calendar need a family, so they would come and go), and two plus More keeps each
- * tab wide enough for its label at 320 px.
- */
-export const TAB_BAR_ITEMS: NavItemConfig[] = [NAV_ITEMS.home, NAV_ITEMS.expenses];
-
-/** The More sheet's sections: each section minus the destinations the tab bar already shows. */
-export const MORE_SECTIONS: NavSection[] = NAV_SECTIONS
-  .map((section) => ({ ...section, items: section.items.filter((item) => !TAB_BAR_ITEMS.includes(item)) }))
-  .filter((section) => section.items.length > 0);
-
-export const MORE_ITEMS: NavItemConfig[] = [...MORE_SECTIONS.flatMap((section) => section.items), NAV_ITEMS.settings];
+/** A section as one user reaches it: its visible items, and the page its tab opens. */
+export type UserSection = Omit<NavSection, "href"> & { href: string };
 
 /**
  * The navigation a user can reach. `membership` is `undefined` while the account is loading: module
  * items show then rather than flash in, since most users reach them. Family-only items wait for the
  * account instead (a user without a family, the common case, would otherwise see them flash in and
- * out), and sit last in the last section, so nothing above them moves. The server and the page
+ * out), and sit last in their section, so nothing above them moves. The server and the page
  * guards enforce access either way. A section with no visible items disappears.
  */
-export function navigationFor(membership: AccountMembership | null | undefined) {
+export function navigationFor(membership: AccountMembership | null | undefined): { sections: UserSection[] } {
   const reachable = (item: NavItemConfig) => {
     if (item.requiresFamily && !membership) return false;
     return membership === undefined || !item.module || can(membership, item.module, "edit");
   };
-  const sections = (list: NavSection[]) =>
-    list.map((section) => ({ ...section, items: section.items.filter(reachable) })).filter((section) => section.items.length > 0);
-  const tabBarItems = TAB_BAR_ITEMS.filter(reachable);
-  const moreSections = sections(
-    NAV_SECTIONS.map((section) => ({ ...section, items: section.items.filter((item) => !TAB_BAR_ITEMS.includes(item)) })),
-  );
-  const moreItems: NavItemConfig[] = [...moreSections.flatMap((section) => section.items), NAV_ITEMS.settings];
-  return { sections: sections(NAV_SECTIONS), tabBarItems, moreSections, moreItems };
+  const sections = NAV_SECTIONS.map((section) => ({ ...section, items: section.items.filter(reachable) }))
+    .filter((section) => section.items.length > 0)
+    .map((section) => ({ ...section, href: section.href ?? section.items[0].href }));
+  return { sections };
 }
 
 export function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** The page of `section` that `pathname` is on: `/expenses/import` is Expenses. */
+export function activeItem(section: UserSection, pathname: string) {
+  return section.items.find((item) => isActivePath(pathname, item.href));
+}
+
+/** The section `pathname` belongs to, if any (`/more` is More, `/settings/mcp` is More too). */
+export function activeSection(sections: readonly UserSection[], pathname: string) {
+  return sections.find((section) => activeItem(section, pathname) || isActivePath(pathname, section.href));
+}
+
+/** The segmented control's options for a section: its pages by URL, or none when it has one page. */
+export function segmentsFor(section: UserSection) {
+  return section.items.length > 1 ? section.items.map(({ href, label }) => ({ value: href, label })) : null;
 }

@@ -21,6 +21,7 @@ import { formatMonth, getBucharestMonth } from "@/lib/calendar";
 import { currenciesByTotal, membersIn, monthShares } from "@/lib/expenses/family-charts";
 import type { FamilyDashboardData } from "@/lib/expenses/types";
 import { formatCurrency } from "@/lib/utils/currency";
+import { transition } from "@/components/ui/theme/motion";
 
 const GAP = "2px";
 
@@ -109,7 +110,7 @@ export function FamilySummaryDashboard() {
                     borderRadius="sm"
                     cursor="pointer"
                     opacity={selected && selected !== share.memberId ? 0.3 : 1}
-                    transition="opacity 0.15s"
+                    transition={transition("opacity", "fast")}
                     aria-pressed={selected === share.memberId}
                     aria-label={`${share.name}, ${formatCurrency(share.total, activeCurrency)}, ${Math.round(share.share)}%`}
                     title={`${share.name}: ${formatCurrency(share.total, activeCurrency)}`}

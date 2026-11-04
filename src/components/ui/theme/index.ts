@@ -3,6 +3,7 @@ import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
 import { globalCss } from "./global-css";
 import { buttonRecipe } from "./recipes/button";
 import { inputRecipe, textareaRecipe } from "./recipes/input";
+import { keyframes } from "./motion";
 import { badgeRecipe, headingRecipe, linkRecipe } from "./recipes/misc";
 import {
   cardSlotRecipe,
@@ -26,6 +27,7 @@ const config = defineConfig({
   theme: {
     tokens,
     semanticTokens,
+    keyframes,
     textStyles,
     recipes: {
       button: buttonRecipe,

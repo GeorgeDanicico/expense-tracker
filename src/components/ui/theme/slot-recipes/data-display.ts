@@ -1,5 +1,7 @@
 import { defineSlotRecipe } from "@chakra-ui/react";
 
+import { transition } from "../motion";
+
 export const tableSlotRecipe = defineSlotRecipe({
   slots: ["root", "header", "body", "row", "columnHeader", "cell", "footer", "caption"],
   base: {
@@ -7,7 +9,7 @@ export const tableSlotRecipe = defineSlotRecipe({
     row: {
       // Row actions stay quiet until the row is hovered or focused; always
       // visible on touch screens.
-      "& [data-row-action]": { opacity: 0.4, transition: "opacity 120ms ease" },
+      "& [data-row-action]": { opacity: 0.4, transition: transition("opacity", "fast") },
       "&:hover [data-row-action], &:focus-within [data-row-action]": { opacity: 1 },
       "@media (hover: none)": { "& [data-row-action]": { opacity: 1 } },
     },
@@ -62,11 +64,13 @@ export const cardSlotRecipe = defineSlotRecipe({
   variants: {
     size: {
       sm: { root: { "--card-padding": "spacing.3" }, title: { textStyle: "sectionTitle" } },
-      md: { root: { "--card-padding": "spacing.4" }, title: { textStyle: "sectionTitle" } },
+      // More room on desktop ("Spacing per breakpoint" in docs/ui-direction.md).
+      md: { root: { "--card-padding": { base: "spacing.4", md: "spacing.5" } }, title: { textStyle: "sectionTitle" } },
     },
     variant: {
+      // Fewer lines: a white surface and a soft shadow on the cream canvas separate a card, not a border.
       outline: {
-        root: { bg: "bg.surface", borderColor: "border", boxShadow: "xs" },
+        root: { bg: "bg.surface", borderColor: "transparent", boxShadow: "xs" },
       },
       subtle: {
         root: { bg: "bg.subtle" },

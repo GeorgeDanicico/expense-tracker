@@ -50,6 +50,8 @@ import type { ConnectedAppView } from "@/lib/mcp/views";
 import { EXPENSE_CATEGORIES } from "@/lib/expenses/categories";
 import type { McpToken } from "@/lib/mcp/token-repository";
 
+import { MobileGallery } from "./gallery-mobile";
+import { MotionGallery } from "./gallery-motion";
 import { GalleryRow, GallerySection } from "./gallery-section";
 import { TokenSwatches, TypeScale } from "./gallery-tokens";
 
@@ -96,7 +98,11 @@ export function UiGallery() {
           }
         />
 
-        <GallerySection title="Buttons" description="xs 28px · sm 32px (default) · md 36px">
+        <MotionGallery />
+
+        <MobileGallery />
+
+        <GallerySection title="Buttons" description="xs 28px · sm 32px (default) · md 36px; below 768px sm and md are 44px and xs keeps 28px with a 44px hit area. Every button presses in on tap.">
           {(["solid", "outline", "ghost", "subtle"] as const).map((variant) => (
             <GalleryRow key={variant} label={variant}>
               {SIZES.map((size) => (
@@ -335,7 +341,7 @@ export function UiGallery() {
           </Card>
         </SimpleGrid>
 
-        <GallerySection title="Dialogs" description="AppDialog docks to the bottom on mobile; ConfirmDialog stays centred.">
+        <GallerySection title="Dialogs" description="Below 768px every AppDialog and ConfirmDialog is a bottom sheet (drag handle; swipe down or tap outside to close; a typed-in form asks first). From 768px a centred dialog. Same props.">
           <GalleryRow label="open">
             <AppDialog
               title="Add expense"

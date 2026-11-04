@@ -1,80 +1,104 @@
 "use client";
 
-import { Flex, Link as ChakraLink } from "@chakra-ui/react";
+import { Box, Flex, Stack, Text } from "@chakra-ui/react";
+import { Bell, ChevronRight, KeyRound, ShieldCheck, Sparkles, UserCog, UserRound, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 
+import { useAppPathname } from "@/components/layout/use-app-pathname";
+import { ICON } from "@/components/ui/icon";
+import { IconTile } from "@/components/ui/icon-tile";
+import { transition } from "@/components/ui/theme/motion";
 import type { AccountData } from "@/lib/account/types";
 
-export type SettingsTab = { href: string; label: string };
-
-const AI_ASSISTANTS_TAB: SettingsTab = { href: "/settings/mcp", label: "AI assistants" };
-const AI_FEATURES_TAB: SettingsTab = { href: "/settings/ai", label: "AI features" };
-const NOTIFICATIONS_TAB: SettingsTab = { href: "/settings/notifications", label: "Notifications" };
+export type SettingsRow = { href: string; label: string; icon: LucideIcon };
+export type SettingsGroup = { label: string; rows: SettingsRow[] };
 
 /**
- * The settings tabs for this account. Account, AI assistants, AI features and Notifications are always there
- * (reminders don't need a family); the family tabs only when the family module is on, and Manage
- * family only for parents.
+ * The settings list for this account, in the order of the direction doc (Account, Family, AI).
+ * Account, Notifications and the two AI pages are always there (reminders don't need a family); the
+ * Family group only when the family module is on, and Manage family only for parents.
  */
-export function settingsTabs(account: Pick<AccountData, "features" | "membership">): SettingsTab[] {
-  const tabs: SettingsTab[] = [{ href: "/settings", label: "Account" }];
+export function settingsGroups(account: Pick<AccountData, "features" | "membership">): SettingsGroup[] {
+  const groups: SettingsGroup[] = [
+    {
+      label: "Account",
+      rows: [
+        { href: "/settings", label: "Account", icon: UserRound },
+        { href: "/settings/notifications", label: "Notifications", icon: Bell },
+      ],
+    },
+  ];
   if (account.features.family) {
-    tabs.push({ href: "/settings/family", label: "Family" }, { href: "/settings/permissions", label: "My permissions" });
-    if (account.membership?.role === "parent") tabs.push({ href: "/settings/family/manage", label: "Manage family" });
+    const rows: SettingsRow[] = [
+      { href: "/settings/family", label: "Family", icon: Users },
+      { href: "/settings/permissions", label: "My permissions", icon: KeyRound },
+    ];
+    if (account.membership?.role === "parent") rows.push({ href: "/settings/family/manage", label: "Manage family", icon: UserCog });
+    groups.push({ label: "Family", rows });
   }
-  tabs.push(AI_ASSISTANTS_TAB, AI_FEATURES_TAB, NOTIFICATIONS_TAB);
-  return tabs;
+  groups.push({
+    label: "AI",
+    rows: [
+      { href: "/settings/mcp", label: "AI assistants", icon: ShieldCheck },
+      { href: "/settings/ai", label: "AI features", icon: Sparkles },
+    ],
+  });
+  return groups;
 }
 
-/** The tab for `pathname`: the one with the longest matching href, so `/settings/family/manage` isn't "Family". */
-export function activeSettingsTab(tabs: readonly SettingsTab[], pathname: string): SettingsTab | undefined {
-  return tabs
+/** The row for `pathname`: the one with the longest matching href, so `/settings/family/manage` isn't "Family". */
+export function activeSettingsRow(groups: readonly SettingsGroup[], pathname: string): SettingsRow | undefined {
+  return groups
+    .flatMap((group) => group.rows)
     .filter(({ href }) => pathname === href || pathname.startsWith(`${href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0];
 }
 
-/** Tab-style navigation shared by every settings page. It scrolls sideways on a narrow screen. */
-export function SettingsNav({ tabs }: { tabs: readonly SettingsTab[] }) {
-  const pathname = usePathname();
-  const active = activeSettingsTab(tabs, pathname);
+/**
+ * The grouped list: More on a phone, the column left of the open page on desktop. The open page is
+ * highlighted from `md` up only; on a phone the list is a menu and no page is open.
+ */
+export function SettingsList({ groups }: { groups: readonly SettingsGroup[] }) {
+  const pathname = useAppPathname();
+  const active = activeSettingsRow(groups, pathname);
   return (
-    <Flex
-      as="nav"
-      aria-label="Settings"
-      gap="1"
-      overflowX="auto"
-      borderBottomWidth="1px"
-      borderColor="border"
-      css={{ scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}
-    >
-      {tabs.map((tab) => {
-        const isActive = tab === active;
-        return (
-          <ChakraLink
-            key={tab.href}
-            asChild
-            flexShrink="0"
-            display="flex"
-            alignItems="center"
-            minH="10"
-            px="3"
-            mb="-1px"
-            borderBottomWidth="2px"
-            borderColor={isActive ? "fg.accent" : "transparent"}
-            textStyle="bodySm"
-            fontWeight="medium"
-            color={isActive ? "fg" : "fg.muted"}
-            textDecoration="none"
-            whiteSpace="nowrap"
-            _hover={{ color: "fg", textDecoration: "none" }}
-          >
-            <Link href={tab.href} aria-current={isActive ? "page" : undefined}>
-              {tab.label}
-            </Link>
-          </ChakraLink>
-        );
-      })}
-    </Flex>
+    <Stack as="nav" aria-label="Settings" gap="4">
+      {groups.map((group) => (
+        <Stack key={group.label} gap="1.5">
+          <Text textStyle="label" color="fg.subtle" textTransform="uppercase" letterSpacing="0.04em" px="1" pt="2" pb="1">
+            {group.label}
+          </Text>
+          <Box as="ul" listStyleType="none" m="0" p="0" bg="bg.surface" borderRadius="card" overflow="hidden" boxShadow="xs">
+            {group.rows.map((row, index) => {
+              const current = row === active;
+              return (
+                <Box as="li" key={row.href}>
+                  <Link href={row.href} aria-current={current ? "page" : undefined}>
+                    <Flex
+                      align="center"
+                      gap="3"
+                      minH={{ base: "14", md: "12" }}
+                      px="3.5"
+                      borderTopWidth={index === 0 ? "0" : "1px"}
+                      borderColor="border"
+                      bg={current ? { md: "bg.selected" } : undefined}
+                      transition={transition("background-color", "fast")}
+                      _hover={{ bg: current ? { md: "bg.selected" } : "bg.subtle" }}
+                      _active={{ bg: "bg.muted" }}
+                    >
+                      <IconTile icon={row.icon} bg="bg.muted" color={current ? { base: "fg.muted", md: "fg.accent" } : "fg.muted"} />
+                      <Text as="span" flex="1" textStyle="body" fontWeight="medium">
+                        {row.label}
+                      </Text>
+                      <ChevronRight size={ICON.sm} aria-hidden="true" />
+                    </Flex>
+                  </Link>
+                </Box>
+              );
+            })}
+          </Box>
+        </Stack>
+      ))}
+    </Stack>
   );
 }
