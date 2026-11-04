@@ -447,6 +447,8 @@ expenses hooks (read only), tests.
 - Done and Snooze share `useReminderActions` with the Reminders page. Screenshots:
   `docs/ui-styling/screenshots/u7-*.jpg`.
 
+**Signed off (George, 4 November 2026)** and merged in #215.
+
 ### U8: Expenses
 
 **Files:** `src/app/(app)/expenses/**`, `src/components/expenses/**`, a new
