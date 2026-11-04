@@ -201,7 +201,7 @@ and add lint rules as described above.
 | U1 | Local ESLint plugin, `RuleTester`, `docs/lint-rules.md`, existing guardrails moved, the known rules | — | D2, D6, D9 (rules) | — | **sonnet** | Precise rules with tests; fixing existing violations is mechanical but wide. |
 | U2 | Screen audit: what each screen shows and does, tap counts, `find-simpler-ways` per module | 17.1 | — | — | **opus** | Judgement about what to hide, merge or move, across every screen. |
 | U3 | Design direction and 390/1280 mockups in `/dev/preview` | 17.2 | — | U2 | **opus** | The design decisions everything else follows. |
-| — | **Checkpoint:** George signs off the direction and mockups | | | U3 | George | Nothing is built until then. |
+| — | **Checkpoint:** George signs off the direction and mockups | | | U3 | George | Nothing is built until then. **Passed 4 November 2026** (recommended answers to every open question; see [ui-direction.md](ui-direction.md), "Decisions"). |
 | U4 | Theme refresh (radii, spacing, motion tokens, reduced motion) and mobile primitives: bottom sheet, sticky action bar, row actions, undo toast, amount input, touch sizes | 17.2 | — | U3 | **opus** | Changes how every screen looks and moves at once; focus, keyboard, safe-area and reduced-motion handling are easy to get subtly wrong. |
 | U5 | Navigation: Home, Money, +, Planning, More; the sidebar to match; Settings as one list | 17.3 | — | U4 | **sonnet** | Rewrites `nav-items.ts` and the shell to a signed-off mockup. |
 | U6 | The quick-add sheet and the fast expense form, with suggestions and the category guess | — | B1, B8 | U5 | **opus** | Expense writes from every screen, cache updates across screens, and a new suggestions endpoint. |
@@ -286,9 +286,12 @@ only, no API), `docs/ui-styling/screenshots/` (390 and 1280 px).
   plain stand-ins for the U4 ones. Phone first; desktop for each.
 - Each mockup lists its tap counts against the table's targets.
 
-**Direction, mockups and open questions:** [ui-direction.md](ui-direction.md).
+**Direction, mockups and decisions:** [ui-direction.md](ui-direction.md).
 
 **Done when** George signs off the direction and the mockups (the checkpoint).
+
+**Checkpoint passed (George, 4 November 2026):** direction and mockups signed off, with the
+recommended answer to every open question ("Decisions" in [ui-direction.md](ui-direction.md)).
 
 ### U4: Theme refresh and mobile primitives
 

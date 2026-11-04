@@ -144,25 +144,26 @@ real primitives pick up the new radii without a theme change. U4 moves the value
 - **Quick-add To-do is 3 taps, not 2.** The plan's "+ → To-do → Enter: 2" counts two presses for
   three. Remembering the last kind used (per device, plan point 10) makes a repeat to-do 2.
 
-## Open questions for George
+## Decisions (George, 4 November 2026)
 
-1. **Radius on desktop:** the same steps as phones (as signed off), or one step smaller on desktop
-   (control 8, card 12)? Recommended: the same.
-2. **The quick-add amount at 40 px:** the one size above the type scale. Or keep it at 28 px (`4xl`)?
-3. **Should the sheet remember the last kind** (To-do after a to-do), bringing a repeat to-do to 2
-   taps? Or always open on Expense?
-4. **Money's member picker:** a "Me ▾" menu (2 taps to switch to Everyone, one row) or today's chips
-   (1 tap, two rows at 390 px)? Recommended: the menu.
-5. **To-dos on a phone:** one column at a time with a segmented control (shown, as the audit
-   suggests) or columns that scroll sideways (the plan's U10)?
-6. **Insights:** the Home card links to Money. Should Insights be a fourth segment of Money or a
-   view inside Expenses?
-7. **Event defaults in quick add:** which day and time should the chips start on? Today and all day,
-   or the next whole hour, as the calendar does now? The mockup shows them already set (Sat 7 Nov,
-   all day).
-8. **Calendar on phones:** Agenda (better at 390 px today) or Week. It isn't mocked here.
-9. **Sheet close timing:** the HTML closes in `slow` (300 ms). A `moderate` (200 ms) exit would feel
-   snappier. Keep `slow`?
-10. **Kids:** More shows parent rows (Invite, Add a kid) only to parents, and U7's Home must work
-    without the expenses permission (reminders and to-dos first). Is that enough, or do you want a
-    kid mockup before U5?
+George signed off the direction and the mockups and took the recommended answer to every open
+question. Where a question named no recommendation, the answer is the one this page and the mockups
+already show.
+
+1. **Radius on desktop:** the same steps as phones (control 10, card 16, sheet 22, pill), as signed
+   off. No smaller desktop step.
+2. **The quick-add amount:** 40 px, the one size above the type scale.
+3. **The sheet remembers the last kind** used, per device (plan point 10), so a repeat to-do is 2
+   taps. The first open on a device starts on Expense.
+4. **Money's member picker:** a "Me ▾" menu (one row at 390 px).
+5. **To-dos on a phone:** one column at a time with a segmented control, as shown.
+6. **Insights:** a fourth segment of Money (Expenses, Investments, Net worth, Insights), which Home's
+   card links to.
+7. **Event defaults in quick add:** today, all day, as the mockup shows; "Choose a time…" sets a time.
+8. **Calendar on phones:** Agenda.
+9. **Sheet close timing:** keep `slow` (300 ms) with the `exit` easing.
+10. **Kids:** parent-only rows in More and a Home that works without the expenses permission are
+    enough; no kid mockup before U5.
+
+U4 builds on these. The values in "The look" above are now the theme's
+(`src/components/ui/theme`), and the mockups use the real tokens and primitives.
