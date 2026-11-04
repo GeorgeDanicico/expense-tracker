@@ -58,6 +58,10 @@ export class FakeExpenseRepository implements ExpenseRepository {
       && (!search || matchesExpenseSearch(expense, search)));
   }
 
+  async count(userId: string) {
+    return this.owned(userId).length;
+  }
+
   /** Computes the summary the way `get_expense_dashboard` does. */
   async getDashboard(userId: string, ranges: { current: DateRange; analytics: DateRange }) {
     const current = this.newestFirst(userId).filter((expense) => inRange(expense, ranges.current));

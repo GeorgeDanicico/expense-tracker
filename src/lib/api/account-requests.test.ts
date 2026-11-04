@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { changeEmail, changePassword, deleteAccount, downloadMyData, signOut, signOutEverywhere } from "./account-requests";
+import { changeCurrency, changeEmail, changePassword, deleteAccount, downloadMyData, signOut, signOutEverywhere } from "./account-requests";
 
 function stubFetch(response: () => Response = () => new Response(null, { status: 204 })) {
   const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => response());
@@ -136,5 +136,38 @@ describe("downloadMyData", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("network")));
 
     await expect(downloadMyData()).rejects.toMatchObject({ status: 503 });
+  });
+});
+
+// Audit B10: the warning comes from the server, which knows whether any expenses exist.
+describe("changeCurrency", () => {
+  const json = (status: number, body: unknown) => () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+  it("returns the saved account when nothing needs confirming", async () => {
+    const fetchMock = stubFetch(json(200, { currency: "USD" }));
+
+    expect(await changeCurrency("USD")).toEqual({ saved: { currency: "USD" } });
+    expect(sent(fetchMock)).toEqual({ url: "/api/account", method: "PATCH", body: { currency: "USD" } });
+  });
+
+  it("returns the server's warning to confirm, instead of an error, while expenses exist", async () => {
+    const warning = "Your 3 past expenses will be shown as USD; amounts aren't converted.";
+    stubFetch(json(409, { error: warning, code: "currency_relabel" }));
+
+    expect(await changeCurrency("USD")).toEqual({ confirm: warning });
+  });
+
+  it("sends the confirmation with a confirmed change", async () => {
+    const fetchMock = stubFetch(json(200, { currency: "USD" }));
+
+    await changeCurrency("USD", { confirmRelabel: true });
+
+    expect(sent(fetchMock).body).toEqual({ currency: "USD", confirmRelabel: true });
+  });
+
+  it("throws any other refusal for the form to show", async () => {
+    stubFetch(json(422, { error: "Choose a supported currency." }));
+
+    await expect(changeCurrency("XYZ")).rejects.toMatchObject({ status: 422, message: "Choose a supported currency." });
   });
 });

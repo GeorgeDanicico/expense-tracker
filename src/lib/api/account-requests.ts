@@ -1,3 +1,5 @@
+import { CURRENCY_RELABEL } from "@/lib/account/currency-change";
+import type { AccountData } from "@/lib/account/types";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import {
   ACCOUNT_API_KEY,
@@ -31,6 +33,24 @@ export async function changePassword({ currentPassword, password, confirmPasswor
 /** Asks to change the signed-in user's email; the server checks the current password first. */
 export async function changeEmail({ email, currentPassword }: { email: string; currentPassword: string }) {
   await apiRequest<void>(ACCOUNT_EMAIL_API_URL, { method: "PATCH", body: JSON.stringify({ email, currentPassword }) });
+}
+
+/** A currency change: saved, or waiting for the user to confirm the warning the server sent. */
+export type CurrencyChange = { saved: AccountData } | { confirm: string };
+
+/**
+ * Changes the account currency. While the user has expenses the server first answers with a warning
+ * ("Your 214 past expenses will be shown as USD; amounts aren't converted.", audit B10), returned as
+ * `confirm` for the screen to ask about; sending again with `confirmRelabel` saves the change.
+ */
+export async function changeCurrency(currency: string, { confirmRelabel = false } = {}): Promise<CurrencyChange> {
+  try {
+    const body = confirmRelabel ? { currency, confirmRelabel } : { currency };
+    return { saved: await apiRequest<AccountData>(ACCOUNT_API_KEY, { method: "PATCH", body: JSON.stringify(body) }) };
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.code === CURRENCY_RELABEL) return { confirm: caught.message };
+    throw caught;
+  }
 }
 
 /** Signs this browser out. */

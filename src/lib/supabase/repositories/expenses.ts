@@ -188,6 +188,14 @@ export const supabaseExpenseRepository: ExpenseRepository = {
     return queryExpensesForUser(userId, { tab, filters, ...expenseTabDateBounds(filters) });
   },
 
+  /** A count with no rows read (`head`), on the owner's index. */
+  async count(userId) {
+    const supabase = await createClient();
+    const { count, error } = await supabase.from("expenses").select("id", { count: "exact", head: true }).eq("user_id", userId);
+    if (error) throw translateDatabaseError(error, "Unable to load expenses.");
+    return count ?? 0;
+  },
+
   async getDashboard(userId, { current, analytics }) {
     const supabase = await createClient();
     const [recentResult, summaryResult] = await Promise.all([

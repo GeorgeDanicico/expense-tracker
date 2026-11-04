@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
-import { aKid, aParent } from "@/test/builders";
+import { aKid, aParent, anExpense } from "@/test/builders";
 import { forgetLastActive } from "@/lib/family/last-active";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
@@ -274,6 +274,45 @@ describe("PATCH /api/account", () => {
     const response = await callRoute(PATCH, { method: "PATCH", body: "{" });
 
     expect(response).toMatchObject({ status: 422, body: { error: "Choose a supported currency." } });
+  });
+
+  // Audit B10: past expenses have no currency of their own, so a change relabels them.
+  describe("with past expenses", () => {
+    beforeEach(() => {
+      repositories.account.currencies.set(user.id, "EUR");
+      repositories.expenses.expenses.set(user.id, [anExpense({ id: "a" }), anExpense({ id: "b" })]);
+    });
+
+    it("refuses an unconfirmed change with 409 currency_relabel, saying how many, and saves nothing", async () => {
+      const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } });
+
+      expect(response).toMatchObject({
+        status: 409,
+        body: { error: "Your 2 past expenses will be shown as USD; amounts aren't converted.", code: "currency_relabel" },
+      });
+      expect(repositories.account.currencies.get(user.id)).toBe("EUR");
+    });
+
+    it("saves a confirmed change", async () => {
+      const response = await callRoute(PATCH, { method: "PATCH", body: { currency: "USD", confirmRelabel: true } });
+
+      expect(response).toMatchObject({ status: 200, body: { currency: "USD" } });
+      expect(repositories.account.currencies.get(user.id)).toBe("USD");
+    });
+
+    it("saves the same currency again without asking or counting", async () => {
+      const count = vi.spyOn(repositories.expenses, "count");
+
+      expect((await callRoute(PATCH, { method: "PATCH", body: { currency: "EUR" } })).status).toBe(200);
+      expect(count).not.toHaveBeenCalled();
+    });
+
+    it("counts only the caller's own expenses", async () => {
+      repositories.expenses.expenses.set(user.id, []);
+      repositories.expenses.expenses.set("someone-else", [anExpense()]);
+
+      expect((await callRoute(PATCH, { method: "PATCH", body: { currency: "USD" } })).status).toBe(200);
+    });
   });
 
   it("hides a storage failure behind a generic message", async () => {
