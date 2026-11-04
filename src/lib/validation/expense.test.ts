@@ -140,3 +140,25 @@ describe("validateExpensePatch", () => {
     expect(() => validateExpensePatch({ description: "  " })).toThrow("Enter a description.");
   });
 });
+
+// Audit B8: a control character in a description made the spreadsheet export unreadable.
+describe("control characters", () => {
+  it("drops control characters from a description and turns line breaks and tabs into a space", () => {
+    expect(expenseSchema.parse({ ...input, description: "Card\u0002 payment\u007F" }).description).toBe("Card payment");
+    expect(expenseSchema.parse({ ...input, description: " Lidl\r\nCluj\tcentre " }).description).toBe("Lidl Cluj centre");
+  });
+
+  it("refuses a description of nothing but control characters as empty", () => {
+    const result = expenseSchema.safeParse({ ...input, description: "\u0001\u0002" });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(fieldErrorsOf(result.error).description).toEqual(["Enter a description."]);
+  });
+
+  it("keeps line breaks in notes but drops other control characters", () => {
+    expect(expenseSchema.parse({ ...input, notes: "Two\nlines\u0000" }).notes).toBe("Two\nlines");
+  });
+
+  it("cleans a patch the same way", () => {
+    expect(validateExpensePatch({ description: "Fuel\u001B", notes: "a\u0007b" })).toEqual({ description: "Fuel", notes: "ab" });
+  });
+});

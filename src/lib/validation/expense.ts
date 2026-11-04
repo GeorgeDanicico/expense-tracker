@@ -66,13 +66,39 @@ export const expenseAmountSchema = expenseAmountInput
 /** The message for a subtype that doesn't belong to the expense's category; the SQL's update_expense uses it too. */
 export const SUBTYPE_CATEGORY_MESSAGE = "Choose a subtype belonging to the selected category.";
 
+/** Line breaks and tabs, which a one-line description turns into a space. */
+const LINE_BREAKS = /[\t\n\r]+/g;
+/**
+ * The other C0 control characters and DEL. XML 1.0 refuses them, so one in a stored description made
+ * the spreadsheet export "damaged" in Excel (audit B8); bank statements and MCP clients send them.
+ */
+const CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+/** `text` as one line: line breaks and tabs become a space and other control characters are dropped. */
+export function oneLine(text: string) {
+  return text.replace(LINE_BREAKS, " ").replace(CONTROL_CHARACTERS, "");
+}
+
+/** `text` with control characters dropped, keeping line breaks and tabs (notes). */
+function withoutControlCharacters(text: string) {
+  return text.replace(CONTROL_CHARACTERS, "");
+}
+
+const description = z.string().overwrite(oneLine).trim().min(1, "Enter a description.").max(120, "Use at most 120 characters.");
+const notes = z.string().overwrite(withoutControlCharacters).trim().max(500, "Use at most 500 characters.");
+
+/**
+ * A new expense, as the REST route, the MCP tools, reminder templates and import confirmations all
+ * take it: one schema, so the transports can't drift (audit D10). The description is one line with
+ * no control characters, and the amount has at most two decimals (B1).
+ */
 export const expenseSchema = z.object({
-  description: z.string().trim().min(1, "Enter a description.").max(120),
+  description,
   amount: expenseAmountSchema,
   category: z.enum(EXPENSE_CATEGORIES),
   subtype: z.enum(EXPENSE_SUBTYPES).nullable().optional().default(null),
   expenseDate: z.iso.date("Choose a valid date."),
-  notes: z.string().trim().max(500).optional(),
+  notes: notes.optional(),
 }).superRefine((expense, context) => {
   if (expense.subtype && SUBTYPE_CATEGORIES[expense.subtype] !== expense.category) {
     context.addIssue({ code: "custom", path: ["subtype"], message: SUBTYPE_CATEGORY_MESSAGE });
@@ -104,13 +130,14 @@ export type ExpenseChanges = Partial<{
 
 const fields = expenseSchema.shape;
 
-const expensePatchSchema = z.object({
+/** A change to some fields of an expense, each checked like `expenseSchema`'s; MCP's `update_expense` extends it. */
+export const expensePatchSchema = z.object({
   description: fields.description.optional(),
   amount: fields.amount.optional(),
   category: fields.category.optional(),
   subtype: z.enum(EXPENSE_SUBTYPES).nullable().optional(),
   expenseDate: fields.expenseDate.optional(),
-  notes: z.string().trim().max(500).nullable().optional(),
+  notes: notes.nullable().optional(),
 }).superRefine((patch, context) => {
   if (patch.subtype && patch.category !== undefined && SUBTYPE_CATEGORIES[patch.subtype] !== patch.category) {
     context.addIssue({ code: "custom", path: ["subtype"], message: SUBTYPE_CATEGORY_MESSAGE });

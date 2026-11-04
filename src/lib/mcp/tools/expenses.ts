@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
 import { getDashboardData, getMonthlyLedger } from "@/lib/expenses/service";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
 import { parseAnalyticsFilters } from "@/lib/expenses/url-state";
@@ -12,7 +11,7 @@ import {
   isValidDate,
   isValidMonth,
 } from "@/lib/calendar";
-import { expenseAmountInput, expenseSchema } from "@/lib/validation/expense";
+import { expenseAmountInput, expensePatchSchema, expenseSchema } from "@/lib/validation/expense";
 import { idSchema } from "@/lib/validation/primitives";
 
 const fields = expenseSchema.shape;
@@ -35,15 +34,8 @@ const addExpenseSchema = z.preprocess(
   expenseSchema,
 );
 
-const updateExpenseSchema = z.object({
-  id: idSchema(),
-  description: fields.description.optional(),
-  amount: fields.amount.optional(),
-  category: z.enum(EXPENSE_CATEGORIES).optional(),
-  subtype: z.enum(EXPENSE_SUBTYPES).nullable().optional(),
-  expenseDate: fields.expenseDate.optional(),
-  notes: z.string().trim().max(500).nullable().optional(),
-}).refine((value) => Object.entries(value).some(([key, field]) => key !== "id" && field !== undefined), "Provide at least one change.");
+// The REST patch's own schema plus the id, so both transports check a change the same way.
+const updateExpenseSchema = expensePatchSchema.safeExtend({ id: idSchema() }).refine((value) => Object.entries(value).some(([key, field]) => key !== "id" && field !== undefined), "Provide at least one change.");
 
 export const expenseTools = [
   defineTool({

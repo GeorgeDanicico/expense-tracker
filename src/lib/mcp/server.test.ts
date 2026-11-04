@@ -192,6 +192,35 @@ describe("MCP server", () => {
     expect(expenses.create).not.toHaveBeenCalled();
   });
 
+  // Audit B8: the same schema as POST /api/expenses.
+  describe("control characters in a description", () => {
+    const fuel = { amount: 10.5, category: "car", subtype: "car_fuel" };
+
+    it("strips them in add_expense", async () => {
+      expenses.create.mockResolvedValue(stored);
+
+      await call("add_expense", { ...fuel, description: "Fuel\u0002 station\tCluj" });
+
+      expect(expenses.create).toHaveBeenCalledWith("owner", expect.objectContaining({ description: "Fuel station Cluj" }));
+    });
+
+    it("strips them in update_expense", async () => {
+      repositories.expenses.expenses.set("owner", [stored]);
+
+      await call("update_expense", { id: ID, description: "Fuel\u0007", notes: "one\ntwo\u0000" });
+
+      expect(expenses.update).toHaveBeenCalledWith("owner", ID, { description: "Fuel", notes: "one\ntwo" });
+    });
+
+    it("refuses a description of nothing but control characters, and saves nothing", async () => {
+      const result = await call("add_expense", { ...fuel, description: "\u0001" });
+
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain("Enter a description.");
+      expect(expenses.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe("amounts of more than two decimal places", () => {
     const fuel = { description: "Fuel", category: "car", subtype: "car_fuel" };
 
