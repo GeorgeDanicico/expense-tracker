@@ -435,6 +435,18 @@ expenses hooks (read only), tests.
 
 **Done when** the screenshots are signed off and marking a reminder done takes one tap.
 
+**Built (4 November 2026), waiting for George's sign-off:**
+- Home (`/dashboard`) is the month against last month, up to three due or overdue reminders with
+  Done and Snooze on the row, the last five expenses and your open family to-dos. Each block links
+  to its section. It fits 390 x 844 with three reminders and five expenses.
+- Blocks follow permissions: no spending blocks without the expenses permission, no to-dos without
+  a family.
+- Summary, Monthly and History are Money's fourth segment, **Insights** (`/insights`, with the
+  expenses permission). `/dashboard` URLs carrying `view`, `month`, `period`, `granularity`, `date`
+  or `member` redirect there (`next.config.ts`), so bookmarks work.
+- Done and Snooze share `useReminderActions` with the Reminders page. Screenshots:
+  `docs/ui-styling/screenshots/u7-*.jpg`.
+
 ### U8: Expenses
 
 **Files:** `src/app/(app)/expenses/**`, `src/components/expenses/**`, a new
