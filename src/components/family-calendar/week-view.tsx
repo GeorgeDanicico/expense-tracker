@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AttendeeDots, eventAppearance, eventLabel, type ColorOf } from "@/components/family-calendar/event-appearance";
 import { EventChip } from "@/components/family-calendar/month-view";
+import { useNow } from "@/hooks/use-now";
 import { isAllDayRowEvent, localTime } from "@/lib/family-calendar/days";
 import {
   layoutDayColumns,
@@ -33,19 +34,6 @@ const gridColumns = (days: number) => ({
   md: `${GUTTER.md} repeat(${days}, minmax(0, 1fr))`,
 });
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-
-/** The minute-by-minute clock the "now" line follows: null until the first client render, so the server's markup matches. */
-function useNow(enabled: boolean) {
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    if (!enabled) return undefined;
-    const tick = () => setNow(new Date());
-    tick();
-    const timer = setInterval(tick, 60_000);
-    return () => clearInterval(timer);
-  }, [enabled]);
-  return now;
-}
 
 /** One timed event in its day column: a block in the member's colour, placed by time, sharing the width with overlapping ones. */
 function EventBlock({ item, colorOf, onOpen }: { item: DayColumnItem; colorOf: ColorOf; onOpen: (event: CalendarEvent) => void }) {
@@ -133,8 +121,8 @@ export function WeekView({
   // The grid's scrollbar takes width the header doesn't have; the header pads by the same amount to stay in line.
   const [scrollbar, setScrollbar] = useState(0);
   const showsToday = days.includes(today);
-  const now = useNow(showsToday);
-  const clock = now ? nowPosition(now, DEFAULT_EVENT_TIMEZONE) : null;
+  const now = useNow(undefined, showsToday);
+  const clock = showsToday ? nowPosition(now, DEFAULT_EVENT_TIMEZONE) : null;
 
   const allDay = useMemo(() => layoutMonthWeek(events.filter(isAllDayRowEvent), days[0], ALL_DAY_LANES, days.length), [events, days]);
   const columns = useMemo(() => days.map((date) => ({ date, items: layoutDayColumns(events, date) })), [events, days]);

@@ -1,15 +1,17 @@
 "use client";
 
-import { Badge, Box, Button, chakra, Flex, Link as ChakraLink, Menu, Portal, Text } from "@chakra-ui/react";
-import { AlarmClock, BellOff, BellRing, Check, CircleAlert, CircleCheck, Pencil, Receipt, Repeat } from "lucide-react";
+import { Box, Button, chakra, Menu, Portal, Text } from "@chakra-ui/react";
+import { AlarmClock, BellOff, BellRing, CircleAlert, CircleCheck, Receipt } from "lucide-react";
 import NextLink from "next/link";
 import type { ReactNode } from "react";
 
 import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { IconTile } from "@/components/ui/icon-tile";
+import { ListRow } from "@/components/ui/list-row";
+import { transition } from "@/components/ui/theme/motion";
 import { formatDay, formatDueAt, formatInstant, overdueText, repeatLabel, snoozedText } from "@/lib/reminders/format";
 import type { DoneEntry, ListedReminder } from "@/lib/reminders/list";
-import { transition } from "@/components/ui/theme/motion";
 
 /** Where "Expense logged" leads: the expenses page on the occurrence's month. */
 export function loggedExpenseHref(occurrenceOn: string) {
@@ -19,31 +21,26 @@ export function loggedExpenseHref(occurrenceOn: string) {
 /** The Done row's "Expense logged" marker, linking to the month the expense is in. */
 function ExpenseLogged({ occurrenceOn }: { occurrenceOn: string }) {
   return (
-    <ChakraLink asChild color="fg.accent" fontWeight="medium" display="inline-flex" alignItems="center" gap="1">
+    <chakra.span color="fg.accent" fontWeight="medium">
       <NextLink href={loggedExpenseHref(occurrenceOn)}>
-        <Receipt size={12} strokeWidth={ICON_STROKE} aria-hidden="true" /> Expense logged
+        <Receipt size={12} strokeWidth={ICON_STROKE} aria-hidden="true" style={{ display: "inline", verticalAlign: "-1px" }} /> Expense logged
       </NextLink>
-    </ChakraLink>
+    </chakra.span>
   );
 }
 
 export type SnoozeChoice = "hour" | "tomorrow" | "until";
 
-const LEADING: Record<ListedReminder["state"], { icon: typeof BellRing; color: string; bg: string; label: string }> = {
-  upcoming: { icon: BellRing, color: "fg.muted", bg: "bg.subtle", label: "Upcoming" },
-  due: { icon: BellRing, color: "brand.fg", bg: "brand.muted", label: "Due today" },
-  overdue: { icon: CircleAlert, color: "fg.error", bg: "bg.error", label: "Overdue" },
-  snoozed: { icon: AlarmClock, color: "fg.muted", bg: "bg.subtle", label: "Snoozed" },
-  done: { icon: CircleCheck, color: "fg.success", bg: "bg.success", label: "Done" },
+const TILE: Record<ListedReminder["state"], { icon: typeof BellRing; color: string; bg: string }> = {
+  upcoming: { icon: BellRing, color: "fg.muted", bg: "bg.subtle" },
+  due: { icon: BellRing, color: "brand.fg", bg: "brand.muted" },
+  overdue: { icon: CircleAlert, color: "fg.error", bg: "bg.error" },
+  snoozed: { icon: AlarmClock, color: "fg.muted", bg: "bg.subtle" },
+  done: { icon: CircleCheck, color: "fg.success", bg: "bg.success" },
 };
 
-function Leading({ state }: { state: ListedReminder["state"] }) {
-  const { icon: Icon, color, bg } = LEADING[state];
-  return (
-    <Flex flexShrink="0" boxSize="8" align="center" justify="center" borderRadius="full" bg={bg} color={color} aria-hidden="true">
-      <Icon size={ICON.sm} strokeWidth={ICON_STROKE} />
-    </Flex>
-  );
+function Tile({ state }: { state: ListedReminder["state"] }) {
+  return <IconTile {...TILE[state]} />;
 }
 
 /** The title as a button that opens the reminder's dialog. */
@@ -52,14 +49,12 @@ function TitleButton({ title, onClick }: { title: string; onClick: () => void })
     <chakra.button
       type="button"
       onClick={onClick}
+      display="block"
+      maxW="full"
       textAlign="start"
-      textStyle="bodySm"
-      fontWeight="medium"
       color="fg"
-      minW="0"
-      wordBreak="break-word"
-      lineClamp={2}
       cursor="pointer"
+      truncate
       borderRadius="l1"
       _hover={{ textDecoration: "underline" }}
       _focusVisible={{ outline: "2px solid", outlineColor: "brand.focusRing", outlineOffset: "2px" }}
@@ -69,99 +64,44 @@ function TitleButton({ title, onClick }: { title: string; onClick: () => void })
   );
 }
 
-function Meta({ children, color = "fg.muted" }: { children: ReactNode; color?: string }) {
-  return (
-    <Flex align="center" gap="1" textStyle="caption" color={color} minW="0" wrap="wrap">
-      {children}
-    </Flex>
-  );
-}
-
 /**
- * One list row. `reminderId` lets the page find it (`/reminders?focus=<id>`); `focused` rings it
+ * One list item. `reminderId` lets the page find it (`/reminders?focus=<id>`); `focused` rings it
  * briefly when a notification opened the page on it.
  */
-function RowFrame({
-  reminderId,
-  highlight = false,
-  focused = false,
-  children,
-}: {
-  reminderId: string;
-  highlight?: boolean;
-  focused?: boolean;
-  children: ReactNode;
-}) {
+function Item({ reminderId, focused = false, children }: { reminderId: string; focused?: boolean; children: ReactNode }) {
   return (
     <Box
       as="li"
       data-reminder-id={reminderId}
       data-focused={focused ? "" : undefined}
       listStyleType="none"
-      px={{ base: "3", md: "4" }}
-      py="3"
-      borderBottomWidth="1px"
-      borderColor="border"
-      bg={focused ? "brand.muted" : highlight ? "brand.subtle" : undefined}
+      borderRadius="control"
+      bg={focused ? "brand.muted" : undefined}
       boxShadow={focused ? "inset 0 0 0 2px {colors.brand.focusRing}" : undefined}
       transition={transition("background-color, box-shadow", "slow")}
       scrollMarginBlock="6rem"
-      _last={{ borderBottomWidth: "0" }}
     >
-      <Flex align="center" gap="3" wrap="wrap" rowGap="2">
-        {children}
-      </Flex>
+      {children}
     </Box>
   );
 }
 
-/** The row's actions: their own line under the text on a phone, at the end of the row from `md`. */
-function Actions({ children }: { children: ReactNode }) {
-  return (
-    <Flex
-      data-row-actions=""
-      align="center"
-      gap={{ base: "2", md: "1" }}
-      flexBasis={{ base: "100%", md: "auto" }}
-      ps={{ base: "11", md: "0" }}
-      ms={{ base: "0", md: "auto" }}
-      flexShrink="0"
-    >
-      {children}
-    </Flex>
-  );
-}
-
-/** Taller touch targets on a phone, the compact size from `md`. */
-const ACTION_SIZE = { base: "sm", md: "xs" } as const;
-
-/**
- * "Snooze" with its three choices: an hour, until tomorrow 09:00, or a chosen time. `compact` is an
- * icon button (Home's rows, where Done sits beside it).
- */
+/** Snooze, an icon button with its three choices: an hour, until tomorrow 09:00, or a chosen time. */
 export function SnoozeMenu({
   title,
   disabled,
-  compact = false,
   onChoose,
 }: {
   title: string;
   disabled: boolean;
-  compact?: boolean;
   onChoose: (choice: SnoozeChoice) => void;
 }) {
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }} onSelect={({ value }) => onChoose(value as SnoozeChoice)}>
       <Menu.Trigger asChild>
-        {compact ? (
-          <IconButton aria-label={`Snooze ${title}`} disabled={disabled}>
-            <AlarmClock size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
-          </IconButton>
-        ) : (
-          <Button size={ACTION_SIZE} variant="ghost" disabled={disabled} aria-label={`Snooze ${title}`}>
-            <AlarmClock size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Snooze
-          </Button>
-        )}
+        <IconButton aria-label={`Snooze ${title}`} disabled={disabled}>
+          <AlarmClock size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </IconButton>
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
@@ -180,10 +120,8 @@ export function SnoozeMenu({
 }
 
 /**
- * One open reminder: title (opens the dialog), next due date and time, how it repeats, a muted
- * icon, how late it is or until when it's snoozed, and Mark done / Snooze / Edit. A reminder due
- * today is highlighted. On a phone (below 768 px) the actions sit on their own line under the
- * text, lined up with it, with taller touch targets; from 768 px they share the row.
+ * One open reminder: a tile for where it stands, the title (opens the dialog), when it's due, how it
+ * repeats, how late it is or until when it's snoozed, and Snooze and Done on the row.
  */
 export function ReminderRow({
   reminder,
@@ -205,55 +143,43 @@ export function ReminderRow({
   onEdit: (reminder: ListedReminder) => void;
 }) {
   const { state } = reminder;
-  const due = formatDueAt(reminder, now);
   const snoozed = state === "snoozed" ? snoozedText(reminder, now) : null;
-
   return (
-    <RowFrame reminderId={reminder.id} highlight={state === "due"} focused={focused}>
-      <Leading state={state} />
-      <Flex direction="column" gap="0.5" flex="1 1 14rem" minW="0">
-        <Flex align="center" gap="2" minW="0">
-          <TitleButton title={reminder.title} onClick={() => onEdit(reminder)} />
-          {state === "due" ? <Badge size="sm" variant="solid" colorPalette="brand" flexShrink="0">Today</Badge> : null}
-          {reminder.notificationsMuted ? (
-            <Box as="span" color="fg.subtle" flexShrink="0" title="Notifications muted">
-              <BellOff size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
-              <span className="sr-only">Notifications muted</span>
-            </Box>
-          ) : null}
-        </Flex>
-        <Meta>
-          <Text as="span"><span className="sr-only">Due </span>{due}</Text>
-          <Text as="span" aria-hidden="true">·</Text>
-          <Flex as="span" align="center" gap="1">
-            <Repeat size={12} strokeWidth={ICON_STROKE} aria-hidden="true" />
-            {repeatLabel(reminder.repeatUnit, reminder.repeatInterval)}
-          </Flex>
-        </Meta>
-        {state === "overdue" && reminder.nextDueAt ? (
-          <Meta color="fg.error">
-            <Text as="span" fontWeight="medium">{overdueText(reminder.nextDueAt, now)}</Text>
-          </Meta>
-        ) : null}
-        {snoozed ? (
-          <Meta>
-            <AlarmClock size={12} strokeWidth={ICON_STROKE} aria-hidden="true" />
-            <Text as="span">{snoozed}</Text>
-          </Meta>
-        ) : null}
-      </Flex>
-      <Actions>
-        <Button size={ACTION_SIZE} variant="outline" disabled={busy} onClick={() => onComplete(reminder)} aria-label={`Mark ${reminder.title} done`}>
-          <Check size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Mark done
-        </Button>
-        <SnoozeMenu title={reminder.title} disabled={busy} onChoose={(choice) => onSnooze(reminder, choice)} />
-        <Box ms={{ base: "auto", md: "0" }}>
-          <IconButton aria-label={`Edit ${reminder.title}`} size="xs" tooltip onClick={() => onEdit(reminder)}>
-            <Pencil size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
-          </IconButton>
-        </Box>
-      </Actions>
-    </RowFrame>
+    <Item reminderId={reminder.id} focused={focused}>
+      <ListRow
+        as="div"
+        leading={<Tile state={state} />}
+        title={(
+          <>
+            <TitleButton title={reminder.title} onClick={() => onEdit(reminder)} />
+            {reminder.notificationsMuted ? (
+              <Box as="span" color="fg.subtle" ms="1" title="Notifications muted">
+                <BellOff size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
+                <span className="sr-only">Notifications muted</span>
+              </Box>
+            ) : null}
+          </>
+        )}
+        meta={(
+          <>
+            <span className="sr-only">Due </span>
+            {formatDueAt(reminder, now)} · {repeatLabel(reminder.repeatUnit, reminder.repeatInterval)}
+            {state === "overdue" && reminder.nextDueAt ? (
+              <Text as="span" color="fg.error" fontWeight="medium"> · {overdueText(reminder.nextDueAt, now)}</Text>
+            ) : null}
+            {snoozed ? ` · ${snoozed}` : null}
+          </>
+        )}
+        trailing={(
+          <>
+            <SnoozeMenu title={reminder.title} disabled={busy} onChoose={(choice) => onSnooze(reminder, choice)} />
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => onComplete(reminder)} aria-label={`Mark ${reminder.title} done`}>
+              Done
+            </Button>
+          </>
+        )}
+      />
+    </Item>
   );
 }
 
@@ -275,27 +201,23 @@ export function DoneRow({
 }) {
   const { completion, reminder } = entry;
   return (
-    <RowFrame reminderId={reminder.id} focused={focused}>
-      <Leading state="done" />
-      <Flex direction="column" gap="0.5" flex="1 1 14rem" minW="0">
-        <TitleButton title={reminder.title} onClick={() => onEdit(reminder)} />
-        <Meta>
-          <Text as="span">Done {formatInstant(completion.doneAt, reminder.timezone, now)}</Text>
-          <Text as="span" aria-hidden="true">·</Text>
-          <Text as="span">for {formatDay(completion.occurrenceOn, now)}</Text>
-          {completion.expenseId ? (
-            <>
-              <Text as="span" aria-hidden="true">·</Text>
-              <ExpenseLogged occurrenceOn={completion.occurrenceOn} />
-            </>
-          ) : null}
-        </Meta>
-      </Flex>
-      <Actions>
-        <Text textStyle="caption" color="fg.muted">
-          {reminder.nextDueOn === null ? "Finished" : `Next ${formatDay(reminder.nextDueOn, now)}`}
-        </Text>
-      </Actions>
-    </RowFrame>
+    <Item reminderId={reminder.id} focused={focused}>
+      <ListRow
+        as="div"
+        leading={<Tile state="done" />}
+        title={<TitleButton title={reminder.title} onClick={() => onEdit(reminder)} />}
+        meta={(
+          <>
+            Done {formatInstant(completion.doneAt, reminder.timezone, now)} · for {formatDay(completion.occurrenceOn, now)}
+            {completion.expenseId ? <> · <ExpenseLogged occurrenceOn={completion.occurrenceOn} /></> : null}
+          </>
+        )}
+        trailing={(
+          <Text textStyle="caption">
+            {reminder.nextDueOn === null ? "Finished" : `Next ${formatDay(reminder.nextDueOn, now)}`}
+          </Text>
+        )}
+      />
+    </Item>
   );
 }

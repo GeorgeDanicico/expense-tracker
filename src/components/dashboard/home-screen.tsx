@@ -5,7 +5,8 @@ import { Box, Flex, Grid, Heading, Stack, Text } from "@chakra-ui/react";
 import { MonthCard, RecentExpenses } from "@/components/dashboard/home-spending";
 import { DueReminders } from "@/components/dashboard/home-reminders";
 import { FamilyTodos } from "@/components/dashboard/home-todos";
-import { useNow } from "@/components/reminders/use-reminders";
+import { REMINDERS_TICK_MS } from "@/components/reminders/use-reminders";
+import { useNow } from "@/hooks/use-now";
 import { PAGE_SPACING } from "@/components/ui/theme/layout";
 import { useAccount } from "@/hooks/use-account";
 import { useCan } from "@/hooks/use-can";
@@ -34,7 +35,7 @@ const DESKTOP_AREAS: Record<string, string> = {
  */
 export function HomeScreen() {
   useDocumentTitle("Home");
-  const now = useNow();
+  const now = useNow(REMINDERS_TICK_MS);
   const { account } = useAccount();
   const spending = useCan("expenses", "edit");
   const memberId = account?.membership?.memberId ?? null;

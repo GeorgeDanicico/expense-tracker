@@ -6,7 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { SnoozeMenu } from "@/components/reminders/reminder-row";
 import { useReminderActions } from "@/components/reminders/use-reminder-actions";
-import { useNow, useReminders } from "@/components/reminders/use-reminders";
+import { REMINDERS_TICK_MS, useReminders } from "@/components/reminders/use-reminders";
+import { useNow } from "@/hooks/use-now";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -37,7 +38,7 @@ function Meta({ reminder, now }: { reminder: ListedReminder; now: Date }) {
  * refuses it, with the reason above the rows (`useReminders`).
  */
 export function DueReminders() {
-  const now = useNow();
+  const now = useNow(REMINDERS_TICK_MS);
   const reminders = useReminders(now);
   const [toast, setToast] = useState<string | null>(null);
   const actions = useReminderActions(reminders, now, setToast);
@@ -95,7 +96,7 @@ export function DueReminders() {
                 meta={<Meta reminder={reminder} now={now} />}
                 trailing={
                   <>
-                    <SnoozeMenu compact title={reminder.title} disabled={actions.busy.has(reminder.id)} onChoose={(choice) => actions.snooze(reminder, choice)} />
+                    <SnoozeMenu title={reminder.title} disabled={actions.busy.has(reminder.id)} onChoose={(choice) => actions.snooze(reminder, choice)} />
                     <Button
                       size="sm"
                       variant="solid"

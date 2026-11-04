@@ -1,65 +1,27 @@
 "use client";
 
-import { Badge, Box, Button, Stack, Tabs, Text } from "@chakra-ui/react";
-import { BellRing, CircleCheck, PartyPopper, Plus, X } from "lucide-react";
+import { Box, Stack, Text } from "@chakra-ui/react";
+import { BellRing, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ReminderDialog } from "@/components/reminders/reminder-dialog";
 import { DoneRow, ReminderRow } from "@/components/reminders/reminder-row";
 import { useReminderActions } from "@/components/reminders/use-reminder-actions";
-import { useNow, useReminders } from "@/components/reminders/use-reminders";
-import { Card } from "@/components/ui/card";
+import { REMINDERS_TICK_MS, useReminders } from "@/components/reminders/use-reminders";
+import { useNow } from "@/hooks/use-now";
 import { DataError, DataLoading } from "@/components/ui/data-state";
+import { Card } from "@/components/ui/card";
+import { Disclosure } from "@/components/ui/disclosure";
 import { EmptyState } from "@/components/ui/empty-state";
+import { GroupLabel } from "@/components/ui/group-label";
 import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { useIsPhone } from "@/hooks/use-is-phone";
+import { UndoToast } from "@/components/ui/undo-toast";
 import { prefersReducedMotion } from "@/hooks/use-reduced-motion";
-import { doneEntries, groupReminders, tabOf, type ListedReminder, type ReminderTab } from "@/lib/reminders/list";
+import { doneEntries, groupOf, planReminders, type ListedReminder } from "@/lib/reminders/list";
 import { DONE_WINDOW_DAYS_LABEL } from "@/lib/reminders/format";
-
-function List({ children }: { children: ReactNode }) {
-  return (
-    <Card>
-      <Box as="ul" m="0" p="0">
-        {children}
-      </Box>
-    </Card>
-  );
-}
-
-function Empty({ icon, title, description, action }: { icon: ReactNode; title: string; description: string; action?: ReactNode }) {
-  return (
-    <Card>
-      <Card.Body>
-        <EmptyState size="sm" titleAs="h2" icon={icon} title={title} description={description} action={action} />
-      </Card.Body>
-    </Card>
-  );
-}
-
-/** The tabs' names, in order. */
-export const REMINDER_TAB_LABELS: Record<ReminderTab, string> = { upcoming: "Upcoming", overdue: "Overdue", done: "Done" };
-
-/**
- * The phone's tab switcher (below 768 px): Upcoming / Overdue / Done as a full-width
- * `SegmentedControl`, like the to-do board's columns. Overdue carries its count when there is one.
- */
-export function ReminderTabSwitcher({ value, overdueCount, onValueChange }: {
-  value: ReminderTab;
-  overdueCount: number;
-  onValueChange: (tab: ReminderTab) => void;
-}) {
-  const items = (Object.keys(REMINDER_TAB_LABELS) as ReminderTab[]).map((tab) => (
-    tab === "overdue" && overdueCount > 0
-      ? { value: tab, label: `Overdue · ${overdueCount}`, ariaLabel: `Overdue, ${overdueCount}` }
-      : { value: tab, label: REMINDER_TAB_LABELS[tab] }
-  ));
-  return <SegmentedControl items={items} value={value} onValueChange={onValueChange} fullWidth aria-label="Reminders" />;
-}
 
 /** How long a reminder opened from a notification stays highlighted. */
 export const FOCUS_HIGHLIGHT_MS = 2500;
@@ -70,38 +32,40 @@ function scrollToReminder(id: string) {
   row?.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
 }
 
+/** How long "Marked done" stays on screen. */
+const TOAST_MS = 3000;
+
 /**
- * The reminders page: Upcoming (due today first and highlighted, then upcoming and snoozed ones),
- * Overdue (with its count) and Done (the occurrences marked done in the last 30 days), the add
- * and edit dialog, and Snooze until…. Only the caller's own reminders; nobody else sees them.
+ * The reminders page: one list grouped as Today (what is overdue or due today, with Done and Snooze
+ * on each row), Upcoming, and Done folded under its count (the occurrences marked done in the last
+ * 30 days). Only the caller's own reminders; nobody else sees them. Adding is the shell's + button.
  *
- * `focusId` (from `/reminders?focus=<id>`, where a notification leads) opens the tab that lists
- * that reminder once the list has loaded, scrolls to it and highlights it for a moment.
+ * `focusId` (from `/reminders?focus=<id>`, where a notification leads) scrolls to that reminder
+ * once the list has loaded, opens Done when it is there, and highlights it for a moment.
  */
 export function RemindersScreen({ focusId = null }: { focusId?: string | null }) {
-  const now = useNow();
-  const phone = useIsPhone();
+  const now = useNow(REMINDERS_TICK_MS);
   const reminders = useReminders(now);
-  const { busy, complete, snooze, dialogs } = useReminderActions(reminders, now);
-  const [tab, setTab] = useState<ReminderTab>("upcoming");
-  // The focus id already acted on, so a refetch or a tab change by hand doesn't jump back.
+  const [toast, setToast] = useState<string | null>(null);
+  const { busy, complete, snooze, dialogs } = useReminderActions(reminders, now, setToast);
+  // The focus id already acted on, so a refetch doesn't jump back.
   const [handledFocus, setHandledFocus] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [doneOpen, setDoneOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const groups = useMemo(() => groupReminders(reminders.reminders ?? []), [reminders.reminders]);
+  const plan = useMemo(() => planReminders(reminders.reminders ?? []), [reminders.reminders]);
   const done = useMemo(
     () => doneEntries(reminders.completions ?? [], reminders.reminders ?? []),
     [reminders.completions, reminders.reminders],
   );
 
   if (focusId && focusId !== handledFocus && reminders.reminders) {
-    // Adjusting state while rendering, once per focus id, so the right tab renders straight away.
+    // Adjusting state while rendering, once per focus id, so the right group renders straight away.
     setHandledFocus(focusId);
-    const focusTab = tabOf(focusId, groups, done);
-    if (focusTab) {
-      setTab(focusTab);
+    const group = groupOf(focusId, plan, done);
+    if (group) {
+      setDoneOpen(group === "done");
       setHighlighted(focusId);
     }
   }
@@ -113,16 +77,16 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
     return () => clearTimeout(timer);
   }, [highlighted]);
 
-  const editing = editingId ? reminders.reminders?.find((reminder) => reminder.id === editingId) : undefined;
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
+  const editing = editingId ? reminders.reminders?.find((reminder) => reminder.id === editingId) : undefined;
   const edit = (reminder: ListedReminder) => setEditingId(reminder.id);
 
-  const addButton = (
-    <Button size="sm" variant="solid" colorPalette="brand" onClick={() => setAdding(true)}>
-      <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add reminder
-    </Button>
-  );
-  const header = <PageHeader title="Reminders" description="Only you can see your reminders." actions={addButton} />;
+  const header = <PageHeader title="Reminders" description="Only you can see your reminders." />;
 
   if (reminders.error && !reminders.reminders) {
     return (
@@ -134,63 +98,25 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
   }
   if (!reminders.reminders) return <DataLoading label="Loading your reminders…" />;
 
-  const rowProps = { now, onComplete: complete, onSnooze: snooze, onEdit: edit };
-  const overdueCount = groups.overdue.length;
-
-  const panels: Record<ReminderTab, ReactNode> = {
-    upcoming: groups.upcoming.length > 0 ? (
-      <List>
-        {groups.upcoming.map((reminder) => (
-          <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} focused={reminder.id === highlighted} {...rowProps} />
-        ))}
-      </List>
-    ) : (
-      <Empty
-        icon={<BellRing size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
-        title={reminders.reminders.length === 0 ? "No reminders yet" : "Nothing coming up"}
-        description={reminders.reminders.length === 0
-          ? "Add one for the rent, a renewal or anything that repeats, and pick when it notifies you."
-          : overdueCount > 0 ? "Everything open is overdue; see the Overdue tab." : "Every reminder is done."}
-        action={addButton}
-      />
-    ),
-    overdue: overdueCount > 0 ? (
-      <List>
-        {groups.overdue.map((reminder) => (
-          <ReminderRow key={reminder.id} reminder={reminder} busy={busy.has(reminder.id)} focused={reminder.id === highlighted} {...rowProps} />
-        ))}
-      </List>
-    ) : (
-      <Empty
-        icon={<PartyPopper size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
-        title="Nothing overdue"
-        description="You're all caught up."
-      />
-    ),
-    done: done.length > 0 ? (
-      <Stack gap="2">
-        <List>
-          {done.map((entry, index) => (
-            <DoneRow
-              key={entry.completion.id}
-              entry={entry}
-              now={now}
-              // Only its latest completion, the first listed, is highlighted.
-              focused={entry.reminder.id === highlighted && done.findIndex((other) => other.reminder.id === highlighted) === index}
-              onEdit={edit}
-            />
-          ))}
-        </List>
-        <Text textStyle="caption" textAlign="center">{DONE_WINDOW_DAYS_LABEL}</Text>
-      </Stack>
-    ) : (
-      <Empty
-        icon={<CircleCheck size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
-        title="Nothing done lately"
-        description={`What you mark done shows here. ${DONE_WINDOW_DAYS_LABEL}`}
-      />
-    ),
-  };
+  const openRows = (list: readonly ListedReminder[]) => list.map((reminder) => (
+    <ReminderRow
+      key={reminder.id}
+      reminder={reminder}
+      now={now}
+      busy={busy.has(reminder.id)}
+      focused={reminder.id === highlighted}
+      onComplete={complete}
+      onSnooze={snooze}
+      onEdit={edit}
+    />
+  ));
+  const group = (label: string, rows: ReactNode) => (
+    <Box>
+      <GroupLabel px="2">{label}</GroupLabel>
+      <Stack as="ul" gap="0.5" m="0" p="0">{rows}</Stack>
+    </Box>
+  );
+  const nothingOpen = plan.today.length === 0 && plan.upcoming.length === 0;
 
   return (
     <Stack gap={{ base: "4", md: "5" }} maxW="4xl">
@@ -207,44 +133,44 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
           {reminders.actionError}
         </InlineAlert>
       ) : null}
-      {phone ? (
-        <Stack gap="3">
-          <ReminderTabSwitcher value={tab} overdueCount={overdueCount} onValueChange={setTab} />
-          <Box role="region" aria-label={REMINDER_TAB_LABELS[tab]}>
-            {panels[tab]}
-          </Box>
-        </Stack>
-      ) : (
-        <Tabs.Root value={tab} onValueChange={({ value }) => setTab(value as ReminderTab)} lazyMount>
-          <Tabs.List aria-label="Reminders" mb="4">
-            <Tabs.Trigger value="upcoming">Upcoming</Tabs.Trigger>
-            <Tabs.Trigger value="overdue">
-              Overdue
-              <Badge
+      <Card>
+        <Card.Body>
+          <Stack gap="1">
+            {plan.today.length > 0 ? group("Today", openRows(plan.today)) : null}
+            {plan.upcoming.length > 0 ? group("Upcoming", openRows(plan.upcoming)) : null}
+            {nothingOpen ? (
+              <EmptyState
                 size="sm"
-                variant={overdueCount > 0 ? "solid" : "subtle"}
-                colorPalette={overdueCount > 0 ? "danger" : "neutral"}
-                aria-label={`${overdueCount} overdue`}
-              >
-                {overdueCount}
-              </Badge>
-            </Tabs.Trigger>
-            <Tabs.Trigger value="done">Done</Tabs.Trigger>
-          </Tabs.List>
-          {(Object.keys(REMINDER_TAB_LABELS) as ReminderTab[]).map((value) => (
-            <Tabs.Content key={value} value={value} pt="0">
-              {panels[value]}
-            </Tabs.Content>
-          ))}
-        </Tabs.Root>
-      )}
-      {adding ? (
-        <ReminderDialog
-          open
-          onOpenChange={(open) => { if (!open) setAdding(false); }}
-          onSave={reminders.add}
-        />
-      ) : null}
+                titleAs="h2"
+                icon={<BellRing size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />}
+                title={reminders.reminders.length === 0 ? "No reminders yet" : "Nothing to do"}
+                description={reminders.reminders.length === 0
+                  ? "Tap + to add one for the rent, a renewal or anything that repeats."
+                  : "Everything is done."}
+              />
+            ) : plan.today.length === 0 ? (
+              <Text textStyle="caption" px="2" py="1">Nothing due today.</Text>
+            ) : null}
+            {done.length > 0 ? (
+              <Disclosure key={doneOpen ? "open" : "closed"} label={`Done · ${done.length}`} defaultOpen={doneOpen}>
+                <Stack as="ul" gap="0.5" m="0" p="0">
+                  {done.map((entry, index) => (
+                    <DoneRow
+                      key={entry.completion.id}
+                      entry={entry}
+                      now={now}
+                      // Only its latest completion, the first listed, is highlighted.
+                      focused={entry.reminder.id === highlighted && done.findIndex((other) => other.reminder.id === highlighted) === index}
+                      onEdit={edit}
+                    />
+                  ))}
+                </Stack>
+                <Text textStyle="caption" textAlign="center">{DONE_WINDOW_DAYS_LABEL}</Text>
+              </Disclosure>
+            ) : null}
+          </Stack>
+        </Card.Body>
+      </Card>
       {editing ? (
         <ReminderDialog
           key={editing.id}
@@ -256,6 +182,7 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
         />
       ) : null}
       {dialogs}
+      <UndoToast message={toast} />
     </Stack>
   );
 }

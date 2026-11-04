@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
 import { useReminderApi, type LogExpenseOptions, type ReminderFields } from "@/components/reminders/reminder-api";
@@ -18,18 +18,8 @@ import type { SnoozeInput } from "@/lib/validation/reminder";
 
 /** How often the list refetches while the tab is visible (SWR skips hidden tabs). */
 export const REMINDERS_REFRESH_MS = 60_000;
-/** How often the page works the states out again (a reminder turning due or overdue). */
-export const NOW_TICK_MS = 30_000;
-
-/** The current time, moving on every `intervalMs`. */
-export function useNow(intervalMs = NOW_TICK_MS) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), intervalMs);
-    return () => clearInterval(timer);
-  }, [intervalMs]);
-  return now;
-}
+/** How often reminder screens work the states out again (a reminder turning due or overdue). */
+export const REMINDERS_TICK_MS = 30_000;
 
 const EMPTY: RemindersResponse = { reminders: [], completions: [] };
 

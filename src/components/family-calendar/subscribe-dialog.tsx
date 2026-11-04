@@ -1,7 +1,8 @@
 "use client";
 
 import { Button, Flex, Input, Stack, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 
 import { useCalendarApi } from "@/components/family-calendar/calendar-api";
 import { CopyButton } from "@/components/family/create-invite-dialog";
@@ -12,6 +13,7 @@ import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
+import { CALENDAR_FEED_LINK_API_KEY } from "@/lib/api/keys";
 import { formatDateTime } from "@/lib/calendar";
 import type { CalendarFeed } from "@/lib/family-calendar/feed-repository";
 import { feedWebcalUrl } from "@/lib/family-calendar/feed-link";
@@ -193,31 +195,20 @@ export function SubscribeDialog({ onClose }: { onClose: () => void }) {
   const api = useCalendarApi();
   const origin = useOrigin();
   const form = useApiForm();
-  const [feed, setFeed] = useState<CalendarFeed | null | undefined>(undefined);
+  // The link's metadata, loaded through the API object so the preview's fake answers too.
+  const { data: feed, error: loadFailed, mutate: setFeed } = useSWR<CalendarFeed | null>(
+    CALENDAR_FEED_LINK_API_KEY,
+    () => api.feedLink(),
+    { revalidateOnFocus: false },
+  );
   const [secret, setSecret] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState("");
-  const [attempt, setAttempt] = useState(0);
   const [confirming, setConfirming] = useState<ManageAction | null>(null);
-
-  useEffect(() => {
-    let current = true;
-    api.feedLink().then(
-      (loaded) => { if (current) setFeed(loaded); },
-      () => { if (current) setLoadError("Your calendar link could not be loaded."); },
-    );
-    return () => { current = false; };
-  }, [api, attempt]);
-
-  function retry() {
-    setLoadError("");
-    setFeed(undefined);
-    setAttempt((count) => count + 1);
-  }
+  const loadError = loadFailed && feed === undefined ? "Your calendar link could not be loaded." : "";
 
   function create() {
     void form.submit(async () => {
       const created = await api.createFeedLink();
-      setFeed(created.feed);
+      await setFeed(created.feed, { revalidate: false });
       setSecret(created.token);
       setConfirming(null);
     }, { fallback: "Unable to create your calendar link. Please try again." });
@@ -227,7 +218,7 @@ export function SubscribeDialog({ onClose }: { onClose: () => void }) {
     if (action === "regenerate") return create();
     void form.submit(async () => {
       await api.deleteFeedLink();
-      setFeed(null);
+      await setFeed(null, { revalidate: false });
       setSecret(null);
       setConfirming(null);
     }, { fallback: "Unable to turn off your calendar link. Please try again." });
@@ -252,7 +243,7 @@ export function SubscribeDialog({ onClose }: { onClose: () => void }) {
         onCreate={create}
         onAsk={(action) => { form.reset(); setConfirming(action); }}
         onConfirm={confirm}
-        onRetry={retry}
+        onRetry={() => void setFeed()}
       />
     </AppDialog>
   );

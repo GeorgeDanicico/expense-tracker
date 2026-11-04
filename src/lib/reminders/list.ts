@@ -8,8 +8,8 @@ import type { SnoozeInput } from "@/lib/validation/reminder";
 /** A reminder with where it stands, as `GET /api/reminders` returns it. */
 export type ListedReminder = Reminder & { state: ReminderState };
 
-export const REMINDER_TABS = ["upcoming", "overdue", "done"] as const;
-export type ReminderTab = (typeof REMINDER_TABS)[number];
+/** The groups the Reminders page lists, top to bottom. */
+export type ReminderGroup = "today" | "upcoming" | "done";
 
 /** An occurrence marked done, with its reminder, for the Done tab. */
 export type DoneEntry = { completion: ReminderCompletion; reminder: ListedReminder };
@@ -104,17 +104,30 @@ export function snoozeLocally(reminder: ListedReminder, snooze: SnoozeInput, now
 }
 
 /**
- * The tab that lists reminder `id` (for `/reminders?focus=<id>`): Overdue or Upcoming while it's
- * open, Done for a one-off marked done with a completion still shown; null when it isn't listed
- * (deleted, or done before the Done tab's window).
+ * The page's two open groups from reminders whose state is current. **Today** is everything that
+ * needs doing now: overdue ones first (the most late at the top), then those due today by time.
+ * **Upcoming** is the rest still open: upcoming and snoozed ones by due time.
  */
-export function tabOf(
+export function planReminders(reminders: readonly ListedReminder[]) {
+  const { overdue, upcoming } = groupReminders(reminders);
+  return {
+    today: [...overdue, ...upcoming.filter((reminder) => reminder.state === "due")],
+    upcoming: upcoming.filter((reminder) => reminder.state !== "due"),
+  };
+}
+
+/**
+ * The group that lists reminder `id` (for `/reminders?focus=<id>`): Today or Upcoming while it's
+ * open, Done for a one-off marked done with a completion still shown; null when it isn't listed
+ * (deleted, or done before the Done group's window).
+ */
+export function groupOf(
   id: string,
-  groups: ReturnType<typeof groupReminders>,
+  plan: ReturnType<typeof planReminders>,
   done: readonly DoneEntry[],
-): ReminderTab | null {
-  if (groups.overdue.some((reminder) => reminder.id === id)) return "overdue";
-  if (groups.upcoming.some((reminder) => reminder.id === id)) return "upcoming";
+): ReminderGroup | null {
+  if (plan.today.some((reminder) => reminder.id === id)) return "today";
+  if (plan.upcoming.some((reminder) => reminder.id === id)) return "upcoming";
   if (done.some((entry) => entry.reminder.id === id)) return "done";
   return null;
 }
