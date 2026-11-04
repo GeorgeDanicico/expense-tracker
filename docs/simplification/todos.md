@@ -1,5 +1,7 @@
 # Simpler ways: to-dos
 
+**Status (U10, 4 November 2026):** proposal 2 (`TodoQuickAdd` on `useApiForm`) done. The shared family helpers (proposal 1) are left: they touch the filter, dialog and member files U10 did not rebuild.
+
 Looked at `src/components/todos/**` (9 files, ~1,300 lines without tests), `src/app/(app)/todos`, `src/app/api/todos/**`, `src/lib/todos/**` (~550 lines), `src/lib/validation/todo.ts`, `src/lib/mcp/tools/todos.ts`, `src/lib/supabase/repositories/todos.ts` and the to-do preview fixture, with the `find-shapes` script (`todos`) and by reading the screen, board, card, dialog and quick add. **To-dos already use the target data style** (`todo-api.tsx` + `use-todo-board.ts`, optimistic, previewable). Most of the repetition is **shared with the calendar**: the member chips, the member name, the "no family" screen and the family read. 5 proposals, about 70 lines across the two modules; the first is **one set of family helpers for To-dos and Calendar** (proposal 1).
 
 ## Map

@@ -1,5 +1,7 @@
 # Simpler ways: expenses
 
+**Status (U10, 4 November 2026):** proposal 7 (`useNow`) done in U10 (`src/hooks/use-now.ts`, used by reminders, Home, the week view and recent imports).
+
 Looked at the expenses module as U8 will rebuild it: `src/components/expenses/**` (import included), `src/components/dashboard/**`, `src/app/(app)/expenses/**`, `src/app/api/expenses/**`, `src/app/api/expense-tabs/**`, `src/lib/expenses/**`, `src/lib/validation/expense.ts`, `src/lib/mcp/tools/expenses.ts` and the expense half of `src/lib/api/invalidate.ts`: 83 files, about 5,200 lines of components and 1,900 of `src/lib/expenses`. Method: the `find-shapes` script, then reading every component and the files it paired them with. **7 proposals, about 150 lines in all.** The one most worth doing is **one ledger panel instead of two** (proposal 1), because U8 rebuilds that screen anyway; the most urgent is not a simplification but a bug found on the way: **the add-expense form dates every new expense on the last day of the month** (see "Found on the way").
 
 **Done in U8 (4 November 2026):** proposals 1, 2, 3, 4 and 6, the B4 fix and the tidy-ups

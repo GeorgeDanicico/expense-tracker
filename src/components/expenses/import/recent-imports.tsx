@@ -2,7 +2,7 @@
 
 import { Box, Button, Flex, Stack, Text } from "@chakra-ui/react";
 import { RotateCcw, Undo2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
 import { useImportApi } from "@/components/expenses/import/import-api";
@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DataLoading } from "@/components/ui/data-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { useNow } from "@/hooks/use-now";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { SectionHeader } from "@/components/ui/section-header";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
@@ -36,16 +37,6 @@ export const DISCARDED_MESSAGE = "Import discarded. Nothing was added.";
 
 const STATUS_LABEL: Record<ImportStatus, string> = { draft: "Draft", confirmed: "Imported", undone: "Undone" };
 const STATUS_TONE: Record<ImportStatus, StatusTone> = { draft: "info", confirmed: "positive", undone: "neutral" };
-
-/** The current time, refreshed every minute so "expires in 19 h" stays true while the page is open. */
-function useNow(): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-}
 
 function ImportRow({
   item,

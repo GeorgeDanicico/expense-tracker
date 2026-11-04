@@ -53,7 +53,7 @@ describe("the local lint plugin", () => {
   });
 });
 
-// U8 and U9 converted expenses, investments and net worth (audit D6): their components and pages make no request of their own.
+// U8 to U10 converted expenses, investments, net worth, reminders, to-dos and the calendar (audit D6): their components and pages make no request of their own.
 describe("no-fetch-in-components in eslint.config.mjs", () => {
   const options = config
     .filter((entry) => entry.rules?.["local/no-fetch-in-components"])
@@ -65,10 +65,13 @@ describe("no-fetch-in-components in eslint.config.mjs", () => {
       "src/components/expenses", "src/app/(app)/expenses",
       "src/components/investments", "src/app/(app)/investments",
       "src/components/net-worth", "src/app/(app)/net-worth",
+      "src/components/reminders", "src/app/(app)/reminders",
+      "src/components/todos", "src/app/(app)/todos",
+      "src/components/family-calendar", "src/app/(app)/calendar",
     ]));
   });
 
-  it.each(["investments", "net-worth"])("reports a request in a %s component", async (module) => {
+  it.each(["investments", "net-worth", "reminders", "todos", "family-calendar"])("reports a request in a %s component", async (module) => {
     const { ESLint } = await import("eslint");
     const eslint = new ESLint({ cwd: new URL("..", import.meta.url).pathname });
     const [result] = await eslint.lintText(`export async function f() { await fetch("/api/x"); }\n`, {

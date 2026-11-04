@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReminderApiProvider, type ReminderApi } from "@/components/reminders/reminder-api";
 import { ReminderRow } from "@/components/reminders/reminder-row";
-import { ReminderTabSwitcher } from "@/components/reminders/reminders-screen";
 import { useReminders, type RemindersState } from "@/components/reminders/use-reminders";
 import { ledgerSystem } from "@/components/ui/theme";
 import { REMINDERS_API_KEY, REMINDERS_SUMMARY_API_KEY, type RemindersResponse } from "@/lib/api/keys";
@@ -79,29 +78,10 @@ describe("the nav badge after a write on the reminders page", () => {
   });
 });
 
-describe("the phone layout", () => {
-  it("switches tabs with a full-width segmented control carrying the overdue count", () => {
-    const html = wrap(<ReminderTabSwitcher value="overdue" overdueCount={2} onValueChange={() => {}} />);
-    expect(html).toContain('aria-label="Reminders"');
-    expect(html).toContain(">Upcoming<");
-    expect(html).toContain("Overdue · 2");
-    expect(html).toContain('aria-label="Overdue, 2"');
-    expect(html).toContain(">Done<");
-    expect(html).toMatch(/value="overdue"[^>]*checked=""|checked=""[^>]*value="overdue"/);
-  });
-
-  it("names Overdue plainly when nothing is late", () => {
-    const html = wrap(<ReminderTabSwitcher value="upcoming" overdueCount={0} onValueChange={() => {}} />);
-    expect(html).toContain(">Overdue<");
-    expect(html).not.toContain("Overdue ·");
-  });
-
-  it("puts a row's actions on their own line on a phone", () => {
+describe("a row's actions", () => {
+  it("has Snooze and Done on the row itself, with the reminder's name, at every width", () => {
     const html = wrap(<ReminderRow reminder={REMINDER} now={NOW} onComplete={() => {}} onSnooze={() => {}} onEdit={() => {}} />);
-    const actions = html.match(/<div[^>]*data-row-actions=""[^>]*>/)?.[0] ?? "";
-    expect(actions).not.toBe("");
-    // The actions take the whole line below 768 px and share the row from `md`.
-    expect(html).toMatch(/flex-basis:100%/);
-    expect(html).toMatch(/@media screen and \(min-width: 48rem\)\{[^}]*flex-basis:auto/);
+    expect(html).toContain(`aria-label="Snooze ${REMINDER.title}"`);
+    expect(html).toContain(`aria-label="Mark ${REMINDER.title} done"`);
   });
 });

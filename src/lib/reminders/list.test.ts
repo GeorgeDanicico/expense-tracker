@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   completeLocally,
   doneEntries,
+  groupOf,
   groupReminders,
+  planReminders,
   pendingCompletion,
   snoozeLocally,
   upsertReminder,
@@ -115,5 +117,33 @@ describe("upsertReminder", () => {
     const renamed = { ...a, title: "Renamed" };
     expect(upsertReminder([a], renamed)).toEqual([renamed]);
     expect(upsertReminder([a], reminder({ id: "b" })).map((item) => item.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("planReminders", () => {
+  it("puts overdue ones, then those due today, under Today and the rest under Upcoming", () => {
+    const lateTwoDays = reminder({ id: "late2", nextDueOn: "2026-10-22" });
+    const lateToday = reminder({ id: "lateToday", nextDueOn: "2026-10-24", timeOfDay: "08:00" });
+    const dueToday = reminder({ id: "today", nextDueOn: "2026-10-24", timeOfDay: "18:00" });
+    const tomorrow = reminder({ id: "tomorrow", nextDueOn: "2026-10-25" });
+    const snoozed = reminder({ id: "snoozed", nextDueOn: "2026-10-22", snoozedUntil: "2026-10-26T07:00:00.000Z" });
+    const finished = reminder({ id: "finished", nextDueOn: null });
+    const plan = planReminders([tomorrow, dueToday, snoozed, finished, lateToday, lateTwoDays]);
+    expect(plan.today.map((item) => item.id)).toEqual(["late2", "lateToday", "today"]);
+    expect(plan.upcoming.map((item) => item.id)).toEqual(["snoozed", "tomorrow"]);
+  });
+});
+
+describe("groupOf", () => {
+  it("names the group that lists a reminder, or none", () => {
+    const open = reminder({ id: "open" });
+    const later = reminder({ id: "later", nextDueOn: "2026-11-30" });
+    const finished = reminder({ id: "finished", nextDueOn: null });
+    const plan = planReminders([open, later, finished]);
+    const done = doneEntries([completion("c1", "finished", "2026-10-20T08:00:00.000Z")], [finished]);
+    expect(groupOf("open", plan, done)).toBe("today");
+    expect(groupOf("later", plan, done)).toBe("upcoming");
+    expect(groupOf("finished", plan, done)).toBe("done");
+    expect(groupOf("gone", plan, done)).toBeNull();
   });
 });

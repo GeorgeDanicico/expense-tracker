@@ -24,6 +24,12 @@ const CONVERTED_MODULES = [
   "src/app/(app)/investments",
   "src/components/net-worth",
   "src/app/(app)/net-worth",
+  "src/components/reminders",
+  "src/app/(app)/reminders",
+  "src/components/todos",
+  "src/app/(app)/todos",
+  "src/components/family-calendar",
+  "src/app/(app)/calendar",
 ];
 
 /**

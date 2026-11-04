@@ -20,7 +20,7 @@ Run them with `npm run lint`.
 | [`no-local-date-parse`](#no-local-date-parse) | error | 2 fixed (`formatDate`, `formatMonthLabel`) | U8 |
 | [`no-locale-date-without-zone`](#no-locale-date-without-zone) | error | 7 fixed, 8 formatter modules exempt | U1 |
 | [`no-redundant-swr-fetcher`](#no-redundant-swr-fetcher) | error | 5 fixed | U1 |
-| [`no-fetch-in-components`](#no-fetch-in-components) | error, on for expenses (U8), investments and net worth (U9) | 15 component files in other modules still call `apiRequest` or `fetch` (U10–U11) | U1 |
+| [`no-fetch-in-components`](#no-fetch-in-components) | error, on for expenses (U8), investments and net worth (U9), reminders, to-dos and the calendar (U10) | 15 component files in other modules still call `apiRequest` or `fetch` (U10–U11) | U1 |
 | [`no-zod-flatten`](#no-zod-flatten) | error | 15 fixed (6 in code, 9 in tests) | U1 |
 | [`no-raw-dialog`](#no-raw-dialog) | error | none | U1 |
 | [`no-window-confirm`](#no-window-confirm) | error | none | U1 |
@@ -217,6 +217,7 @@ are in `investment-api.tsx` and `net-worth-api.tsx`, called through `useInvestme
 `useNetWorthWrites`. **Left to U10–U11:** 15 component files: `family` 12, `auth` 1, `oauth` 1,
 `settings` 1. No page under `src/app/(app)` makes a request of its own any more
 (Settings' currency change moved to `src/lib/api/account-requests.ts` in U8).
+**On for reminders, to-dos and the calendar since U10**: `src/components/{reminders,todos,family-calendar}` and `src/app/(app)/{reminders,todos,calendar}`, whose requests were already in `reminder-api.tsx`, `todo-api.tsx` and `calendar-api.tsx`. No violations were left; the last raw `useEffect` load (the calendar link in `subscribe-dialog.tsx`) is now SWR.
 
 **Disable:** `// eslint-disable-next-line local/no-fetch-in-components -- <reason>`.
 

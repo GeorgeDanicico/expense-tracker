@@ -1,5 +1,6 @@
 import { ChakraProvider } from "@chakra-ui/react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { SWRConfig } from "swr";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,8 +9,10 @@ import {
   SECRET_WARNING,
   SUBSCRIBE_STEPS,
   SubscribeContent,
+  SubscribeDialog,
   UNSUPPORTED_NOTE,
 } from "@/components/family-calendar/subscribe-dialog";
+import { CALENDAR_FEED_LINK_API_KEY } from "@/lib/api/keys";
 import { ledgerSystem } from "@/components/ui/theme";
 import type { CalendarFeed } from "@/lib/family-calendar/feed-repository";
 import { feedWebcalUrl } from "@/lib/family-calendar/feed-link";
@@ -119,5 +122,21 @@ describe("SubscribeContent", () => {
     const failed = render({ feed: undefined, loadError: "Your calendar link could not be loaded." });
     expect(failed).toContain("could not be loaded");
     expect(failed).toContain("Try again");
+  });
+});
+
+describe("SubscribeDialog", () => {
+  const renderDialog = (fallback: Record<string, unknown>) => renderToStaticMarkup(
+    <ChakraProvider value={ledgerSystem}>
+      <SWRConfig value={{ fetcher: () => new Promise(() => {}), fallback }}>
+        <SubscribeDialog onClose={noop} />
+      </SWRConfig>
+    </ChakraProvider>,
+  );
+
+  it("reads the link's status from the SWR cache and shows loading until it has it", () => {
+    expect(renderDialog({})).toContain("Loading your calendar link");
+    expect(renderDialog({ [CALENDAR_FEED_LINK_API_KEY]: FEED })).toContain("Link created on 28 Oct 2026");
+    expect(renderDialog({ [CALENDAR_FEED_LINK_API_KEY]: null })).toContain("Create link");
   });
 });

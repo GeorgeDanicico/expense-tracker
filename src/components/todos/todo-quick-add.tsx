@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { useApiForm } from "@/hooks/use-api-form";
 import { TODO_STATUS_LABELS, type TodoStatus } from "@/lib/todos/types";
 
 /**
@@ -21,8 +22,7 @@ export function TodoQuickAdd({
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const { pending, error, submit: run, reset } = useApiForm();
   const [notice, setNotice] = useState("");
   const button = useRef<HTMLButtonElement>(null);
   const label = `Add a card to ${TODO_STATUS_LABELS[status]}`;
@@ -30,25 +30,19 @@ export function TodoQuickAdd({
   function close() {
     setOpen(false);
     setTitle("");
-    setError("");
+    reset();
     setNotice("");
     requestAnimationFrame(() => button.current?.focus());
   }
 
-  async function submit() {
+  function submit() {
     const trimmed = title.trim();
-    if (!trimmed || pending) return;
-    setPending(true);
-    setError("");
-    try {
+    if (!trimmed) return;
+    void run(async () => {
       const added = await onAdd(trimmed, status);
       setNotice(typeof added === "string" ? added : "");
       setTitle("");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The card could not be added.");
-    } finally {
-      setPending(false);
-    }
+    }, { fallback: "The card could not be added." });
   }
 
   if (!open) {
@@ -86,7 +80,7 @@ export function TodoQuickAdd({
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();
-            void submit();
+            submit();
           } else if (event.key === "Escape") {
             event.preventDefault();
             event.stopPropagation();

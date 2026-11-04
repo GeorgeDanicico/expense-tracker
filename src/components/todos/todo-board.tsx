@@ -306,9 +306,8 @@ function TodoColumn({
       as="section"
       aria-labelledby={headingId}
       bg="bg.subtle"
-      borderWidth="1px"
-      borderColor={isOver ? "border.strong" : "border"}
-      borderRadius="l3"
+      borderRadius="card"
+      boxShadow={isOver ? "inset 0 0 0 2px {colors.border.strong}" : undefined}
       p="3"
       minW="0"
     >

@@ -1,5 +1,7 @@
 # Simpler ways: calendar
 
+**Status (U10, 4 November 2026):** proposal 1 (feed link on SWR) done. `useNow` in the week view now comes from `src/hooks/use-now.ts`. The other proposals touch files U10 did not rebuild.
+
 Looked at `src/components/family-calendar/**` (14 files, ~2,900 lines without tests), `src/app/(app)/calendar`, `src/app/api/calendar/**`, `src/lib/family-calendar/**` (~2,100 lines), `src/lib/validation/calendar-event.ts`, `src/lib/mcp/tools/calendar.ts` and the calendar preview fixture, with the `find-shapes` script and by reading the screen, the three views, the event dialog and the subscribe dialog. **The calendar already uses the target data style** (`calendar-api.tsx` + `use-calendar-events.ts`, optimistic, previewable). 5 proposals, about 45 lines here; the shared family helpers are written up in the to-dos report and only referenced here. The one that is the calendar's own is **the subscribe dialog's hand-rolled load** (proposal 1), which the plan already gives to U10.
 
 ## Map

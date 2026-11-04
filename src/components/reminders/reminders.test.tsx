@@ -46,8 +46,8 @@ describe("ReminderRow", () => {
     expect(html).toContain("Pay the rent");
     expect(html).toContain("Sat 31 Oct, 09:00");
     expect(html).toContain("Monthly");
-    expect(html).toContain("Mark done");
-    expect(html).toContain("Snooze");
+    expect(html).toContain('aria-label="Mark Pay the rent done"');
+    expect(html).toContain('aria-label="Snooze Pay the rent"');
     expect(html).not.toContain("Notifications muted");
     expect(html).not.toMatch(/\d+ (minute|hour|day)s? late/);
   });
@@ -61,7 +61,7 @@ describe("ReminderRow", () => {
   it("marks a muted reminder, a due-today one and a snoozed one", () => {
     const due = render(<ReminderRow reminder={reminder({ nextDueOn: "2026-10-24", timeOfDay: "18:00", notificationsMuted: true })} now={NOW} onComplete={noop} onSnooze={noop} onEdit={noop} />);
     expect(due).toContain("Notifications muted");
-    expect(due).toContain("Today");
+    expect(due).toContain("Sat 24 Oct, 18:00");
     const snoozed = render(<ReminderRow reminder={reminder({ nextDueOn: "2026-10-22", snoozedUntil: "2026-10-25T07:00:00.000Z" })} now={NOW} onComplete={noop} onSnooze={noop} onEdit={noop} />);
     expect(snoozed).toContain("Snoozed until Sun 25 Oct, 09:00");
     expect(snoozed).not.toMatch(/\d+ (minute|hour|day)s? late/);
@@ -92,43 +92,45 @@ describe("DoneRow", () => {
 });
 
 describe("RemindersScreen", () => {
-  it("shows the overdue count and the empty Upcoming state", () => {
+  it("says there are no reminders, with no Add button of its own", () => {
     const html = render(<RemindersScreen />, { reminders: [], completions: [] });
-    expect(html).toContain("Upcoming");
-    expect(html).toContain('aria-label="0 overdue"');
     expect(html).toContain("No reminders yet");
+    expect(html).not.toContain("Add reminder");
+    expect(html).not.toContain('role="tablist"');
   });
 });
 
-describe("RemindersScreen with ?focus=<id>", () => {
+describe("RemindersScreen groups and ?focus=<id>", () => {
   // States are worked out at the real time the screen renders, so the dates are far off.
   const late = reminder({ id: "late", title: "Renew the passport", repeatUnit: "none", startsOn: "2020-01-10", nextDueOn: "2020-01-10" });
   const soon = reminder({ id: "soon", title: "Pay the rent", startsOn: "2099-01-31", nextDueOn: "2099-01-31" });
   const finished = reminder({ id: "finished", title: "Book the dentist", repeatUnit: "none", startsOn: "2020-01-05", nextDueOn: null });
   const data: RemindersResponse = {
-    reminders: [late, soon, finished],
+    reminders: [soon, late, finished],
     completions: [
       { id: "c1", reminderId: "finished", occurrenceOn: "2020-01-05", doneAt: "2020-01-05T08:00:00.000Z", expenseId: null },
     ],
   };
 
-  /** The selected tab's label and the rows marked focused. */
-  function focus(focusId: string | null) {
-    const html = render(<RemindersScreen focusId={focusId} />, data);
-    const selected = html.match(/aria-selected="true"[^>]*>([A-Za-z]+)/)?.[1];
-    const focused = [...html.matchAll(/data-reminder-id="([^"]+)" data-focused=""/g)].map((match) => match[1]);
-    return { selected, focused };
-  }
-
-  it("opens the tab that lists the reminder and highlights its row", () => {
-    expect(focus("late")).toEqual({ selected: "Overdue", focused: ["late"] });
-    expect(focus("soon")).toEqual({ selected: "Upcoming", focused: ["soon"] });
-    expect(focus("finished")).toEqual({ selected: "Done", focused: ["finished"] });
+  it("lists overdue ones under Today, the rest under Upcoming, and Done folded under its count", () => {
+    const html = render(<RemindersScreen />, data);
+    const at = (text: string) => html.indexOf(text);
+    expect(at("Today")).toBeGreaterThan(-1);
+    expect(at("Renew the passport")).toBeGreaterThan(at("Today"));
+    expect(at("Upcoming")).toBeGreaterThan(at("Renew the passport"));
+    expect(at("Pay the rent")).toBeGreaterThan(at("Upcoming"));
+    expect(html).toContain("Done · 1");
+    expect(at("Book the dentist")).toBeGreaterThan(at("Pay the rent"));
   });
 
-  it("stays on Upcoming with nothing highlighted for an unknown reminder or no focus", () => {
-    expect(focus("deleted")).toEqual({ selected: "Upcoming", focused: [] });
-    expect(focus(null)).toEqual({ selected: "Upcoming", focused: [] });
+  it("highlights the row of the reminder a notification opened", () => {
+    const focused = (id: string | null) =>
+      [...render(<RemindersScreen focusId={id} />, data).matchAll(/data-reminder-id="([^"]+)" data-focused=""/g)].map((match) => match[1]);
+    expect(focused("late")).toEqual(["late"]);
+    expect(focused("soon")).toEqual(["soon"]);
+    expect(focused("finished")).toEqual(["finished"]);
+    expect(focused("deleted")).toEqual([]);
+    expect(focused(null)).toEqual([]);
   });
 });
 
