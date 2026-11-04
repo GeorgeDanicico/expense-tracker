@@ -10,6 +10,10 @@ export const QUICK_ADD_KINDS: readonly { kind: QuickAddKind; label: string; href
   { kind: "event", label: "Event", href: NAV_ITEMS.calendar.href },
 ];
 
+export function isQuickAddKind(value: string): value is QuickAddKind {
+  return QUICK_ADD_KINDS.some((entry) => entry.kind === value);
+}
+
 /**
  * What the sheet offers someone, from the pages they can reach (`navigationFor`): Expense needs the
  * expenses permission, To-do and Event a family, Reminder nothing.

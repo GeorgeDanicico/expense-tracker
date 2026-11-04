@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, chakra, Flex, Input, NativeSelect, Stack, Switch, Text, Textarea } from "@chakra-ui/react";
+import { chakra, Flex, Input, NativeSelect, Stack, Switch, Text, Textarea } from "@chakra-ui/react";
 import { Users } from "lucide-react";
 import { useId, useRef, useState, type RefObject } from "react";
 import useSWR from "swr";
@@ -14,6 +14,7 @@ import { FormField, FormRow } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { SaveBar, useSheetSave } from "@/components/ui/save-button";
+import { ToggleChip } from "@/components/ui/toggle-chip";
 import { useAccount } from "@/hooks/use-account";
 import { useMemberColors } from "@/hooks/use-member-colors";
 import { ApiError } from "@/lib/api/client";
@@ -56,21 +57,6 @@ export function goingSummary(people: readonly Person[], selected: readonly strin
 /** The last date of a repeat of `count` from `startDate`, for the hint under Repeat. */
 export function repeatEndsOn(startDate: string, kind: SeriesRepeat, count: number) {
   return addDays(startDate, (kind === "weekly" ? 7 : 1) * (count - 1));
-}
-
-function Chip({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <Button
-      size="sm"
-      variant={pressed ? "solid" : "outline"}
-      colorPalette={pressed ? "brand" : undefined}
-      aria-pressed={pressed}
-      flexShrink="0"
-      onClick={onClick}
-    >
-      {children}
-    </Button>
-  );
 }
 
 /** The family's members as the form lists them, plus `attendees` who have since left, so their chip stays to be seen. */
@@ -218,7 +204,7 @@ export function EventFormFields({
       hint={goingSummary(people, draft.attendeeMemberIds, myMemberId)}
     >
       <Flex gap="2" wrap="wrap" role="group" aria-labelledby={goingLabel}>
-        <Chip
+        <ToggleChip
           pressed={everyone}
           onClick={() => onChange({
             ...draft,
@@ -227,16 +213,16 @@ export function EventFormFields({
         >
           <Users size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
           Everyone
-        </Chip>
+        </ToggleChip>
         {people.map((person) => (
-          <Chip
+          <ToggleChip
             key={person.memberId}
             pressed={draft.attendeeMemberIds.includes(person.memberId)}
             onClick={() => onChange(toggleAttendee(draft, person.memberId))}
           >
             <Avatar size="xs" name={person.name} src={person.avatarUrl} color={colorOf(person.memberId)} decorative />
             {person.memberId === myMemberId ? "Me" : person.name}
-          </Chip>
+          </ToggleChip>
         ))}
       </Flex>
     </FormField>
