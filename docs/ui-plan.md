@@ -525,7 +525,8 @@ tests.
   `useApiForm`; turn on `local/no-fetch-in-components` for these folders.
 
 **Done when** the screens are signed off and the lint rule is on for every module (it then
-covers all of `src/components`).
+covers all of `src/components`). Built on 4 November 2026 (the rule now covers all of
+`src/components` and `src/app/(app)`); awaiting George's sign-off.
 
 ### U12: Swipe actions
 

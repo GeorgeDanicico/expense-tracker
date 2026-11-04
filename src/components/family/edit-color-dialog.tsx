@@ -47,9 +47,8 @@ export function EditColorDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={`Colour for ${name}`}
       description="Shown beside their name and on their expenses. Automatic picks the first colour nobody has chosen."
       footer={<FormActions submitLabel="Save colour" form={formId} closesDialog pending={form.pending} />}

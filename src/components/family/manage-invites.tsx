@@ -47,9 +47,7 @@ function InviteRow({ invite }: { invite: FamilyInviteView }) {
           {revoking ? (
             <ConfirmDialog
               open
-              onOpenChange={(next) => {
-                if (!form.pending) setRevoking(next);
-              }}
+              onOpenChange={setRevoking}
               title="Revoke this invite?"
               description="The code and link stop working right away."
               confirmLabel="Revoke"

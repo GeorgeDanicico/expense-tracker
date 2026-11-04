@@ -1,30 +1,27 @@
 "use client";
 
-import { Box, Button, Flex, Table, Text } from "@chakra-ui/react";
+import { Box, Button } from "@chakra-ui/react";
+import { KeyRound, Palette, ShieldCheck, Trash2, UserRoundX } from "lucide-react";
 import { useState } from "react";
 
 import { CreateKidDialog } from "@/components/family/create-kid-dialog";
 import { DeleteKidAccountDialog } from "@/components/family/delete-kid-account-dialog";
-import { MemberSwatch } from "@/components/family/member-swatch";
 import { EditColorDialog } from "@/components/family/edit-color-dialog";
 import { EditPermissionsDialog } from "@/components/family/edit-permissions-dialog";
 import { RemoveMemberDialog } from "@/components/family/remove-member-dialog";
 import { ResetPasswordDialog } from "@/components/family/reset-password-dialog";
+import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { ListRow } from "@/components/ui/list-row";
+import { RowActions, useRowActions, type RowAction } from "@/components/ui/row-actions";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { lastActiveLabel } from "@/lib/family/last-active-label";
 import { memberColorTokens } from "@/lib/family/member-colors";
 import type { FamilyMemberView, FamilyView } from "@/lib/family/views";
 
-function memberName(member: FamilyMemberView) {
-  return member.displayName ?? member.username ?? "Unnamed";
-}
+type Dialog = "colour" | "permissions" | "password" | "remove" | "delete";
 
-function roleLabel(member: FamilyMemberView) {
-  return member.role === "parent" ? "Parent" : "Kid";
-}
-
-function MemberRow({
+function ManagedMemberRow({
   member,
   members,
   canRemove,
@@ -35,96 +32,54 @@ function MemberRow({
   canRemove: boolean;
   color: string | undefined;
 }) {
-  const [choosingColor, setChoosingColor] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const name = memberName(member);
+  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const { rowProps, menu } = useRowActions();
+  const name = member.displayName ?? member.username ?? "Unnamed";
+  const close = (open: boolean) => {
+    if (!open) setDialog(null);
+  };
+  const actions: RowAction[] = [
+    { label: "Colour", icon: Palette, onSelect: () => setDialog("colour") },
+    ...(member.role === "kid"
+      ? [
+          { label: "Permissions", icon: ShieldCheck, onSelect: () => setDialog("permissions") },
+          { label: "Reset password", icon: KeyRound, onSelect: () => setDialog("password") },
+          { label: "Delete account", icon: Trash2, onSelect: () => setDialog("delete"), tone: "danger" as const },
+        ]
+      : []),
+    ...(canRemove && !member.isCreator
+      ? [{ label: "Remove from family", icon: UserRoundX, onSelect: () => setDialog("remove"), tone: "danger" as const }]
+      : []),
+  ];
 
   return (
-    <Table.Row>
-      <Table.Cell ps="4">
-        <Flex align="center" gap="2" minW="0">
-          <MemberSwatch color={color} />
-          <Box minW="0">
-            <Text as="span" textStyle="bodySm" fontWeight="medium" display="block" truncate>
-              {name}
-            </Text>
-            <Text as="span" textStyle="caption" display="block" truncate>
-              <Text as="span" display={{ base: "inline", md: "none" }}>
-                {roleLabel(member)}
-                {member.displayName && member.username ? " · " : ""}
-              </Text>
-              {member.displayName && member.username ? `@${member.username}` : null}
-            </Text>
-          </Box>
+    <ListRow
+      {...rowProps}
+      leading={<Avatar size="md" name={name} src={member.avatarUrl} color={color} />}
+      title={
+        <Box as="span" display="inline-flex" alignItems="center" gap="2">
+          {name}
           {member.isCreator ? <StatusBadge tone="brand">Creator</StatusBadge> : null}
-        </Flex>
-      </Table.Cell>
-      <Table.Cell color="fg.muted" display={{ base: "none", md: "table-cell" }}>
-        {roleLabel(member)}
-      </Table.Cell>
-      <Table.Cell color="fg.muted" whiteSpace="nowrap">
-        {lastActiveLabel(member.lastActiveAt)}
-      </Table.Cell>
-      <Table.Cell pe="3">
-        <Flex direction={{ base: "column", md: "row" }} align="stretch" justify="flex-end" gap="1.5">
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => setChoosingColor(true)}
-            aria-label={`Choose colour for ${name}`}
-          >
-            Colour
-          </Button>
-          {member.role === "kid" ? (
-            <>
-              <Button size="xs" variant="outline" onClick={() => setEditing(true)} aria-label={`Edit permissions for ${name}`}>
-                Edit permissions
-              </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => setResetting(true)}
-                aria-label={`Reset password for ${name}`}
-              >
-                Reset password
-              </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                colorPalette="danger"
-                onClick={() => setDeleting(true)}
-                aria-label={`Delete ${name}'s account`}
-              >
-                Delete account
-              </Button>
-            </>
-          ) : null}
-          {canRemove && !member.isCreator ? (
-            <Button
-              size="xs"
-              variant="outline"
-              colorPalette="danger"
-              onClick={() => setRemoving(true)}
-              aria-label={`Remove ${name} from the family`}
-            >
-              Remove
-            </Button>
-          ) : null}
-        </Flex>
-        {choosingColor ? <EditColorDialog member={member} members={members} open onOpenChange={setChoosingColor} /> : null}
-        {editing ? <EditPermissionsDialog member={member} open onOpenChange={setEditing} /> : null}
-        {resetting ? <ResetPasswordDialog member={member} open onOpenChange={setResetting} /> : null}
-        {removing ? <RemoveMemberDialog member={member} open onOpenChange={setRemoving} /> : null}
-        {deleting ? <DeleteKidAccountDialog member={member} open onOpenChange={setDeleting} /> : null}
-      </Table.Cell>
-    </Table.Row>
+        </Box>
+      }
+      meta={[member.role === "parent" ? "Parent" : "Kid", member.displayName && member.username ? `@${member.username}` : null, lastActiveLabel(member.lastActiveAt)]
+        .filter(Boolean)
+        .join(" · ")}
+      actions={
+        <>
+          <RowActions label={name} actions={actions} {...menu} />
+          {dialog === "colour" ? <EditColorDialog member={member} members={members} open onOpenChange={close} /> : null}
+          {dialog === "permissions" ? <EditPermissionsDialog member={member} open onOpenChange={close} /> : null}
+          {dialog === "password" ? <ResetPasswordDialog member={member} open onOpenChange={close} /> : null}
+          {dialog === "remove" ? <RemoveMemberDialog member={member} open onOpenChange={close} /> : null}
+          {dialog === "delete" ? <DeleteKidAccountDialog member={member} open onOpenChange={close} /> : null}
+        </>
+      }
+    />
   );
 }
 
-/** The members table for parents: role, last activity, kid accounts, a colour button for each member, permission, password and delete-account buttons for each kid, and Remove for the creator. */
+/** The members for parents, one row each (role, last active), whose actions are Colour, and for a kid Permissions, Reset password and Delete account, and Remove for the creator. */
 export function ManageMembers({ data, isCreator = false }: { data: FamilyView; isCreator?: boolean }) {
   const [adding, setAdding] = useState(false);
   const colors = memberColorTokens(data.members);
@@ -141,32 +96,19 @@ export function ManageMembers({ data, isCreator = false }: { data: FamilyView; i
         }
       />
       {adding ? <CreateKidDialog open onOpenChange={setAdding} /> : null}
-      <Box overflowX="auto">
-        <Table.Root>
-          <Table.Caption className="sr-only">Family members</Table.Caption>
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader ps="4">Name</Table.ColumnHeader>
-              <Table.ColumnHeader display={{ base: "none", md: "table-cell" }}>Role</Table.ColumnHeader>
-              <Table.ColumnHeader>Last active</Table.ColumnHeader>
-              <Table.ColumnHeader pe="3">
-                <span className="sr-only">Actions</span>
-              </Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {data.members.map((member) => (
-              <MemberRow
-                key={member.memberId}
-                member={member}
-                members={data.members}
-                canRemove={isCreator}
-                color={colors.get(member.memberId.toLowerCase())}
-              />
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Box>
+      <Card.Body>
+        <Box as="ul" m="0" p="0" mx="-2">
+          {data.members.map((member) => (
+            <ManagedMemberRow
+              key={member.memberId}
+              member={member}
+              members={data.members}
+              canRemove={isCreator}
+              color={colors.get(member.memberId.toLowerCase())}
+            />
+          ))}
+        </Box>
+      </Card.Body>
     </Card>
   );
 }

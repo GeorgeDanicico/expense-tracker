@@ -47,9 +47,8 @@ export function DeleteKidAccountDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={`Delete ${name}'s account?`}
       description="This can't be undone."
       footer={

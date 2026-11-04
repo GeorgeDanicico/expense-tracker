@@ -41,9 +41,8 @@ export function ResetPasswordDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={done ? "Password reset" : `Reset password for ${name}`}
       description={done ? undefined : "Set a temporary password. They'll choose a new one the next time they sign in."}
       footer={

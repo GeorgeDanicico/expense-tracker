@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Flex, Stack } from "@chakra-ui/react";
+import { Box, Button, Flex, Stack, Text } from "@chakra-ui/react";
 import { ImageUp, Trash2 } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 
@@ -45,12 +45,20 @@ export function AvatarCard({ signInName, avatarUrl }: { signInName: string; avat
 
   return (
     <Card>
-      <Card.Header title="Profile picture" description="Shown to your family. JPG or PNG, up to 5 MB." />
       <Card.Body>
         <Stack gap="3">
           {form.error && !removing ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
           <Flex align="center" gap="4" wrap="wrap">
             <Avatar size="lg" name={name} src={avatarUrl} />
+            <Box flex="1" minW="10rem">
+              <Text textStyle="sectionTitle" truncate>
+                {name}
+              </Text>
+              <Text textStyle="bodySm" color="fg.muted" truncate>
+                {signInName}
+              </Text>
+              <Text textStyle="caption">Shown to your family. JPG or PNG, up to 5 MB.</Text>
+            </Box>
             <Flex gap="2" wrap="wrap">
               <input
                 ref={input}

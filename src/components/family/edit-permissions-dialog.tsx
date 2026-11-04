@@ -37,9 +37,8 @@ export function EditPermissionsDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={`Permissions for ${name}`}
       description="Changes apply the next time they open the app."
       footer={<FormActions submitLabel="Save permissions" form={formId} closesDialog pending={form.pending} />}

@@ -49,9 +49,7 @@ function ConnectedAppRow({ app }: { app: ConnectedAppView }) {
           {confirming ? (
             <ConfirmDialog
               open
-              onOpenChange={(next) => {
-                if (!form.pending) setConfirming(next);
-              }}
+              onOpenChange={setConfirming}
               title={`Disconnect ${app.name}?`}
               description={`${connected}. It's refused from its next request; to use it again, connect it again. Other connections with the same name stay.`}
               confirmLabel="Disconnect"

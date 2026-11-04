@@ -14,7 +14,7 @@ import type {
   FamilyDashboardData,
   FamilyExpensesData,
 } from "@/lib/expenses/types";
-import type { AiSettingsResponse, FamilyResponse } from "@/lib/api/keys";
+import type { AiSettingsResponse, FamilyResponse, InvitesResponse } from "@/lib/api/keys";
 import { groupByCurrency } from "@/lib/expenses/family";
 import { suggestExpenses } from "@/lib/expenses/suggestions";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
@@ -266,7 +266,11 @@ const ACCOUNT: AccountData = {
   avatarUrl: null,
 };
 
-const FAMILY: FamilyResponse = {
+const FAMILY_INVITES: InvitesResponse = {
+  invites: [{ inviteId: "i-1", role: "kid", createdByName: "George", expiresAt: "2026-11-10T10:00:00.000Z" }],
+};
+
+export const PREVIEW_FAMILY: FamilyResponse = {
   family: {
     family: { name: "The Danicicos" },
     members: FAMILY_MEMBERS.map((member, index) => ({
@@ -376,7 +380,8 @@ function previewsNoFamily() {
 
 /**
  * The account: `?noFamily=1` without a family, `?kidNoExpenses=1` a kid whose parent turned expenses off
- * (Home without its spending blocks), `?kidEmail=1` a kid's generated address (Settings then
+ * (Home without its spending blocks), `?kid=1` a kid with the default permissions (Family without Manage family),
+ * `?kidEmail=1` a kid's generated address (Settings then
  * shows "Add an email address"), `?mustChange=1` an account that must choose a new password (the
  * change-password screen then asks for the temporary one).
  */
@@ -385,6 +390,9 @@ function previewAccount(): AccountData {
   let account: AccountData = previewsNoFamily() ? { ...ACCOUNT, membership: null } : ACCOUNT;
   if (params.has("kidNoExpenses") && account.membership) {
     account = { ...account, membership: { ...account.membership, role: "kid", isCreator: false, permissions: { ...DEFAULT_KID_PERMISSIONS, expenses: "off" } } };
+  }
+  if (params.has("kid") && account.membership) {
+    account = { ...account, membership: { ...account.membership, role: "kid", isCreator: false, permissions: DEFAULT_KID_PERMISSIONS } };
   }
   if (params.has("kidEmail")) account = { ...account, email: null, signInName: "ana" };
   if (params.has("mustChange")) account = { ...account, mustChangePassword: true };
@@ -412,7 +420,8 @@ export function fixtureFor(key: string): unknown {
   const family = params.get("member") === "all";
   // `?noFamily=1` previews a user without a family: no To-dos nav item, and the board's "join a family".
   if (path === "/api/account") return previewAccount();
-  if (path === "/api/family") return FAMILY;
+  if (path === "/api/family") return PREVIEW_FAMILY;
+  if (path === "/api/family/invites") return FAMILY_INVITES;
   if (path === "/api/dashboard") return family ? familyDashboard() : dashboard();
   if (path === "/api/expenses") {
     const month = params.get("month") ?? getBucharestMonth();

@@ -41,9 +41,8 @@ export function DeleteFamilyDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={`Delete ${familyName}?`}
       description="This can't be undone."
       footer={

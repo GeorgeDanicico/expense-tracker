@@ -30,9 +30,7 @@ export function RemoveMemberDialog({
   return (
     <ConfirmDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
       title={`Remove ${name} from the family?`}
       description={`${name} keeps their account and their own data.`}
       confirmLabel="Remove"

@@ -108,9 +108,8 @@ export function CreateInviteDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={created ? "Invite created" : "Invite someone"}
       description={created ? "Send them the code or the link. It is shown only once." : "They join your family with a code."}
       footer={

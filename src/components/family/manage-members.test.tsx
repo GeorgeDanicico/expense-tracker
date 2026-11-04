@@ -43,24 +43,23 @@ describe("ManageMembers", () => {
     const html = render(<ManageMembers data={data} />);
     expect(html).toContain("Ana");
     expect(html).toContain("Creator");
-    expect(html).toContain(">Parent<");
-    expect(html).toContain(">Kid<");
+    expect(html).toContain("Parent · ");
+    expect(html).toContain("Kid · @mara.p");
     expect(html).toContain("Never");
   });
 
-  it("offers Edit permissions for kids only", () => {
+  it("offers Permissions for kids only", () => {
     const html = render(<ManageMembers data={data} />);
-    expect(html.match(/Edit permissions/g)).toHaveLength(2); // aria-label and text of the single kid button
-    expect(html).toContain("Edit permissions for Mara");
-    expect(html).not.toContain("Edit permissions for Ana");
+    expect(html).toContain("Permissions: Mara");
+    expect(html).not.toContain("Permissions: Ana");
   });
 });
 
 describe("ManageMembers colours", () => {
   it("offers a colour button for every member", () => {
     const html = render(<ManageMembers data={data} />);
-    expect(html).toContain("Choose colour for Ana");
-    expect(html).toContain("Choose colour for Mara");
+    expect(html).toContain("Colour: Ana");
+    expect(html).toContain("Colour: Mara");
   });
 });
 
@@ -89,14 +88,14 @@ describe("ManageMembers kid accounts", () => {
   it("offers Add a kid and Reset password for kids only", () => {
     const html = render(<ManageMembers data={data} />);
     expect(html).toContain("Add a kid");
-    expect(html).toContain("Reset password for Mara");
-    expect(html).not.toContain("Reset password for Ana");
+    expect(html).toContain("Reset password: Mara");
+    expect(html).not.toContain("Reset password: Ana");
   });
 
   it("offers Delete account for kids only", () => {
     const html = render(<ManageMembers data={data} />);
-    expect(html).toContain("Delete Mara&#x27;s account");
-    expect(html).not.toContain("Delete Ana&#x27;s account");
+    expect(html).toContain("Delete account: Mara");
+    expect(html).not.toContain("Delete account: Ana");
   });
 });
 
@@ -125,9 +124,9 @@ describe("ManageMembers removal", () => {
 
   it("offers Remove to the creator for everyone but the creator", () => {
     const html = render(<ManageMembers data={withParent} isCreator />);
-    expect(html).toContain("Remove Mara from the family");
-    expect(html).toContain("Remove Dan from the family");
-    expect(html).not.toContain("Remove Ana from the family");
+    expect(html).toContain("Remove from family: Mara");
+    expect(html).toContain("Remove from family: Dan");
+    expect(html).not.toContain("Remove from family: Ana");
   });
 
   it("hides Remove from other parents", () => {

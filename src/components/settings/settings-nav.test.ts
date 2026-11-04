@@ -24,7 +24,7 @@ describe("settingsGroups", () => {
     ]);
   });
 
-  it("shows the Family group but not Manage family to a user without a family or to a kid", () => {
+  it("shows the Family group, with My permissions and without Manage family, to a user without a family or to a kid", () => {
     for (const who of [null, membership("kid")]) {
       expect(outline({ features: { family: true }, membership: who })).toEqual([
         "Account: Account, Notifications",
@@ -34,21 +34,20 @@ describe("settingsGroups", () => {
     }
   });
 
-  it("shows Manage family to a parent only", () => {
+  it("shows Manage family to a parent only, and My permissions (which says parents can do everything) not to a parent", () => {
     expect(outline({ features: { family: true }, membership: membership("parent") })).toEqual([
       "Account: Account, Notifications",
-      "Family: Family, My permissions, Manage family",
+      "Family: Family, Manage family",
       "AI: AI assistants, AI features",
     ]);
   });
 
-  it("keeps every settings page at its existing URL, for everyone who could reach it before", () => {
+  it("keeps every settings page at its existing URL", () => {
     const rows = settingsGroups({ features: { family: true }, membership: membership("parent") }).flatMap((group) => group.rows);
     expect(rows.map((row) => row.href)).toEqual([
       "/settings",
       "/settings/notifications",
       "/settings/family",
-      "/settings/permissions",
       "/settings/family/manage",
       "/settings/mcp",
       "/settings/ai",
@@ -57,10 +56,10 @@ describe("settingsGroups", () => {
 });
 
 describe("activeSettingsRow", () => {
-  const groups = settingsGroups({ features: { family: true }, membership: membership("parent") });
+  const groups = settingsGroups({ features: { family: true }, membership: membership("kid") });
 
   it("picks the longest matching row", () => {
-    expect(activeSettingsRow(groups, "/settings/family/manage")?.label).toBe("Manage family");
+    expect(activeSettingsRow(settingsGroups({ features: { family: true }, membership: membership("parent") }), "/settings/family/manage")?.label).toBe("Manage family");
     expect(activeSettingsRow(groups, "/settings/family")?.label).toBe("Family");
     expect(activeSettingsRow(groups, "/settings")?.label).toBe("Account");
     expect(activeSettingsRow(groups, "/settings/permissions")?.label).toBe("My permissions");

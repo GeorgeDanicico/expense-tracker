@@ -170,9 +170,8 @@ function RegenerateDialog({
   return (
     <AppDialog
       open
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       size="sm"
       title={`Regenerate “${token.name}”?`}
       description="The current token stops working right away. You'll copy the new one next."

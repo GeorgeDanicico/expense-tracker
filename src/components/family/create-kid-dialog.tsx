@@ -37,9 +37,8 @@ export function CreateKidDialog({ open, onOpenChange }: { open: boolean; onOpenC
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={created ? "Kid added" : "Add a kid"}
       description={created ? undefined : "Create an account for a kid. They sign in with a username, so no email is needed."}
       footer={

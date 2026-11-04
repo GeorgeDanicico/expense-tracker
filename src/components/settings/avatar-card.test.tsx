@@ -105,7 +105,7 @@ describe("avatarName", () => {
 describe("AvatarCard", () => {
   it("offers an upload, and no Remove, without a picture", () => {
     const html = render(null);
-    expect(html).toContain("Profile picture");
+    expect(html).toContain("Profile picture file");
     expect(html).toContain("Shown to your family. JPG or PNG, up to 5 MB.");
     expect(html).toContain("Upload picture");
     expect(html).not.toContain("Remove");

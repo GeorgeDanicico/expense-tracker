@@ -13,6 +13,9 @@ import InvestmentsPage from "@/app/(app)/investments/page";
 import MorePage from "@/app/(app)/more/page";
 import NetWorthPage from "@/app/(app)/net-worth/page";
 import RemindersPage from "@/app/(app)/reminders/page";
+import FamilySettingsPage from "@/app/(app)/settings/family/page";
+import ManageFamilyPage from "@/app/(app)/settings/family/manage/page";
+import MyPermissionsPage from "@/app/(app)/settings/permissions/page";
 import AiFeaturesSettingsPage from "@/app/(app)/settings/ai/page";
 import SettingsLayout from "@/app/(app)/settings/layout";
 import NotificationsSettingsPage from "@/app/(app)/settings/notifications/page";
@@ -20,6 +23,7 @@ import SettingsPage from "@/app/(app)/settings/page";
 import TodosPage from "@/app/(app)/todos/page";
 import ChangePasswordPage from "@/app/change-password/page";
 import { ExpenseApiProvider } from "@/components/expenses/expense-api";
+import { FamilyApiProvider } from "@/components/family/family-api";
 import { ImportApiProvider } from "@/components/expenses/import/import-api";
 import { CalendarApiProvider } from "@/components/family-calendar/calendar-api";
 import { InvestmentApiProvider } from "@/components/investments/investment-api";
@@ -31,6 +35,7 @@ import { ReminderApiProvider } from "@/components/reminders/reminder-api";
 import { TodoApiProvider } from "@/components/todos/todo-api";
 
 import { previewCalendarApi } from "../calendar-fixtures";
+import { previewFamilyApi } from "../family-fixtures";
 import { previewExpenseApi } from "../expense-fixtures";
 import { fixtureFor } from "../fixtures";
 import { previewInvestmentApi, previewNetWorthApi } from "../money-fixtures";
@@ -52,6 +57,9 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   calendar: CalendarPage,
   notifications: NotificationsPreview,
   "ai-settings": AiSettingsPreview,
+  family: FamilyPreview,
+  "manage-family": ManageFamilyPreview,
+  permissions: PermissionsPreview,
   import: ImportPreview,
   "change-password": ChangePasswordPage,
 };
@@ -70,6 +78,9 @@ const APP_PATH: Record<PreviewScreen, string> = {
   calendar: "/calendar",
   notifications: "/settings/notifications",
   "ai-settings": "/settings/ai",
+  family: "/settings/family",
+  "manage-family": "/settings/family/manage",
+  permissions: "/settings/permissions",
   import: "/expenses/import",
   "change-password": "/change-password",
 };
@@ -122,10 +133,35 @@ function AiSettingsPreview() {
   );
 }
 
+/** Settings → Family, Manage family and My permissions with the list beside them (`?kid=1` previews a kid; `?noFamily=1` no family). */
+function FamilyPreview() {
+  return (
+    <SettingsLayout>
+      <FamilySettingsPage />
+    </SettingsLayout>
+  );
+}
+
+function ManageFamilyPreview() {
+  return (
+    <SettingsLayout>
+      <ManageFamilyPage />
+    </SettingsLayout>
+  );
+}
+
+function PermissionsPreview() {
+  return (
+    <SettingsLayout>
+      <MyPermissionsPage />
+    </SettingsLayout>
+  );
+}
+
 /**
  * Every screen's writes, and the quick-add sheet's, kept in memory: expenses (`expense-fixtures.ts`),
  * investments and net worth (`money-fixtures.ts`), the board (`todo-fixtures.ts`), reminders (`reminder-fixtures.ts`) and the calendar
- * (`calendar-fixtures.ts`).
+ * (`calendar-fixtures.ts`) and the family's (`family-fixtures.ts`).
  */
 function PreviewApis({ children }: { children: React.ReactNode }) {
   return (
@@ -134,7 +170,9 @@ function PreviewApis({ children }: { children: React.ReactNode }) {
         <NetWorthApiProvider api={previewNetWorthApi}>
           <TodoApiProvider api={previewTodoApi}>
             <ReminderApiProvider api={previewReminderApi}>
-              <CalendarApiProvider api={previewCalendarApi}>{children}</CalendarApiProvider>
+              <CalendarApiProvider api={previewCalendarApi}>
+                <FamilyApiProvider api={previewFamilyApi}>{children}</FamilyApiProvider>
+              </CalendarApiProvider>
             </ReminderApiProvider>
           </TodoApiProvider>
         </NetWorthApiProvider>

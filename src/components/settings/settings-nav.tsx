@@ -30,10 +30,9 @@ export function settingsGroups(account: Pick<AccountData, "features" | "membersh
     },
   ];
   if (account.features.family) {
-    const rows: SettingsRow[] = [
-      { href: "/settings/family", label: "Family", icon: Users },
-      { href: "/settings/permissions", label: "My permissions", icon: KeyRound },
-    ];
+    const rows: SettingsRow[] = [{ href: "/settings/family", label: "Family", icon: Users }];
+    // Parents can use every part of the app, so "My permissions" is for kids (and for no family yet).
+    if (account.membership?.role !== "parent") rows.push({ href: "/settings/permissions", label: "My permissions", icon: KeyRound });
     if (account.membership?.role === "parent") rows.push({ href: "/settings/family/manage", label: "Manage family", icon: UserCog });
     groups.push({ label: "Family", rows });
   }
