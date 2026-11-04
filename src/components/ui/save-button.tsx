@@ -1,12 +1,13 @@
 "use client";
 
-import { Box, Button, Flex, type ButtonProps } from "@chakra-ui/react";
+import { Box, Button, Flex, Stack, type ButtonProps } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { ActionBar } from "@/components/ui/action-bar";
 import { ICON } from "@/components/ui/icon";
-import { useApiForm } from "@/hooks/use-api-form";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { useApiForm, type ApiForm } from "@/hooks/use-api-form";
 import { DURATION_MS } from "@/components/ui/theme/motion";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
@@ -74,32 +75,47 @@ export function useSheetSave() {
 }
 
 /**
- * The bottom of a sheet form, within thumb reach: the big save button (a submit, so Enter saves too)
- * and "Save and add another".
+ * A form in a sheet: its fields, the error when a save fails, and at the bottom, within thumb reach,
+ * the big save button (a submit, so Enter saves too) and "Save and add another". Pair it with
+ * `useSheetSave`: `onSave(another)` runs the save.
  */
-export function SaveBar({
-  children,
+export function SheetForm({
+  label,
+  form,
   saved,
-  pendingAction,
-  onAnother,
+  onSave,
+  children,
 }: {
   /** What the save button says: "Save expense". */
-  children: ReactNode;
+  label: ReactNode;
+  form: Pick<ApiForm, "error" | "pendingAction">;
   saved: boolean;
-  pendingAction: string | null;
-  onAnother: () => void;
+  onSave: (another: boolean) => void;
+  children: ReactNode;
 }) {
-  const busy = pendingAction !== null;
+  const busy = form.pendingAction !== null;
   return (
-    <ActionBar placement="sheet">
-      <Flex gap="2">
-        <SaveButton type="submit" saved={saved} loading={pendingAction === "save"} disabled={busy && !saved}>
-          {children}
-        </SaveButton>
-        <Button type="button" variant="outline" size="md" loading={pendingAction === "another"} disabled={busy || saved} onClick={onAnother}>
-          Save and add another
-        </Button>
-      </Flex>
-    </ActionBar>
+    <form
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave(false);
+      }}
+    >
+      <Stack gap="3">
+        {children}
+        {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
+        <ActionBar placement="sheet">
+          <Flex gap="2">
+            <SaveButton type="submit" saved={saved} loading={form.pendingAction === "save"} disabled={busy && !saved}>
+              {label}
+            </SaveButton>
+            <Button type="button" variant="outline" size="md" loading={form.pendingAction === "another"} disabled={busy || saved} onClick={() => onSave(true)}>
+              Save and add another
+            </Button>
+          </Flex>
+        </ActionBar>
+      </Stack>
+    </form>
   );
 }

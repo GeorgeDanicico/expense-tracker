@@ -16,13 +16,13 @@ import type {
 } from "@/lib/expenses/types";
 import type { AiSettingsResponse, FamilyResponse } from "@/lib/api/keys";
 import { groupByCurrency } from "@/lib/expenses/family";
+import { suggestExpenses } from "@/lib/expenses/suggestions";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
 import { ALL_MEMBERS, type Viewing } from "@/lib/family/viewing";
 import type { FamilyInvestmentsOverview } from "@/lib/investments/types";
 import type { FamilyNetWorthOverview } from "@/lib/net-worth/types";
 
 import { previewCalendarEvents } from "./calendar-fixtures";
-import { previewSuggestions } from "./expense-fixtures";
 import { previewRecentImports } from "./import-fixtures";
 import { previewReminders, previewReminderSummary } from "./reminder-fixtures";
 import { previewTodos } from "./todo-fixtures";
@@ -417,7 +417,7 @@ export function fixtureFor(key: string): unknown {
   if (path === "/api/expenses/suggestions") {
     const month = getBucharestMonth();
     const history = [month, shiftMonth(month, -1), shiftMonth(month, -2)].flatMap((key) => expensesFor(key));
-    return previewSuggestions(history, params.get("q") ?? "");
+    return suggestExpenses(history, params.get("q") ?? "");
   }
   if (path === "/api/expense-tabs") return { tabs: [CAR_TAB] };
   if (path.startsWith("/api/expense-tabs/") && path.endsWith("/expenses")) return carLedger();

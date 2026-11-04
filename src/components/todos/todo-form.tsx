@@ -7,10 +7,9 @@ import useSWR, { useSWRConfig } from "swr";
 import { useTodoApi } from "@/components/todos/todo-api";
 import { ChipMenu } from "@/components/ui/chip-menu";
 import { FormField } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { SaveBar, useSheetSave } from "@/components/ui/save-button";
+import { SheetForm, useSheetSave } from "@/components/ui/save-button";
 import { useAccount } from "@/hooks/use-account";
-import { FAMILY_API_KEY, TODOS_API_KEY, type FamilyResponse, type TodosResponse } from "@/lib/api/keys";
+import { FAMILY_API_KEY, isTodosKey, type FamilyResponse, type TodosResponse } from "@/lib/api/keys";
 import { addDays, formatShortDate, getBucharestToday } from "@/lib/calendar";
 import type { FamilyMemberView } from "@/lib/family/views";
 import { upsertTodo } from "@/lib/todos/board";
@@ -19,13 +18,8 @@ import { TODO_STATUS_LABELS, type Todo, type TodoStatus } from "@/lib/todos/type
 /** A card's fields as typed: empty strings for no assignee and no due date. */
 export type TodoDraft = { title: string; notes: string; assigneeMemberId: string; dueDate: string };
 
-export function memberName(member: FamilyMemberView) {
+function memberName(member: FamilyMemberView) {
   return member.displayName ?? member.username ?? "Family member";
-}
-
-/** Whether `key` is one of the board's SWR keys (`/api/todos`, with or without `?doneSince=`). */
-export function isTodosKey(key: unknown) {
-  return typeof key === "string" && (key === TODOS_API_KEY || key.startsWith(`${TODOS_API_KEY}?`));
 }
 
 const PICK_DATE = "pick";
@@ -203,35 +197,23 @@ export function NewTodoForm({ onSaved }: { onSaved: (todo: Todo, another: boolea
   }
 
   return (
-    <form
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        save(false);
-      }}
-    >
-      <Stack gap="3">
-        <TodoFields
-          compact
-          draft={draft}
-          onChange={setDraft}
-          members={family?.family?.members ?? []}
-          myMemberId={myMemberId}
-          fieldError={form.fieldError}
-          chips={(
-            <ChipMenu
-              aria-label={`Column: ${TODO_STATUS_LABELS[status]}`}
-              label={TODO_STATUS_LABELS[status]}
-              items={NEW_CARD_COLUMNS.map((value) => ({ value, label: TODO_STATUS_LABELS[value] }))}
-              onSelect={(value) => setStatus(value as TodoStatus)}
-            />
-          )}
-        />
-        {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
-        <SaveBar saved={saved} pendingAction={form.pendingAction} onAnother={() => save(true)}>
-          Add to-do
-        </SaveBar>
-      </Stack>
-    </form>
+    <SheetForm label="Add to-do" form={form} saved={saved} onSave={save}>
+      <TodoFields
+        compact
+        draft={draft}
+        onChange={setDraft}
+        members={family?.family?.members ?? []}
+        myMemberId={myMemberId}
+        fieldError={form.fieldError}
+        chips={(
+          <ChipMenu
+            aria-label={`Column: ${TODO_STATUS_LABELS[status]}`}
+            label={TODO_STATUS_LABELS[status]}
+            items={NEW_CARD_COLUMNS.map((value) => ({ value, label: TODO_STATUS_LABELS[value] }))}
+            onSelect={(value) => setStatus(value as TodoStatus)}
+          />
+        )}
+      />
+    </SheetForm>
   );
 }

@@ -298,6 +298,11 @@ export function todosApiKey(doneSince?: string | null) {
   return doneSince ? `${TODOS_API_KEY}?doneSince=${encodeURIComponent(doneSince)}` : TODOS_API_KEY;
 }
 
+/** Whether `key` is one of the board's SWR keys ({@link todosApiKey}), to update every cached board at once. */
+export function isTodosKey(key: unknown): key is string {
+  return typeof key === "string" && (key === TODOS_API_KEY || key.startsWith(`${TODOS_API_KEY}?`));
+}
+
 /** PATCH (any of title, notes, assigneeMemberId, dueDate) → {@link TodoResponse}; DELETE → `{ success: true }`. */
 export function todoApiUrl(id: string) {
   return `${TODOS_API_KEY}/${encodeURIComponent(id)}`;

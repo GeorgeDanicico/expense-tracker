@@ -8,16 +8,21 @@ import { afterExpenseChange } from "@/lib/api/invalidate";
 import type { DashboardData, Expense, ExpensesData } from "@/lib/expenses/types";
 import type { ExpenseInput } from "@/lib/validation/expense";
 
-/** The month of a cached `/api/expenses?month=…` ledger of the caller's own, or null for any other key. */
-export function ownLedgerMonth(key: string) {
-  if (!key.startsWith("/api/expenses?")) return null;
-  const params = new URLSearchParams(key.slice(key.indexOf("?") + 1));
-  return params.has("member") ? null : params.get("month");
+/** The query of a cached key, when it is one of the caller's own reads at `path` (not a member's or the family's). */
+function ownQuery(key: string, path: string) {
+  if (!key.startsWith(`${path}?`)) return null;
+  const params = new URLSearchParams(key.slice(path.length + 1));
+  return params.has("member") ? null : params;
 }
 
-/** Whether `key` is the caller's own dashboard (Home), not a member's or the family's. */
+/** The month of a cached `/api/expenses?month=…` ledger of the caller's own, or null for any other key. */
+export function ownLedgerMonth(key: string) {
+  return ownQuery(key, "/api/expenses")?.get("month") ?? null;
+}
+
+/** Whether `key` is the caller's own dashboard (Home). */
 function isOwnDashboardKey(key: string) {
-  return key.startsWith("/api/dashboard?") && !new URLSearchParams(key.slice(key.indexOf("?") + 1)).has("member");
+  return ownQuery(key, "/api/dashboard") !== null;
 }
 
 /** A cached response that shows `expense` at once: its month's ledger, or the dashboard of its month. */

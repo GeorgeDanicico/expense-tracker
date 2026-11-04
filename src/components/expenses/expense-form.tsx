@@ -1,7 +1,7 @@
 "use client";
 
-import { Flex, Input, Stack, Textarea } from "@chakra-ui/react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Flex, Input, Textarea } from "@chakra-ui/react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 
 import { CATEGORY_ICONS } from "@/components/expenses/category-visual";
@@ -12,8 +12,7 @@ import { ChipMenu, ChipRow } from "@/components/ui/chip-menu";
 import { Disclosure } from "@/components/ui/disclosure";
 import { FormField } from "@/components/ui/form-field";
 import { ICON } from "@/components/ui/icon";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { SaveBar, useSheetSave } from "@/components/ui/save-button";
+import { SheetForm, useSheetSave } from "@/components/ui/save-button";
 import { ToggleChip } from "@/components/ui/toggle-chip";
 import { ApiError } from "@/lib/api/client";
 import { expenseSuggestionsApiKey } from "@/lib/api/keys";
@@ -135,92 +134,80 @@ export function ExpenseForm({
   ];
 
   return (
-    <form
-      noValidate
-      onSubmit={(event: FormEvent) => {
-        event.preventDefault();
-        save(false);
-      }}
-    >
-      <Stack gap="3">
-        <FormField label={`Amount in ${currency}`} labelHidden error={form.fieldError("amount")}>
-          <AmountInput
-            ref={amountRef}
-            variant="hero"
-            name="amount"
-            currency={currency}
-            value={amount}
-            onValueChange={setAmount}
-            autoFocus
-            aria-invalid={form.fieldError("amount") ? true : undefined}
-          />
+    <SheetForm label="Save expense" form={form} saved={saved} onSave={save}>
+      <FormField label={`Amount in ${currency}`} labelHidden error={form.fieldError("amount")}>
+        <AmountInput
+          ref={amountRef}
+          variant="hero"
+          name="amount"
+          currency={currency}
+          value={amount}
+          onValueChange={setAmount}
+          autoFocus
+          aria-invalid={form.fieldError("amount") ? true : undefined}
+        />
+      </FormField>
+      <FormField label="Description" labelHidden error={form.fieldError("description")}>
+        <Input
+          name="description"
+          size="md"
+          maxLength={120}
+          placeholder="What was it?"
+          autoComplete="off"
+          enterKeyHint="done"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </FormField>
+      {suggestions.length > 0 ? (
+        <ChipRow label="Your recent descriptions">
+          {suggestions.map((suggestion) => (
+            <ToggleChip
+              key={suggestion.description}
+              flexShrink="0"
+              onClick={() => {
+                setDescription(suggestion.description);
+                setPicked(suggestion.description);
+                setChosen({ category: suggestion.category, subtype: suggestion.subtype });
+              }}
+            >
+              {suggestion.description} · {CATEGORY_LABELS[suggestion.category]}
+            </ToggleChip>
+          ))}
+        </ChipRow>
+      ) : null}
+      <Flex gap="2" wrap="wrap" align="center">
+        <ChipMenu
+          aria-label={`Category: ${CATEGORY_LABELS[category]}`}
+          label={<CategoryLabel category={category} />}
+          items={CATEGORY_ITEMS}
+          onSelect={(value) => {
+            const next = value as ExpenseCategory;
+            setChosen({ category: next, subtype: subtypeForCategory(next, subtype) });
+          }}
+        />
+        <ChipMenu
+          aria-label={`Date: ${dateChipLabel(expenseDate, today)}`}
+          label={dateChipLabel(expenseDate, today)}
+          selected={expenseDate !== today}
+          items={dateItems}
+          onSelect={(value) => {
+            setPickingDate(value === PICK_DATE);
+            if (value !== PICK_DATE) setExpenseDate(value);
+          }}
+        />
+      </Flex>
+      {pickingDate || form.fieldError("expenseDate") ? (
+        <FormField label="Date" error={form.fieldError("expenseDate")}>
+          <Input name="expenseDate" type="date" size="md" value={expenseDate} required onChange={(event) => setExpenseDate(event.target.value)} />
         </FormField>
-        <FormField label="Description" labelHidden error={form.fieldError("description")}>
-          <Input
-            name="description"
-            size="md"
-            maxLength={120}
-            placeholder="What was it?"
-            autoComplete="off"
-            enterKeyHint="done"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
+      ) : null}
+      <Disclosure label="More details">
+        <FormField label="Notes" labelHidden optional error={form.fieldError("notes")}>
+          <Textarea name="notes" size="md" rows={2} maxLength={500} placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
         </FormField>
-        {suggestions.length > 0 ? (
-          <ChipRow label="Your recent descriptions">
-            {suggestions.map((suggestion) => (
-              <ToggleChip
-                key={suggestion.description}
-                flexShrink="0"
-                onClick={() => {
-                  setDescription(suggestion.description);
-                  setPicked(suggestion.description);
-                  setChosen({ category: suggestion.category, subtype: suggestion.subtype });
-                }}
-              >
-                {suggestion.description} · {CATEGORY_LABELS[suggestion.category]}
-              </ToggleChip>
-            ))}
-          </ChipRow>
-        ) : null}
-        <Flex gap="2" wrap="wrap" align="center">
-          <ChipMenu
-            aria-label={`Category: ${CATEGORY_LABELS[category]}`}
-            label={<CategoryLabel category={category} />}
-            items={CATEGORY_ITEMS}
-            onSelect={(value) => {
-              const next = value as ExpenseCategory;
-              setChosen({ category: next, subtype: subtypeForCategory(next, subtype) });
-            }}
-          />
-          <ChipMenu
-            aria-label={`Date: ${dateChipLabel(expenseDate, today)}`}
-            label={dateChipLabel(expenseDate, today)}
-            selected={expenseDate !== today}
-            items={dateItems}
-            onSelect={(value) => {
-              setPickingDate(value === PICK_DATE);
-              if (value !== PICK_DATE) setExpenseDate(value);
-            }}
-          />
-        </Flex>
-        {pickingDate || form.fieldError("expenseDate") ? (
-          <FormField label="Date" error={form.fieldError("expenseDate")}>
-            <Input name="expenseDate" type="date" size="md" value={expenseDate} required onChange={(event) => setExpenseDate(event.target.value)} />
-          </FormField>
-        ) : null}
-        <Disclosure label="More details">
-          <FormField label="Notes" labelHidden optional error={form.fieldError("notes")}>
-            <Textarea name="notes" size="md" rows={2} maxLength={500} placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-          </FormField>
-          <SubtypeField category={category} value={subtype} onChange={(next) => setChosen({ category, subtype: next })} error={form.fieldError("subtype")} />
-        </Disclosure>
-        {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
-        <SaveBar saved={saved} pendingAction={form.pendingAction} onAnother={() => save(true)}>
-          Save expense
-        </SaveBar>
-      </Stack>
-    </form>
+        <SubtypeField category={category} value={subtype} onChange={(next) => setChosen({ category, subtype: next })} error={form.fieldError("subtype")} />
+      </Disclosure>
+    </SheetForm>
   );
 }

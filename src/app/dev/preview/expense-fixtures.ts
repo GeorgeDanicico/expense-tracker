@@ -1,7 +1,5 @@
 import type { ExpenseApi } from "@/components/expenses/expense-api";
 import { ApiError } from "@/lib/api/client";
-import type { ClassifiedDescription } from "@/lib/expenses/repository";
-import { suggestExpenses } from "@/lib/expenses/suggestions";
 
 // The expense writes for `/dev/preview`: a save answers after a moment with the expense as stored,
 // so the optimistic add, the save check and the toast can be seen; nothing is kept. Open a preview
@@ -22,7 +20,3 @@ export const previewExpenseApi: ExpenseApi = {
   },
 };
 
-/** The suggestions `GET /api/expenses/suggestions?q=` would answer for someone with these expenses (newest first). */
-export function previewSuggestions(rows: readonly ClassifiedDescription[], query: string) {
-  return suggestExpenses(rows, query);
-}

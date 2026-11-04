@@ -12,8 +12,7 @@ import { ChipMenu } from "@/components/ui/chip-menu";
 import { Disclosure } from "@/components/ui/disclosure";
 import { FormField, FormRow } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { SaveBar, useSheetSave } from "@/components/ui/save-button";
+import { SheetForm, useSheetSave } from "@/components/ui/save-button";
 import { ToggleChip } from "@/components/ui/toggle-chip";
 import { useAccount } from "@/hooks/use-account";
 import { useMemberColors } from "@/hooks/use-member-colors";
@@ -41,7 +40,7 @@ const REPEAT_OPTIONS: { value: SeriesRepeat; label: string }[] = [
   { value: "weekly", label: "Every week" },
 ];
 
-export function memberName(member: FamilyMemberView) {
+function memberName(member: FamilyMemberView) {
   return member.displayName ?? member.username ?? "Family member";
 }
 
@@ -388,29 +387,17 @@ export function NewEventForm({ onSaved }: { onSaved: (events: CalendarEvent[], a
   }
 
   return (
-    <form
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        save(false);
-      }}
-    >
-      <Stack gap="3">
-        <EventFormFields
-          compact
-          draft={draft}
-          onChange={setDraft}
-          people={people}
-          myMemberId={myMemberId}
-          colorOf={colorOf}
-          fieldError={form.fieldError}
-          titleRef={titleRef}
-        />
-        {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
-        <SaveBar saved={saved} pendingAction={form.pendingAction} onAnother={() => save(true)}>
-          Add event
-        </SaveBar>
-      </Stack>
-    </form>
+    <SheetForm label="Add event" form={form} saved={saved} onSave={save}>
+      <EventFormFields
+        compact
+        draft={draft}
+        onChange={setDraft}
+        people={people}
+        myMemberId={myMemberId}
+        colorOf={colorOf}
+        fieldError={form.fieldError}
+        titleRef={titleRef}
+      />
+    </SheetForm>
   );
 }

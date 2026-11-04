@@ -2,7 +2,7 @@
 
 import { Stack } from "@chakra-ui/react";
 import { useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { ExpenseForm } from "@/components/expenses/expense-form";
 import { NewEventForm } from "@/components/family-calendar/event-form";
@@ -105,9 +105,7 @@ function QuickAddSheet({
             fullWidth
           />
         ) : null}
-        <Stack key={state.kind} gap="0">
-          {forms[state.kind]}
-        </Stack>
+        <Fragment key={state.kind}>{forms[state.kind]}</Fragment>
       </Stack>
     </AppDialog>
   );

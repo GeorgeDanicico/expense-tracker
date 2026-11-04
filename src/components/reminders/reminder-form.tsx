@@ -11,8 +11,7 @@ import { ChipMenu } from "@/components/ui/chip-menu";
 import { Disclosure } from "@/components/ui/disclosure";
 import { FormField, FormRow } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { SaveBar, useSheetSave } from "@/components/ui/save-button";
+import { SheetForm, useSheetSave } from "@/components/ui/save-button";
 import { useAccount } from "@/hooks/use-account";
 import { REMINDERS_API_KEY, REMINDERS_SUMMARY_API_KEY, type RemindersResponse } from "@/lib/api/keys";
 import { addDays, APPLICATION_TIMEZONE, formatShortDate, getBucharestToday } from "@/lib/calendar";
@@ -491,20 +490,8 @@ export function NewReminderForm({ onSaved }: { onSaved: (reminder: ListedReminde
   }
 
   return (
-    <form
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        save(false);
-      }}
-    >
-      <Stack gap="3">
-        <ReminderFormFields compact draft={draft} onChange={setDraft} fieldError={form.fieldError} currency={currency} showExpense={showExpense} />
-        {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
-        <SaveBar saved={saved} pendingAction={form.pendingAction} onAnother={() => save(true)}>
-          Save reminder
-        </SaveBar>
-      </Stack>
-    </form>
+    <SheetForm label="Save reminder" form={form} saved={saved} onSave={save}>
+      <ReminderFormFields compact draft={draft} onChange={setDraft} fieldError={form.fieldError} currency={currency} showExpense={showExpense} />
+    </SheetForm>
   );
 }

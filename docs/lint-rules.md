@@ -304,6 +304,8 @@ becomes a rule above.
 - **Dates go through the formatters,** and "today" and "this month" come from the application calendar (`getBucharestToday`, `getBucharestMonth`), never from the browser's zone.
 - **A date field for a new entry defaults to today** (`getBucharestToday`, or `defaultDateInMonth` inside a month view), not the end of the range or the last record's date, so a quick save never future-dates or overwrites. A "later" snooze or deadline is counted from the later of now and the thing's own due time.
 - **A form is one component,** shared by the full page and the quick-add sheet, not two copies.
+- **A form in a sheet is a `SheetForm` with `useSheetSave`** (fields, error, the big save button and
+  "Save and add another"), and a choice with a stated default is a `ChipMenu`, not a select (U6).
 - **Copy says what happened or what to do,** in plain words: "Couldn't save. Try again.", not "Error 500".
 - **A destructive action** on one row is undone, not confirmed; deleting a family, an account or a kid keeps a typed confirmation.
 - **No new dependency for something the platform or Chakra already does,** such as gestures, animation or dialogs.
