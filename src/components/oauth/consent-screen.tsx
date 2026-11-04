@@ -14,15 +14,10 @@ import {
   type Decision,
   type RefusedDetails,
 } from "@/components/oauth/consent-views";
-import { apiFormError } from "@/hooks/use-api-form";
-import { ApiError, apiRequest } from "@/lib/api/client";
-import {
-  oauthApproveApiUrl,
-  oauthAuthorizationApiKey,
-  oauthDenyApiUrl,
-  type OAuthAuthorizationResponse,
-  type OAuthDecisionResponse,
-} from "@/lib/api/keys";
+import { answerAuthorization } from "@/components/oauth/oauth-api";
+import { useApiForm } from "@/hooks/use-api-form";
+import { ApiError } from "@/lib/api/client";
+import { oauthAuthorizationApiKey, type OAuthAuthorizationResponse } from "@/lib/api/keys";
 import { isAuthorizationId } from "@/lib/validation/oauth";
 
 export type ConsentScreenState =
@@ -66,13 +61,6 @@ export function consentScreenState({
   return { view: "consent", details: data };
 }
 
-/** Answers the request through our API; resolves to the URL that sends the browser back to the app. */
-export async function answerAuthorization(authorizationId: string, decision: Decision) {
-  const url = decision === "approve" ? oauthApproveApiUrl(authorizationId) : oauthDenyApiUrl(authorizationId);
-  const { redirectUrl } = await apiRequest<OAuthDecisionResponse>(url, { method: "POST" });
-  return redirectUrl;
-}
-
 function shouldRetry(error: unknown) {
   return !(error instanceof ApiError && error.status < 500);
 }
@@ -90,8 +78,10 @@ export function OAuthConsentScreen({ authorizationId }: { authorizationId: strin
     valid ? oauthAuthorizationApiKey(authorizationId) : null,
     { revalidateIfStale: false, revalidateOnReconnect: false, shouldRetryOnError: shouldRetry },
   );
-  const [pending, setPending] = useState<Decision | null>(null);
-  const [decisionError, setDecisionError] = useState("");
+  const decisionForm = useApiForm();
+  // Stays set once the browser is leaving, so neither button can be pressed again.
+  const [leaving, setLeaving] = useState<Decision | null>(null);
+  const pending = (decisionForm.pendingAction as Decision | null) ?? leaving;
   const state = consentScreenState({ authorizationId, data, error });
 
   const redirectUrl = state.view === "approved" ? state.redirectUrl : null;
@@ -102,21 +92,23 @@ export function OAuthConsentScreen({ authorizationId }: { authorizationId: strin
     if (redirectUrl) window.location.assign(redirectUrl);
   }, [redirectUrl]);
 
-  async function decide(decision: Decision) {
+  function decide(decision: Decision) {
     if (pending || !authorizationId) return;
-    setPending(decision);
-    setDecisionError("");
-    try {
-      // Stays pending while the browser leaves, so neither button can be pressed again.
-      window.location.assign(await answerAuthorization(authorizationId, decision));
-    } catch (caught) {
-      setPending(null);
-      if (caught instanceof ApiError && caught.status === 401) {
-        router.replace(consentLoginPath(authorizationId));
-        return;
-      }
-      setDecisionError(apiFormError(caught, "Unable to answer the request. Please try again.").error);
-    }
+    void decisionForm.submit(
+      async () => {
+        try {
+          window.location.assign(await answerAuthorization(authorizationId, decision));
+          setLeaving(decision);
+        } catch (caught) {
+          if (caught instanceof ApiError && caught.status === 401) {
+            router.replace(consentLoginPath(authorizationId));
+            return;
+          }
+          throw caught;
+        }
+      },
+      { fallback: "Unable to answer the request. Please try again.", action: decision },
+    );
   }
 
   switch (state.view) {
@@ -134,7 +126,7 @@ export function OAuthConsentScreen({ authorizationId }: { authorizationId: strin
         <ConsentRefusedCard
           details={state.details}
           pending={pending}
-          error={decisionError}
+          error={decisionForm.error}
           onBack={() => void decide("deny")}
         />
       );
@@ -143,7 +135,7 @@ export function OAuthConsentScreen({ authorizationId }: { authorizationId: strin
         <ConsentRequestCard
           details={state.details}
           pending={pending}
-          error={decisionError}
+          error={decisionForm.error}
           onDecide={(decision) => void decide(decision)}
         />
       );

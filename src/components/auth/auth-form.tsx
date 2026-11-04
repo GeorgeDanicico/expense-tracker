@@ -5,13 +5,13 @@ import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSWRConfig } from "swr";
 
+import { submitAuth } from "@/components/auth/auth-api";
 import { Brand } from "@/components/layout/brand";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
 import { afterSignIn } from "@/lib/api/invalidate";
 
 type AuthMode = "login" | "signup";
@@ -29,18 +29,7 @@ function AuthModeForm({ mode, next }: { mode: AuthMode; next: string }) {
     const formData = new FormData(event.currentTarget);
 
     void form.submit(async () => {
-      const result = await apiRequest<{
-        authenticated: boolean;
-        message?: string;
-      }>("/api/auth", {
-        method: "POST",
-        body: JSON.stringify({
-          mode,
-          email: formData.get("email"),
-          password: formData.get("password"),
-          next,
-        }),
-      });
+      const result = await submitAuth({ mode, email: formData.get("email"), password: formData.get("password"), next });
 
       if (result.authenticated) {
         await afterSignIn(mutate);

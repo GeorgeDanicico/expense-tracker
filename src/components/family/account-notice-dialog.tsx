@@ -1,15 +1,14 @@
 "use client";
 
 import { Button, Text } from "@chakra-ui/react";
-import useSWR, { useSWRConfig } from "swr";
+import useSWR from "swr";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
 import type { AccountNotice } from "@/lib/account/notice-repository";
-import { apiRequest } from "@/lib/api/client";
-import { afterNoticeDismissed } from "@/lib/api/invalidate";
-import { ACCOUNT_NOTICES_API_KEY, dismissNoticeApiUrl, type NoticesResponse } from "@/lib/api/keys";
+import { ACCOUNT_NOTICES_API_KEY, type NoticesResponse } from "@/lib/api/keys";
 
 /** What a notice says. The family's own data is gone from the user's view, their personal data is not. */
 export function noticeMessage(notice: Pick<AccountNotice, "kind" | "familyName">): string {
@@ -62,7 +61,7 @@ export function NoticeDialog({
  * while the family feature is on: the notices route answers 404 otherwise.
  */
 export function AccountNoticeDialog() {
-  const { mutate } = useSWRConfig();
+  const writes = useFamilyWrites();
   const { data } = useSWR<NoticesResponse>(ACCOUNT_NOTICES_API_KEY);
   const form = useApiForm();
   const notice = data?.notices[0];
@@ -78,8 +77,7 @@ export function AccountNoticeDialog() {
       onDismiss={() =>
         void form.submit(
           async () => {
-            await apiRequest(dismissNoticeApiUrl(notice.id), { method: "POST" });
-            await afterNoticeDismissed(mutate, notice.id);
+            await writes.dismissNotice(notice.id);
           },
           { fallback: "Unable to dismiss the notice. Please try again." },
         )

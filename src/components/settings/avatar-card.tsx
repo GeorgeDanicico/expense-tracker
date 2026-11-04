@@ -3,49 +3,15 @@
 import { Button, Flex, Stack } from "@chakra-ui/react";
 import { ImageUp, Trash2 } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
-import { useSWRConfig } from "swr";
 
+import { AVATAR_TYPES } from "@/components/settings/settings-api";
+import { useSettingsWrites } from "@/components/settings/use-settings-writes";
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { invalidateAfterAvatarChange } from "@/lib/api/invalidate";
-import { ACCOUNT_AVATAR_API_URL } from "@/lib/api/keys";
-
-/** The types the server accepts; it checks the file's bytes again. */
-export const AVATAR_TYPES = ["image/jpeg", "image/png"] as const;
-/** The server's upload limit (5 MB). */
-export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
-
-/** Why the browser refuses `file` before sending it, or `null` when it may be sent. */
-export function validateAvatarFile(file: Pick<File, "type" | "size">): string | null {
-  if (!(AVATAR_TYPES as readonly string[]).includes(file.type)) return "Choose a JPG or PNG image.";
-  if (file.size > AVATAR_MAX_BYTES) return "Choose an image under 5 MB.";
-  return null;
-}
-
-/**
- * Uploads `file` as the signed-in user's picture: the raw bytes, with the file's own type as the
- * `Content-Type` (`apiRequest` lets `init.headers` override its JSON default). A file the browser
- * refuses throws its message without a request.
- */
-export async function uploadAvatar(file: File) {
-  const refused = validateAvatarFile(file);
-  if (refused) throw new Error(refused);
-  return apiRequest<{ avatarUrl: string }>(ACCOUNT_AVATAR_API_URL, {
-    method: "PUT",
-    body: file,
-    headers: { "Content-Type": file.type },
-  });
-}
-
-/** Removes the signed-in user's picture. */
-export function removeAvatar() {
-  return apiRequest<void>(ACCOUNT_AVATAR_API_URL, { method: "DELETE" });
-}
 
 /** The fallback name: the sign-in name's part before any `@` (`AccountData` has no display name yet). */
 export function avatarName(signInName: string) {
@@ -54,7 +20,7 @@ export function avatarName(signInName: string) {
 
 /** Settings → Profile picture. Only ever changes the signed-in user's own picture. */
 export function AvatarCard({ signInName, avatarUrl }: { signInName: string; avatarUrl: string | null }) {
-  const { mutate } = useSWRConfig();
+  const writes = useSettingsWrites();
   const form = useApiForm();
   const input = useRef<HTMLInputElement>(null);
   const [removing, setRemoving] = useState(false);
@@ -66,15 +32,13 @@ export function AvatarCard({ signInName, avatarUrl }: { signInName: string; avat
     event.target.value = "";
     if (!file || form.pending) return;
     void form.submit(async () => {
-      await uploadAvatar(file);
-      await invalidateAfterAvatarChange(mutate);
+      await writes.uploadAvatar(file);
     }, { fallback: "Unable to upload your picture. Please try again.", action: "upload" });
   }
 
   function remove() {
     void form.submit(async () => {
-      await removeAvatar();
-      await invalidateAfterAvatarChange(mutate);
+      await writes.removeAvatar();
       setRemoving(false);
     }, { fallback: "Unable to remove your picture. Please try again.", action: "remove" });
   }

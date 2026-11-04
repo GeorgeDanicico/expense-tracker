@@ -2,15 +2,12 @@
 
 import { Button, chakra, Flex, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { useSWRConfig } from "swr";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterFamilyChanged } from "@/lib/api/invalidate";
-import { familyMemberColorApiUrl, type FamilyResponse } from "@/lib/api/keys";
 import { MEMBER_COLOR_COUNT, MEMBER_COLOR_NAMES } from "@/lib/family/member-colors";
 import type { FamilyMemberView } from "@/lib/family/views";
 
@@ -31,7 +28,7 @@ export function EditColorDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { mutate } = useSWRConfig();
+  const writes = useFamilyWrites();
   const form = useApiForm();
   const [color, setColor] = useState<number | null>(member.color);
   const name = member.displayName ?? member.username ?? "this member";
@@ -42,11 +39,7 @@ export function EditColorDialog({
 
   function save() {
     void form.submit(async () => {
-      const updated = await apiRequest<FamilyResponse>(familyMemberColorApiUrl(member.memberId), {
-        method: "PATCH",
-        body: JSON.stringify({ color }),
-      });
-      await afterFamilyChanged(mutate, updated);
+      await writes.setColor(member.memberId, color);
       onOpenChange(false);
     }, { fallback: "Unable to save the colour. Please try again." });
   }

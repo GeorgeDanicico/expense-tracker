@@ -10,11 +10,11 @@ import { oauthAuthorizationApiKey, type OAuthAuthorizationResponse } from "@/lib
 import { BRAND } from "@/lib/brand";
 
 import {
-  answerAuthorization,
   consentLoginPath,
   consentScreenState,
   OAuthConsentScreen,
 } from "./consent-screen";
+import { answerAuthorization } from "./oauth-api";
 import {
   CONSENT_CAPABILITIES,
   ConsentExpired,
