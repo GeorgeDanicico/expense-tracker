@@ -1,7 +1,7 @@
 # Phase 17 update, 4 November 2026 (cloud session)
 
 Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-session-rk7uoj`.
-**PR #213 (U3, U4 and U5), PR #214 (U6), PR #215 (U7), PR #216 (U8 and U9), PR #217 (U10) and PR #218 (U11) merged on 4 November.** U12 and U13 are done on the same branch; U12 awaits George's sign-off.
+**PR #213 (U3, U4 and U5), PR #214 (U6), PR #215 (U7), PR #216 (U8 and U9), PR #217 (U10) and PR #218 (U11) merged on 4 November.** U12 and U13 are done and signed off on the same branch, with a fix that highlights the whole bottom-bar tab; they go out in one PR.
 
 ## Where the tasks stand
 
@@ -18,8 +18,8 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U9 Investments and Net worth** | **Done. George signed it off on 4 November; merged in #216.** |
 | **U10 Planning** | **Done. George signed it off on 4 November; merged in #217.** |
 | **U11 Settings and the family pages** | **Done. George signed it off on 4 November; merged in #218.** |
-| **U12 Swipe actions** | **Done, pushed, waiting for George's sign-off (to be tried on a real phone).** |
-| **U13 Accessibility pass** | **Done, pushed on top of U12 (small grey labels are a shade darker; no screenshots).** |
+| **U12 Swipe actions** | **Done. George tried it locally and signed it off on 4 November.** |
+| **U13 Accessibility pass** | **Done. George signed it off on 4 November (small grey labels are a shade darker).** |
 | U14 | Not started. |
 
 ## What U3 added
