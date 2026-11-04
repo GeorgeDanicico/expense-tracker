@@ -163,6 +163,11 @@ export function shiftMonth(month: string, amount: number) {
   return addMonths(getMonthRange(month).month, amount);
 }
 
+/** "October": a `YYYY-MM` month's name alone. */
+export function formatMonthName(month: string) {
+  return formatMonth(month).split(" ")[0];
+}
+
 export function formatMonth(month: string, locale = "en-US") {
   const { month: safeMonth } = getMonthRange(month);
   return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(

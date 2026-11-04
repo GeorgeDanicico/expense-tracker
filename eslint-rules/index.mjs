@@ -6,6 +6,7 @@ import clientOnlyChakraFactory from "./client-only-chakra-factory.mjs";
 import motionTokens from "./motion-tokens.mjs";
 import noFetchInComponents from "./no-fetch-in-components.mjs";
 import noIsoDateSlice from "./no-iso-date-slice.mjs";
+import noLocalDateParse from "./no-local-date-parse.mjs";
 import noLocaleDateWithoutZone from "./no-locale-date-without-zone.mjs";
 import noRawDialog from "./no-raw-dialog.mjs";
 import noReducedMotionQuery from "./no-reduced-motion-query.mjs";
@@ -24,6 +25,7 @@ const plugin = {
     "motion-tokens": motionTokens,
     "no-fetch-in-components": noFetchInComponents,
     "no-iso-date-slice": noIsoDateSlice,
+    "no-local-date-parse": noLocalDateParse,
     "no-locale-date-without-zone": noLocaleDateWithoutZone,
     "no-raw-dialog": noRawDialog,
     "no-reduced-motion-query": noReducedMotionQuery,

@@ -2,6 +2,7 @@ import type { ScopedMutator } from "swr";
 
 import { EXPENSE_TABS_API_KEY, IMPORTS_API_KEY, type TabsResponse } from "@/lib/api/keys";
 import type { ExpenseTab, ExpenseTabLedgerData } from "@/lib/expenses/tabs";
+import { summarizeExpenses } from "@/lib/expenses/summary";
 import type { DashboardData, Expense, ExpensesData } from "@/lib/expenses/types";
 
 // The SWR cache of everything that shows expenses, and how a write changes it (audit D6). Only the
@@ -34,7 +35,6 @@ const isOwnTabLedgerKey = (key: string) => isTabLedgerKey(key) && !new URLSearch
 export type ExpenseChange = { removed?: Expense; added?: Expense };
 
 const monthOf = (expense: Expense | undefined) => expense?.expenseDate.slice(0, 7);
-const sum = (expenses: readonly Expense[]) => expenses.reduce((total, expense) => total + expense.amount, 0);
 
 /** Newest first by date, as the lists sort; a new expense goes before others of its day. */
 function byDate(expenses: Expense[]) {
@@ -52,16 +52,14 @@ function changedList(expenses: Expense[], { removed, added }: ExpenseChange, mon
 function ledgerWith(ledger: ExpensesData, change: ExpenseChange): ExpensesData | null {
   const expenses = changedList(ledger.expenses, change, ledger.month);
   if (!expenses) return null;
-  const total = sum(expenses);
-  return { ...ledger, expenses, total, average: expenses.length ? total / expenses.length : 0 };
+  const { total, average } = summarizeExpenses(expenses);
+  return { ...ledger, expenses, total, average };
 }
 
 /** A tab ledger only loses rows by hand: which tab a new or changed expense belongs to is the server's to say. */
 function tabLedgerWith(ledger: ExpenseTabLedgerData, { removed }: ExpenseChange): ExpenseTabLedgerData | null {
   const expenses = changedList(ledger.expenses, { removed });
-  if (!expenses) return null;
-  const total = sum(expenses);
-  return { ...ledger, expenses, total, count: expenses.length, average: expenses.length ? total / expenses.length : 0 };
+  return expenses && { ...ledger, expenses, ...summarizeExpenses(expenses) };
 }
 
 /** Home's month: the totals move by what left and came into the current month; the five newest are kept to five. */
@@ -100,12 +98,12 @@ export function applyExpenseChange(key: string, current: unknown, change: Expens
 const startsWith = (prefix: string) => (key: unknown) => typeof key === "string" && key.startsWith(prefix);
 
 /**
- * Refetches what a write changes but the cache can't work out: every view that isn't the caller's
- * own month ledger (members', the family's: audit B4), the saved-tab ledgers, the dashboards
- * (analytics) and the description suggestions.
+ * Refetches what a write changes but the cache can't work out: every month ledger that isn't the
+ * caller's own (members', the family's: audit B4), the saved-tab ledgers, the dashboards (analytics)
+ * and the description suggestions. `ownLedgers` refetches the caller's own month ledgers too.
  */
-export function refreshExpenseViews(mutate: ScopedMutator) {
-  void mutate((key) => typeof key === "string" && key.startsWith("/api/expenses?") && ownLedgerMonth(key) === null);
+export function refreshExpenseViews(mutate: ScopedMutator, { ownLedgers = false } = {}) {
+  void mutate((key) => typeof key === "string" && key.startsWith("/api/expenses?") && (ownLedgers || ownLedgerMonth(key) === null));
   void mutate((key) => typeof key === "string" && isTabLedgerKey(key));
   void mutate(startsWith("/api/dashboard?"));
   void mutate(startsWith("/api/expenses/suggestions?"));
@@ -113,8 +111,7 @@ export function refreshExpenseViews(mutate: ScopedMutator) {
 
 /** Refetches every cached ledger and derived view, after expenses added somewhere else (a reminder, an import). */
 export function afterExpenseLogged(mutate: ScopedMutator) {
-  void mutate(startsWith("/api/expenses?"));
-  refreshExpenseViews(mutate);
+  refreshExpenseViews(mutate, { ownLedgers: true });
 }
 
 /** After an import is confirmed or undone, which adds or removes many expenses at once: also the recent imports. */

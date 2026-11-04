@@ -16,7 +16,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { transition } from "@/components/ui/theme/motion";
 import { useAccount } from "@/hooks/use-account";
 import { dashboardApiKey } from "@/lib/api/keys";
-import { formatMonth, getBucharestMonth } from "@/lib/calendar";
+import { formatMonthName, getBucharestMonth } from "@/lib/calendar";
 import { expenseClassificationLabel } from "@/lib/expenses/categories";
 import type { DashboardData } from "@/lib/expenses/types";
 import { monthSoFar, relativeDay } from "@/lib/home/today";
@@ -32,10 +32,6 @@ function useHomeDashboard() {
   return useSWR<DashboardData>(dashboardApiKey({ period: "3m", granularity: "month", customDate: month }, null));
 }
 
-function monthName(month: string) {
-  return formatMonth(month).split(" ")[0];
-}
-
 /** This month's total against last month's, with a meter of how much of last month's it is. */
 export function MonthCard() {
   const { currency } = useAccount();
@@ -48,10 +44,10 @@ export function MonthCard() {
     );
   }
   const { previousMonth, previousTotal, share, over } = monthSoFar(data);
-  const previous = monthName(previousMonth);
+  const previous = formatMonthName(previousMonth);
   return (
     <Card size="sm">
-      <Card.Header title={`Spent in ${monthName(data.currentMonth)}`} actions={<SectionLink href={INSIGHTS_PATH}>Insights</SectionLink>} />
+      <Card.Header title={`Spent in ${formatMonthName(data.currentMonth)}`} actions={<SectionLink href={INSIGHTS_PATH}>Insights</SectionLink>} />
       <Card.Body>
         <Stack gap="2">
           <Flex align="baseline" gap="2.5" wrap="wrap">

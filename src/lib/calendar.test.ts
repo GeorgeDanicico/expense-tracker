@@ -7,6 +7,7 @@ import {
   APPLICATION_TIMEZONE,
   dateInMonth,
   daysInMonth,
+  formatDate,
   formatInstantDate,
   formatMonth,
   formatMonthLabel,
@@ -170,5 +171,22 @@ describe("date formatters", () => {
   it("formats the day of a timestamp in the chosen locale", () => {
     expect(formatInstantDate("2026-10-12T12:00:00Z")).toBe("12 Oct 2026");
     expect(formatInstantDate("2026-10-12T12:00:00Z", "en-US")).toBe("Oct 12, 2026");
+  });
+});
+
+// Audit D9: a calendar date reads the same day wherever the device is.
+describe("calendar dates in any time zone", () => {
+  const zone = process.env.TZ;
+  afterEach(() => {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  });
+
+  it.each(["Pacific/Kiritimati", "Pacific/Auckland", "Europe/Bucharest", "America/Los_Angeles", "Pacific/Pago_Pago"])("formats the same day and month in %s", (tz) => {
+    process.env.TZ = tz;
+    expect(formatDate("2026-10-31")).toBe("Oct 31, 2026");
+    expect(formatDate("2026-01-01")).toBe("Jan 01, 2026");
+    expect(formatMonthLabel("2026-11")).toBe("Nov");
+    expect(formatMonthLabel("2026-01", true)).toBe("Jan 26");
   });
 });

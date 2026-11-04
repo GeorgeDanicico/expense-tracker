@@ -7,7 +7,7 @@ import useSWR from "swr";
 import { CategoryBreakdown } from "@/components/dashboard/category-breakdown";
 import { CurrencyAmounts } from "@/components/expenses/currency-totals";
 import { ExpenseFilters } from "@/components/expenses/expense-filters";
-import { ExpenseList, filterExpenses, NO_FILTER } from "@/components/expenses/expense-list";
+import { ExpenseList } from "@/components/expenses/expense-list";
 import type { ExpenseRowActions } from "@/components/expenses/expense-rows";
 import { MemberName } from "@/components/family/member-swatch";
 import { Amount } from "@/components/ui/amount";
@@ -19,7 +19,9 @@ import { mainExpensesApiKey } from "@/lib/api/keys";
 import { formatMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
 import { monthAnalytics } from "@/lib/expenses/analytics";
 import { groupByCurrency } from "@/lib/expenses/family";
+import { filterExpenses, NO_LEDGER_FILTER } from "@/lib/expenses/filters";
 import { monthChange } from "@/lib/expenses/month-change";
+import { summarizeExpenses } from "@/lib/expenses/summary";
 import type { ExpensesData, FamilyExpensesData, ListedExpense } from "@/lib/expenses/types";
 
 type Ledger = ExpensesData | FamilyExpensesData;
@@ -69,7 +71,7 @@ export function LedgerPanel({
   controls: ReactNode;
 }) {
   const viewing = useViewing();
-  const [filter, setFilter] = useState(NO_FILTER);
+  const [filter, setFilter] = useState(NO_LEDGER_FILTER);
   const { data, error, isValidating, mutate } = useSWR<Ledger>(mainExpensesApiKey(month, viewing.member), { keepPreviousData: false });
   // The month before, for the comparison; it also has ‹ ready. The family view mixes currencies, so it has none.
   const previousMonth = shiftMonth(month, -1);
@@ -85,16 +87,18 @@ export function LedgerPanel({
     );
   }
 
-  const expenses: ListedExpense[] = ledger.expenses;
-  const visible = actions ? expenses.filter((expense) => !actions.hidden.has(expense.id)) : expenses;
+  // Filtered once: the rows (deleted ones still there, to collapse), and what the totals count.
   const filtering = filtersOpen && (filter.query.trim() !== "" || filter.category !== "all");
-  const shown = filtering ? filterExpenses(visible, filter) : visible;
+  const matching: ListedExpense[] = filtering ? filterExpenses(ledger.expenses, filter) : ledger.expenses;
+  const isShown = (expense: ListedExpense) => !actions?.hidden.has(expense.id);
+  const shown = matching.filter(isShown);
+  const visibleCount = ledger.expenses.filter(isShown).length;
   const totals = isFamilyLedger(ledger)
     ? groupByCurrency(shown.map((expense) => ({ currency: expense.currency ?? currency, total: expense.amount, count: 1, largest: expense.amount })))
     : null;
-  const total = shown.reduce((sum, expense) => sum + expense.amount, 0);
+  const { total } = summarizeExpenses(shown);
   const change = !totals && !filtering && previous?.month === previousMonth
-    ? monthChange(month, visible, previous.expenses, getBucharestToday())
+    ? monthChange(month, shown, previous.expenses, getBucharestToday())
     : null;
 
   return (
@@ -108,7 +112,7 @@ export function LedgerPanel({
             category={filter.category}
             onCategoryChange={(category) => setFilter({ ...filter, category })}
             shown={shown.length}
-            total={visible.length}
+            total={visibleCount}
           />
         ) : null}
         <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
@@ -122,10 +126,10 @@ export function LedgerPanel({
         <Card>
           <Card.Body>
             <ExpenseList
-              expenses={ledger.expenses}
+              expenses={matching}
               currency={currency}
               actions={actions}
-              filter={filtersOpen ? filter : NO_FILTER}
+              filtered={filtering}
               emptyHint={actions ? `Nothing in ${formatMonth(month)} yet. Tap + to add an expense.` : null}
             />
           </Card.Body>

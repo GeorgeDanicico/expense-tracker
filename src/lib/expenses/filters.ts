@@ -5,6 +5,7 @@ import {
   EXPENSE_CATEGORIES,
   EXPENSE_SUBTYPES,
   SUBTYPE_LABELS,
+  type ExpenseCategory,
 } from "@/lib/expenses/categories";
 import type { Expense } from "@/lib/expenses/types";
 import { addDays, toIsoDate } from "@/lib/calendar";
@@ -44,6 +45,17 @@ export function matchesExpenseSearch(expense: Expense, term: string) {
   return [expense.description, expense.notes ?? "", CATEGORY_LABELS[expense.category],
     expense.subtype ? SUBTYPE_LABELS[expense.subtype] : "No subtype"]
     .some((value) => value.toLowerCase().includes(term));
+}
+
+/** The month ledger's search and category filter (behind the Expenses screen's Filters chip). */
+export type LedgerFilter = { query: string; category: ExpenseCategory | "all" };
+
+export const NO_LEDGER_FILTER: LedgerFilter = { query: "", category: "all" };
+
+/** The expenses `filter` keeps: the search in the description, notes, category or subtype, and the category. */
+export function filterExpenses<T extends Expense>(expenses: readonly T[], { query, category }: LedgerFilter) {
+  const term = query.trim().toLocaleLowerCase();
+  return expenses.filter((expense) => (category === "all" || expense.category === category) && (!term || matchesExpenseSearch(expense, term)));
 }
 
 type SearchParams = { get(name: string): string | null };

@@ -17,6 +17,7 @@ Run them with `npm run lint`.
 | [`theme-control-size`](#theme-control-size) | error | none (moved unchanged) | U1 |
 | [`postgrest-filter-string`](#postgrest-filter-string) | error | none (moved unchanged) | U1 |
 | [`no-iso-date-slice`](#no-iso-date-slice) | error | 2 fixed | U1 |
+| [`no-local-date-parse`](#no-local-date-parse) | error | 2 fixed (`formatDate`, `formatMonthLabel`) | U8 |
 | [`no-locale-date-without-zone`](#no-locale-date-without-zone) | error | 7 fixed, 8 formatter modules exempt | U1 |
 | [`no-redundant-swr-fetcher`](#no-redundant-swr-fetcher) | error | 5 fixed | U1 |
 | [`no-fetch-in-components`](#no-fetch-in-components) | error, on for expenses (U8) | 20 component files in other modules still call `apiRequest` or `fetch` (U9–U11) | U1 |
@@ -131,6 +132,24 @@ application's today, and the expense form's latest date is `lastDayOfMonth` of t
 `datetime-local` input from the browser's own zone (`order-fields.tsx`, deliberately local).
 
 **Disable:** `// eslint-disable-next-line local/no-iso-date-slice -- <why UTC is meant>`.
+
+### `no-local-date-parse`
+
+**Catches:** `new Date(…)` and `Date.parse(…)` of a string or template literal that ends in a time
+with no `Z` or offset: `` new Date(`${date}T12:00:00`) ``, `new Date("2026-10-01T09:30")`.
+
+**Why:** JavaScript reads such a date and time in the device's zone, so the same calendar date is a
+different instant on every device, and formatting it elsewhere (or in another zone) can show another
+day (audit D9, B5). For a calendar date use noon UTC and format in UTC (`formatDate`,
+`formatShortDate`); for "today" and months, the helpers in `src/lib/calendar.ts`. A date-only string
+(`"2026-10-01"`) is read as UTC and isn't caught.
+
+**Added by:** U8, from its `/simplify` pass. **Existing cases:** 2, fixed: `formatDate` and
+`formatMonthLabel` in `src/lib/calendar.ts` now parse at noon UTC and format in UTC.
+
+**Not caught:** a string built in a variable first.
+
+**Disable:** `// eslint-disable-next-line local/no-local-date-parse -- <why the device's zone is meant>`.
 
 ### `no-locale-date-without-zone`
 

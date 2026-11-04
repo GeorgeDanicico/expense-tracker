@@ -41,6 +41,7 @@ const localRules = {
     // Injection guard (security plan S8): string-built PostgREST filters.
     "local/postgrest-filter-string": "error",
     "local/no-iso-date-slice": "error",
+    "local/no-local-date-parse": "error",
     "local/no-redundant-swr-fetcher": "error",
     "local/no-window-confirm": "error",
     "local/no-zod-flatten": "error",
