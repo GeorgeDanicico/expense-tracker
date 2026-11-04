@@ -1,6 +1,6 @@
 import { defineRecipe } from "@chakra-ui/react";
 
-import { PRESS_SCALE, pressFeedback } from "../motion";
+import { PRESS_SCALE, pressFeedback, transition } from "../motion";
 
 export const headingRecipe = defineRecipe({
   base: { fontWeight: "semibold", letterSpacing: "normal" },
@@ -82,7 +82,7 @@ export const chipRecipe = defineRecipe({
  */
 export const revealRowActions = {
   "@media (hover: hover)": {
-    "& [data-row-actions]": { opacity: 0, transition: "opacity {durations.fast} {easings.standard}" },
+    "& [data-row-actions]": { opacity: 0, transition: transition("opacity", "fast") },
     "&:hover [data-row-actions], &:focus-within [data-row-actions]": { opacity: 1 },
   },
 } as const;

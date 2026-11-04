@@ -9,6 +9,7 @@ import { NavBadge, remindersBadgeLabel } from "@/components/layout/nav-badge";
 import { isActivePath, type NavItemConfig, type NavSection } from "@/components/layout/nav-items";
 import { useReminderBadge } from "@/components/reminders/use-reminder-badge";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { transition } from "@/components/ui/theme/motion";
 
 /**
  * Sidebar / More sheet navigation row. `compact` rows are 32px (sidebar);
@@ -43,7 +44,7 @@ export function NavItem({
       color={active ? "fg" : "fg.muted"}
       bg={active ? "bg.selected" : "transparent"}
       textDecoration="none"
-      transition="background-color {durations.fast} {easings.standard}, color {durations.fast} {easings.standard}"
+      transition={transition("background-color, color", "fast")}
       _hover={{ bg: active ? "bg.selected" : "bg.muted", color: "fg", textDecoration: "none" }}
       _before={
         active

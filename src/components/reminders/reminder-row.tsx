@@ -9,6 +9,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { formatDay, formatDueAt, formatInstant, overdueText, repeatLabel, snoozedText } from "@/lib/reminders/format";
 import type { DoneEntry, ListedReminder } from "@/lib/reminders/list";
+import { transition } from "@/components/ui/theme/motion";
 
 /** Where "Expense logged" leads: the expenses page on the occurrence's month. */
 export function loggedExpenseHref(occurrenceOn: string) {
@@ -103,7 +104,7 @@ function RowFrame({
       borderColor="border"
       bg={focused ? "brand.muted" : highlight ? "brand.subtle" : undefined}
       boxShadow={focused ? "inset 0 0 0 2px {colors.brand.focusRing}" : undefined}
-      transition="background-color {durations.slow} {easings.standard}, box-shadow {durations.slow} {easings.standard}"
+      transition={transition("background-color, box-shadow", "slow")}
       scrollMarginBlock="6rem"
       _last={{ borderBottomWidth: "0" }}
     >

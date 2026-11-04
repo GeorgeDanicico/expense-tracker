@@ -139,19 +139,18 @@ export function AppDialog({
     if (open === undefined) setOpenOnItsOwn(next);
     onOpenChange?.(next);
   };
-  /** Returns whether the dialog closed (or was already asked to). */
-  const requestClose = (reason: CloseReason) => {
+  /** Asks first when it should; returns whether the close may go ahead. */
+  const allowClose = (reason: CloseReason) => {
     const decision = closeDecision({ reason, dirty: dirty ?? changed.current, pending });
-    if (decision === "close") setOpen(false);
     if (decision === "ask") setAsking(true);
     return decision === "close";
   };
+  const requestClose = (reason: CloseReason) => {
+    if (allowClose(reason)) setOpen(false);
+  };
   /** Tap outside and Escape: Chakra closes unless the event is stopped. */
   const guardDismiss = (event: { preventDefault: () => void }) => {
-    const decision = closeDecision({ reason: "dismiss", dirty: dirty ?? changed.current, pending });
-    if (decision === "close") return;
-    event.preventDefault();
-    if (decision === "ask") setAsking(true);
+    if (!allowClose("dismiss")) event.preventDefault();
   };
   const drag = useSheetDrag(ownContent, () => requestClose("dismiss"));
   const grab = { ...drag, touchAction: { base: "none", md: "auto" } } as const;

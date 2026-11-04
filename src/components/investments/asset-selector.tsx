@@ -7,6 +7,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { investmentAssetKey } from "@/lib/investments/identity";
 import type { InvestmentOverviewAsset } from "@/lib/investments/types";
+import { transition } from "@/components/ui/theme/motion";
 
 /** Selectable list of a broker's assets; the selected row opens its detail below. */
 export function AssetSelector({
@@ -51,7 +52,7 @@ export function AssetSelector({
                 textAlign="start"
                 cursor="pointer"
                 bg={selected ? "bg.selected" : "bg.surface"}
-                transition="background-color {durations.fast} {easings.standard}"
+                transition={transition("background-color", "fast")}
                 _hover={{ bg: selected ? "bg.selected" : "bg.subtle" }}
                 _focusVisible={{ outline: "2px solid", outlineColor: "fg.accent", outlineOffset: "-2px" }}
                 _before={selected ? {

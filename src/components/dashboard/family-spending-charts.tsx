@@ -8,6 +8,7 @@ import { formatMonth, formatMonthLabel } from "@/lib/calendar";
 import { categoryBars, trendColumns, type Segment } from "@/lib/expenses/family-charts";
 import type { FamilyDashboardMember } from "@/lib/expenses/types";
 import { formatCurrency } from "@/lib/utils/currency";
+import { transition } from "@/components/ui/theme/motion";
 
 // Plain-CSS charts for the family dashboard. Every segment is a button: it shows a tooltip on hover and
 // on keyboard focus, and selecting it picks that member for the whole dashboard. Segments are told
@@ -63,7 +64,7 @@ function SegmentButton({
       borderRadius="sm"
       cursor="pointer"
       opacity={dimmed ? 0.3 : 1}
-      transition="opacity {durations.fast} {easings.standard}"
+      transition={transition("opacity", "fast")}
       aria-pressed={isSelected}
       aria-label={`${segment.name}, ${context}, ${amount}`}
       onClick={() => onSelect(isSelected ? null : segment.memberId)}

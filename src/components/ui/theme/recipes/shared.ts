@@ -1,5 +1,7 @@
-/** Below Chakra's `md` breakpoint (48rem, 768 px): a phone. The same width as `PHONE_QUERY` in `use-is-phone.ts`. */
-export const PHONE = "@media (max-width: 47.99rem)";
+import { PHONE_QUERY } from "@/hooks/use-is-phone";
+
+/** Below Chakra's `md` breakpoint (48rem, 768 px): a phone, as `useIsPhone()` sees it. */
+export const PHONE = `@media ${PHONE_QUERY}`;
 
 /** Inputs keep a 16px font below the `md` breakpoint so iOS does not zoom on focus. */
 export const mobileInputFont = {

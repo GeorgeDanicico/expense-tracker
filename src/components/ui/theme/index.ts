@@ -4,7 +4,7 @@ import { globalCss } from "./global-css";
 import { buttonRecipe } from "./recipes/button";
 import { inputRecipe, textareaRecipe } from "./recipes/input";
 import { keyframes } from "./motion";
-import { badgeRecipe, chipRecipe, headingRecipe, linkRecipe, rowRecipe } from "./recipes/misc";
+import { badgeRecipe, headingRecipe, linkRecipe } from "./recipes/misc";
 import {
   cardSlotRecipe,
   emptyStateSlotRecipe,
@@ -36,8 +36,6 @@ const config = defineConfig({
       heading: headingRecipe,
       badge: badgeRecipe,
       link: linkRecipe,
-      chip: chipRecipe,
-      row: rowRecipe,
     },
     slotRecipes: {
       nativeSelect: nativeSelectSlotRecipe,

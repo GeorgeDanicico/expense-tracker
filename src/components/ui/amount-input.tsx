@@ -1,7 +1,7 @@
 "use client";
 
 import { chakra, Flex, Input, InputGroup, Text } from "@chakra-ui/react";
-import { forwardRef, useState, type ChangeEvent } from "react";
+import { forwardRef, useMemo, useState, type ChangeEvent } from "react";
 
 /** Up to nine whole digits and two decimals: what an amount field accepts while it is typed. */
 const AMOUNT = /^\d{0,9}(\.\d{0,2})?$/;
@@ -53,7 +53,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
 ) {
   const [own, setOwn] = useState(defaultValue);
   const text = value ?? own;
-  const symbol = currencySymbol(currency);
+  const symbol = useMemo(() => currencySymbol(currency), [currency]);
   const field = {
     ...props,
     type: "text",

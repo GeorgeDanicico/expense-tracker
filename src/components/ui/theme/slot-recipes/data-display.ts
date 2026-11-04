@@ -1,5 +1,7 @@
 import { defineSlotRecipe } from "@chakra-ui/react";
 
+import { transition } from "../motion";
+
 export const tableSlotRecipe = defineSlotRecipe({
   slots: ["root", "header", "body", "row", "columnHeader", "cell", "footer", "caption"],
   base: {
@@ -7,7 +9,7 @@ export const tableSlotRecipe = defineSlotRecipe({
     row: {
       // Row actions stay quiet until the row is hovered or focused; always
       // visible on touch screens.
-      "& [data-row-action]": { opacity: 0.4, transition: "opacity {durations.fast} {easings.standard}" },
+      "& [data-row-action]": { opacity: 0.4, transition: transition("opacity", "fast") },
       "&:hover [data-row-action], &:focus-within [data-row-action]": { opacity: 1 },
       "@media (hover: none)": { "& [data-row-action]": { opacity: 1 } },
     },

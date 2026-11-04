@@ -117,6 +117,8 @@ export function RowActions({
       </Flex>
       <Box display={{ base: phoneMenu ? "block" : "none", md: "none" }}>
         <Menu.Root
+          lazyMount
+          unmountOnExit
           open={open}
           onOpenChange={onOpenChange ? (details) => onOpenChange(details.open) : undefined}
           positioning={{
