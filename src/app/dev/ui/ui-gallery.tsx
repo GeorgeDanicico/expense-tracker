@@ -50,6 +50,7 @@ import type { ConnectedAppView } from "@/lib/mcp/views";
 import { EXPENSE_CATEGORIES } from "@/lib/expenses/categories";
 import type { McpToken } from "@/lib/mcp/token-repository";
 
+import { MotionGallery } from "./gallery-motion";
 import { GalleryRow, GallerySection } from "./gallery-section";
 import { TokenSwatches, TypeScale } from "./gallery-tokens";
 
@@ -95,6 +96,8 @@ export function UiGallery() {
             </>
           }
         />
+
+        <MotionGallery />
 
         <GallerySection title="Buttons" description="xs 28px · sm 32px (default) · md 36px">
           {(["solid", "outline", "ghost", "subtle"] as const).map((variant) => (

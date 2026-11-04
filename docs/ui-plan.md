@@ -286,6 +286,8 @@ only, no API), `docs/ui-styling/screenshots/` (390 and 1280 px).
   plain stand-ins for the U4 ones. Phone first; desktop for each.
 - Each mockup lists its tap counts against the table's targets.
 
+**Direction, mockups and open questions:** [ui-direction.md](ui-direction.md).
+
 **Done when** George signs off the direction and the mockups (the checkpoint).
 
 ### U4: Theme refresh and mobile primitives
