@@ -2,12 +2,11 @@
 
 import { Badge, Box, Button, Stack, Tabs, Text } from "@chakra-ui/react";
 import { BellRing, CircleCheck, PartyPopper, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { LogExpenseDialog } from "@/components/reminders/log-expense-dialog";
 import { ReminderDialog } from "@/components/reminders/reminder-dialog";
-import { DoneRow, ReminderRow, type SnoozeChoice } from "@/components/reminders/reminder-row";
-import { SnoozeDialog } from "@/components/reminders/snooze-dialog";
+import { DoneRow, ReminderRow } from "@/components/reminders/reminder-row";
+import { useReminderActions } from "@/components/reminders/use-reminder-actions";
 import { useNow, useReminders } from "@/components/reminders/use-reminders";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading } from "@/components/ui/data-state";
@@ -17,7 +16,6 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { useAccount } from "@/hooks/use-account";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { prefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { doneEntries, groupReminders, tabOf, type ListedReminder, type ReminderTab } from "@/lib/reminders/list";
@@ -84,16 +82,13 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
   const now = useNow();
   const phone = useIsPhone();
   const reminders = useReminders(now);
+  const { busy, complete, snooze, dialogs } = useReminderActions(reminders, now);
   const [tab, setTab] = useState<ReminderTab>("upcoming");
   // The focus id already acted on, so a refetch or a tab change by hand doesn't jump back.
   const [handledFocus, setHandledFocus] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [snoozingId, setSnoozingId] = useState<string | null>(null);
-  const [loggingId, setLoggingId] = useState<string | null>(null);
-  const { currency } = useAccount();
-  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
 
   const groups = useMemo(() => groupReminders(reminders.reminders ?? []), [reminders.reminders]);
   const done = useMemo(
@@ -118,35 +113,8 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
     return () => clearTimeout(timer);
   }, [highlighted]);
 
-  const find = (id: string | null) => (id ? reminders.reminders?.find((reminder) => reminder.id === id) : undefined);
-  const editing = find(editingId);
-  const snoozing = find(snoozingId);
-  const logging = find(loggingId);
+  const editing = editingId ? reminders.reminders?.find((reminder) => reminder.id === editingId) : undefined;
 
-  /** Runs a mark done or snooze, keeping that row's actions disabled until it settles. */
-  const track = useCallback(async (id: string, write: () => Promise<boolean>) => {
-    setBusy((current) => new Set(current).add(id));
-    try {
-      await write();
-    } finally {
-      setBusy((current) => {
-        const next = new Set(current);
-        next.delete(id);
-        return next;
-      });
-    }
-  }, []);
-
-  const markDone = (reminder: ListedReminder) => void track(reminder.id, () => reminders.complete(reminder.id));
-  // A reminder with an expense template asks first whether to log it (R12).
-  const complete = (reminder: ListedReminder) => {
-    if (reminder.expenseTemplate && reminder.nextDueOn) setLoggingId(reminder.id);
-    else markDone(reminder);
-  };
-  const snooze = (reminder: ListedReminder, choice: SnoozeChoice) => {
-    if (choice === "until") setSnoozingId(reminder.id);
-    else void track(reminder.id, () => reminders.snooze(reminder.id, { kind: choice }));
-  };
   const edit = (reminder: ListedReminder) => setEditingId(reminder.id);
 
   const addButton = (
@@ -287,35 +255,7 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
           onDelete={reminders.remove}
         />
       ) : null}
-      {logging?.expenseTemplate && logging.nextDueOn ? (
-        <LogExpenseDialog
-          key={`${logging.id}-${logging.nextDueOn}`}
-          reminder={logging}
-          template={logging.expenseTemplate}
-          occurrenceOn={logging.nextDueOn}
-          currency={currency}
-          now={now}
-          open
-          onOpenChange={(open) => { if (!open) setLoggingId(null); }}
-          onJustDone={() => markDone(logging)}
-          onLog={(amount) => {
-            const occurrenceOn = logging.nextDueOn ?? "";
-            return track(logging.id, async () => {
-              await reminders.completeWithExpense(logging.id, { occurrenceOn, amount });
-              return true;
-            });
-          }}
-        />
-      ) : null}
-      {snoozing ? (
-        <SnoozeDialog
-          key={snoozing.id}
-          reminder={snoozing}
-          open
-          onOpenChange={(open) => { if (!open) setSnoozingId(null); }}
-          onSnooze={(until) => void track(snoozing.id, () => reminders.snooze(snoozing.id, { kind: "until", until }))}
-        />
-      ) : null}
+      {dialogs}
     </Stack>
   );
 }

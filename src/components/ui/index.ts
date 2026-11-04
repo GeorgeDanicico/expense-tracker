@@ -20,6 +20,7 @@ export { PageHeader } from "./page-header";
 export { RowActions, useRowActions, type RowAction } from "./row-actions";
 export { SaveButton, SheetForm, useSaveCheck, useSheetSave } from "./save-button";
 export { SectionHeader } from "./section-header";
+export { SectionLink } from "./section-link";
 export { SegmentedControl } from "./segmented-control";
 export { Stat, StatGroup } from "./stat";
 export { CategoryBadge, StatusBadge, type StatusTone } from "./status-badge";

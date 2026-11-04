@@ -90,6 +90,7 @@ describe("the sidebar", () => {
       "Expenses=/expenses",
       "Investments=/investments",
       "Net worth=/net-worth",
+      "Insights=/insights",
       "Reminders=/reminders",
       "To-dos=/todos",
       "Calendar=/calendar",
@@ -99,9 +100,9 @@ describe("the sidebar", () => {
 
   it("shows a user without a family Reminders alone, and a kid without investments Expenses alone", () => {
     expect(links(render(<SidebarNav signInName="a" />, null))).toEqual(
-      ["Home=/dashboard*", "Expenses=/expenses", "Investments=/investments", "Net worth=/net-worth", "Reminders=/reminders", "Settings=/settings"],
+      ["Home=/dashboard*", "Expenses=/expenses", "Investments=/investments", "Net worth=/net-worth", "Insights=/insights", "Reminders=/reminders", "Settings=/settings"],
     );
-    expect(links(render(<SidebarNav signInName="a" />, membership("kid"))).slice(1, 3)).toEqual(["Expenses=/expenses", "Reminders=/reminders"]);
+    expect(links(render(<SidebarNav signInName="a" />, membership("kid"))).slice(1, 4)).toEqual(["Expenses=/expenses", "Insights=/insights", "Reminders=/reminders"]);
   });
 });
 
@@ -114,7 +115,14 @@ describe("the segmented control", () => {
       { value: "/expenses", checked: false },
       { value: "/investments", checked: true },
       { value: "/net-worth", checked: false },
+      { value: "/insights", checked: false },
     ]);
+  });
+
+  it("selects Insights on its own page, for the user whose expenses it shows", () => {
+    navigation.pathname = "/insights";
+    expect(segments(render(<SectionNav />)).find((segment) => segment.checked)?.value).toBe("/insights");
+    expect(segments(render(<SectionNav />, membership("kid"))).map((segment) => segment.value)).toEqual(["/expenses", "/insights"]);
   });
 
   it("keeps Expenses selected on its import page", () => {
@@ -130,8 +138,8 @@ describe("the segmented control", () => {
   it("shows nothing for a section with one page, or outside Money and Planning", () => {
     navigation.pathname = "/reminders";
     expect(segments(render(<SectionNav />, null))).toEqual([]);
-    navigation.pathname = "/expenses";
-    expect(segments(render(<SectionNav />, membership("kid")))).toEqual([]);
+    navigation.pathname = "/investments";
+    expect(segments(render(<SectionNav />, membership("kid", { ...DEFAULT_KID_PERMISSIONS, expenses: "off", investments: "edit" })))).toEqual([]);
     for (const pathname of ["/dashboard", "/settings", "/more"]) {
       navigation.pathname = pathname;
       expect(segments(render(<SectionNav />))).toEqual([]);

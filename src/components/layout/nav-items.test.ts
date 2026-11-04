@@ -33,7 +33,7 @@ describe("navigation sections", () => {
 
   it("keeps every page at its existing URL", () => {
     expect(hrefs(Object.values(NAV_ITEMS)).sort()).toEqual(
-      ["/calendar", "/dashboard", "/expenses", "/investments", "/net-worth", "/reminders", "/settings", "/todos"],
+      ["/calendar", "/dashboard", "/expenses", "/insights", "/investments", "/net-worth", "/reminders", "/settings", "/todos"],
     );
   });
 
@@ -50,7 +50,7 @@ describe("navigationFor", () => {
   it("gives a user without a family Planning with Reminders alone", () => {
     expect(outline(null)).toEqual([
       "Home: Home",
-      "Money: Expenses, Investments, Net worth",
+      "Money: Expenses, Investments, Net worth, Insights",
       "Planning: Reminders",
       "More: Settings",
     ]);
@@ -59,7 +59,7 @@ describe("navigationFor", () => {
   it("shows everything to a parent", () => {
     expect(outline(parent)).toEqual([
       "Home: Home",
-      "Money: Expenses, Investments, Net worth",
+      "Money: Expenses, Investments, Net worth, Insights",
       "Planning: Reminders, To-dos, Calendar",
       "More: Settings",
     ]);
@@ -68,22 +68,22 @@ describe("navigationFor", () => {
   it("shows the module items and Reminders but not To-dos or Calendar while the account is loading", () => {
     expect(outline(undefined)).toEqual([
       "Home: Home",
-      "Money: Expenses, Investments, Net worth",
+      "Money: Expenses, Investments, Net worth, Insights",
       "Planning: Reminders",
       "More: Settings",
     ]);
   });
 
   it("leaves a kid with only expenses on Money with Expenses alone, and the family pages", () => {
-    expect(outline(kid())).toEqual(["Home: Home", "Money: Expenses", "Planning: Reminders, To-dos, Calendar", "More: Settings"]);
+    expect(outline(kid())).toEqual(["Home: Home", "Money: Expenses, Insights", "Planning: Reminders, To-dos, Calendar", "More: Settings"]);
   });
 
   it("shows each money module a kid has turned on, and no empty segments", () => {
-    expect(outline(kid({ investments: "edit" }))[1]).toBe("Money: Expenses, Investments");
-    expect(outline(kid({ net_worth: "edit" }))[1]).toBe("Money: Expenses, Net worth");
+    expect(outline(kid({ investments: "edit" }))[1]).toBe("Money: Expenses, Investments, Insights");
+    expect(outline(kid({ net_worth: "edit" }))[1]).toBe("Money: Expenses, Net worth, Insights");
     expect(outline(kid({ expenses: "off", investments: "edit" }))[1]).toBe("Money: Investments");
     expect(outline(kid({ expenses: "off", net_worth: "edit" }))[1]).toBe("Money: Net worth");
-    expect(outline(kid({ investments: "edit", net_worth: "edit" }))[1]).toBe("Money: Expenses, Investments, Net worth");
+    expect(outline(kid({ investments: "edit", net_worth: "edit" }))[1]).toBe("Money: Expenses, Investments, Net worth, Insights");
   });
 
   it("drops Money for a kid with every money module off, keeping the other three", () => {
@@ -111,6 +111,7 @@ describe("the active section", () => {
     ["/investments", "money", "Investments"],
     ["/investments/some-asset", "money", "Investments"],
     ["/net-worth", "money", "Net worth"],
+    ["/insights", "money", "Insights"],
     ["/reminders", "planning", "Reminders"],
     ["/todos", "planning", "To-dos"],
     ["/calendar", "planning", "Calendar"],
@@ -139,6 +140,7 @@ describe("segmentsFor", () => {
       { value: "/expenses", label: "Expenses" },
       { value: "/investments", label: "Investments" },
       { value: "/net-worth", label: "Net worth" },
+      { value: "/insights", label: "Insights" },
     ]);
     expect(segmentsFor(sectionOf(parent, "planning"))).toEqual([
       { value: "/reminders", label: "Reminders" },
@@ -149,12 +151,19 @@ describe("segmentsFor", () => {
 
   it("has no segmented control for a section with one page", () => {
     expect(segmentsFor(sectionOf(null, "planning"))).toBeNull();
-    expect(segmentsFor(sectionOf(kid(), "money"))).toBeNull();
+    // Investments alone: Insights belongs to the expenses permission.
+    expect(segmentsFor(sectionOf(kid({ expenses: "off", investments: "edit" }), "money"))).toBeNull();
     expect(segmentsFor(sectionOf(parent, "home"))).toBeNull();
     expect(segmentsFor(sectionOf(parent, "more"))).toBeNull();
   });
 
-  it("follows the permissions: a kid with investments gets two segments", () => {
-    expect(segmentsFor(sectionOf(kid({ investments: "edit" }), "money"))?.map((segment) => segment.value)).toEqual(["/expenses", "/investments"]);
+  it("follows the permissions: Insights comes with Expenses, so a kid with it gets two segments, three with investments", () => {
+    expect(segmentsFor(sectionOf(kid(), "money"))?.map((segment) => segment.value)).toEqual(["/expenses", "/insights"]);
+    expect(segmentsFor(sectionOf(kid({ investments: "edit" }), "money"))?.map((segment) => segment.value)).toEqual(["/expenses", "/investments", "/insights"]);
+  });
+
+  it("puts Insights last in Money, for everyone who reaches Expenses", () => {
+    for (const membership of [null, parent, kid()]) expect(outline(membership)[1]).toMatch(/^Money: Expenses.*Insights$/);
+    expect(outline(kid({ expenses: "off", investments: "edit" }))[1]).not.toContain("Insights");
   });
 });

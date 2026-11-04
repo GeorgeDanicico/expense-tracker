@@ -1,7 +1,7 @@
 # Phase 17 update, 4 November 2026 (cloud session)
 
 Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-session-rk7uoj`.
-**PR #213 (U3, U4 and U5) merged on 4 November.** U6 is pushed to the same branch, with no PR open yet.
+**PR #213 (U3, U4 and U5) and PR #214 (U6) merged on 4 November.** U7 is in progress on the same branch.
 
 ## Where the tasks stand
 
@@ -12,8 +12,9 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U3 Direction and mockups** | **Done. George approved it on 4 November, taking the recommended answers.** |
 | **U4 Theme refresh and mobile primitives** | **Done. George signed off the screenshots on 4 November.** |
 | **U5 Navigation** | **Done. George signed off the screenshots on 4 November; merged in #213 with U3 and U4.** |
-| **U6 Quick add and the fast expense form** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
-| U7 onwards | Not started. |
+| **U6 Quick add and the fast expense form** | **Done. George signed off the screenshots on 4 November; merged in #214.** |
+| **U7 Home as "today"** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
+| U8 onwards | Not started. |
 
 ## What U3 added
 
@@ -218,10 +219,46 @@ An opus agent did the work, as the plan says for this task.
 - The screens still have their own "Add expense" button, now opening the sheet. The direction says
   screens add none; U7 and U8 remove them as they rebuild Home and Expenses.
 
+## What U7 added
+
+A sonnet agent did the work, as the plan says for this task.
+
+- **Home** (`/dashboard`, `src/components/dashboard/home-*.tsx`):
+  - a month card (total, and how much of last month's total it is, with a meter);
+  - **Due today**: overdue, then due today, three rows, each with Snooze (an hour, tomorrow 09:00,
+    or a chosen time) and **Done**, and "+N more due";
+  - **Recent expenses**: the last five of the month;
+  - **To-dos for you**: your open cards, nearest due date first (only with a family).
+  Each block's header links to its section. Spending blocks need the expenses permission.
+- **Insights:** `/insights` is the old Home dashboards, as Money's fourth segment. Old `/dashboard`
+  URLs with a dashboard query redirect to it (`src/lib/http/legacy-redirects.ts`).
+- **Code:** `useReminderActions` (Done, Snooze and their dialogs) is shared by Home and the
+  Reminders page; `SectionLink` is a new primitive; `src/lib/home/today.ts` holds the pure parts.
+  Home reads the same dashboard cache key as Insights' Summary, so U6's optimistic adds show on it.
+- **Preview:** `/dev/preview/insights` is new; `?kidNoExpenses=1` and `?noFamily=1` show the
+  shorter Homes.
+- **Screenshots:** `docs/ui-styling/screenshots/u7-{home,home-no-family,home-kid,insights}-{390,1280}.jpg`.
+- **Taps:** Done **1** (2 for a reminder with an expense template, which asks first), Snooze **2**,
+  seeing this month's spending **0**, Insights **1**.
+
+### Left over from U7
+
+- No row exit animation or Undo for Done (there is no un-complete API); a toast says "Marked done".
+- Home has no avatar or name in the greeting (the account has no display name).
+- The Insights Summary still has its own Add expense button (U8).
+
+## Decisions for U8
+
+George settled the two open U8 questions on 4 November 2026:
+
+- **D10:** the expense's date decides its month. `selectedMonth` is dropped from the API, REST and
+  MCP the same.
+- **B10:** Settings warns and asks to confirm when the account currency changes while expenses
+  exist. No migration.
+
 ## Next steps
 
-1. George signs off the U6 screenshots at 390 and 1280 px, and tries the sheet in
-   `/dev/preview/dashboard?quickAdd=expense`.
-2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U6. **Merging changes
-   adding in production:** the + opens the real sheet, and every Add expense button opens it.
-3. Then U7, Home as "today".
+1. George signs off the U7 screenshots at 390 and 1280 px.
+2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U7. **Merging changes Home
+   in production.**
+3. Then U8, with D10 and B10 as decided above.

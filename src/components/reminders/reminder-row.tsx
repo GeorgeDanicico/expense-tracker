@@ -135,14 +135,33 @@ function Actions({ children }: { children: ReactNode }) {
 /** Taller touch targets on a phone, the compact size from `md`. */
 const ACTION_SIZE = { base: "sm", md: "xs" } as const;
 
-/** "Snooze" with its three choices: an hour, until tomorrow 09:00, or a chosen time. */
-function SnoozeMenu({ title, disabled, onChoose }: { title: string; disabled: boolean; onChoose: (choice: SnoozeChoice) => void }) {
+/**
+ * "Snooze" with its three choices: an hour, until tomorrow 09:00, or a chosen time. `compact` is an
+ * icon button (Home's rows, where Done sits beside it).
+ */
+export function SnoozeMenu({
+  title,
+  disabled,
+  compact = false,
+  onChoose,
+}: {
+  title: string;
+  disabled: boolean;
+  compact?: boolean;
+  onChoose: (choice: SnoozeChoice) => void;
+}) {
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }} onSelect={({ value }) => onChoose(value as SnoozeChoice)}>
       <Menu.Trigger asChild>
-        <Button size={ACTION_SIZE} variant="ghost" disabled={disabled} aria-label={`Snooze ${title}`}>
-          <AlarmClock size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Snooze
-        </Button>
+        {compact ? (
+          <IconButton aria-label={`Snooze ${title}`} disabled={disabled}>
+            <AlarmClock size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
+          </IconButton>
+        ) : (
+          <Button size={ACTION_SIZE} variant="ghost" disabled={disabled} aria-label={`Snooze ${title}`}>
+            <AlarmClock size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Snooze
+          </Button>
+        )}
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>

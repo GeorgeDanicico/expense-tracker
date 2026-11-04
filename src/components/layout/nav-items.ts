@@ -1,5 +1,6 @@
 import {
   BellRing,
+  ChartColumn,
   CalendarDays,
   CreditCard,
   House,
@@ -44,6 +45,7 @@ export const NAV_ITEMS = {
   expenses: { href: "/expenses", label: "Expenses", icon: CreditCard, module: "expenses" },
   investments: { href: "/investments", label: "Investments", icon: TrendingUp, module: "investments" },
   netWorth: { href: "/net-worth", label: "Net worth", icon: Scale, module: "net_worth" },
+  insights: { href: "/insights", label: "Insights", icon: ChartColumn, module: "expenses" },
   reminders: { href: "/reminders", label: "Reminders", icon: BellRing, badge: "reminders" },
   todos: { href: "/todos", label: "To-dos", icon: SquareKanban, requiresFamily: true },
   calendar: { href: "/calendar", label: "Calendar", icon: CalendarDays, requiresFamily: true },
@@ -52,14 +54,15 @@ export const NAV_ITEMS = {
 
 /**
  * The navigation by frequency ("How the app becomes mobile first", point 5). Money and Planning
- * switch between their pages with a segmented control; More is the settings list on a phone, so its
+ * switch between their pages with a segmented control (Insights, the Summary, Monthly and History
+ * dashboards, is the last of Money's, with Expenses' permission); More is the settings list on a phone, so its
  * tab goes to `/more` while the sidebar links Settings directly. Planning holds the personal
  * Reminders, which everyone reaches, then the family-only To-dos and Calendar, so a user without a
  * family keeps the section with Reminders alone.
  */
 export const NAV_SECTIONS: NavSection[] = [
   { key: "home", label: "Home", icon: House, items: [NAV_ITEMS.home] },
-  { key: "money", label: "Money", icon: WalletCards, items: [NAV_ITEMS.expenses, NAV_ITEMS.investments, NAV_ITEMS.netWorth] },
+  { key: "money", label: "Money", icon: WalletCards, items: [NAV_ITEMS.expenses, NAV_ITEMS.investments, NAV_ITEMS.netWorth, NAV_ITEMS.insights] },
   { key: "planning", label: "Planning", icon: LayoutGrid, items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] },
   { key: "more", label: "More", icon: MoreHorizontal, items: [NAV_ITEMS.settings], href: "/more" },
 ];

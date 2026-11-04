@@ -20,6 +20,7 @@ import { dashboardApiKey, withMember } from "@/lib/api/keys";
 import { formatMonth, getBucharestMonth } from "@/lib/calendar";
 import { currenciesByTotal, membersIn, monthShares } from "@/lib/expenses/family-charts";
 import type { FamilyDashboardData } from "@/lib/expenses/types";
+import { INSIGHTS_PATH } from "@/lib/expenses/url-state";
 import { formatCurrency } from "@/lib/utils/currency";
 import { transition } from "@/components/ui/theme/motion";
 
@@ -158,7 +159,7 @@ export function FamilySummaryDashboard() {
                   {selectedMember.name} is highlighted in every chart.{" "}
                   {selectedMember.count === 1 ? "1 transaction" : `${selectedMember.count} transactions`} this month.
                 </Text>
-                <CardLink href={withMember("/dashboard", selectedMember.memberId)}>{`${selectedMember.name}'s dashboard`}</CardLink>
+                <CardLink href={withMember(INSIGHTS_PATH, selectedMember.memberId)}>{`${selectedMember.name}'s dashboard`}</CardLink>
               </Flex>
             ) : null}
           </Stack>

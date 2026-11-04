@@ -6,6 +6,7 @@ import { SWRConfig, type Middleware } from "swr";
 
 import CalendarPage from "@/app/(app)/calendar/page";
 import DashboardPage from "@/app/(app)/dashboard/page";
+import InsightsPage from "@/app/(app)/insights/page";
 import ExpensesPage from "@/app/(app)/expenses/page";
 import ImportPage from "@/app/(app)/expenses/import/page";
 import InvestmentsPage from "@/app/(app)/investments/page";
@@ -37,6 +38,7 @@ import type { PreviewScreen } from "./screens";
 
 const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   dashboard: DashboardPage,
+  insights: InsightsPage,
   more: MorePage,
   expenses: ExpensesPage,
   investments: InvestmentsPage,
@@ -54,6 +56,7 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
 /** The app page each screen stands for, so the navigation highlights it though the URL is `/dev/preview/…`. */
 const APP_PATH: Record<PreviewScreen, string> = {
   dashboard: "/dashboard",
+  insights: "/insights",
   more: "/more",
   expenses: "/expenses",
   investments: "/investments",
