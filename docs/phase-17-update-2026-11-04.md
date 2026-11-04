@@ -18,8 +18,9 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U9 Investments and Net worth** | **Done. George signed it off on 4 November; merged in #216.** |
 | **U10 Planning** | **Done. George signed it off on 4 November; merged in #217.** |
 | **U11 Settings and the family pages** | **Done. George signed it off on 4 November; merged in #218.** |
-| **U12 Swipe actions** | **Done; awaiting George's sign-off on a real phone.** |
-| U13 onwards | Not started. |
+| **U12 Swipe actions** | **Done, pushed, waiting for George's sign-off (to be tried on a real phone).** |
+| **U13 Accessibility pass** | **In progress.** |
+| U14 | Not started. |
 
 ## What U3 added
 
