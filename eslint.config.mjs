@@ -85,6 +85,17 @@ const motion = {
   rules: { "local/motion-tokens": "error" },
 };
 
+/**
+ * Chakra's factories and React's createContext only exist in the browser bundle. Called when a module
+ * loads, they break `next build` for any server page that imports the module, even through the
+ * @/components/ui barrel (PR #213), so such a module starts with "use client".
+ */
+const clientOnlyFactories = {
+  files: ["src/**/*.{ts,tsx}"],
+  ignores: ["src/**/*.test.{ts,tsx}"],
+  rules: { "local/client-only-chakra-factory": "error" },
+};
+
 const reducedMotion = {
   files: ["src/**/*.{ts,tsx}"],
   ignores: ["src/hooks/use-reduced-motion.ts"],
@@ -180,6 +191,7 @@ const eslintConfig = defineConfig([
   uiGuardrails,
   motion,
   reducedMotion,
+  clientOnlyFactories,
   supabaseBoundary,
   workerBoundary,
   noConsole,
