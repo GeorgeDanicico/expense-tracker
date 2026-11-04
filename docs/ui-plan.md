@@ -334,6 +334,19 @@ gallery shows every new primitive and the motion section.
 the whole app has the new radii, spacing and motion with the same colours, and George has signed
 off the gallery and screenshots at 390 and 1280 px.
 
+**Built (4 November 2026), waiting for George's sign-off:** the theme (`theme/motion.ts`,
+`theme/layout.ts`, the radii in `tokens.ts`, touch sizes and press feedback in the recipes, the
+reduced-motion block in `global-css.ts`), the responsive `AppDialog` (plus `pending` and `dirty`),
+`ActionBar`, `RowActions` with `useRowActions()`, `UndoToast` with `useUndo()`, `AmountInput`,
+`ToggleChip`, `Disclosure` and `Collapse`, `IconTile`, `useReducedMotion()`, and
+`local/no-reduced-motion-query`; `local/motion-tokens` is an error. Screenshots:
+`docs/ui-styling/screenshots/u4-{gallery-motion,gallery-mobile,gallery-sheet,dashboard,expenses,expenses-add-dialog,reminders,reminder-dialog}-{390,1280}.jpg`,
+and the U3 mockups re-shot on the real theme (`u3-*.jpg`). One sheet for every width below `md`
+comes from the dialog recipe (Chakra's `Dialog`, not `Drawer`), so a rotating phone never remounts
+a form. Left for later: `AppDialog`'s `pending` replaces the 15 hand-written guards (and
+`local/no-dialog-pending-guard`), the chips in 6 files move to `ToggleChip` (and
+`local/no-raw-toggle-button`), and `DataGate`; the screen tasks that rebuild those files do it.
+
 ### U5: Navigation
 
 **Files:** `src/components/layout/*`, `src/components/settings/settings-nav.tsx`,

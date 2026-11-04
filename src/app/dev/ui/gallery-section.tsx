@@ -6,14 +6,17 @@ import { Card } from "@/components/ui/card";
 export function GallerySection({
   title,
   description,
+  id,
   children,
 }: {
   title: string;
+  /** An anchor, for links and screenshots (`/dev/ui#mobile`). */
+  id?: string;
   description?: string;
   children: ReactNode;
 }) {
   return (
-    <Card>
+    <Card id={id}>
       <Card.Header title={title} description={description} />
       <Card.Body>
         <Stack gap="4">{children}</Stack>

@@ -34,6 +34,7 @@ const SAMPLES: Sample[] = [
 export function MobileGallery() {
   return (
     <GallerySection
+      id="mobile"
       title="Mobile primitives"
       description="RowActions (⋯ on phones, long-press too; icons on hover on desktop), UndoToast (5 s, the write is sent only when it expires), AmountInput, ToggleChip, Disclosure, ActionBar, IconTile. 44px touch targets below 768px."
     >
