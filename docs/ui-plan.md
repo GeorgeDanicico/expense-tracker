@@ -484,7 +484,7 @@ and D9, D10, B4, B5 and B10 are closed.
 
 Screenshots: `docs/ui-styling/screenshots/u8-*.jpg`.
 
-**Signed off (George, 4 November 2026);** it goes out with U9 in one PR.
+**Signed off (George, 4 November 2026).** Merged in #216.
 
 ### U9: Investments and Net worth
 
@@ -497,7 +497,7 @@ tests.
 
 **Done when** the screens are signed off and both modules have the lint rule on.
 
-**Signed off (George, 4 November 2026);** it goes out with U8 in one PR.
+**Signed off (George, 4 November 2026).** Merged in #216.
 
 ### U10: Planning
 

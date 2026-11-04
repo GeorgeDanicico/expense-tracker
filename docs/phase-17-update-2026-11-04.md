@@ -1,7 +1,7 @@
 # Phase 17 update, 4 November 2026 (cloud session)
 
 Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-session-rk7uoj`.
-**PR #213 (U3, U4 and U5), PR #214 (U6) and PR #215 (U7) merged on 4 November.** U8 is done and signed off on the same branch; U9 builds on it, and both go out in one PR.
+**PR #213 (U3, U4 and U5), PR #214 (U6), PR #215 (U7) and PR #216 (U8 and U9) merged on 4 November.** U10 is in progress on the same branch.
 
 ## Where the tasks stand
 
@@ -14,9 +14,10 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U5 Navigation** | **Done. George signed off the screenshots on 4 November; merged in #213 with U3 and U4.** |
 | **U6 Quick add and the fast expense form** | **Done. George signed off the screenshots on 4 November; merged in #214.** |
 | **U7 Home as "today"** | **Done. George signed off the screenshots on 4 November; merged in #215.** |
-| **U8 Expenses** | **Done. George signed it off on 4 November; it goes out with U9 in one PR.** |
-| **U9 Investments and Net worth** | **Done. George signed it off on 4 November; it goes out with U8 in one PR.** |
-| U10 onwards | Not started. |
+| **U8 Expenses** | **Done. George signed it off on 4 November; merged in #216.** |
+| **U9 Investments and Net worth** | **Done. George signed it off on 4 November; merged in #216.** |
+| **U10 Planning** | **In progress.** |
+| U11 onwards | Not started. |
 
 ## What U3 added
 
