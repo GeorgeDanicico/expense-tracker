@@ -141,6 +141,11 @@ export function mainExpensesApiKey(month: string, member?: string | null) {
   return `${expensesApiKey(resolveMainExpenseMonth(month), member)}&context=main`;
 }
 
+/** GET → `SuggestionsResponse` (`@/lib/expenses/suggestions`): the caller's own descriptions matching `query`, and the category guess. */
+export function expenseSuggestionsApiKey(query: string) {
+  return `/api/expenses/suggestions?q=${encodeURIComponent(query)}`;
+}
+
 export function mainExpensesExportUrl(month: string, member?: string | null) {
   return withMember(`/api/expenses/export?month=${encodeURIComponent(resolveMainExpenseMonth(month))}`, member);
 }

@@ -86,6 +86,7 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   "POST /api/expenses": expenses,
   "DELETE /api/expenses/[id]": expenses,
   "GET /api/expenses/export": expenses,
+  "GET /api/expenses/suggestions": expenses,
   "GET /api/family": signedIn,
   "POST /api/family": { access: "sql", who: "no family", check: "create_family: not already in a family" },
   "DELETE /api/family": creatorInSql("delete_family"),
