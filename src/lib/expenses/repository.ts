@@ -16,6 +16,9 @@ export type MerchantCategory = {
   expenseDate: string;
 };
 
+/** An expense's description with the classification it was given. */
+export type ClassifiedDescription = Pick<MerchantCategory, "description" | "category" | "subtype">;
+
 /** What the dashboard reads from storage; `src/lib/expenses/service.ts` turns it into `DashboardData`. */
 export type ExpenseDashboardSnapshot = {
   /** The newest five expenses in the current range. */
@@ -41,6 +44,11 @@ export interface ExpenseRepository {
    * reader groups these by normalised merchant to reuse the user's own choices.
    */
   recentCategoriesByMerchant(userId: string, since: string): Promise<MerchantCategory[]>;
+  /**
+   * The description, category and subtype of the user's `limit` newest expenses (by expense date,
+   * then creation), newest first: what the expense form's suggestions are worked out from.
+   */
+  recentDescriptions(userId: string, limit: number): Promise<ClassifiedDescription[]>;
   /**
    * The user's expenses in the tab's categories or subtypes, narrowed by the filters.
    * The caller resolves the tab with the user's ownership first. A tab with no selections lists nothing.

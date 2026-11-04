@@ -10,15 +10,13 @@ import {
   INVESTMENTS_API_KEY,
   NET_WORTH_API_KEY,
   expenseTabApiKey,
-  expensesApiKey,
-  mainExpensesApiKey,
   type FamilyResponse,
   type NoticesResponse,
   type TabsResponse,
 } from "@/lib/api/keys";
 import type { AccountData } from "@/lib/account/types";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
-import type { Expense, ExpensesData } from "@/lib/expenses/types";
+import type { ExpensesData } from "@/lib/expenses/types";
 
 // What to refresh after each mutation. Every helper takes the global `mutate`
 // from `useSWRConfig()`. Retry buttons keep calling their own bound `mutate()`.
@@ -31,15 +29,6 @@ function isTabLedgerKey(key: unknown) {
   return typeof key === "string" && key.startsWith(`${EXPENSE_TABS_API_KEY}/`) && key.includes("/expenses?");
 }
 
-function withExpenseAdded(expense: Expense) {
-  return (current: ExpensesData | undefined) => {
-    if (!current) return current;
-    const expenses = [expense, ...current.expenses];
-    const total = current.total + expense.amount;
-    return { ...current, expenses, total, average: total / expenses.length };
-  };
-}
-
 function withExpenseRemoved(id: string) {
   return (current: ExpensesData | undefined) => {
     if (!current?.expenses.some((expense) => expense.id === id)) return current;
@@ -49,17 +38,10 @@ function withExpenseRemoved(id: string) {
   };
 }
 
-/** Background refresh of every view derived from expenses: tab ledgers and dashboards. */
+/** Background refresh of every view derived from expenses: tab ledgers and dashboards. New expenses: `useExpenseWrites`. */
 export function afterExpenseChange(mutate: ScopedMutator) {
   void mutate(isTabLedgerKey);
   void mutate(startsWith("/api/dashboard?"));
-}
-
-/** Adds the new expense to the cached month ledgers of `month`, then refreshes derived views. */
-export async function afterExpenseCreated(mutate: ScopedMutator, month: string, expense: Expense) {
-  await mutate(expensesApiKey(month), withExpenseAdded(expense), { revalidate: false });
-  await mutate(mainExpensesApiKey(month), withExpenseAdded(expense), { revalidate: false });
-  afterExpenseChange(mutate);
 }
 
 /** Refetches every cached month ledger and derived view, after an expense added somewhere else (a reminder). */

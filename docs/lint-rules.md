@@ -25,6 +25,7 @@ Run them with `npm run lint`.
 | [`no-window-confirm`](#no-window-confirm) | error | none | U1 |
 | [`motion-tokens`](#motion-tokens) | error | 5 fixed in U4 (a `warn` until the tokens existed) | U1 |
 | [`no-reduced-motion-query`](#no-reduced-motion-query) | error | 1 fixed | U4 |
+| [`client-only-chakra-factory`](#client-only-chakra-factory) | error | none left (`list-row.tsx` was fixed by hand in #213) | U6 |
 
 A rule that would need more than about 40 fixes outside the screen's own files lands as `warn`
 with its count here, and turns to `error` once the count reaches zero.
@@ -272,6 +273,24 @@ previews' "Simulate reduced motion" switch.
 
 **Disable:** `// eslint-disable-next-line local/no-reduced-motion-query -- <reason>`.
 
+### `client-only-chakra-factory`
+
+**Catches:** a call to `chakra(…)`, `createRecipeContext(…)`, `createSlotRecipeContext(…)` or
+`createContext(…)` (Chakra's or React's, also `React.createContext`) at the top level of a module,
+outside any function, in a file under `src/` that doesn't start with `"use client"`. Tests are
+exempt.
+
+**Why:** those factories only exist in the browser bundle, and a top-level call runs as soon as the
+module loads. A server page that imports the file, even through the `@/components/ui` barrel, then
+fails `next build` while it collects page data, which unit tests and `tsc` never see. It happened in
+#213: `list-row.tsx` called `chakra("li", rowRecipe)` without the directive and `/dev/preview/mockups`
+imported it. Put `"use client"` at the top of the file.
+
+**Added by:** U6, from #213's CI failure. **Existing cases:** none left; `list-row.tsx` got its
+directive in #213. Recipes (`defineRecipe`) are plain configuration and pass.
+
+**Disable:** `// eslint-disable-next-line local/client-only-chakra-factory -- <why it never reaches a server module>`.
+
 ## Conventions
 
 Checks that need judgement, so no rule can do them. They are in the review checklist: a reviewer,
@@ -285,6 +304,8 @@ becomes a rule above.
 - **Dates go through the formatters,** and "today" and "this month" come from the application calendar (`getBucharestToday`, `getBucharestMonth`), never from the browser's zone.
 - **A date field for a new entry defaults to today** (`getBucharestToday`, or `defaultDateInMonth` inside a month view), not the end of the range or the last record's date, so a quick save never future-dates or overwrites. A "later" snooze or deadline is counted from the later of now and the thing's own due time.
 - **A form is one component,** shared by the full page and the quick-add sheet, not two copies.
+- **A form in a sheet is a `SheetForm` with `useSheetSave`** (fields, error, the big save button and
+  "Save and add another"), and a choice with a stated default is a `ChipMenu`, not a select (U6).
 - **Copy says what happened or what to do,** in plain words: "Couldn't save. Try again.", not "Error 500".
 - **A destructive action** on one row is undone, not confirmed; deleting a family, an account or a kid keeps a typed confirmation.
 - **No new dependency for something the platform or Chakra already does,** such as gestures, animation or dialogs.

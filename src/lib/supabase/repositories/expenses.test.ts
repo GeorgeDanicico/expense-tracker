@@ -347,6 +347,31 @@ describe("recentCategoriesByMerchant", () => {
   });
 });
 
+describe("recentDescriptions", () => {
+  it("returns the owner's newest descriptions with their classification, up to the limit", async () => {
+    const { queries } = useDatabase([
+      anExpenseRow({ id: "old", description: "Lidl", category: "groceries", expenseDate: "2026-08-01" }),
+      anExpenseRow({ id: "fuel", description: "Station", category: "car", subtype: "car_fuel", expenseDate: "2026-09-02" }),
+      anExpenseRow({ id: "cafe", description: "Cafe", category: "other", expenseDate: "2026-09-05" }),
+      anExpenseRow({ id: "foreign", description: "Zara", category: "shopping", expenseDate: "2026-09-06" }, "other"),
+    ]);
+
+    const rows = await repository.recentDescriptions("owner", 2);
+
+    expect(rows).toEqual([
+      { description: "Cafe", category: "other", subtype: null },
+      { description: "Station", category: "car", subtype: "car_fuel" },
+    ]);
+    expect(queries[0]).toMatchObject({ filters: [["eq", "user_id", "owner"]], orders: ["expense_date", "created_at", "id"], limits: ["2"] });
+  });
+
+  it("fails with the load message", async () => {
+    useDatabase([], { fail: () => true });
+
+    await expect(repository.recentDescriptions("owner", 10)).rejects.toThrow(new Error("Unable to load expenses."));
+  });
+});
+
 describe("getDashboard", () => {
   const summary = {
     currentTotal: "12.50", currentCount: 1, currentLargest: "12.50", analyticsTotal: "40.00", analyticsCount: 2,

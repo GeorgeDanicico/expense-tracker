@@ -1,107 +1,213 @@
 "use client";
 
-import { Flex, Input, Stack, Textarea } from "@chakra-ui/react";
-import { FormEvent, useState } from "react";
-import { useSWRConfig } from "swr";
+import { Flex, Input, Textarea } from "@chakra-ui/react";
+import { useEffect, useRef, useState } from "react";
+import useSWR from "swr";
 
-import { CategoryField, SubtypeField } from "@/components/expenses/expense-category-fields";
+import { CATEGORY_ICONS } from "@/components/expenses/category-visual";
+import { SubtypeField } from "@/components/expenses/expense-category-fields";
+import { useExpenseWrites } from "@/components/expenses/use-expense-writes";
+import { AmountInput } from "@/components/ui/amount-input";
+import { ChipMenu, ChipRow } from "@/components/ui/chip-menu";
+import { Disclosure } from "@/components/ui/disclosure";
 import { FormField } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import type { ApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterExpenseCreated } from "@/lib/api/invalidate";
-import { subtypeForCategory, type ExpenseCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
+import { ICON } from "@/components/ui/icon";
+import { SheetForm, useSheetSave } from "@/components/ui/save-button";
+import { ToggleChip } from "@/components/ui/toggle-chip";
+import { ApiError } from "@/lib/api/client";
+import { expenseSuggestionsApiKey } from "@/lib/api/keys";
+import { addDays, formatShortDate, getBucharestToday } from "@/lib/calendar";
+import { CATEGORY_LABELS, EXPENSE_CATEGORIES, subtypeForCategory, type ExpenseCategory } from "@/lib/expenses/categories";
+import type { Classification, SuggestionsResponse } from "@/lib/expenses/suggestions";
 import type { Expense } from "@/lib/expenses/types";
-import { defaultDateInMonth, getBucharestToday, getMonthRange, lastDayOfMonth } from "@/lib/calendar";
+import { expenseSchema } from "@/lib/validation/expense";
+import { fieldErrorsOf } from "@/lib/validation/field-errors";
 
-/** Add-expense form body. Submits to `/api/expenses` and updates the SWR caches. */
+/** The category a new expense starts on until a description says otherwise: the most common one. */
+export const DEFAULT_CATEGORY: ExpenseCategory = "groceries";
+/** How long typing pauses before the suggestions are asked for. */
+const SUGGEST_AFTER_MS = 150;
+const PICK_DATE = "pick";
+
+/** `value`, once it has stayed the same for `ms`. */
+function useSettled(value: string, ms: number) {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(value), ms);
+    return () => window.clearTimeout(timer);
+  }, [value, ms]);
+  return settled;
+}
+
+/** What a date chip says: Today, Yesterday, or the day ("Nov 2"). */
+export function dateChipLabel(date: string, today: string) {
+  if (date === today) return "Today";
+  if (date === addDays(today, -1)) return "Yesterday";
+  return formatShortDate(date, date.slice(0, 4) !== today.slice(0, 4));
+}
+
+/**
+ * The classification the form shows: the one chosen by hand or by picking a suggestion, else the
+ * one guessed from the description, else the default.
+ */
+export function shownClassification(chosen: Classification | null, guess: Classification | null): Classification {
+  return chosen ?? guess ?? { category: DEFAULT_CATEGORY, subtype: null };
+}
+
+function CategoryLabel({ category }: { category: ExpenseCategory }) {
+  const Icon = CATEGORY_ICONS[category];
+  return (
+    <>
+      <Icon size={ICON.xs} aria-hidden="true" />
+      {CATEGORY_LABELS[category]}
+    </>
+  );
+}
+
+const CATEGORY_ITEMS = EXPENSE_CATEGORIES.map((category) => ({ value: category, label: <CategoryLabel category={category} /> }));
+
+/**
+ * The fast expense form ("How the app becomes mobile first", point 3, in docs/ui-plan.md), the one
+ * form for adding an expense, in the quick-add sheet: the amount first (decimal keypad, focused),
+ * a description with suggestions from the caller's own expenses (picking one fills its category
+ * and subtype), the category guessed from the description as a chip that changes in one tap, today
+ * as the date, notes and subtype behind "More details", and Save at the bottom with "Save and add
+ * another". Checked with the shared `expenseSchema` before anything is sent, then saved
+ * optimistically (`useExpenseWrites`).
+ */
 export function ExpenseForm({
-  id,
-  selectedMonth,
   currency,
-  form,
-  onSuccess,
+  defaultDate,
+  onSaved,
 }: {
-  id: string;
-  selectedMonth: string;
   currency: string;
-  /** Owned by the dialog so its submit button can show the pending state. */
-  form: ApiForm;
-  onSuccess: () => void;
+  /** The date to start on; today when absent. */
+  defaultDate?: string;
+  /** After a save: `another` is true when the form has cleared itself for the next expense. */
+  onSaved: (expense: Expense, another: boolean) => void;
 }) {
-  const { mutate } = useSWRConfig();
-  const [category, setCategory] = useState<ExpenseCategory>("groceries");
-  const [subtype, setSubtype] = useState<ExpenseSubtype | null>(null);
-  const range = getMonthRange(selectedMonth);
-  const maxDate = lastDayOfMonth(range.month);
+  const today = getBucharestToday();
+  const { form, saved, save: run } = useSheetSave();
+  const { add } = useExpenseWrites();
+  const amountRef = useRef<HTMLInputElement>(null);
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [picked, setPicked] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<Classification | null>(null);
+  const [expenseDate, setExpenseDate] = useState(defaultDate ?? today);
+  const [pickingDate, setPickingDate] = useState(false);
+  const [notes, setNotes] = useState("");
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+  const typed = description.trim();
+  const query = useSettled(typed, SUGGEST_AFTER_MS);
+  const { data } = useSWR<SuggestionsResponse>(query ? expenseSuggestionsApiKey(query) : null, {
+    keepPreviousData: true,
+    revalidateOnFocus: false,
+  });
+  const suggestions = typed && description !== picked ? (data?.suggestions ?? []) : [];
+  const { category, subtype } = shownClassification(chosen, typed ? (data?.guess ?? null) : null);
 
-    void form.submit(async () => {
-      const { expense } = await apiRequest<{ expense: Expense }>("/api/expenses", {
-        method: "POST",
-        body: JSON.stringify({
-          selectedMonth,
-          description: formData.get("description"),
-          amount: formData.get("amount"),
-          category: formData.get("category"),
-          subtype,
-          expenseDate: formData.get("expenseDate"),
-          notes: formData.get("notes"),
-        }),
-      });
-
-      await afterExpenseCreated(mutate, selectedMonth, expense);
-      onSuccess();
-    }, { fallback: "The expense could not be saved." });
+  function clear() {
+    setAmount("");
+    setDescription("");
+    setPicked(null);
+    setChosen(null);
+    setNotes("");
+    amountRef.current?.focus();
   }
 
-  const { fieldError } = form;
+  function save(another: boolean) {
+    run(another, async () => {
+      const parsed = expenseSchema.safeParse({ description, amount, category, subtype, expenseDate, notes });
+      if (!parsed.success) throw new ApiError("Check the highlighted details and try again.", 422, fieldErrorsOf(parsed.error));
+      return add(parsed.data);
+    }, (expense, cleared) => {
+      if (cleared) clear();
+      onSaved(expense, cleared);
+    });
+  }
+
+  const dateItems = [
+    { value: today, label: "Today" },
+    { value: addDays(today, -1), label: "Yesterday" },
+    { value: PICK_DATE, label: "Pick a date…" },
+  ];
 
   return (
-    <form id={id} onSubmit={submit}>
-      <Stack gap="3">
-        <FormField label="Description" error={fieldError("description")}>
-          <Input name="description" maxLength={120} placeholder="e.g. Weekly groceries" autoFocus required />
+    <SheetForm label="Save expense" form={form} saved={saved} onSave={save}>
+      <FormField label={`Amount in ${currency}`} labelHidden error={form.fieldError("amount")}>
+        <AmountInput
+          ref={amountRef}
+          variant="hero"
+          name="amount"
+          currency={currency}
+          value={amount}
+          onValueChange={setAmount}
+          autoFocus
+          aria-invalid={form.fieldError("amount") ? true : undefined}
+        />
+      </FormField>
+      <FormField label="Description" labelHidden error={form.fieldError("description")}>
+        <Input
+          name="description"
+          size="md"
+          maxLength={120}
+          placeholder="What was it?"
+          autoComplete="off"
+          enterKeyHint="done"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </FormField>
+      {suggestions.length > 0 ? (
+        <ChipRow label="Your recent descriptions">
+          {suggestions.map((suggestion) => (
+            <ToggleChip
+              key={suggestion.description}
+              flexShrink="0"
+              onClick={() => {
+                setDescription(suggestion.description);
+                setPicked(suggestion.description);
+                setChosen({ category: suggestion.category, subtype: suggestion.subtype });
+              }}
+            >
+              {suggestion.description} · {CATEGORY_LABELS[suggestion.category]}
+            </ToggleChip>
+          ))}
+        </ChipRow>
+      ) : null}
+      <Flex gap="2" wrap="wrap" align="center">
+        <ChipMenu
+          aria-label={`Category: ${CATEGORY_LABELS[category]}`}
+          label={<CategoryLabel category={category} />}
+          items={CATEGORY_ITEMS}
+          onSelect={(value) => {
+            const next = value as ExpenseCategory;
+            setChosen({ category: next, subtype: subtypeForCategory(next, subtype) });
+          }}
+        />
+        <ChipMenu
+          aria-label={`Date: ${dateChipLabel(expenseDate, today)}`}
+          label={dateChipLabel(expenseDate, today)}
+          selected={expenseDate !== today}
+          items={dateItems}
+          onSelect={(value) => {
+            setPickingDate(value === PICK_DATE);
+            if (value !== PICK_DATE) setExpenseDate(value);
+          }}
+        />
+      </Flex>
+      {pickingDate || form.fieldError("expenseDate") ? (
+        <FormField label="Date" error={form.fieldError("expenseDate")}>
+          <Input name="expenseDate" type="date" size="md" value={expenseDate} required onChange={(event) => setExpenseDate(event.target.value)} />
         </FormField>
-
-        <FormField label={`Amount (${currency})`} error={fieldError("amount")}>
-          <Input name="amount" type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" placeholder="0.00" required />
+      ) : null}
+      <Disclosure label="More details">
+        <FormField label="Notes" labelHidden optional error={form.fieldError("notes")}>
+          <Textarea name="notes" size="md" rows={2} maxLength={500} placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
         </FormField>
-
-        <Flex gap="3" direction={{ base: "column", sm: "row" }}>
-          <CategoryField
-            flex="1"
-            value={category}
-            error={fieldError("category")}
-            onChange={(nextCategory) => {
-              setCategory(nextCategory);
-              setSubtype((current) => subtypeForCategory(nextCategory, current));
-            }}
-          />
-
-          <FormField flex="1" label="Date" error={fieldError("expenseDate")}>
-            <Input
-              name="expenseDate"
-              type="date"
-              defaultValue={defaultDateInMonth(range.month, getBucharestToday())}
-              min={range.start}
-              max={maxDate}
-              required
-            />
-          </FormField>
-        </Flex>
-
-        <SubtypeField category={category} value={subtype} onChange={setSubtype} error={fieldError("subtype")} />
-
-        <FormField label="Notes" optional error={fieldError("notes")}>
-          <Textarea name="notes" maxLength={500} rows={3} placeholder="Add an optional note" resize="vertical" />
-        </FormField>
-
-        {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
-      </Stack>
-    </form>
+        <SubtypeField category={category} value={subtype} onChange={(next) => setChosen({ category, subtype: next })} error={form.fieldError("subtype")} />
+      </Disclosure>
+    </SheetForm>
   );
 }

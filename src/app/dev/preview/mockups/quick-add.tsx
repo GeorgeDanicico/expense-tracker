@@ -4,14 +4,13 @@ import { Button, Flex, Input, Stack, Switch, Text, Textarea } from "@chakra-ui/r
 import { useState, type ReactNode } from "react";
 
 import { CATEGORY_ICONS } from "@/components/expenses/category-visual";
-import { ActionBar, AmountInput, AppDialog, Disclosure, ICON, SegmentedControl, ToggleChip } from "@/components/ui";
+import { ActionBar, AmountInput, AppDialog, ChipMenu, ChipRow, Disclosure, ICON, SaveButton, SegmentedControl, ToggleChip, useSaveCheck } from "@/components/ui";
 import { CATEGORY_LABELS, EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/expenses/categories";
 
 import { useMockState } from "./mock-state";
 import { MOCK_MEMBERS, MOCK_SUGGESTIONS } from "./mockup-data";
 import type { QuickAddKind } from "./mockups";
 import { MOCK_CURRENCY } from "./mockup-data";
-import { ChipMenu, ChipRow, SaveButton, useSaveCheck } from "./stand-ins";
 
 const KINDS: { value: QuickAddKind; label: string }[] = [
   { value: "expense", label: "Expense" },
@@ -46,10 +45,14 @@ export function QuickAddSheet() {
 function useQuickSave(message: string, onSave: () => (() => void) | void) {
   const { closeQuickAdd, showToast } = useMockState();
   const announce = (undo: (() => void) | void) => showToast({ message, action: undo ? "Undo" : "View", onAction: undo || undefined });
-  const { saved, save } = useSaveCheck(() => {
-    announce(onSave());
-    closeQuickAdd();
-  });
+  const { saved, showCheck } = useSaveCheck();
+  const save = () => {
+    if (saved) return;
+    showCheck(() => {
+      announce(onSave());
+      closeQuickAdd();
+    });
+  };
   return { saved, save, saveAndNew: () => announce(onSave()) };
 }
 

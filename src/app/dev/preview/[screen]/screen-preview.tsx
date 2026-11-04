@@ -18,14 +18,17 @@ import NotificationsSettingsPage from "@/app/(app)/settings/notifications/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import TodosPage from "@/app/(app)/todos/page";
 import ChangePasswordPage from "@/app/change-password/page";
+import { ExpenseApiProvider } from "@/components/expenses/expense-api";
 import { ImportApiProvider } from "@/components/expenses/import/import-api";
 import { CalendarApiProvider } from "@/components/family-calendar/calendar-api";
 import { AppShell } from "@/components/layout/app-shell";
 import { AppPathProvider } from "@/components/layout/use-app-pathname";
+import type { QuickAddOptions } from "@/components/quick-add/quick-add-provider";
 import { ReminderApiProvider } from "@/components/reminders/reminder-api";
 import { TodoApiProvider } from "@/components/todos/todo-api";
 
 import { previewCalendarApi } from "../calendar-fixtures";
+import { previewExpenseApi } from "../expense-fixtures";
 import { fixtureFor } from "../fixtures";
 import { PREVIEW_READ_STATEMENT_FILE, previewImportApi, previewSampleStatement } from "../import-fixtures";
 import { previewReminderApi } from "../reminder-fixtures";
@@ -39,9 +42,9 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   investments: InvestmentsPage,
   "net-worth": NetWorthPage,
   settings: SettingsPreview,
-  todos: TodosPreview,
-  reminders: RemindersPreview,
-  calendar: CalendarPreview,
+  todos: TodosPage,
+  reminders: RemindersPage,
+  calendar: CalendarPage,
   notifications: NotificationsPreview,
   "ai-settings": AiSettingsPreview,
   import: ImportPreview,
@@ -113,30 +116,20 @@ function AiSettingsPreview() {
   );
 }
 
-/** The board with its writes kept in memory (see `todo-fixtures.ts`). */
-function TodosPreview() {
+/**
+ * Every screen's writes, and the quick-add sheet's, kept in memory: expenses (`expense-fixtures.ts`),
+ * the board (`todo-fixtures.ts`), reminders (`reminder-fixtures.ts`) and the calendar
+ * (`calendar-fixtures.ts`).
+ */
+function PreviewApis({ children }: { children: React.ReactNode }) {
   return (
-    <TodoApiProvider api={previewTodoApi}>
-      <TodosPage />
-    </TodoApiProvider>
-  );
-}
-
-/** The calendar with its events and writes kept in memory (see `calendar-fixtures.ts`). */
-function CalendarPreview() {
-  return (
-    <CalendarApiProvider api={previewCalendarApi}>
-      <CalendarPage />
-    </CalendarApiProvider>
-  );
-}
-
-/** The reminders with their writes kept in memory (see `reminder-fixtures.ts`). */
-function RemindersPreview() {
-  return (
-    <ReminderApiProvider api={previewReminderApi}>
-      <RemindersPage />
-    </ReminderApiProvider>
+    <ExpenseApiProvider api={previewExpenseApi}>
+      <TodoApiProvider api={previewTodoApi}>
+        <ReminderApiProvider api={previewReminderApi}>
+          <CalendarApiProvider api={previewCalendarApi}>{children}</CalendarApiProvider>
+        </ReminderApiProvider>
+      </TodoApiProvider>
+    </ExpenseApiProvider>
   );
 }
 
@@ -146,7 +139,7 @@ const fixtures: Middleware = (useSWRNext) => (key, _fetcher, config) => {
   return useSWRNext(key, fetcher as typeof _fetcher, config);
 };
 
-export function ScreenPreview({ screen }: { screen: PreviewScreen }) {
+export function ScreenPreview({ screen, quickAdd = null }: { screen: PreviewScreen; quickAdd?: QuickAddOptions | null }) {
   const Screen = SCREENS[screen];
   const content = (
     <Suspense>
@@ -155,9 +148,13 @@ export function ScreenPreview({ screen }: { screen: PreviewScreen }) {
   );
   return (
     <SWRConfig value={{ use: [fixtures], dedupingInterval: 60_000, revalidateOnFocus: false }}>
-      {WITHOUT_SHELL.has(screen) ? content : <AppPathProvider value={APP_PATH[screen]}>
-          <AppShell signInName="preview@example.com">{content}</AppShell>
-        </AppPathProvider>}
+      <PreviewApis>
+        {WITHOUT_SHELL.has(screen) ? content : (
+          <AppPathProvider value={APP_PATH[screen]}>
+            <AppShell signInName="preview@example.com" quickAdd={quickAdd}>{content}</AppShell>
+          </AppPathProvider>
+        )}
+      </PreviewApis>
     </SWRConfig>
   );
 }

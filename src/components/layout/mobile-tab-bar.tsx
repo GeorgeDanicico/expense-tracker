@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { NavBadge, remindersBadgeLabel } from "@/components/layout/nav-badge";
 import { activeSection } from "@/components/layout/nav-items";
-import { useQuickAdd } from "@/components/layout/quick-add";
+import { useQuickAdd } from "@/components/quick-add/quick-add-provider";
 import { useAppPathname } from "@/components/layout/use-app-pathname";
 import { useNavigation } from "@/components/layout/use-navigation";
 import { useReminderBadge } from "@/components/reminders/use-reminder-badge";
@@ -47,7 +47,7 @@ export function MobileTabBar() {
       css={pressFeedback(PRESS_SCALE.icon)}
       aria-label="Quick add"
       aria-haspopup="dialog"
-      onClick={quickAdd.open}
+      onClick={() => quickAdd.open()}
     >
       <Plus size={26} strokeWidth={2.4} aria-hidden="true" />
     </chakra.button>

@@ -44,6 +44,10 @@ export class FakeExpenseRepository implements ExpenseRepository {
       .map(({ description, category, subtype, expenseDate }) => ({ description, category, subtype, expenseDate }));
   }
 
+  async recentDescriptions(userId: string, limit: number) {
+    return this.newestFirst(userId).slice(0, limit).map(({ description, category, subtype }) => ({ description, category, subtype }));
+  }
+
   async listForTab(userId: string, tab: ExpenseTab, filters: ExpenseTabFilters) {
     const search = filters.search.toLowerCase();
     return this.newestFirst(userId).filter((expense) =>

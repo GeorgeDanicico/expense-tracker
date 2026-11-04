@@ -166,6 +166,24 @@ export const supabaseExpenseRepository: ExpenseRepository = {
     }));
   },
 
+  async recentDescriptions(userId, limit) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("description, category, subtype")
+      .eq("user_id", userId)
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(limit);
+    if (error) throw translateDatabaseError(error, "Unable to load expenses.");
+    return (data ?? []).map((row) => ({
+      description: row.description,
+      category: row.category as ExpenseCategory,
+      subtype: row.subtype as ExpenseSubtype | null,
+    }));
+  },
+
   async listForTab(userId, tab, filters) {
     return queryExpensesForUser(userId, { tab, filters, ...expenseTabDateBounds(filters) });
   },

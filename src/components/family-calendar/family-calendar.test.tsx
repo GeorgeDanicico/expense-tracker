@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { eventAppearance, eventLabel, attendeeNames } from "@/components/family-calendar/event-appearance";
-import { goingSummary, repeatEndsOn } from "@/components/family-calendar/event-dialog";
+import { goingSummary, repeatEndsOn } from "@/components/family-calendar/event-form";
 import { EventRow, seriesLabel } from "@/components/family-calendar/event-row";
 import { NoFamilyCalendar } from "@/components/family-calendar/calendar-screen";
 import { MemberChips } from "@/components/family-calendar/member-chips";

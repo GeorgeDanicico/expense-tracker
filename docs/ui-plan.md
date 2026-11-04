@@ -377,6 +377,8 @@ at most two taps from Home.
 moves), the quick-add placeholder, `/more`, and Settings as a grouped list. Screenshots:
 `docs/ui-styling/screenshots/u5-*.jpg`. Insights (a fourth Money segment) waits for U7.
 
+**Signed off (George, 4 November 2026)** and merged in #213 with U3 and U4.
+
 ### U6: Quick add and the fast expense form
 
 **Files:** new `src/components/quick-add/*`, `src/components/expenses/expense-form.tsx`,
@@ -405,6 +407,17 @@ and rollback; the sheet from three different screens.
 
 **Done when** an expense takes two taps plus typing from any screen on a phone, and the tests
 above pass.
+
+**Built (4 November 2026), waiting for George's sign-off:**
+- the sheet in `src/components/quick-add/`, with each module's form in its compact mode;
+- the fast expense form, and the suggestions route;
+- optimistic adds through `expense-api.tsx` and `useExpenseWrites`;
+- the shared schema's text rules;
+- `local/client-only-chakra-factory`.
+
+An expense takes + → Save (2 taps) when the guess is right. Screenshots:
+`docs/ui-styling/screenshots/u6-*.jpg`. Left for U8: `POST /api/expenses`' month rule, which the
+client no longer needs.
 
 ### U7: Home as "today"
 

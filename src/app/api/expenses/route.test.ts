@@ -83,6 +83,21 @@ describe("POST /api/expenses", () => {
     expect(create).toHaveBeenCalledWith(user.id, expect.objectContaining({ amount: expected }));
   });
 
+  // Audit B8, through the shared expense schema.
+  it("stores the description without control characters", async () => {
+    await post({ ...body, description: "Fuel\u0002 station\nCluj" });
+
+    expect(create).toHaveBeenCalledWith(user.id, expect.objectContaining({ description: "Fuel station Cluj" }));
+  });
+
+  it("answers 422 for a description of nothing but control characters", async () => {
+    const response = await post({ ...body, description: "\u0002\u0003" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.fieldErrors.description).toEqual(["Enter a description."]);
+    expect(create).not.toHaveBeenCalled();
+  });
+
   // The request guard (security plan S5), through withPermission.
   it.each([
     ["Sec-Fetch-Site: cross-site", { "Sec-Fetch-Site": "cross-site" }],

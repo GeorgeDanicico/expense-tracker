@@ -4,7 +4,7 @@ import { Box, Flex, Grid, Menu, Portal, Stack, Text } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight, Download, FileUp, MoreHorizontal, SlidersHorizontal, Tags } from "lucide-react";
 import { useState } from "react";
 
-import { Amount, Card, EmptyState, ICON, IconButton, SegmentedControl, ToggleChip } from "@/components/ui";
+import { Amount, Card, ChipMenu, ChipRow, EmptyState, ICON, IconButton, SegmentedControl, ToggleChip } from "@/components/ui";
 import { PAGE_SPACING } from "@/components/ui/theme/layout";
 import { transition } from "@/components/ui/theme/motion";
 import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
@@ -13,7 +13,7 @@ import { formatCurrency } from "@/lib/utils/currency";
 import { useMockState } from "../mock-state";
 import { MOCK_CURRENCY, MOCK_EXPENSE_TABS, MOCK_MEMBERS, MOCK_MONTH, type MockExpense } from "../mockup-data";
 import { CategoryTile, ExpenseRow, GroupLabel, PageTitle, Rows } from "../mockup-parts";
-import { ChipMenu, ChipRow, SwipeRow } from "../stand-ins";
+import { SwipeRow } from "../stand-ins";
 
 const SECTIONS = [
   { value: "expenses", label: "Expenses" },

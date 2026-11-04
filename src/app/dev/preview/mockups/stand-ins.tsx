@@ -3,110 +3,17 @@
 /**
  * Pieces only the mockups need, on the real theme. The primitives U4 built (AppDialog as a sheet,
  * ActionBar, UndoToast, AmountInput, ToggleChip, Disclosure, Collapse, IconTile, RowActions) are
- * imported from src/components/ui; what's left here is for later tasks (the save check for U6, swipes
- * for U12) or for the mockups' fixtures.
+ * imported from src/components/ui, and so are U6's ChipMenu, ChipRow and SaveButton; what's left here
+ * is for later tasks (swipes for U12) or for the mockups' fixtures.
  */
 
-import { Box, Button, chakra, Flex, Menu, Portal, Text } from "@chakra-ui/react";
-import { Check } from "lucide-react";
+import { Box, chakra, Flex, Text } from "@chakra-ui/react";
 import { useRef, useState, type ReactNode } from "react";
 
-import { ICON, ToggleChip } from "@/components/ui";
-import { DURATION_MS, transition } from "@/components/ui/theme/motion";
+import { transition } from "@/components/ui/theme/motion";
 import { rowRecipe } from "@/components/ui/theme/recipes/misc";
 
 import { useMotionDelay } from "./motion-scope";
-
-/** A primary button that turns into a check for a moment once saved. */
-export function SaveButton({ saved, onClick, children }: { saved: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <Button variant="solid" colorPalette={saved ? "success" : "brand"} size="md" flex="1" onClick={onClick} aria-live="polite">
-      {saved ? (
-        <Box
-          as="span"
-          display="inline-flex"
-          animationName="scale-in, fade-in"
-          animationDuration="slow"
-          animationTimingFunction="enter"
-          animationFillMode="both"
-        >
-          <Check size={ICON.nav} aria-hidden="true" />
-        </Box>
-      ) : null}
-      {saved ? "Saved" : children}
-    </Button>
-  );
-}
-
-/** Saves, shows the check for a moment, then calls `done`. */
-export function useSaveCheck(done: () => void) {
-  const [saved, setSaved] = useState(false);
-  const later = useMotionDelay();
-  const save = () => {
-    if (saved) return;
-    setSaved(true);
-    later(DURATION_MS.countUp, () => {
-      setSaved(false);
-      done();
-    });
-  };
-  return { saved, save };
-}
-
-/** A chip that opens a menu of choices: "Today ▾", "Me ▾". */
-export function ChipMenu({
-  label,
-  items,
-  onSelect,
-  selected = true,
-}: {
-  label: ReactNode;
-  items: { value: string; label: string }[];
-  onSelect?: (value: string) => void;
-  selected?: boolean;
-}) {
-  return (
-    <Menu.Root positioning={{ placement: "bottom-start" }} onSelect={({ value }) => onSelect?.(value)}>
-      <Menu.Trigger asChild>
-        <ToggleChip selected={selected}>
-          {label}
-          <Text as="span" aria-hidden="true" color="fg.subtle">
-            ▾
-          </Text>
-        </ToggleChip>
-      </Menu.Trigger>
-      <Portal>
-        <Menu.Positioner>
-          <Menu.Content minW="44">
-            {items.map((item) => (
-              <Menu.Item key={item.value} value={item.value}>
-                {item.label}
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Positioner>
-      </Portal>
-    </Menu.Root>
-  );
-}
-
-/** A sideways-scrolling row of chips that bleeds to the screen edge on phones. */
-export function ChipRow({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    <Flex
-      role="group"
-      aria-label={label}
-      gap="2"
-      overflowX="auto"
-      mx={{ base: "-4", md: "0" }}
-      px={{ base: "4", md: "0" }}
-      py="1"
-      css={{ scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}
-    >
-      {children}
-    </Flex>
-  );
-}
 
 const Row = chakra("div", rowRecipe);
 

@@ -89,6 +89,7 @@ export function LedgerPanel({ month, currency }: { month: string; currency: stri
 
 ## Found on the way (bugs, not simplifications)
 
+- **Fixed in U6:** the fast expense form starts on today, or on the last day of a past month shown.
 - **New expenses default to the last day of the month.** `expense-form.tsx` sets `defaultValue={maxDate}`, and `maxDate` is `lastDayOfMonth(range.month)`, so on 4 November the date field says 30 November (seen in the browser at `/dev/preview/dashboard` and `/dev/preview/expenses`). Anyone who doesn't change it records a future-dated expense. Default to `getBucharestToday()` when the selected month is the current one, else the month's last day. U6 rewrites the form; fix it there, or sooner as its own small PR.
 - **Saved-tab filters take the whole first screen on a phone.** On `?tab=…` the Date scope, Search, Category and Subtype fields plus Apply and Reset come before the total; the first figure is below the fold at 390 px. A U8 layout point, not code.
 

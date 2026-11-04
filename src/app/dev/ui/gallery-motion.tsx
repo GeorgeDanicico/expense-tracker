@@ -4,13 +4,13 @@ import { Box, Button, chakra, Flex, Grid, Input, SimpleGrid, Stack, Switch, Text
 import { BellRing, House, LayoutGrid, MoreHorizontal, Plus, ShoppingBasket, Trash2, WalletCards } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
-import { Amount, AppDialog, Collapse, FormActions, ICON, IconButton, IconTile, SegmentedControl, ToggleChip, UndoToast } from "@/components/ui";
+import { Amount, AppDialog, Collapse, FormActions, ICON, IconButton, IconTile, SaveButton, SegmentedControl, ToggleChip, UndoToast, useSaveCheck } from "@/components/ui";
 import { DURATION_MS, PRESS_SCALE, pressFeedback, transition } from "@/components/ui/theme/motion";
 import { rowRecipe } from "@/components/ui/theme/recipes/misc";
 import { formatCurrency } from "@/lib/utils/currency";
 
 import { MotionScope, useCountUp } from "../preview/mockups/motion-scope";
-import { MockRow, SaveButton, useSaveCheck } from "../preview/mockups/stand-ins";
+import { MockRow } from "../preview/mockups/stand-ins";
 import { GallerySection } from "./gallery-section";
 
 const MS = DURATION_MS;
@@ -222,12 +222,12 @@ function IndicatorDemo() {
 }
 
 function SaveDemo() {
-  const { saved, save } = useSaveCheck(() => undefined);
+  const { saved, showCheck } = useSaveCheck();
   return (
     <Stack gap="3">
       <MockRow leading={<IconTile icon={BellRing} bg="bg.info" color="fg.info" />} title="Renew car insurance" meta="Tomorrow, 9:00" />
       <Flex>
-        <SaveButton saved={saved} onClick={save}>
+        <SaveButton saved={saved} onClick={() => showCheck(() => undefined)}>
           Save reminder
         </SaveButton>
       </Flex>

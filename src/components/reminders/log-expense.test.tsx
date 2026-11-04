@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { confirmAmount, LogExpenseDialog } from "@/components/reminders/log-expense-dialog";
 import { ReminderApiProvider, type ReminderApi } from "@/components/reminders/reminder-api";
-import { draftFor, draftToFields } from "@/components/reminders/reminder-dialog";
+import { draftFor, draftToFields } from "@/components/reminders/reminder-form";
 import { DoneRow, loggedExpenseHref } from "@/components/reminders/reminder-row";
 import { useReminders, type RemindersState } from "@/components/reminders/use-reminders";
 import { ledgerSystem } from "@/components/ui/theme";

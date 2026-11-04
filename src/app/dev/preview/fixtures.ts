@@ -16,6 +16,7 @@ import type {
 } from "@/lib/expenses/types";
 import type { AiSettingsResponse, FamilyResponse } from "@/lib/api/keys";
 import { groupByCurrency } from "@/lib/expenses/family";
+import { suggestExpenses } from "@/lib/expenses/suggestions";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
 import { ALL_MEMBERS, type Viewing } from "@/lib/family/viewing";
 import type { FamilyInvestmentsOverview } from "@/lib/investments/types";
@@ -412,6 +413,11 @@ export function fixtureFor(key: string): unknown {
     const month = params.get("month") ?? getBucharestMonth();
     if (family) return familyLedger(month);
     return ledger(month, month === getBucharestMonth() ? 1 : 0.92);
+  }
+  if (path === "/api/expenses/suggestions") {
+    const month = getBucharestMonth();
+    const history = [month, shiftMonth(month, -1), shiftMonth(month, -2)].flatMap((key) => expensesFor(key));
+    return suggestExpenses(history, params.get("q") ?? "");
   }
   if (path === "/api/expense-tabs") return { tabs: [CAR_TAB] };
   if (path.startsWith("/api/expense-tabs/") && path.endsWith("/expenses")) return carLedger();

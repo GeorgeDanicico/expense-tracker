@@ -1,7 +1,7 @@
 # Phase 17 update, 4 November 2026 (cloud session)
 
 Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-session-rk7uoj`.
-**No PR is open yet.**
+**PR #213 (U3, U4 and U5) merged on 4 November.** U6 is pushed to the same branch, with no PR open yet.
 
 ## Where the tasks stand
 
@@ -11,8 +11,9 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | U2 Screen audit | Merged earlier (#211, with the date fixes in #212) |
 | **U3 Direction and mockups** | **Done. George approved it on 4 November, taking the recommended answers.** |
 | **U4 Theme refresh and mobile primitives** | **Done. George signed off the screenshots on 4 November.** |
-| **U5 Navigation** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
-| U6 onwards | Not started. |
+| **U5 Navigation** | **Done. George signed off the screenshots on 4 November; merged in #213 with U3 and U4.** |
+| **U6 Quick add and the fast expense form** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
+| U7 onwards | Not started. |
 
 ## What U3 added
 
@@ -159,9 +160,68 @@ A sonnet agent did the work, as the plan says for this task.
 - At 320 px the Reminders rows overflow the page by 3 px (the edit icon); that is the screen's own
   layout, for the Planning screen task.
 
+## What U6 added
+
+An opus agent did the work, as the plan says for this task.
+
+- **One quick-add sheet** (`src/components/quick-add/`) behind the bottom bar's **+**, the
+  sidebar's **Add** and **N** on desktop (a plain N, not while typing or with a dialog open). It
+  replaces U5's placeholder.
+  - Expense, To-do, Reminder and Event, offered as `navigationFor` allows: To-do and Event only
+    with a family, Expense only with the expenses permission.
+  - It remembers the last kind used, per device; the first open starts on Expense.
+  - A save shows the check and closes the sheet; "Save and add another" clears the form instead.
+    A toast says what was added ("Reminder set for Thu 5 Nov, 09:00") with **View** to go to it.
+- **One form per thing, with a compact mode:** `ReminderFormFields`, `EventFormFields` and
+  `TodoFields` are now the dialogs' forms too. In the sheet, defaults are chips (tomorrow 9:00 for
+  a reminder; today, all day and everyone for an event; Me and no due date for a to-do), and the
+  rest folds behind "More options". The event form's people are `ToggleChip`s.
+- **The fast expense form** is the only expense form. The screens' "Add expense" buttons open the
+  sheet, dated in the month they show. The form has:
+  - the amount first, focused, on the decimal keypad;
+  - a description with suggestions from your own expenses (picking one fills the category and
+    subtype);
+  - the category guessed from the description, shown as a chip that changes in one tap;
+  - Today as a chip, with notes and subtype behind "More details".
+  - It fixes the "last day of the month" date default from the expenses simplification report.
+- **`GET /api/expenses/suggestions?q=`** (`src/lib/expenses/suggestions.ts`):
+  - the caller's last 200 distinct descriptions, from their newest 1000 expenses, each with its
+    most used category and subtype;
+  - matched by prefix, then by words, and answered with a guess;
+  - with the expenses permission, and never a member's. No AI, no table, no migration.
+- **Optimistic adds:** an expense API object (`expense-api.tsx`) and `useExpenseWrites`. A new
+  expense shows at once in its month's ledgers and on Home, and every view rolls back if the save
+  fails. `afterExpenseCreated` is gone from `invalidate.ts`.
+- **Shared schema (B1, B8, D10):** descriptions are one line with control characters dropped,
+  and notes keep their line breaks. MCP's `update_expense` extends the REST patch schema. B1's
+  two-decimal refusal was already shared; it is now tested on both transports with the new rules.
+- **Lint:** `local/client-only-chakra-factory` (from #213's build failure), with no existing
+  cases. New primitives: `ChipMenu`, `ChipRow`, `SaveButton` and `useSaveCheck`, `SheetForm` and
+  `useSheetSave`, and `FormField`'s `labelHidden`.
+- **Preview:** add `?quickAdd=expense|todo|reminder|event` to any `/dev/preview/<screen>` to open
+  the sheet. Every preview screen writes to in-memory APIs; `?failWrites=1` shows the expense
+  rollback.
+- **Screenshots:** `docs/ui-styling/screenshots/u6-quick-add-{expense,expense-suggestions,todo,reminder,event}-{390,1280}.jpg`.
+- **Checks:** lint has 0 errors and 0 warnings; `tsc` is clean; vitest passes 6439 tests
+  (1 skipped; 6362 before); `npm run build` passes with the CI environment.
+- **Taps:** adding an expense takes **+ → Save: 2** from any screen when the guess is right, or 3
+  with a suggestion picked. On desktop it is N, typing and Enter. A to-do takes 3 (+ → To-do →
+  Enter), or 2 once To-do is the remembered kind. A reminder takes 3.
+
+### Left over from U6
+
+- `POST /api/expenses` still wants a `selectedMonth` with the date inside it. The client now sends
+  the date's own month, so the rule protects nothing. Dropping it (D10's other half) changes the
+  API, so it is left to U8.
+- Delete still uses `afterExpenseDeleted`; the rest of the expense API object (delete and tabs) is
+  U8's proposal 2.
+- The screens still have their own "Add expense" button, now opening the sheet. The direction says
+  screens add none; U7 and U8 remove them as they rebuild Home and Expenses.
+
 ## Next steps
 
-1. George signs off the U5 screenshots, at 320, 390 and 1280 px.
-2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U3, U4 and U5. **Merging
-   changes every screen in production:** the new radii, bottom sheets and touch sizes.
-3. Then U6, the quick-add sheet and the fast expense form (opus).
+1. George signs off the U6 screenshots at 390 and 1280 px, and tries the sheet in
+   `/dev/preview/dashboard?quickAdd=expense`.
+2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U6. **Merging changes
+   adding in production:** the + opens the real sheet, and every Add expense button opens it.
+3. Then U7, Home as "today".

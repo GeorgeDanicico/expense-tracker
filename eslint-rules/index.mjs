@@ -2,6 +2,7 @@
  * The project's own ESLint rules, registered in eslint.config.mjs as the `local` plugin
  * (`local/<rule>`). Each rule is explained in docs/lint-rules.md, in a section named after it.
  */
+import clientOnlyChakraFactory from "./client-only-chakra-factory.mjs";
 import motionTokens from "./motion-tokens.mjs";
 import noFetchInComponents from "./no-fetch-in-components.mjs";
 import noIsoDateSlice from "./no-iso-date-slice.mjs";
@@ -19,6 +20,7 @@ import themeRadius from "./theme-radius.mjs";
 const plugin = {
   meta: { name: "eslint-plugin-local" },
   rules: {
+    "client-only-chakra-factory": clientOnlyChakraFactory,
     "motion-tokens": motionTokens,
     "no-fetch-in-components": noFetchInComponents,
     "no-iso-date-slice": noIsoDateSlice,

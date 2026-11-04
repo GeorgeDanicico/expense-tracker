@@ -14,7 +14,7 @@ import { useState } from "react";
 import { Suspense } from "react";
 import useSWR from "swr";
 
-import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
+import { AddExpenseButton } from "@/components/expenses/add-expense-button";
 import { CustomExpenseTab } from "@/components/expenses/custom-expense-tab";
 import { FamilyExpensesPanel } from "@/components/expenses/family-expenses-panel";
 import { ViewingControls } from "@/components/family/viewing-picker";
@@ -74,7 +74,7 @@ function ExpensesContent() {
         actions={activeTabId === null ? (
           <>
             <WriteOnly>
-              <AddExpenseDialog selectedMonth={month} currency={currency} />
+              <AddExpenseButton selectedMonth={month} />
               <ImportStatementButton />
             </WriteOnly>
             {viewing.family ? null : (
