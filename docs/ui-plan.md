@@ -513,7 +513,7 @@ tests.
 
 **Done when** the screens are signed off. Built on 4 November 2026; awaiting George's sign-off.
 
-**Signed off (George, 4 November 2026).**
+**Signed off (George, 4 November 2026).** Merged in #217.
 
 ### U11: Settings and family
 
