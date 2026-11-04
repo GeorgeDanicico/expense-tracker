@@ -4,7 +4,7 @@ import { Box, Button, Text } from "@chakra-ui/react";
 import { BellRing, CircleAlert, PartyPopper, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { SnoozeMenu } from "@/components/reminders/reminder-row";
+import { ReminderSwipe } from "@/components/reminders/reminder-row";
 import { useReminderActions } from "@/components/reminders/use-reminder-actions";
 import { REMINDERS_TICK_MS, useReminders } from "@/components/reminders/use-reminders";
 import { useNow } from "@/hooks/use-now";
@@ -33,7 +33,7 @@ function Meta({ reminder, now }: { reminder: ListedReminder; now: Date }) {
 }
 
 /**
- * What's overdue and due today, with Done and Snooze on the row: Done is one tap (a reminder with an
+ * What's overdue and due today, with Done and Snooze on the row (and as swipes on a phone): Done is one tap (a reminder with an
  * expense template asks about the expense first). A write shows at once and goes back if the server
  * refuses it, with the reason above the rows (`useReminders`).
  */
@@ -83,33 +83,39 @@ export function DueReminders() {
         ) : (
           <Box as="ul" m="0" p="0">
             {shown.map((reminder) => (
-              <ListRow
-                key={reminder.id}
-                leading={
-                  <IconTile
-                    icon={reminder.state === "overdue" ? CircleAlert : BellRing}
-                    bg={reminder.state === "overdue" ? "bg.error" : "bg.info"}
-                    color={reminder.state === "overdue" ? "fg.error" : "fg.info"}
-                  />
-                }
-                title={reminder.title}
-                meta={<Meta reminder={reminder} now={now} />}
-                trailing={
-                  <>
-                    <SnoozeMenu title={reminder.title} disabled={actions.busy.has(reminder.id)} onChoose={(choice) => actions.snooze(reminder, choice)} />
-                    <Button
-                      size="sm"
-                      variant="solid"
-                      colorPalette="brand"
-                      disabled={actions.busy.has(reminder.id)}
-                      aria-label={`Mark ${reminder.title} done`}
-                      onClick={() => actions.complete(reminder)}
-                    >
-                      Done
-                    </Button>
-                  </>
-                }
-              />
+              <Box as="li" key={reminder.id} listStyleType="none">
+                <ReminderSwipe reminder={reminder} busy={actions.busy.has(reminder.id)} onComplete={actions.complete} onSnooze={actions.snooze}>
+                  {(snoozeMenu) => (
+                    <ListRow
+                      as="div"
+                      leading={
+                        <IconTile
+                          icon={reminder.state === "overdue" ? CircleAlert : BellRing}
+                          bg={reminder.state === "overdue" ? "bg.error" : "bg.info"}
+                          color={reminder.state === "overdue" ? "fg.error" : "fg.info"}
+                        />
+                      }
+                      title={reminder.title}
+                      meta={<Meta reminder={reminder} now={now} />}
+                      trailing={
+                        <>
+                          {snoozeMenu}
+                          <Button
+                            size="sm"
+                            variant="solid"
+                            colorPalette="brand"
+                            disabled={actions.busy.has(reminder.id)}
+                            aria-label={`Mark ${reminder.title} done`}
+                            onClick={() => actions.complete(reminder)}
+                          >
+                            Done
+                          </Button>
+                        </>
+                      }
+                    />
+                  )}
+                </ReminderSwipe>
+              </Box>
             ))}
           </Box>
         )}

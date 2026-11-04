@@ -1,8 +1,8 @@
 import type { Cache, ScopedMutator } from "swr";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { deleteWithUndo, writeOptimistically } from "@/components/expenses/use-expense-writes";
-import { createUndoQueue, type UndoEntry } from "@/components/ui/undo-toast";
+import { EXPENSE_DELETE, writeOptimistically } from "@/components/expenses/use-expense-writes";
+import { createUndoQueue, deleteWithUndo, type UndoEntry } from "@/components/ui/undo-toast";
 import { DEFAULT_EXPENSE_TAB_FILTERS } from "@/lib/expenses/filters";
 import type { ExpenseTabLedgerData } from "@/lib/expenses/tabs";
 import type { DashboardData, Expense, ExpensesData, FamilyExpensesData } from "@/lib/expenses/types";
@@ -203,6 +203,7 @@ describe("deleteWithUndo", () => {
     const failures: string[] = [];
     const removeSpy = vi.fn(remove);
     deleteWithUndo(queue.schedule, rent, {
+      ...EXPENSE_DELETE,
       hide: (id, hiding) => (hiding ? hidden.add(id) : hidden.delete(id)),
       remove: removeSpy,
       onFailure: (message) => failures.push(message),

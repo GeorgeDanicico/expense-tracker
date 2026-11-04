@@ -1,16 +1,17 @@
 import { ChakraProvider } from "@chakra-ui/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SWRConfig } from "swr";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { formatDueDate } from "@/components/todos/todo-card";
 import { focusAfterLeaving, moveToTop, TodoBoard } from "@/components/todos/todo-board";
 import { TodoFilterChips } from "@/components/todos/todo-filters";
-import { NoFamilyBoard } from "@/components/todos/todo-board-screen";
+import { CARD_DELETE, NoFamilyBoard } from "@/components/todos/todo-board-screen";
 import { todoChanges } from "@/components/todos/todo-dialog";
 import { useLinkedCard } from "@/components/todos/use-linked-card";
 import { doneSinceForStep, OLDER_DONE_STEPS } from "@/components/todos/use-todo-board";
 import { ledgerSystem } from "@/components/ui/theme";
+import { createUndoQueue, deleteWithUndo, UNDO_MS, type UndoEntry } from "@/components/ui/undo-toast";
 import type { FamilyMemberView } from "@/lib/family/views";
 import { DEFAULT_TODO_FILTERS, linkedCard, withoutCardHref, type TodoFilters } from "@/lib/todos/filters";
 import type { Todo } from "@/lib/todos/types";
@@ -55,17 +56,17 @@ describe("todoChanges", () => {
   });
 });
 
-describe("TodoBoard", () => {
-  function render(todos: Todo[], singleColumn = false) {
-    return renderToStaticMarkup(
-      <ChakraProvider value={ledgerSystem}>
-        <SWRConfig value={{ fetcher: () => new Promise(() => {}) }}>
-          <TodoBoard todos={todos} onAdd={async () => {}} onMove={async () => {}} onOpen={() => {}} singleColumn={singleColumn} />
-        </SWRConfig>
-      </ChakraProvider>,
-    );
-  }
+function render(todos: Todo[], singleColumn = false, onDelete?: (todo: Todo) => void) {
+  return renderToStaticMarkup(
+    <ChakraProvider value={ledgerSystem}>
+      <SWRConfig value={{ fetcher: () => new Promise(() => {}) }}>
+        <TodoBoard todos={todos} onAdd={async () => {}} onMove={async () => {}} onOpen={() => {}} onDelete={onDelete} singleColumn={singleColumn} />
+      </SWRConfig>
+    </ChakraProvider>,
+  );
+}
 
+describe("TodoBoard", () => {
   it("shows the three columns with their counts and cards in position order", () => {
     const html = render([
       card({ id: "b", title: "Second", position: "a1" }),
@@ -102,6 +103,58 @@ describe("TodoBoard", () => {
     expect(html).not.toContain('id="todo-column-in_progress"');
     expect(html).not.toContain("Painting");
     expect(html).toContain('aria-label="Move Buy milk to…"');
+  });
+});
+
+describe("deleting a card", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("has a hover delete icon and the Delete key on desktop; a phone swipes (and keeps the dialog's Delete)", () => {
+    const desktop = render([card({})], false, () => undefined);
+    expect(desktop).toContain('aria-label="Delete: Buy milk"');
+    expect(desktop).toContain('aria-keyshortcuts="Delete"');
+    expect(desktop).toContain("data-row-actions");
+    const phone = render([card({})], true, () => undefined);
+    expect(phone).not.toContain('aria-label="Delete: Buy milk"');
+    expect(phone).toContain('aria-keyshortcuts="Delete"');
+  });
+
+  it("has no delete without a handler", () => {
+    expect(render([card({})])).not.toContain("Delete: Buy milk");
+  });
+
+  it("hides the card with Card deleted · Undo; Undo brings it back and sends nothing", async () => {
+    const hidden = new Set<string>();
+    const shown: (UndoEntry | null)[] = [];
+    const queue = createUndoQueue({ onChange: (entry) => shown.push(entry) });
+    const remove = vi.fn(async () => undefined);
+    const milk = card({});
+    deleteWithUndo(queue.schedule, milk, {
+      ...CARD_DELETE,
+      hide: (id, hiding) => (hiding ? hidden.add(id) : hidden.delete(id)),
+      remove,
+      onFailure: () => undefined,
+    });
+    expect(hidden.has("t1")).toBe(true);
+    expect(shown.at(-1)?.message).toBe("Card deleted");
+    queue.undo();
+    await vi.advanceTimersByTimeAsync(UNDO_MS * 2);
+    expect(hidden.has("t1")).toBe(false);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("sends the delete when the toast expires, and says so if it fails", async () => {
+    const failures: string[] = [];
+    const queue = createUndoQueue({ onChange: () => undefined });
+    deleteWithUndo(queue.schedule, card({}), {
+      ...CARD_DELETE,
+      hide: () => undefined,
+      remove: async () => { throw new Error("offline"); },
+      onFailure: (message) => failures.push(message),
+    });
+    await vi.advanceTimersByTimeAsync(UNDO_MS);
+    expect(failures).toEqual(["Couldn't delete “Buy milk”. Try again."]);
   });
 });
 

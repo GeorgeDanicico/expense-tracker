@@ -1,7 +1,7 @@
 "use client";
 
 import { chakra, Flex, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { pressFeedback, transition } from "@/components/ui/theme/motion";
 import { PAGE_SPACING } from "@/components/ui/theme/layout";
@@ -84,6 +84,73 @@ export function useUndo(delay = UNDO_MS) {
   }, [queue]);
 
   return { schedule: queue.schedule, toast: { message: entry?.message ?? null, onUndo: queue.undo } };
+}
+
+/** What a delete with Undo says: "Expense deleted", and the failure once the write is refused. */
+export type DeleteCopy<T> = { message: string; failure: (item: T) => string };
+
+/**
+ * A delete with Undo instead of a confirmation (George's decision, "Undo for single rows"): the row
+ * hides at once and the toast shows; the delete is sent when the toast expires (or the page is left),
+ * and Undo cancels it without a request. `hide` keeps the row out of every list until then, so a
+ * refetch in the meantime can't bring it back; a failed delete brings it back and says so.
+ */
+export function deleteWithUndo<T extends { id: string }>(
+  schedule: (entry: UndoEntry) => void,
+  item: T,
+  { message, failure, hide, remove, onFailure }: DeleteCopy<T> & {
+    hide: (id: string, hidden: boolean) => void;
+    remove: (item: T) => Promise<unknown>;
+    onFailure: (message: string) => void;
+  },
+) {
+  hide(item.id, true);
+  schedule({
+    message,
+    commit: async () => {
+      try {
+        await remove(item);
+      } catch {
+        onFailure(failure(item));
+      } finally {
+        hide(item.id, false);
+      }
+    },
+    restore: () => hide(item.id, false),
+  });
+}
+
+/**
+ * A screen's deletes with Undo: `remove(item)` hides the row and offers Undo (`deleteWithUndo`);
+ * lists leave out `hidden`; spread `toast` on an `UndoToast` (it also says when a delete failed).
+ * `remove` and `copy` should keep their identity between renders.
+ */
+export function useDeleteWithUndo<T extends { id: string }>(remove: (item: T) => Promise<unknown>, copy: DeleteCopy<T>) {
+  const undo = useUndo();
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const [failure, setFailure] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!failure) return;
+    const timer = window.setTimeout(() => setFailure(null), UNDO_MS);
+    return () => window.clearTimeout(timer);
+  }, [failure]);
+
+  const hide = useCallback((id: string, hiding: boolean) => {
+    setHidden((current) => {
+      const next = new Set(current);
+      if (hiding) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+  const { schedule } = undo;
+  const removeWithUndo = useCallback((item: T) => {
+    setFailure(null);
+    deleteWithUndo(schedule, item, { ...copy, hide, remove, onFailure: setFailure });
+  }, [copy, hide, remove, schedule]);
+
+  return { hidden, remove: removeWithUndo, toast: failure ? { message: failure } : undo.toast };
 }
 
 /**

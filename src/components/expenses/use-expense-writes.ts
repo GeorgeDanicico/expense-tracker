@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import { useSWRConfig, type Cache, type ScopedMutator } from "swr";
 
 import { useExpenseApi } from "@/components/expenses/expense-api";
 import { applyExpenseChange, refreshExpenseViews, withoutTab, withTabSaved, type ExpenseChange } from "@/components/expenses/expense-cache";
-import { UNDO_MS, useUndo, type UndoEntry } from "@/components/ui/undo-toast";
+import { useDeleteWithUndo, type DeleteCopy } from "@/components/ui/undo-toast";
 import { EXPENSE_TABS_API_KEY, expenseTabApiKey, type TabsResponse } from "@/lib/api/keys";
 import type { ExpenseTab, ExpenseTabInput } from "@/lib/expenses/tabs";
 import type { Expense } from "@/lib/expenses/types";
@@ -98,66 +98,16 @@ export function useExpenseWrites() {
   }, [api, cache, mutate]);
 }
 
-/**
- * A delete with Undo instead of a confirmation (George's decision, "Undo for single rows"): the row
- * hides at once and "Expense deleted · Undo" shows; the delete is sent when the toast expires (or the
- * page is left), and Undo cancels it without a request. `hide` keeps the row out of every list until
- * then, so a refetch in the meantime can't bring it back; a failed delete brings it back and says so.
- */
-export function deleteWithUndo(
-  schedule: (entry: UndoEntry) => void,
-  expense: Expense,
-  { hide, remove, onFailure }: {
-    hide: (id: string, hidden: boolean) => void;
-    remove: (expense: Expense) => Promise<unknown>;
-    onFailure: (message: string) => void;
-  },
-) {
-  hide(expense.id, true);
-  schedule({
-    message: "Expense deleted",
-    commit: async () => {
-      try {
-        await remove(expense);
-      } catch {
-        onFailure(`Couldn't delete “${expense.description}”. Try again.`);
-      } finally {
-        hide(expense.id, false);
-      }
-    },
-    restore: () => hide(expense.id, false),
-  });
-}
+/** What the expense deletes say (`deleteWithUndo`). */
+export const EXPENSE_DELETE: DeleteCopy<Expense> = {
+  message: "Expense deleted",
+  failure: (expense) => `Couldn't delete “${expense.description}”. Try again.`,
+};
 
 /**
  * The Expenses screen's deletes: `remove(expense)` hides the row and offers Undo (`deleteWithUndo`).
  * Lists leave out `hidden`; spread `toast` on an `UndoToast`.
  */
 export function useExpenseDelete() {
-  const writes = useExpenseWrites();
-  const undo = useUndo();
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-  const [failure, setFailure] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!failure) return;
-    const timer = window.setTimeout(() => setFailure(null), UNDO_MS);
-    return () => window.clearTimeout(timer);
-  }, [failure]);
-
-  const hide = useCallback((id: string, hiding: boolean) => {
-    setHidden((current) => {
-      const next = new Set(current);
-      if (hiding) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }, []);
-  const { schedule } = undo;
-  const remove = useCallback((expense: Expense) => {
-    setFailure(null);
-    deleteWithUndo(schedule, expense, { hide, remove: writes.remove, onFailure: setFailure });
-  }, [hide, schedule, writes.remove]);
-
-  return { hidden, remove, toast: failure ? { message: failure } : undo.toast };
+  return useDeleteWithUndo(useExpenseWrites().remove, EXPENSE_DELETE);
 }

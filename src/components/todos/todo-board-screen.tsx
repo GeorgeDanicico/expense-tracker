@@ -4,7 +4,7 @@ import { Button, Flex, Stack, Text } from "@chakra-ui/react";
 import { History, SquareKanban, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import useSWR from "swr";
 
 import { TodoBoard } from "@/components/todos/todo-board";
@@ -18,6 +18,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { UndoToast, useDeleteWithUndo, type DeleteCopy } from "@/components/ui/undo-toast";
 import { useAccount } from "@/hooks/use-account";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { useMemberColors } from "@/hooks/use-member-colors";
@@ -34,6 +35,12 @@ import {
   type TodoFilters,
 } from "@/lib/todos/filters";
 import type { Todo, TodoStatus } from "@/lib/todos/types";
+
+/** What a card's swipe or Delete-key delete says (the dialog's Delete still asks first). */
+export const CARD_DELETE: DeleteCopy<Todo> = {
+  message: "Card deleted",
+  failure: (todo) => `Couldn't delete “${todo.title}”. Try again.`,
+};
 
 /** Shown to a user without a family, who has no board. */
 export function NoFamilyBoard() {
@@ -84,6 +91,8 @@ export function TodoBoardScreen() {
   const hasFamily = Boolean(account?.membership);
   const myMemberId = account?.membership?.memberId ?? null;
   const board = useTodoBoard({ enabled: hasFamily });
+  const { remove: removeCard } = board;
+  const deletes = useDeleteWithUndo(useCallback((todo: Todo) => removeCard(todo.id), [removeCard]), CARD_DELETE);
   const { data: family } = useSWR<FamilyResponse>(hasFamily ? FAMILY_API_KEY : null);
   const members = family?.family?.members;
   const card = useLinkedCard(board.todos, searchParams.get(TODO_CARD_PARAM), pathname);
@@ -92,8 +101,8 @@ export function TodoBoardScreen() {
   const { assignee, due } = parseTodoFilters(searchParams, members?.map((member) => member.memberId));
   const filters = useMemo<TodoFilters>(() => ({ assignee, due }), [assignee, due]);
   const visible = useMemo(
-    () => (board.todos ? filterTodos(board.todos, filters, myMemberId) : undefined),
-    [board.todos, filters, myMemberId],
+    () => (board.todos ? filterTodos(board.todos, filters, myMemberId).filter((todo) => !deletes.hidden.has(todo.id)) : undefined),
+    [board.todos, filters, myMemberId, deletes.hidden],
   );
   // The native History API syncs `useSearchParams` without a server round trip (filtering is
   // client-side), and replacing keeps chip clicks out of the back button's history.
@@ -160,6 +169,7 @@ export function TodoBoardScreen() {
         onAdd={addFiltered}
         onMove={board.move}
         onOpen={(todo: Todo) => card.open(todo.id)}
+        onDelete={deletes.remove}
         onDraggingChange={board.setDragging}
         doneFooter={board.canShowOlder ? (
           <Flex justify="center" mt="2">
@@ -183,6 +193,7 @@ export function TodoBoardScreen() {
           onDelete={board.remove}
         />
       ) : null}
+      <UndoToast {...deletes.toast} />
     </Stack>
   );
 }
