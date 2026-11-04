@@ -10,8 +10,9 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | U1 Lint plugin | Merged earlier (#210) |
 | U2 Screen audit | Merged earlier (#211, with the date fixes in #212) |
 | **U3 Direction and mockups** | **Done. George approved it on 4 November, taking the recommended answers.** |
-| **U4 Theme refresh and mobile primitives** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
-| U5 onwards | Not started. U5 (navigation) depends on U4. |
+| **U4 Theme refresh and mobile primitives** | **Done. George signed off the screenshots on 4 November.** |
+| **U5 Navigation** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
+| U6 onwards | Not started. |
 
 ## What U3 added
 
@@ -119,17 +120,48 @@ An opus agent did the work, as the plan says for this task. It pushed seven comm
 - Move the chips in 6 files to `ToggleChip`, and add a `local/no-raw-toggle-button` rule.
 - A `DataGate` helper.
 
-### For George's U4 sign-off
+### What George signed off for U4
 
 - 44 px buttons and fields on phones.
 - Cards without borders, and list rows without lines.
 - How the sheets look, and the "Discard your changes?" prompt.
 - The 8 decisions that were inferred from the doc and mockups (above).
 
+## What U5 added
+
+A sonnet agent did the work, as the plan says for this task.
+
+- **Bottom bar:** Home, Money, **+**, Planning, More, with labels, fitting at 320 px. The tabs follow
+  `navigationFor`, so Money is missing for a kid with every money module off. A sliding indicator
+  marks the active tab, which now matches on sub-paths (`/expenses/import` is Money). The phone
+  header with only the logo is gone, as in the mockups.
+- **+ and Add:** one `QuickAddProvider` in the shell. Both the bar's **+** and a new **Add** button
+  at the top of the sidebar open a placeholder `AppDialog` that links to the pages that add things
+  today, until U6.
+- **Money and Planning:** a segmented control (`SectionNav`, rendered by the shell) switches pages at
+  their existing URLs; no route moved. A section with one visible page shows no control.
+- **Sidebar:** the same groups (Home, Money, Planning, More), 240 px wide.
+- **More** is a page at `/more` (profile, the settings list, install, sign out); desktop sends it to
+  `/settings`. **Settings** is one grouped list (Account, Family, AI) with the open page beside it
+  from `md` up, and a way back to More on phones. The seven tabs are gone; every settings URL still
+  works, and parent-only and family-only rows still follow the same rules.
+- **Code:** `nav-items.ts` is one table of four sections and `navigationFor` the one source (the
+  `TAB_BAR_ITEMS`, `MORE_*` constants and the More sheet are deleted). `useAppPathname()` lets the
+  preview highlight the right page; `/dev/preview/more` is new.
+- **Screenshots:** `docs/ui-styling/screenshots/u5-{home,money,planning,more,settings,settings-notifications}-{320,390,1280}.jpg`
+  (no `more` at 1280, which is Settings) and `u5-sidebar-1280.jpg`.
+- **Checks:** lint 0 errors and 0 warnings; `tsc` clean; vitest 6362 passed (1 skipped).
+
+### Left over from U5
+
+- Insights as a fourth Money segment waits for U7 (the dashboards still live at Home).
+- The quick-add forms and the `N` shortcut are U6's.
+- At 320 px the Reminders rows overflow the page by 3 px (the edit icon); that is the screen's own
+  layout, for the Planning screen task.
+
 ## Next steps
 
-1. George signs off the U4 screenshots, at 390 and 1280 px.
-2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U3 and U4. **Merging
+1. George signs off the U5 screenshots, at 320, 390 and 1280 px.
+2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U3, U4 and U5. **Merging
    changes every screen in production:** the new radii, bottom sheets and touch sizes.
-3. Then U5, navigation (sonnet): Home, Money, +, Planning and More; the sidebar to match; and
-   Settings as one list.
+3. Then U6, the quick-add sheet and the fast expense form (opus).

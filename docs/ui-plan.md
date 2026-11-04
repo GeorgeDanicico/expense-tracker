@@ -334,7 +334,9 @@ gallery shows every new primitive and the motion section.
 the whole app has the new radii, spacing and motion with the same colours, and George has signed
 off the gallery and screenshots at 390 and 1280 px.
 
-**Built (4 November 2026), waiting for George's sign-off:** the theme (`theme/motion.ts`,
+**Signed off by George on 4 November 2026 (screenshots at 390 and 1280 px).**
+
+**Built (4 November 2026):** the theme (`theme/motion.ts`,
 `theme/layout.ts`, the radii in `tokens.ts`, touch sizes and press feedback in the recipes, the
 reduced-motion block in `global-css.ts`), the responsive `AppDialog` (plus `pending` and `dirty`),
 `ActionBar`, `RowActions` with `useRowActions()`, `UndoToast` with `useUndo()`, `AmountInput`,
@@ -369,6 +371,11 @@ permission); the active state for every route; the segmented control's URLs.
 
 **Done when** screenshots at 320, 390 and 1280 px are signed off and every page is reachable in
 at most two taps from Home.
+
+**Built (4 November 2026), waiting for George's sign-off:** the bottom bar and sidebar from one
+`navigationFor` table, `SectionNav` (the segmented control, rendered by the shell so no route
+moves), the quick-add placeholder, `/more`, and Settings as a grouped list. Screenshots:
+`docs/ui-styling/screenshots/u5-*.jpg`. Insights (a fourth Money segment) waits for U7.
 
 ### U6: Quick add and the fast expense form
 
