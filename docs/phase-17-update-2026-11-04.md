@@ -69,7 +69,7 @@ recommendation; for the other eight, the answer recorded is what the doc and moc
 9. Should the sheet close in 300 ms or 200 ms?
 10. Is a kid-account mockup needed?
 
-## Found along the way (not fixed here)
+## Found along the way
 
 - **Status backgrounds had no fill in production.** The raw `status.*Bg` tokens and the semantic
   `status.*.bg` tokens compiled to the same CSS variable, which ended up referring to itself. So
