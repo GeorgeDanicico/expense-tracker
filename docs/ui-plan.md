@@ -528,7 +528,7 @@ tests.
 covers all of `src/components`). Built on 4 November 2026 (the rule now covers all of
 `src/components` and `src/app/(app)`); awaiting George's sign-off.
 
-**Signed off (George, 4 November 2026).**
+**Signed off (George, 4 November 2026).** Merged in #218.
 
 ### U12: Swipe actions
 
