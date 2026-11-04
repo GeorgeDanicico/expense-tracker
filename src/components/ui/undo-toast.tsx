@@ -98,7 +98,8 @@ export function UndoToast({
   contained = false,
 }: {
   message: string | null;
-  onUndo: () => void;
+  /** Without it the toast only says what happened. */
+  onUndo?: () => void;
   actionLabel?: string;
   contained?: boolean;
 }) {
@@ -121,7 +122,7 @@ export function UndoToast({
       justify="space-between"
       gap="3"
       ps="4"
-      pe="2"
+      pe={onUndo ? "2" : "4"}
       minH="12"
       borderRadius="card"
       bg="fg"
@@ -133,18 +134,20 @@ export function UndoToast({
       pointerEvents={shown ? "auto" : "none"}
     >
       <Text textStyle="body">{last}</Text>
-      <chakra.button
-        type="button"
-        minH="11"
-        px="3"
-        borderRadius="control"
-        color="brand.muted"
-        fontWeight="semibold"
-        onClick={onUndo}
-        css={pressFeedback()}
-      >
-        {actionLabel}
-      </chakra.button>
+      {onUndo ? (
+        <chakra.button
+          type="button"
+          minH="11"
+          px="3"
+          borderRadius="control"
+          color="brand.muted"
+          fontWeight="semibold"
+          onClick={onUndo}
+          css={pressFeedback()}
+        >
+          {actionLabel}
+        </chakra.button>
+      ) : null}
     </Flex>
   );
 }

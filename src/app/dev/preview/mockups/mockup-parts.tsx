@@ -6,13 +6,13 @@ import NextLink from "next/link";
 import type { ReactNode } from "react";
 
 import { CATEGORY_ICONS } from "@/components/expenses/category-visual";
-import { Amount } from "@/components/ui";
+import { Amount, Collapse, IconTile, RowActions } from "@/components/ui";
 import { CATEGORY_LABELS } from "@/lib/expenses/categories";
 
 import { useMockState } from "./mock-state";
 import { MOCK_CURRENCY, memberById, type MockExpense, type MockReminder } from "./mockup-data";
 import { mockupHref, type MockupId } from "./mockups";
-import { CollapseRow, IconTile, MockRow, RowActions, STATUS_SURFACE } from "./stand-ins";
+import { MockRow } from "./stand-ins";
 
 /** The page's title, with at most one action next to it. */
 export function PageTitle({ title, kicker, action }: { title: string; kicker?: string; action?: ReactNode }) {
@@ -124,9 +124,9 @@ export function ExpenseRow({
     />
   );
   return (
-    <CollapseRow gone={removed.has(expense.id)} entering={added.has(expense.id)}>
+    <Collapse open={!removed.has(expense.id)} entering={added.has(expense.id)}>
       {wrap ? wrap(row) : row}
-    </CollapseRow>
+    </Collapse>
   );
 }
 
@@ -143,7 +143,7 @@ export function ReminderTile({ reminder }: { reminder: MockReminder }) {
   return (
     <IconTile
       icon={REMINDER_ICONS[reminder.kind]}
-      bg={tone ? STATUS_SURFACE[tone] : "bg.muted"}
+      bg={tone ? `bg.${tone}` : "bg.muted"}
       color={tone ? `fg.${tone}` : "fg.muted"}
     />
   );

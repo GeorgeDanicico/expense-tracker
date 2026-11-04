@@ -5,38 +5,38 @@ import type { ReactNode } from "react";
 
 import { PAGE_SPACING } from "@/components/ui/theme/layout";
 
+const PLACEMENTS = {
+  /** On the phone's bottom bar (clear of the home indicator), at the window's bottom on desktop. */
+  page: {
+    bottom: { base: PAGE_SPACING.bottomBar, md: "0" },
+    bg: "bg.surface",
+    borderWidth: "1px",
+    borderColor: "border",
+    borderRadius: "card",
+    boxShadow: "xs",
+    px: "4",
+    py: "3",
+  },
+  /** At the bottom of a sheet's scrolling body, for a form whose buttons live inside it. */
+  sheet: { bottom: "0", bg: "bg.surface", pt: "3" },
+} as const;
+
 /**
- * The sticky bottom area for a page's main button(s), within thumb reach: it sits on the phone's
- * bottom bar (clear of the home indicator) and at the bottom of the window on desktop. In a sheet,
- * `AppDialog`'s `footer` is already this bar. `overBottomBar={false}` for a page without the
- * bottom bar, where the bar itself keeps clear of the home indicator.
+ * The sticky bottom area for the main button(s) of a page or a sheet, within thumb reach. A sheet
+ * whose buttons don't need to be inside its form can use `AppDialog`'s `footer` instead, which is
+ * already this bar.
  */
 export function ActionBar({
   children,
-  overBottomBar = true,
+  placement = "page",
   "aria-label": ariaLabel,
 }: {
   children: ReactNode;
-  overBottomBar?: boolean;
+  placement?: keyof typeof PLACEMENTS;
   "aria-label"?: string;
 }) {
   return (
-    <Stack
-      role={ariaLabel ? "region" : undefined}
-      aria-label={ariaLabel}
-      gap="3"
-      position="sticky"
-      bottom={overBottomBar ? { base: PAGE_SPACING.bottomBar, md: "0" } : "0"}
-      zIndex="docked"
-      bg="bg.surface"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="card"
-      boxShadow="xs"
-      px="4"
-      pt="3"
-      pb={overBottomBar ? "3" : { base: "calc(0.75rem + env(safe-area-inset-bottom))", md: "3" }}
-    >
+    <Stack role={ariaLabel ? "region" : undefined} aria-label={ariaLabel} gap="3" position="sticky" zIndex="docked" {...PLACEMENTS[placement]}>
       {children}
     </Stack>
   );

@@ -1,6 +1,7 @@
 # UI direction (phase 17, U3)
 
-How every phase 17 screen should look and behave, for George's checkpoint before U4 builds anything.
+How every phase 17 screen should look and behave. George signed it off on 4 November 2026 (see
+"Decisions" at the end); U4 built the theme and primitives from it.
 It follows [ui-plan.md](ui-plan.md) ("How the app becomes mobile first", "The look") and the
 screen audit ([ui-audit.md](ui-audit.md)). The signed-off HTML mockup (iFam Mobile Mockups, 4
 November) was the starting point. This page and the mockups below record what changed from it and
@@ -102,15 +103,14 @@ the quick-add amount at 40 px (see the questions).
 | Hover actions, row tint | opacity, background | `fast` |
 | Skeleton → content (U4) | opacity | `moderate` · `standard` |
 
-**Reduced motion** sets every duration to 0 ms: changes are instant and the action still happens.
-U4 puts this in one block in `global-css.ts`, replacing today's `globals.css` block (0.01 ms) and the
-one `matchMedia` in `reminders-screen.tsx`. JavaScript motion (the count-up, the check's hand-off)
-asks `useReducedMotion()`.
+**Reduced motion** turns every animation and transition off: changes are instant and the action
+still happens. It is one block in `global-css.ts` (it replaced the `globals.css` block and the one
+`matchMedia` in `reminders-screen.tsx`). JavaScript motion (the count-up, the check's hand-off) asks
+`useReducedMotion()` (`src/hooks/use-reduced-motion.ts`).
 
-The proposed values live in one dev-only file,
-`src/app/dev/preview/mockups/proposed-theme.ts`. It sets CSS variables on the mockups' wrapper, so the
-real primitives pick up the new radii without a theme change. U4 moves the values into
-`src/components/ui/theme` and deletes the file.
+**Where the values live (U4):** the radii in the theme's `tokens.ts`; durations, easings, keyframes
+and press feedback in `src/components/ui/theme/motion.ts`; page spacing in `theme/layout.ts`; touch
+sizes in the recipes. U3's dev-only `proposed-theme.ts` is gone and the mockups use the real theme.
 
 ## What differs from the signed-off mockup
 

@@ -1,40 +1,24 @@
 "use client";
 
 import { Box, type BoxProps } from "@chakra-ui/react";
-import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { PROPOSED_COUNT_UP_MS, proposedScope } from "./proposed-theme";
-
-const SimulatedReducedMotion = createContext(false);
+import { REDUCED_MOTION_STYLES } from "@/components/ui/theme/global-css";
+import { DURATION_MS } from "@/components/ui/theme/motion";
+import { SimulatedReducedMotion, useReducedMotion } from "@/hooks/use-reduced-motion";
 
 /**
- * Previews the proposed radii, spacing, motion and touch sizes on everything inside it (see
- * `proposed-theme.ts`). `reduced` simulates `prefers-reduced-motion: reduce`.
+ * The mockups and the gallery's Motion section run on the real theme. This only adds the
+ * "Simulate reduced motion" switch: with `reduced`, everything inside gets the theme's own
+ * reduced-motion rules (global-css.ts) and `useReducedMotion()` answers true. Dialogs and menus
+ * open in a portal, outside the wrapper, so the switch doesn't reach them; the device setting does.
  */
-export function ProposedThemeScope({ reduced = false, ...props }: { reduced?: boolean } & Omit<BoxProps, "css">) {
+export function MotionScope({ reduced = false, ...props }: { reduced?: boolean } & Omit<BoxProps, "css">) {
   return (
     <SimulatedReducedMotion.Provider value={reduced}>
-      <Box css={proposedScope(reduced)} {...props} />
+      <Box css={reduced ? { "&, & *, & *::before, & *::after": REDUCED_MOTION_STYLES } : undefined} {...props} />
     </SimulatedReducedMotion.Provider>
   );
-}
-
-const QUERY = "(prefers-reduced-motion: reduce)";
-const subscribe = (onChange: () => void) => {
-  const media = window.matchMedia(QUERY);
-  media.addEventListener("change", onChange);
-  return () => media.removeEventListener("change", onChange);
-};
-
-/**
- * Stand-in for U4's shared `useReducedMotion()`: true when the device asks for reduced motion or the
- * scope simulates it. Only JavaScript-driven motion (the count-up, timed hand-offs) needs it; CSS
- * motion follows the scope's variables.
- */
-export function useReducedMotion() {
-  const simulated = useContext(SimulatedReducedMotion);
-  const device = useSyncExternalStore(subscribe, () => window.matchMedia(QUERY).matches, () => false);
-  return simulated || device;
 }
 
 /** Waits `ms` before running `then`, or runs it at once under reduced motion (the action always happens). */
@@ -56,7 +40,7 @@ export function useCountUp(target: number, from = 0) {
     const start = performance.now();
     const origin = current.current;
     let frame = requestAnimationFrame(function step(now) {
-      const t = Math.min(1, (now - start) / PROPOSED_COUNT_UP_MS);
+      const t = Math.min(1, (now - start) / DURATION_MS.countUp);
       current.current = origin + (target - origin) * (1 - (1 - t) ** 3);
       setValue(current.current);
       if (t < 1) frame = requestAnimationFrame(step);

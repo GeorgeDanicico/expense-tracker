@@ -77,6 +77,17 @@ export const chipRecipe = defineRecipe({
 });
 
 /**
+ * `RowActions`' icon buttons show when their row (or card) is hovered or focused, on screens with
+ * a pointer. The row recipe has it; a card that holds `RowActions` spreads it into `css`.
+ */
+export const revealRowActions = {
+  "@media (hover: hover)": {
+    "& [data-row-actions]": { opacity: 0, transition: "opacity {durations.fast} {easings.standard}" },
+    "&:hover [data-row-actions], &:focus-within [data-row-actions]": { opacity: 1 },
+  },
+} as const;
+
+/**
  * A list row: 56px tall on phones (48 from `md`), no line between rows (space separates them).
  * A row that is a link or a button, or marked `data-pressable`, tints on hover and presses in.
  */
@@ -97,10 +108,6 @@ export const rowRecipe = defineRecipe({
       ...pressFeedback(),
       _hover: { bg: "bg.subtle" },
     },
-    // `RowActions`' icon buttons show when the row is hovered or focused, on screens with a pointer.
-    "@media (hover: hover)": {
-      "& [data-row-actions]": { opacity: 0, transition: "opacity {durations.fast} {easings.standard}" },
-      "&:hover [data-row-actions], &:focus-within [data-row-actions]": { opacity: 1 },
-    },
+    ...revealRowActions,
   },
 });

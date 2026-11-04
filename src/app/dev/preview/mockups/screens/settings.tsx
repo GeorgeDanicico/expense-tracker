@@ -23,14 +23,15 @@ import {
 import NextLink from "next/link";
 import type { ReactNode } from "react";
 
-import { Avatar, Card, ICON, InlineAlert } from "@/components/ui";
+import { Avatar, Card, ICON, IconTile, InlineAlert, RowActions } from "@/components/ui";
+import { PAGE_SPACING } from "@/components/ui/theme/layout";
+import { pressFeedback, transition } from "@/components/ui/theme/motion";
 
 import { useMockState } from "../mock-state";
 import { MOCK_ME, MOCK_MEMBERS } from "../mockup-data";
 import { mockupHref, type MockupId } from "../mockups";
 import { GroupLabel, PageTitle } from "../mockup-parts";
-import { PROPOSED_SPACING, radius, transition } from "../proposed-theme";
-import { IconTile, MockRow, RowActions } from "../stand-ins";
+import { MockRow } from "../stand-ins";
 
 type Page = "account" | "notifications" | "family";
 /** `page` marks the entries that are a settings page, so the open one is highlighted on desktop. */
@@ -64,7 +65,7 @@ function settingsGroups(showToast: (message: string) => void): { label?: string;
 /** A rounded list of rows; each opens its page (or does its one thing). */
 function GroupedList({ entries, active }: { entries: ListEntry[]; active?: Page }) {
   return (
-    <Box as="ul" listStyleType="none" m="0" p="0" bg="bg.surface" borderRadius={radius("card")} overflow="hidden" boxShadow="xs">
+    <Box as="ul" listStyleType="none" m="0" p="0" bg="bg.surface" borderRadius="card" overflow="hidden" boxShadow="xs">
       {entries.map((entry, index) => {
         // Highlighted on desktop only: on a phone the list is More, and no page is open.
         const current = Boolean(active && entry.page === active);
@@ -73,7 +74,7 @@ function GroupedList({ entries, active }: { entries: ListEntry[]; active?: Page 
           <Flex
             align="center"
             gap="3"
-            minH={PROPOSED_SPACING.rowMinH}
+            minH={{ base: "14", md: "12" }}
             px="3.5"
             borderTopWidth={index === 0 ? "0" : "1px"}
             borderColor="border"
@@ -102,7 +103,7 @@ function GroupedList({ entries, active }: { entries: ListEntry[]; active?: Page 
                 {row}
               </NextLink>
             ) : (
-              <chakra.button type="button" width="full" textAlign="start" data-pressable onClick={entry.onSelect}>
+              <chakra.button type="button" width="full" textAlign="start" css={pressFeedback()} onClick={entry.onSelect}>
                 {row}
               </chakra.button>
             )}
@@ -133,13 +134,13 @@ function SettingsList({ active }: { active?: Page }) {
  */
 function SettingsLayout({ page, title, listOnPhone = false, children }: { page: Page; title: string; listOnPhone?: boolean; children: ReactNode }) {
   return (
-    <Grid templateColumns={{ base: "minmax(0, 1fr)", md: "16rem minmax(0, 1fr)", lg: "19rem minmax(0, 1fr)" }} gap={PROPOSED_SPACING.columnGap} alignItems="start">
-      <Stack gap={PROPOSED_SPACING.sectionGap} display={{ base: listOnPhone ? "flex" : "none", md: "flex" }}>
+    <Grid templateColumns={{ base: "minmax(0, 1fr)", md: "16rem minmax(0, 1fr)", lg: "19rem minmax(0, 1fr)" }} gap={PAGE_SPACING.columnGap} alignItems="start">
+      <Stack gap={PAGE_SPACING.sectionGap} display={{ base: listOnPhone ? "flex" : "none", md: "flex" }}>
         <PageTitle title={listOnPhone ? "More" : "Settings"} />
         {listOnPhone ? <ProfileCard /> : null}
         <SettingsList active={page} />
       </Stack>
-      <Stack gap={PROPOSED_SPACING.sectionGap} display={{ base: listOnPhone ? "none" : "flex", md: "flex" }} maxW="44rem">
+      <Stack gap={PAGE_SPACING.sectionGap} display={{ base: listOnPhone ? "none" : "flex", md: "flex" }} maxW="44rem">
         <Box display={{ md: "none" }}>
           <NextLink href={mockupHref("more")}>
             <Flex align="center" gap="1" color="fg.accent" textStyle="body" fontWeight="medium" minH="11">
@@ -201,7 +202,7 @@ function RowsCard({ title, rows }: { title?: string; rows: { label: string; icon
         <Card.Body>
           <Stack gap="0.5" mx="-2">
             {rows.map((row) => (
-              <chakra.button key={row.label} type="button" textAlign="start" data-pressable onClick={() => showToast({ message: `${row.label} isn't mocked in U3` })}>
+              <chakra.button key={row.label} type="button" textAlign="start" css={pressFeedback()} onClick={() => showToast({ message: `${row.label} isn't mocked in U3` })}>
                 <MockRow
                   leading={<IconTile icon={row.icon} bg="bg.muted" color="fg.muted" />}
                   title={row.label}
@@ -274,7 +275,7 @@ function AccountPage() {
 
 function SwitchLine({ label, description, defaultChecked = true }: { label: string; description: string; defaultChecked?: boolean }) {
   return (
-    <Switch.Root defaultChecked={defaultChecked} size="md" display="flex" justifyContent="space-between" alignItems="center" gap="4" width="full" minH={PROPOSED_SPACING.rowMinH}>
+    <Switch.Root defaultChecked={defaultChecked} size="md" display="flex" justifyContent="space-between" alignItems="center" gap="4" width="full" minH={{ base: "14", md: "12" }}>
       <Box>
         <Switch.Label textStyle="body" fontWeight="medium">
           {label}

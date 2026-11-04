@@ -4,13 +4,14 @@ import { Button, Flex, Input, Stack, Switch, Text, Textarea } from "@chakra-ui/r
 import { useState, type ReactNode } from "react";
 
 import { CATEGORY_ICONS } from "@/components/expenses/category-visual";
-import { ICON, SegmentedControl } from "@/components/ui";
+import { ActionBar, AmountInput, AppDialog, Disclosure, ICON, SegmentedControl, ToggleChip } from "@/components/ui";
 import { CATEGORY_LABELS, EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/expenses/categories";
 
 import { useMockState } from "./mock-state";
 import { MOCK_MEMBERS, MOCK_SUGGESTIONS } from "./mockup-data";
 import type { QuickAddKind } from "./mockups";
-import { ActionBar, AmountInput, BottomSheet, Chip, ChipMenu, ChipRow, Disclosure, SaveButton, useSaveCheck } from "./stand-ins";
+import { MOCK_CURRENCY } from "./mockup-data";
+import { ChipMenu, ChipRow, SaveButton, useSaveCheck } from "./stand-ins";
 
 const KINDS: { value: QuickAddKind; label: string }[] = [
   { value: "expense", label: "Expense" },
@@ -32,10 +33,12 @@ export function QuickAddSheet() {
   const kind = quickAdd ?? lastKind;
   const Form = FORMS[kind];
   return (
-    <BottomSheet open={quickAdd !== null} onClose={closeQuickAdd} label="Quick add">
-      <SegmentedControl aria-label="What to add" items={KINDS} value={kind} onValueChange={openQuickAdd} fullWidth />
-      <Form key={kind} />
-    </BottomSheet>
+    <AppDialog open={quickAdd !== null} onOpenChange={(open) => (open ? openQuickAdd(kind) : closeQuickAdd())} title="Quick add" size="sm">
+      <Stack gap="4">
+        <SegmentedControl aria-label="What to add" items={KINDS} value={kind} onValueChange={openQuickAdd} fullWidth />
+        <Form key={kind} />
+      </Stack>
+    </AppDialog>
   );
 }
 
@@ -52,13 +55,15 @@ function useQuickSave(message: string, onSave: () => (() => void) | void) {
 
 function SaveRow({ label, saved, save, saveAndNew }: { label: string; saved: boolean; save: () => void; saveAndNew: () => void }) {
   return (
-    <ActionBar>
-      <SaveButton saved={saved} onClick={save}>
-        {label}
-      </SaveButton>
-      <Button variant="outline" size="md" onClick={saveAndNew}>
-        Save + new
-      </Button>
+    <ActionBar placement="sheet">
+      <Flex gap="2">
+        <SaveButton saved={saved} onClick={save}>
+          {label}
+        </SaveButton>
+        <Button variant="outline" size="md" onClick={saveAndNew}>
+          Save + new
+        </Button>
+      </Flex>
     </ActionBar>
   );
 }
@@ -97,12 +102,12 @@ function ExpenseForm() {
 
   return (
     <Stack gap="3" as="form" onSubmit={(event) => { event.preventDefault(); save(); }}>
-      <AmountInput value={amount} onChange={setAmount} />
+      <AmountInput variant="hero" currency={MOCK_CURRENCY} value={amount} onValueChange={setAmount} autoFocus />
       <Input size="md" aria-label="Description" placeholder="What was it?" value={description} onChange={(event) => setDescription(event.target.value)} />
       {suggestions.length > 0 ? (
         <ChipRow label="Your recent descriptions">
           {suggestions.map((item) => (
-            <Chip
+            <ToggleChip
               key={item.description}
               pressed={item.description === description}
               onClick={() => {
@@ -111,7 +116,7 @@ function ExpenseForm() {
               }}
             >
               {item.description} · {CATEGORY_LABELS[item.category]}
-            </Chip>
+            </ToggleChip>
           ))}
         </ChipRow>
       ) : null}
@@ -139,7 +144,7 @@ function TodoForm() {
   const { saved, save, saveAndNew } = useQuickSave("To-do added", () => setTitle(""));
   return (
     <Stack gap="3" as="form" onSubmit={(event) => { event.preventDefault(); save(); }}>
-      <Input data-autofocus size="md" aria-label="To-do" placeholder="What needs doing?" value={title} onChange={(event) => setTitle(event.target.value)} enterKeyHint="done" />
+      <Input autoFocus size="md" aria-label="To-do" placeholder="What needs doing?" value={title} onChange={(event) => setTitle(event.target.value)} enterKeyHint="done" />
       <Flex gap="2" wrap="wrap">
         <ChipMenu label="To do" items={[{ value: "todo", label: "To do" }, { value: "doing", label: "Doing" }]} />
         <ChipMenu label="Assign: Mihai" items={MEMBER_ITEMS} />
@@ -157,7 +162,7 @@ function ReminderForm() {
   const { saved, save, saveAndNew } = useQuickSave("Reminder set for tomorrow, 9:00", () => setTitle(""));
   return (
     <Stack gap="3" as="form" onSubmit={(event) => { event.preventDefault(); save(); }}>
-      <Input data-autofocus size="md" aria-label="Reminder" placeholder="Remind me to…" value={title} onChange={(event) => setTitle(event.target.value)} />
+      <Input autoFocus size="md" aria-label="Reminder" placeholder="Remind me to…" value={title} onChange={(event) => setTitle(event.target.value)} />
       <Flex gap="2" wrap="wrap">
         <ChipMenu
           label="Tomorrow, 9:00"
@@ -192,7 +197,7 @@ function EventForm() {
   const { saved, save, saveAndNew } = useQuickSave("Event added to Saturday", () => setTitle(""));
   return (
     <Stack gap="3" as="form" onSubmit={(event) => { event.preventDefault(); save(); }}>
-      <Input data-autofocus size="md" aria-label="Event" placeholder="What's happening?" value={title} onChange={(event) => setTitle(event.target.value)} />
+      <Input autoFocus size="md" aria-label="Event" placeholder="What's happening?" value={title} onChange={(event) => setTitle(event.target.value)} />
       <Flex gap="2" wrap="wrap">
         <ChipMenu
           label="Sat 7 Nov"

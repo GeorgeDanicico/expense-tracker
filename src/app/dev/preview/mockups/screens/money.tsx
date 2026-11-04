@@ -4,15 +4,16 @@ import { Box, Flex, Grid, Menu, Portal, Stack, Text } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight, Download, FileUp, MoreHorizontal, SlidersHorizontal, Tags } from "lucide-react";
 import { useState } from "react";
 
-import { Amount, Card, EmptyState, ICON, IconButton, SegmentedControl } from "@/components/ui";
+import { Amount, Card, EmptyState, ICON, IconButton, SegmentedControl, ToggleChip } from "@/components/ui";
+import { PAGE_SPACING } from "@/components/ui/theme/layout";
+import { transition } from "@/components/ui/theme/motion";
 import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
 import { formatCurrency } from "@/lib/utils/currency";
 
 import { useMockState } from "../mock-state";
 import { MOCK_CURRENCY, MOCK_EXPENSE_TABS, MOCK_MEMBERS, MOCK_MONTH, type MockExpense } from "../mockup-data";
 import { CategoryTile, ExpenseRow, GroupLabel, PageTitle, Rows } from "../mockup-parts";
-import { PROPOSED_SPACING, radius, transition } from "../proposed-theme";
-import { Chip, ChipMenu, ChipRow, SwipeRow } from "../stand-ins";
+import { ChipMenu, ChipRow, SwipeRow } from "../stand-ins";
 
 const SECTIONS = [
   { value: "expenses", label: "Expenses" },
@@ -27,7 +28,7 @@ const MONTHS = ["September 2026", "October 2026", "November 2026"];
 export function MoneyMockup() {
   const [section, setSection] = useState<Section>("expenses");
   return (
-    <Stack gap={PROPOSED_SPACING.sectionGap}>
+    <Stack gap={PAGE_SPACING.sectionGap}>
       <PageTitle title="Money" action={<MoneyMenu />} />
       <Box alignSelf={{ md: "flex-start" }}>
         <SegmentedControl aria-label="Money section" items={SECTIONS} value={section} onValueChange={setSection} fullWidth={{ base: true, md: false }} />
@@ -86,7 +87,7 @@ function ExpensesSection() {
   const current = month === MONTHS.length - 1;
 
   return (
-    <Grid templateColumns={{ base: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 20rem" }} gap={PROPOSED_SPACING.columnGap} alignItems="start">
+    <Grid templateColumns={{ base: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 20rem" }} gap={PAGE_SPACING.columnGap} alignItems="start">
       <Stack gap="3" minW="0">
         <Flex align="center" gap="1">
           <IconButton aria-label="Previous month" disabled={month === 0} onClick={() => setMonth(month - 1)}>
@@ -110,14 +111,14 @@ function ExpensesSection() {
         </Flex>
         <ChipRow label="Expense tabs">
           {MOCK_EXPENSE_TABS.map((name) => (
-            <Chip key={name} pressed={name === tab} onClick={() => setTab(name)}>
+            <ToggleChip key={name} pressed={name === tab} onClick={() => setTab(name)}>
               {name}
-            </Chip>
+            </ToggleChip>
           ))}
-          <Chip>+ Tab</Chip>
-          <Chip>
+          <ToggleChip>+ Tab</ToggleChip>
+          <ToggleChip>
             <SlidersHorizontal size={ICON.xs} aria-hidden="true" /> Filters
-          </Chip>
+          </ToggleChip>
         </ChipRow>
         {current ? (
           <>
@@ -197,7 +198,7 @@ function ByCategory({ expenses }: { expenses: MockExpense[] }) {
                   </Text>
                   <Amount value={amount} currency={MOCK_CURRENCY} size="sm" />
                 </Flex>
-                <Box height="1.5" bg="bg.muted" borderRadius={radius("pill")} overflow="hidden" aria-hidden="true">
+                <Box height="1.5" bg="bg.muted" borderRadius="pill" overflow="hidden" aria-hidden="true">
                   <Box height="full" bg="chart.bar" transformOrigin="left" transform={`scaleX(${amount / largest})`} transition={transition("transform", "slow")} />
                 </Box>
               </Stack>

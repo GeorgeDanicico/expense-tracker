@@ -4,13 +4,14 @@ import { Box, Button, Flex, Grid, Input, Stack, Text } from "@chakra-ui/react";
 import { AlarmClock, ArrowRightLeft, Check, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { Avatar, Card, EmptyState, ICON, SegmentedControl } from "@/components/ui";
+import { AppDialog, Avatar, Card, Collapse, Disclosure, EmptyState, ICON, RowActions, SegmentedControl, ToggleChip } from "@/components/ui";
+import { PAGE_SPACING } from "@/components/ui/theme/layout";
+import { revealRowActions } from "@/components/ui/theme/recipes/misc";
 
 import { useIdSet, useMockState } from "../mock-state";
 import { memberById, MOCK_EVENTS, MOCK_REMINDERS, MOCK_SNOOZE_CHOICES, MOCK_TODO_COLUMNS, MOCK_TODOS, type MockReminder, type MockTodo, type MockTodoColumn } from "../mockup-data";
 import { GroupLabel, MemberDot, PageTitle, ReminderTile, Rows } from "../mockup-parts";
-import { PROPOSED_SPACING, radius } from "../proposed-theme";
-import { BottomSheet, Chip, ChipMenu, ChipRow, CollapseRow, Disclosure, MockRow, REVEAL_HOVER_ACTIONS, RowActions, SwipeRow } from "../stand-ins";
+import { ChipMenu, ChipRow, MockRow, SwipeRow } from "../stand-ins";
 
 const SECTIONS = [
   { value: "reminders", label: "Reminders" },
@@ -23,7 +24,7 @@ type Section = (typeof SECTIONS)[number]["value"];
 export function PlanningMockup({ initial }: { initial: Section }) {
   const [section, setSection] = useState<Section>(initial);
   return (
-    <Stack gap={PROPOSED_SPACING.sectionGap}>
+    <Stack gap={PAGE_SPACING.sectionGap}>
       <PageTitle title="Planning" />
       <Box alignSelf={{ md: "flex-start" }}>
         <SegmentedControl aria-label="Planning section" items={SECTIONS} value={section} onValueChange={setSection} fullWidth={{ base: true, md: false }} />
@@ -51,7 +52,7 @@ function RemindersSection() {
   const done = MOCK_REMINDERS.filter((reminder) => reminder.group === "Done");
 
   const row = (reminder: MockReminder) => (
-    <CollapseRow key={reminder.id} gone={cleared.has(reminder.id)}>
+    <Collapse key={reminder.id} open={!cleared.has(reminder.id)}>
       <SwipeRow
         gone={cleared.has(reminder.id)}
         right={{ label: "✓ Done", tone: "positive", commit: true }}
@@ -76,11 +77,11 @@ function RemindersSection() {
           }
         />
       </SwipeRow>
-    </CollapseRow>
+    </Collapse>
   );
 
   return (
-    <Grid templateColumns={{ base: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 20rem" }} gap={PROPOSED_SPACING.columnGap} alignItems="start">
+    <Grid templateColumns={{ base: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 20rem" }} gap={PAGE_SPACING.columnGap} alignItems="start">
       <Stack gap="3" minW="0">
         <Card>
           <Card.Body>
@@ -124,8 +125,7 @@ function RemindersSection() {
           </Card.Body>
         </Card>
       </Box>
-      <BottomSheet open={snoozing !== null} onClose={() => setSnoozing(null)} label="Snooze">
-        <Text textStyle="dialogTitle">Snooze “{snoozing?.title}”</Text>
+      <AppDialog open={snoozing !== null} onOpenChange={(open) => !open && setSnoozing(null)} title={`Snooze “${snoozing?.title ?? ""}”`} size="sm">
         <Stack gap="2">
           {MOCK_SNOOZE_CHOICES.map((choice) => (
             <Button
@@ -142,7 +142,7 @@ function RemindersSection() {
             </Button>
           ))}
         </Stack>
-      </BottomSheet>
+      </AppDialog>
     </Grid>
   );
 }
@@ -175,8 +175,8 @@ function TodosSection() {
     <Stack gap="3">
       <ChipRow label="Filters">
         <ChipMenu label="Showing: Everyone" items={[{ value: "all", label: "Everyone" }, { value: "me", label: "Me" }, { value: "mihai", label: "Mihai" }]} />
-        <Chip pressed={false}>Due today</Chip>
-        <Chip pressed={false}>Overdue · 1</Chip>
+        <ToggleChip pressed={false}>Due today</ToggleChip>
+        <ToggleChip pressed={false}>Overdue · 1</ToggleChip>
       </ChipRow>
       <Box display={{ md: "none" }}>
         <SegmentedControl
@@ -189,7 +189,7 @@ function TodosSection() {
       </Box>
       <Grid templateColumns={{ base: "minmax(0, 1fr)", md: "repeat(3, minmax(0, 1fr))" }} gap="4" alignItems="start">
         {MOCK_TODO_COLUMNS.map((item) => (
-          <Stack key={item.value} gap="2" display={{ base: item.value === column ? "flex" : "none", md: "flex" }} bg={{ md: "bg.muted" }} borderRadius={radius("card")} p={{ md: "3" }}>
+          <Stack key={item.value} gap="2" display={{ base: item.value === column ? "flex" : "none", md: "flex" }} bg={{ md: "bg.muted" }} borderRadius="card" p={{ md: "3" }}>
             <Text textStyle="sectionTitle" display={{ base: "none", md: "block" }} px="1">
               {item.label} · {count(item.value)}
             </Text>
@@ -197,7 +197,7 @@ function TodosSection() {
             {todos
               .filter((todo) => todo.column === item.value)
               .map((todo) => (
-                <CollapseRow key={todo.id} gone={deleted.has(todo.id)} entering={fresh.has(todo.id)}>
+                <Collapse key={todo.id} open={!deleted.has(todo.id)} entering={fresh.has(todo.id)}>
                   <SwipeRow gone={deleted.has(todo.id)} left={{ label: "Delete", tone: "negative", commit: true }} onSwipe={() => remove(todo)}>
                     <TodoCard
                       todo={todo}
@@ -216,7 +216,7 @@ function TodosSection() {
                       }
                     />
                   </SwipeRow>
-                </CollapseRow>
+                </Collapse>
               ))}
           </Stack>
         ))}
@@ -269,9 +269,9 @@ function TodoCard({ todo, actions }: { todo: MockTodo; actions: React.ReactNode 
       gap="2"
       p="3"
       bg="bg.surface"
-      borderRadius={radius("control")}
+      borderRadius="control"
       boxShadow="xs"
-      css={REVEAL_HOVER_ACTIONS}
+      css={revealRowActions}
     >
       <Stack gap="1.5" flex="1" minW="0">
         <Text textStyle="body" fontWeight="medium">

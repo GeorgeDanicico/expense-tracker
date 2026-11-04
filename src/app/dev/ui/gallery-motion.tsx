@@ -1,30 +1,33 @@
 "use client";
 
-import { Box, Button, Flex, Grid, SimpleGrid, Stack, Switch, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, Flex, Grid, Input, SimpleGrid, Stack, Switch, Text } from "@chakra-ui/react";
 import { BellRing, House, LayoutGrid, MoreHorizontal, Plus, ShoppingBasket, Trash2, WalletCards } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
-import { Amount, ICON, IconButton, SegmentedControl } from "@/components/ui";
+import { Amount, AppDialog, Collapse, FormActions, ICON, IconButton, IconTile, SegmentedControl, ToggleChip, UndoToast } from "@/components/ui";
+import { DURATION_MS, PRESS_SCALE, pressFeedback, transition } from "@/components/ui/theme/motion";
+import { rowRecipe } from "@/components/ui/theme/recipes/misc";
 import { formatCurrency } from "@/lib/utils/currency";
 
-import { ProposedThemeScope, useCountUp } from "../preview/mockups/motion-scope";
-import { PROPOSED_TEXT, radius, transition } from "../preview/mockups/proposed-theme";
-import { BottomSheet, Chip, CollapseRow, IconTile, MockRow, SaveButton, STATUS_SURFACE, UndoToast, useSaveCheck } from "../preview/mockups/stand-ins";
+import { MotionScope, useCountUp } from "../preview/mockups/motion-scope";
+import { MockRow, SaveButton, useSaveCheck } from "../preview/mockups/stand-ins";
 import { GallerySection } from "./gallery-section";
 
+const MS = DURATION_MS;
+
 /**
- * Every proposed animation, to judge "a little more animated" by feel. The values are U3's
- * proposals for U4 (src/app/dev/preview/mockups/proposed-theme.ts), not theme tokens yet.
+ * Every animation, on the theme's motion tokens (src/components/ui/theme/motion.ts), to judge "a
+ * little more animated" by feel.
  */
 export function MotionGallery() {
   const [reduced, setReduced] = useState(false);
   const [round, setRound] = useState(0);
   return (
     <Box id="motion">
-      <ProposedThemeScope reduced={reduced}>
+      <MotionScope reduced={reduced}>
         <GallerySection
           title="Motion"
-          description="Proposed for U4: press 90 ms, fast 120, moderate 200, slow 300; standard, enter and exit easings. Only transform and opacity move, except the row collapse. Reduced motion makes every change instant; the action still happens."
+          description={`Theme tokens: press ${MS.press} ms, fast ${MS.fast}, moderate ${MS.moderate}, slow ${MS.slow}, countUp ${MS.countUp}; standard, enter and exit easings. Only transform and opacity move, except the row collapse. Reduced motion (the device setting, or the switch for everything but the portalled sheet) makes every change instant; the action still happens.`}
         >
           <Flex gap="4" align="center" wrap="wrap">
             <Switch.Root checked={reduced} onCheckedChange={({ checked }) => setReduced(checked)}>
@@ -37,7 +40,7 @@ export function MotionGallery() {
             </Button>
           </Flex>
           <SimpleGrid key={round} columns={{ base: 1, md: 2, xl: 3 }} gap="4">
-            <Demo title="Sheet slides up" tokens="open: slow · enter · close: slow · exit · scrim: moderate">
+            <Demo title="Sheet slides up (dialog on desktop)" tokens="phone: slow · enter / slow · exit · desktop: pop-in, moderate · scrim: moderate">
               <SheetDemo />
             </Demo>
             <Demo title="Press" tokens="press · standard · scale 0.97 (chips 0.95, icons 0.92)">
@@ -57,7 +60,7 @@ export function MotionGallery() {
             </Demo>
           </SimpleGrid>
         </GallerySection>
-      </ProposedThemeScope>
+      </MotionScope>
     </Box>
   );
 }
@@ -65,7 +68,7 @@ export function MotionGallery() {
 function Demo({ title, tokens, children }: { title: string; tokens: string; children: ReactNode }) {
   return (
     <Stack gap="2">
-      <Box position="relative" overflow="hidden" height="64" bg="bg.canvas" borderRadius={radius("card")} p="4">
+      <Box position="relative" overflow="hidden" height="64" bg="bg.canvas" borderRadius="card" p="4">
         {children}
       </Box>
       <Text textStyle="label">{title}</Text>
@@ -75,24 +78,23 @@ function Demo({ title, tokens, children }: { title: string; tokens: string; chil
 }
 
 function SheetDemo() {
-  const [open, setOpen] = useState(false);
   return (
-    <>
-      <Button size="md" variant="solid" colorPalette="brand" onClick={() => setOpen(true)}>
-        Open the sheet
-      </Button>
-      <BottomSheet contained open={open} onClose={() => setOpen(false)} label="Example sheet">
-        <Text textStyle="dialogTitle">A bottom sheet</Text>
-        <Text textStyle="bodySm" color="fg.muted">
-          Tap outside or press Escape to close.
-        </Text>
-        <Button size="md" variant="solid" colorPalette="brand" onClick={() => setOpen(false)}>
-          Done
+    <AppDialog
+      title="A bottom sheet"
+      description="Swipe it down, tap outside or press Escape. Type something first and it asks."
+      trigger={
+        <Button size="md" variant="solid" colorPalette="brand">
+          Open the sheet
         </Button>
-      </BottomSheet>
-    </>
+      }
+      footer={<FormActions submitLabel="Done" closesDialog onSubmit={() => undefined} />}
+    >
+      <Input size="md" aria-label="Something to type" placeholder="Type to make it dirty" />
+    </AppDialog>
   );
 }
+
+const PressRow = chakra("button", rowRecipe);
 
 function PressDemo() {
   return (
@@ -101,14 +103,17 @@ function PressDemo() {
         <Button size="md" variant="solid" colorPalette="brand">
           Hold me
         </Button>
-        <Chip pressed={false}>A chip</Chip>
-        <Box as="button" data-pressable="icon" boxSize="11" display="grid" placeItems="center" borderRadius={radius("card")} bg="fg.accent" color="bg.surface" aria-label="Quick add">
+        <ToggleChip>A chip</ToggleChip>
+        <Box as="button" boxSize="11" display="grid" placeItems="center" borderRadius="card" bg="fg.accent" color="bg.surface" aria-label="Quick add" css={pressFeedback(PRESS_SCALE.icon)}>
           <Plus size={22} aria-hidden="true" />
         </Box>
       </Flex>
-      <Box as="button" data-pressable width="full" textAlign="start">
-        <MockRow leading={<IconTile icon={ShoppingBasket} bg="category.groceries.bg" color="category.groceries.fg" />} title="A row" meta="Rows press too" />
-      </Box>
+      <PressRow type="button" bg="bg.surface">
+        <IconTile icon={ShoppingBasket} bg="category.groceries.bg" color="category.groceries.fg" />
+        <Text textStyle="body" fontWeight="medium">
+          A row presses too
+        </Text>
+      </PressRow>
     </Stack>
   );
 }
@@ -127,7 +132,7 @@ function RowsDemo() {
       </Button>
       <Stack gap="0.5">
         {rows.map((row) => (
-          <CollapseRow key={row.id} gone={gone.has(row.id)} entering={row.fresh}>
+          <Collapse key={row.id} open={!gone.has(row.id)} entering={row.fresh}>
             <MockRow
               title={row.title}
               trailing={
@@ -140,14 +145,13 @@ function RowsDemo() {
                 </IconButton>
               }
             />
-          </CollapseRow>
+          </Collapse>
         ))}
       </Stack>
       <UndoToast
         contained
         message={last === null ? null : "Deleted"}
-        action="Undo"
-        onAction={() => {
+        onUndo={() => {
           setGone((ids) => new Set([...ids].filter((id) => id !== last)));
           setLast(null);
         }}
@@ -179,7 +183,7 @@ function IndicatorDemo() {
           { value: "calendar", label: "Calendar" },
         ]}
       />
-      <Grid position="relative" templateColumns="repeat(4, minmax(0, 1fr))" bg="bg.surface" borderRadius={radius("card")} py="2">
+      <Grid position="relative" templateColumns="repeat(4, minmax(0, 1fr))" bg="bg.surface" borderRadius="card" py="2">
         <Flex
           position="absolute"
           top="2"
@@ -191,7 +195,7 @@ function IndicatorDemo() {
           transition={transition("transform", "moderate")}
           aria-hidden="true"
         >
-          <Box width="3.25rem" height="full" borderRadius={radius("pill")} bg="bg.selected" />
+          <Box width="3.25rem" height="full" borderRadius="pill" bg="bg.selected" />
         </Flex>
         {TABS.map((item, index) => (
           <Stack
@@ -201,7 +205,7 @@ function IndicatorDemo() {
             align="center"
             gap="1"
             pt="1"
-            data-pressable="icon"
+            css={pressFeedback(PRESS_SCALE.icon)}
             color={index === tab ? "fg" : "fg.subtle"}
             aria-pressed={index === tab}
             onClick={() => setTab(index)}
@@ -221,7 +225,7 @@ function SaveDemo() {
   const { saved, save } = useSaveCheck(() => undefined);
   return (
     <Stack gap="3">
-      <MockRow leading={<IconTile icon={BellRing} bg={STATUS_SURFACE.info} color="fg.info" />} title="Renew car insurance" meta="Tomorrow, 9:00" />
+      <MockRow leading={<IconTile icon={BellRing} bg="bg.info" color="fg.info" />} title="Renew car insurance" meta="Tomorrow, 9:00" />
       <Flex>
         <SaveButton saved={saved} onClick={save}>
           Save reminder
@@ -239,7 +243,7 @@ function CountUpDemo() {
       <Text textStyle="label" color="fg.muted">
         Spent in November
       </Text>
-      <Text {...PROPOSED_TEXT.hero} fontVariantNumeric="tabular-nums">
+      <Text textStyle="amountHero">
         {formatCurrency(shown, "EUR")}
       </Text>
       <Flex gap="2" wrap="wrap">

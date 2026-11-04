@@ -19,8 +19,11 @@ export function ListRow({
   detail,
   trailing,
   actions,
+  as = "li",
   ...rowProps
 }: Omit<ComponentProps<"li">, "title" | "children"> & {
+  /** `div` when the row sits inside a `Collapse as="li"`. */
+  as?: "li" | "div";
   accent?: string;
   leading?: ReactNode;
   title: ReactNode;
@@ -31,7 +34,7 @@ export function ListRow({
   actions?: ReactNode;
 }) {
   return (
-    <RowItem listStyleType="none" {...rowProps}>
+    <RowItem as={as} listStyleType="none" {...rowProps}>
       {accent ? <Box alignSelf="stretch" flexShrink="0" width="1" borderRadius="full" bg={accent} aria-hidden="true" /> : null}
       {leading}
       <Flex direction="column" flex="1" minW="0" gap="0.5">

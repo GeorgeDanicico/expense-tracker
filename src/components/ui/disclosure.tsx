@@ -16,15 +16,20 @@ export function Collapse({
   open,
   entering = false,
   id,
+  as = "div",
   children,
 }: {
   open: boolean;
   entering?: boolean;
   id?: string;
+  /** `li` when the collapsing rows are a list's items (the row inside is then a `div`). */
+  as?: "div" | "li";
   children: ReactNode;
 }) {
   return (
     <Box
+      as={as}
+      listStyleType="none"
       id={id}
       display="grid"
       gridTemplateRows={open ? "1fr" : "0fr"}

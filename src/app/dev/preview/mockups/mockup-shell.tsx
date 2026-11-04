@@ -21,29 +21,29 @@ import { useSelectedLayoutSegment } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Brand } from "@/components/layout/brand";
-import { ICON } from "@/components/ui";
+import { ICON, UndoToast } from "@/components/ui";
+import { PAGE_SPACING } from "@/components/ui/theme/layout";
+import { PRESS_SCALE, pressFeedback, transition } from "@/components/ui/theme/motion";
 
 import { MockStateProvider, useMockState } from "./mock-state";
 import { mockupById, mockupHref, type BarTab, type Mockup, type MockupId, type SidebarItem } from "./mockups";
-import { ProposedThemeScope } from "./motion-scope";
-import { PROPOSED_SPACING, radius, transition } from "./proposed-theme";
+import { MotionScope } from "./motion-scope";
 import { QuickAddSheet } from "./quick-add";
-import { UndoToast } from "./stand-ins";
 
-/** Wraps each mockup in the proposed theme and the stand-in shell; the index page renders as it is. */
+/** Wraps each mockup in the stand-in shell (and the reduced-motion switch); the index page renders as it is. */
 export function MockupShell({ children }: { children: ReactNode }) {
   const segment = useSelectedLayoutSegment();
   const mockup = segment ? mockupById(segment) : undefined;
   const [reduced, setReduced] = useState(false);
   if (!mockup) return children;
   return (
-    <ProposedThemeScope reduced={reduced} minH="100dvh" bg="bg.canvas">
+    <MotionScope reduced={reduced} minH="100dvh" bg="bg.canvas">
       <MockStateProvider key={mockup.id} initialQuickAdd={mockup.quickAdd ?? null}>
         <Shell mockup={mockup} reduced={reduced} onReducedChange={setReduced}>
           {children}
         </Shell>
       </MockStateProvider>
-    </ProposedThemeScope>
+    </MotionScope>
   );
 }
 
@@ -71,8 +71,8 @@ function Shell({ mockup, reduced, onReducedChange, children }: { mockup: Mockup;
           as="main"
           flex="1"
           minW="0"
-          px={PROPOSED_SPACING.pageX}
-          pt={PROPOSED_SPACING.pageTop}
+          px={PAGE_SPACING.pageX}
+          pt={PAGE_SPACING.pageTop}
           pb={{ base: "calc(7rem + env(safe-area-inset-bottom))", md: "10" }}
         >
           <Box maxW="72rem" mx="auto">
@@ -84,11 +84,15 @@ function Shell({ mockup, reduced, onReducedChange, children }: { mockup: Mockup;
       <QuickAddSheet />
       <UndoToast
         message={toast?.message ?? null}
-        action={toast?.action}
-        onAction={() => {
-          toast?.onAction?.();
-          hideToast();
-        }}
+        actionLabel={toast?.action}
+        onUndo={
+          toast?.action
+            ? () => {
+                toast.onAction?.();
+                hideToast();
+              }
+            : undefined
+        }
       />
     </>
   );
@@ -97,7 +101,7 @@ function Shell({ mockup, reduced, onReducedChange, children }: { mockup: Mockup;
 /** What this mockup is and its tap counts against the plan's targets. Not part of the design. */
 function MockupCaption({ mockup, reduced, onReducedChange }: { mockup: Mockup; reduced: boolean; onReducedChange: (on: boolean) => void }) {
   return (
-    <Box as="aside" aria-label="About this mockup" bg="bg.muted" borderBottomWidth="1px" borderColor="border" px={PROPOSED_SPACING.pageX} py="2">
+    <Box as="aside" aria-label="About this mockup" bg="bg.muted" borderBottomWidth="1px" borderColor="border" px={PAGE_SPACING.pageX} py="2">
       <Stack gap="1" maxW="1440px" mx="auto">
         <Flex gap="3" align="center" wrap="wrap">
           <Text textStyle="label">
@@ -206,7 +210,7 @@ function SidebarEntry({ item, active }: { item: SidebarLink; active: boolean }) 
       gap="2.5"
       px="2.5"
       py="2"
-      borderRadius={radius("control")}
+      borderRadius="control"
       color={active ? "fg.accent" : item.href ? "fg.muted" : "fg.subtle"}
       bg={active ? "bg.selected" : undefined}
       fontWeight="medium"
@@ -218,7 +222,7 @@ function SidebarEntry({ item, active }: { item: SidebarLink; active: boolean }) 
         {item.label}
       </Text>
       {item.badge ? (
-        <Box as="span" textStyle="xs" fontWeight="semibold" px="2" borderRadius={radius("pill")} bg="fg.error" color="bg.surface">
+        <Box as="span" textStyle="xs" fontWeight="semibold" px="2" borderRadius="pill" bg="fg.error" color="bg.surface">
           {item.badge}
         </Box>
       ) : null}
@@ -276,7 +280,7 @@ function BottomBar({ active }: { active: BarTab }) {
         transition={transition("transform", "moderate")}
         aria-hidden="true"
       >
-        <Box width="3.25rem" height="full" borderRadius={radius("pill")} bg="bg.selected" />
+        <Box width="3.25rem" height="full" borderRadius="pill" bg="bg.selected" />
       </Box>
       {TABS.map((tab, index) => {
         const on = tab.key === active;
@@ -287,7 +291,7 @@ function BottomBar({ active }: { active: BarTab }) {
             aria-current={on ? "page" : undefined}
             style={{ gridColumn: column(index) + 1, gridRow: 1, position: "relative" }}
           >
-            <Stack align="center" gap="1" pt="1" color={on ? "fg" : "fg.subtle"} data-pressable="icon">
+            <Stack align="center" gap="1" pt="1" color={on ? "fg" : "fg.subtle"} css={pressFeedback(PRESS_SCALE.icon)}>
               <tab.icon size={22} aria-hidden="true" />
               <Text as="span" fontSize="2xs" lineHeight="0.875rem" fontWeight="medium">
                 {tab.label}
@@ -305,11 +309,11 @@ function BottomBar({ active }: { active: BarTab }) {
         boxSize="3.25rem"
         display="grid"
         placeItems="center"
-        borderRadius={radius("card")}
+        borderRadius="card"
         bg="fg.accent"
         color="bg.surface"
         boxShadow="overlay"
-        data-pressable="icon"
+        css={pressFeedback(PRESS_SCALE.icon)}
         aria-label={quickAdd ? "Close quick add" : "Quick add"}
         aria-expanded={Boolean(quickAdd)}
         onClick={() => (quickAdd ? closeQuickAdd() : openQuickAdd())}

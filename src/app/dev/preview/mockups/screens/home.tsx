@@ -4,15 +4,16 @@ import { Box, Button, Flex, Grid, Menu, Portal, Stack, Text } from "@chakra-ui/r
 import { AlarmClock, Check, SquareKanban } from "lucide-react";
 import { useState } from "react";
 
-import { Avatar, Card, ICON, IconButton, StatusBadge } from "@/components/ui";
+import { Avatar, Card, Collapse, ICON, IconButton, IconTile, StatusBadge } from "@/components/ui";
+import { PAGE_SPACING } from "@/components/ui/theme/layout";
+import { transition } from "@/components/ui/theme/motion";
 import { formatCurrency } from "@/lib/utils/currency";
 
 import { useIdSet, useMockState } from "../mock-state";
 import { MOCK_CURRENCY, MOCK_DATE, MOCK_ME, MOCK_MONTH, MOCK_REMINDERS, MOCK_SNOOZE_CHOICES, MOCK_TODOS, MOCK_TODO_COLUMNS } from "../mockup-data";
 import { ExpenseRow, MemberDot, PageTitle, ReminderTile, Rows, SectionLink } from "../mockup-parts";
 import { useCountUp, useMotionDelay } from "../motion-scope";
-import { PROPOSED_SPACING, PROPOSED_TEXT, radius, transition } from "../proposed-theme";
-import { CollapseRow, IconTile, MockRow } from "../stand-ins";
+import { MockRow } from "../stand-ins";
 
 /**
  * Home is "today": what's due with Done on the row, this month against last, the latest expenses and
@@ -20,10 +21,10 @@ import { CollapseRow, IconTile, MockRow } from "../stand-ins";
  */
 export function HomeMockup() {
   return (
-    <Stack gap={PROPOSED_SPACING.sectionGap}>
+    <Stack gap={PAGE_SPACING.sectionGap}>
       <PageTitle kicker={MOCK_DATE} title="Good morning, Ana" action={<Avatar name={MOCK_ME.fullName} color="member.1" size="md" />} />
       <Grid
-        gap={PROPOSED_SPACING.columnGap}
+        gap={PAGE_SPACING.columnGap}
         alignItems="start"
         templateColumns={{ base: "minmax(0, 1fr)", lg: "minmax(0, 1.15fr) minmax(0, 1fr)" }}
         templateAreas={{ base: `"month" "due" "recent" "todos"`, lg: `"month due" "recent due" "recent todos"` }}
@@ -55,16 +56,16 @@ function MonthCard() {
       <Card.Body>
         <Stack gap="3">
           <Flex align="baseline" gap="2.5" wrap="wrap">
-            <Text {...PROPOSED_TEXT.hero} fontVariantNumeric="tabular-nums" aria-live="polite">
+            <Text textStyle="amountHero" aria-live="polite">
               {formatCurrency(shown, MOCK_CURRENCY)}
             </Text>
             <StatusBadge tone="positive">↓ {Math.abs(MOCK_MONTH.changePercent)}% vs {MOCK_MONTH.previous}</StatusBadge>
           </Flex>
-          <Box height="2" borderRadius={radius("pill")} bg="bg.muted" overflow="hidden" aria-hidden="true">
+          <Box height="2" borderRadius="pill" bg="bg.muted" overflow="hidden" aria-hidden="true">
             <Box
               height="full"
               bg="chart.bar"
-              borderRadius={radius("pill")}
+              borderRadius="pill"
               transformOrigin="left"
               transform={`scaleX(${share})`}
               transition={transition("transform", "slow")}
@@ -105,7 +106,7 @@ function DueToday() {
       <Card.Body>
         <Rows>
           {due.map((reminder) => (
-            <CollapseRow key={reminder.id} gone={cleared.has(reminder.id)}>
+            <Collapse key={reminder.id} open={!cleared.has(reminder.id)}>
               <MockRow
                 leading={<ReminderTile reminder={reminder} />}
                 title={reminder.title}
@@ -143,7 +144,7 @@ function DueToday() {
                   </>
                 }
               />
-            </CollapseRow>
+            </Collapse>
           ))}
           {allDone ? (
             <Text textStyle="body" color="fg.muted" px="2" py="3">
