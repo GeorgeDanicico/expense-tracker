@@ -37,47 +37,50 @@ function render(account: AccountData | null) {
   );
 }
 
-const IMPORT_LINK = /<a[^>]*href="\/expenses\/import"[^>]*>.*?Import statement/s;
+const MENU = 'aria-label="More expense actions"';
 
 beforeEach(() => {
   state.search = "";
 });
 
-describe("the Import statement button on the Expenses page", () => {
-  it("links to the import page for a user without a family", () => {
-    expect(render(anAccount(null))).toMatch(IMPORT_LINK);
+// Import and export are behind ⋯ (their items: `expensesMenuItems`); adding is the bottom bar's +.
+describe("the Expenses page", () => {
+  it("has no Add expense button of its own, and its ⋯ for a user without a family", () => {
+    const html = render(anAccount(null));
+    expect(html).not.toContain("Add expense");
+    expect(html).toContain(MENU);
   });
 
-  it("links to the import page for a kid with Expenses on", () => {
-    const html = render(anAccount(kid(DEFAULT_KID_PERMISSIONS)));
-    expect(html).toContain("Add expense");
-    expect(html).toMatch(IMPORT_LINK);
+  it("has its ⋯ for a kid with Expenses on", () => {
+    expect(render(anAccount(kid(DEFAULT_KID_PERMISSIONS)))).toContain(MENU);
   });
 
   it("is not shown to a kid with Expenses off, who gets the turned-off message instead of the page", () => {
     const html = render(anAccount(kid({ ...DEFAULT_KID_PERMISSIONS, expenses: "off" })));
     expect(html).toContain("This part of the app is turned off for you. Ask a parent.");
-    expect(html).not.toContain("Import statement");
-    expect(html).not.toContain("/expenses/import");
+    expect(html).not.toContain(MENU);
   });
 
-  it("is not shown while the account is still loading", () => {
-    expect(render(null)).not.toContain("Import statement");
+  it("shows nothing while the account is still loading", () => {
+    expect(render(null)).not.toContain(MENU);
   });
 
-  it("is not shown on another member's data: an import only creates your own expenses", () => {
+  it("keeps ⋯ (for export) on another member's month", () => {
     state.search = `member=${"70000000-0000-4000-8000-000000000003"}`;
-    const html = render(anAccount(null));
-    expect(html).not.toContain("Import statement");
+    expect(render(anAccount(null))).toContain(MENU);
   });
 
-  it("is not shown on the family view", () => {
+  it("has no ⋯ on the family view, which can't be exported or imported into", () => {
     state.search = "member=all";
-    expect(render(anAccount(null))).not.toContain("Import statement");
+    expect(render(anAccount(null))).not.toContain(MENU);
   });
 
-  it("is not shown on a saved tab, only on the main ledger", () => {
-    state.search = "tab=90000000-0000-4000-8000-000000000009";
-    expect(render(anAccount(null))).not.toContain("Import statement");
+  it("shows the month as a compact control and the tabs as chips", () => {
+    const html = render(anAccount(null));
+    expect(html).toMatch(/aria-label="Month: [A-Z][a-z]+ \d{4}"/);
+    expect(html).toContain('aria-label="Previous month"');
+    expect(html).toMatch(/role="group"[^>]*aria-label="Expense tabs"/);
+    expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*>All<\/button>/);
+    expect(html).toContain("Filters");
   });
 });

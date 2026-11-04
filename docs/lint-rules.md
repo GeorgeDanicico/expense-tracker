@@ -19,7 +19,7 @@ Run them with `npm run lint`.
 | [`no-iso-date-slice`](#no-iso-date-slice) | error | 2 fixed | U1 |
 | [`no-locale-date-without-zone`](#no-locale-date-without-zone) | error | 7 fixed, 8 formatter modules exempt | U1 |
 | [`no-redundant-swr-fetcher`](#no-redundant-swr-fetcher) | error | 5 fixed | U1 |
-| [`no-fetch-in-components`](#no-fetch-in-components) | error, no module listed yet | 26 component and page files still call `apiRequest` or `fetch` (U8–U11) | U1 |
+| [`no-fetch-in-components`](#no-fetch-in-components) | error, on for expenses (U8) | 20 component files in other modules still call `apiRequest` or `fetch` (U9–U11) | U1 |
 | [`no-zod-flatten`](#no-zod-flatten) | error | 15 fixed (6 in code, 9 in tests) | U1 |
 | [`no-raw-dialog`](#no-raw-dialog) | error | none | U1 |
 | [`no-window-confirm`](#no-window-confirm) | error | none | U1 |
@@ -188,10 +188,12 @@ const CONVERTED_MODULES = ["src/components/expenses", "src/app/(app)/expenses"];
 
 U11 ends with every folder under `src/components` listed.
 
-**Added by:** U1, with an empty list, so it is on but matches nothing yet. **Left to U8–U11:** 26
-component and page files call `apiRequest` or `fetch` today: `expenses` 4, `family` 12,
-`investments` 2, `net-worth` 3, `auth` 1, `oauth` 1, `settings` 1 (components), and 2 pages under
-`src/app/(app)`.
+**Added by:** U1, with an empty list. **On for expenses since U8**: `src/components/expenses`
+(the import screens included) and `src/app/(app)/expenses`, whose requests are all in
+`expense-api.tsx` and `import/import-api.tsx`, called through `useExpenseWrites` and the import
+hooks. **Left to U9–U11:** 20 component files: `family` 12, `investments` 2, `net-worth` 3,
+`auth` 1, `oauth` 1, `settings` 1. No page under `src/app/(app)` makes a request of its own any more
+(Settings' currency change moved to `src/lib/api/account-requests.ts` in U8).
 
 **Disable:** `// eslint-disable-next-line local/no-fetch-in-components -- <reason>`.
 

@@ -4,13 +4,12 @@ import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 import { Inbox } from "lucide-react";
 import useSWR from "swr";
 
-import { CATEGORY_ICONS } from "@/components/expenses/category-visual";
+import { CategoryTile } from "@/components/expenses/category-visual";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON } from "@/components/ui/icon";
-import { IconTile } from "@/components/ui/icon-tile";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -103,7 +102,7 @@ export function RecentExpenses({ now }: { now: Date }) {
             {expenses.map((expense) => (
               <ListRow
                 key={expense.id}
-                leading={<IconTile icon={CATEGORY_ICONS[expense.category]} bg={`category.${expense.category}.bg`} color={`category.${expense.category}.fg`} />}
+                leading={<CategoryTile category={expense.category} />}
                 title={expense.description}
                 meta={`${relativeDay(expense.expenseDate, now)} · ${expenseClassificationLabel(expense.category, expense.subtype)}`}
                 trailing={<Amount value={expense.amount} currency={currency} size="sm" />}

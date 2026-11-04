@@ -1,6 +1,6 @@
 "use client";
 
-import { Flex, SimpleGrid, Stack, Text } from "@chakra-ui/react";
+import { SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import useSWR from "swr";
 
 import { CardLink } from "@/components/ui/card-link";
@@ -9,8 +9,6 @@ import { DailySpendingChart } from "@/components/dashboard/daily-spending-chart"
 import { MonthComparison } from "@/components/dashboard/month-comparison";
 import { MonthlyStats } from "@/components/dashboard/monthly-stats";
 import { TopExpenses } from "@/components/dashboard/top-expenses";
-import { WriteOnly } from "@/components/family/write-only";
-import { AddExpenseButton } from "@/components/expenses/add-expense-button";
 import { MonthToolbar } from "@/components/expenses/month-toolbar";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
@@ -49,12 +47,7 @@ export function MonthlyDashboard({
         month={month}
         href={(value) => dashboardHref(params, { view: "monthly", month: value })}
       />
-      <Flex gap="2" wrap="wrap" align="center">
-        <WriteOnly>
-          <AddExpenseButton selectedMonth={month} />
-        </WriteOnly>
-        <CardLink href={hrefFor(`/expenses?month=${month}`)}>View expenses</CardLink>
-      </Flex>
+      <CardLink href={hrefFor(`/expenses?month=${month}`)}>View expenses</CardLink>
       {!analytics ? (
         current.error ? (
           <DataError retry={() => void current.mutate()} />

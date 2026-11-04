@@ -15,7 +15,7 @@ import { Toolbar } from "@/components/ui/toolbar";
 import { useApiForm } from "@/hooks/use-api-form";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { ApiError } from "@/lib/api/client";
-import { afterImportChange } from "@/lib/api/invalidate";
+import { afterImportChange } from "@/components/expenses/expense-cache";
 import type { ImportConfirmResponse } from "@/lib/api/keys";
 import { discardDescription } from "@/lib/imports/recent";
 import { formatCurrency } from "@/lib/utils/currency";

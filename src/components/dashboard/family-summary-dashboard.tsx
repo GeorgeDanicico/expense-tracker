@@ -191,14 +191,14 @@ export function FamilySummaryDashboard() {
           </Card.Body>
         </Card>
       </SimpleGrid>
-      <Card overflow="hidden">
+      <Card>
         <Card.Header
           title={selectedMember ? `Recent expenses, ${selectedMember.name}` : "Recent expenses"}
           actions={<CardLink href={hrefFor(`/expenses?month=${data.currentMonth}`)}>View all</CardLink>}
         />
-        <Box mt="3" borderTopWidth="1px" borderColor="border">
-          <ExpenseList expenses={recent} currency={activeCurrency} compact />
-        </Box>
+        <Card.Body>
+          <ExpenseList expenses={recent} currency={activeCurrency} limit={5} emptyHint={null} />
+        </Card.Body>
       </Card>
     </Stack>
   );

@@ -17,7 +17,7 @@ const localPlugin = { plugins: { local } };
  * object and hooks, like src/components/todos). Add a module's folders when it is converted, for
  * example "src/components/expenses" and "src/app/(app)/expenses" (U8 to U11 in docs/ui-plan.md).
  */
-const CONVERTED_MODULES = [];
+const CONVERTED_MODULES = ["src/components/expenses", "src/app/(app)/expenses"];
 
 /**
  * The modules that are the app's date formatters: the rule against `Intl.DateTimeFormat` and

@@ -6,7 +6,8 @@ import type { AnalyticsPeriod } from "@/lib/expenses/types";
  * Every "now" — the current month and today, on server and client — reads the
  * Europe/Bucharest application calendar: `getBucharestMonth`, `getBucharestToday`.
  * Month and day arithmetic is pure string/UTC math and never depends on the process time zone.
- * Only `formatMonth`/`formatDate`/`formatDateTime` touch the runtime's zone, for display.
+ * Calendar dates are formatted at noon UTC in UTC, so they read the same day in every zone; only
+ * `formatDateTime` and `formatInstantDate`, which show an instant, use the viewer's zone.
  */
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -66,15 +67,6 @@ export function daysInMonth(month: string) {
 
 export function lastDayOfMonth(month: string) {
   return dateInMonth(month, daysInMonth(month));
-}
-
-/**
- * The date a new entry in `month` starts on: `today` when it falls in that month, else the month's
- * last day for a past month (the end of what is being looked at) or its first day for a future one.
- */
-export function defaultDateInMonth(month: string, today: string) {
-  if (today.startsWith(month)) return today;
-  return today > month ? lastDayOfMonth(month) : dateInMonth(month, 1);
 }
 
 /** Pure calendar arithmetic on a `YYYY-MM-DD` date; no time zone is involved. */
@@ -178,12 +170,14 @@ export function formatMonth(month: string, locale = "en-US") {
   );
 }
 
+/** "Nov 04, 2026": a `YYYY-MM-DD` date, never shifted by the device's time zone (audit D9). */
 export function formatDate(date: string, locale = "en-US") {
   return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(new Date(`${date}T12:00:00`));
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00Z`));
 }
 
 export function formatDateTime(date: string, locale = "en-US") {
@@ -223,10 +217,10 @@ export function formatUtcDay(instant: Date) {
   return shortDateWithYearFormatter.format(instant);
 }
 
-const monthLabelFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
-const monthLabelWithYearFormatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" });
+const monthLabelFormatter = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" });
+const monthLabelWithYearFormatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit", timeZone: "UTC" });
 
-/** "Oct", or "Oct 26" with `withYear`: an axis label for a `YYYY-MM` month. */
+/** "Oct", or "Oct 26" with `withYear`: an axis label for a `YYYY-MM` month, never shifted by a time zone. */
 export function formatMonthLabel(month: string, withYear = false) {
-  return (withYear ? monthLabelWithYearFormatter : monthLabelFormatter).format(new Date(`${month}-01T12:00:00`));
+  return (withYear ? monthLabelWithYearFormatter : monthLabelFormatter).format(new Date(`${month}-01T12:00:00Z`));
 }

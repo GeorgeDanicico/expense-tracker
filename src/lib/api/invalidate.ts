@@ -3,103 +3,19 @@ import type { ScopedMutator } from "swr";
 import {
   ACCOUNT_API_KEY,
   ACCOUNT_NOTICES_API_KEY,
-  EXPENSE_TABS_API_KEY,
   FAMILY_API_KEY,
   FAMILY_INVITES_API_KEY,
-  IMPORTS_API_KEY,
   INVESTMENTS_API_KEY,
   NET_WORTH_API_KEY,
-  expenseTabApiKey,
   type FamilyResponse,
   type NoticesResponse,
-  type TabsResponse,
 } from "@/lib/api/keys";
 import type { AccountData } from "@/lib/account/types";
-import type { ExpenseTab } from "@/lib/expenses/tabs";
-import type { ExpensesData } from "@/lib/expenses/types";
 
-// What to refresh after each mutation. Every helper takes the global `mutate`
-// from `useSWRConfig()`. Retry buttons keep calling their own bound `mutate()`.
-
-function startsWith(prefix: string) {
-  return (key: unknown) => typeof key === "string" && key.startsWith(prefix);
-}
-
-function isTabLedgerKey(key: unknown) {
-  return typeof key === "string" && key.startsWith(`${EXPENSE_TABS_API_KEY}/`) && key.includes("/expenses?");
-}
-
-function withExpenseRemoved(id: string) {
-  return (current: ExpensesData | undefined) => {
-    if (!current?.expenses.some((expense) => expense.id === id)) return current;
-    const expenses = current.expenses.filter((expense) => expense.id !== id);
-    const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-    return { ...current, expenses, total, average: expenses.length ? total / expenses.length : 0 };
-  };
-}
-
-/** Background refresh of every view derived from expenses: tab ledgers and dashboards. New expenses: `useExpenseWrites`. */
-export function afterExpenseChange(mutate: ScopedMutator) {
-  void mutate(isTabLedgerKey);
-  void mutate(startsWith("/api/dashboard?"));
-}
-
-/** Refetches every cached month ledger and derived view, after an expense added somewhere else (a reminder). */
-export function afterExpenseLogged(mutate: ScopedMutator) {
-  void mutate(startsWith("/api/expenses?"));
-  afterExpenseChange(mutate);
-}
-
-/**
- * After an import is confirmed or undone, which adds or removes many expenses at once: refetches
- * every cached month ledger, the tab ledgers and dashboards, and the list of recent imports.
- */
-export function afterImportChange(mutate: ScopedMutator) {
-  afterExpenseLogged(mutate);
-  void mutate(IMPORTS_API_KEY);
-}
-
-/**
- * After a draft is uploaded or discarded, which changes the list of recent imports and no expense:
- * refetches that list only.
- */
-export function afterImportDraftChange(mutate: ScopedMutator) {
-  void mutate(IMPORTS_API_KEY);
-}
-
-/** Removes the expense from every cached month ledger, then refreshes derived views. */
-export async function afterExpenseDeleted(mutate: ScopedMutator, id: string) {
-  await mutate(startsWith("/api/expenses?"), withExpenseRemoved(id), { revalidate: false });
-  afterExpenseChange(mutate);
-}
-
-/** Upserts the saved tab in the tab list; an edited tab's ledgers are refreshed. */
-export async function afterTabSaved(mutate: ScopedMutator, saved: ExpenseTab, { editing }: { editing: boolean }) {
-  await mutate(
-    EXPENSE_TABS_API_KEY,
-    (current: TabsResponse | undefined) => {
-      const existing = current?.tabs ?? [];
-      const tabs = editing
-        ? existing.map((item) => item.id === saved.id ? saved : item)
-        : [...existing.filter((item) => item.id !== saved.id), saved];
-      return { tabs };
-    },
-    { revalidate: false },
-  );
-  if (editing) void mutate(startsWith(`${expenseTabApiKey(saved.id)}/expenses?`));
-}
-
-/** Drops the tab from the tab list and refreshes its ledgers. */
-export async function afterTabDeleted(mutate: ScopedMutator, id: string) {
-  await mutate(
-    EXPENSE_TABS_API_KEY,
-    (current: TabsResponse | undefined) => current
-      ? { tabs: current.tabs.filter((item) => item.id !== id) }
-      : current,
-    { revalidate: false },
-  );
-  void mutate(startsWith(`${expenseTabApiKey(id)}/expenses?`));
-}
+// What to refresh after each mutation of the modules not yet on an API object and hooks. Every helper
+// takes the global `mutate` from `useSWRConfig()`. Retry buttons keep calling their own bound
+// `mutate()`. Expenses, saved tabs and imports moved out in U8: `src/components/expenses/expense-cache.ts`
+// and `useExpenseWrites`.
 
 /** Refreshes investments, net worth and, when given, the asset's transaction list. */
 export function afterInvestmentChange(mutate: ScopedMutator, transactionsKey?: string) {

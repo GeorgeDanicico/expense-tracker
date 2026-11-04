@@ -136,9 +136,18 @@ export function expensesApiKey(month: string, member?: string | null) {
   return withMember(`/api/expenses?month=${encodeURIComponent(month)}`, member);
 }
 
-/** GET → `ExpensesData` (`@/lib/expenses/types`). */
+/**
+ * GET → `ExpensesData` (`@/lib/expenses/types`): {@link expensesApiKey} with a future month brought
+ * back to the current one, as the Expenses screen shows it. The same key as Insights' Monthly for the
+ * same month, so the two share one cache entry and one update.
+ */
 export function mainExpensesApiKey(month: string, member?: string | null) {
-  return `${expensesApiKey(resolveMainExpenseMonth(month), member)}&context=main`;
+  return expensesApiKey(resolveMainExpenseMonth(month), member);
+}
+
+/** POST a new expense to `/api/expenses`; PATCH or DELETE one here. */
+export function expenseApiUrl(id: string) {
+  return `/api/expenses/${encodeURIComponent(id)}`;
 }
 
 /** GET → `SuggestionsResponse` (`@/lib/expenses/suggestions`): the caller's own descriptions matching `query`, and the category guess. */

@@ -5,7 +5,7 @@ import useSWR, { useSWRConfig } from "swr";
 
 import { useReminderApi, type LogExpenseOptions, type ReminderFields } from "@/components/reminders/reminder-api";
 import { ApiError } from "@/lib/api/client";
-import { afterExpenseLogged } from "@/lib/api/invalidate";
+import { afterExpenseLogged } from "@/components/expenses/expense-cache";
 import { REMINDERS_API_KEY, REMINDERS_SUMMARY_API_KEY, type RemindersResponse } from "@/lib/api/keys";
 import {
   completeLocally,

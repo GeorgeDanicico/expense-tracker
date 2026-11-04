@@ -6,7 +6,7 @@ import { Search } from "lucide-react";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { CATEGORY_LABELS, EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/expenses/categories";
 
-/** Search + category filter row above the main expense list. */
+/** Search + category filter above the main expense list, behind the Filters chip. */
 export function ExpenseFilters({
   query,
   onQueryChange,
@@ -28,10 +28,6 @@ export function ExpenseFilters({
       justify="space-between"
       gap="2"
       direction={{ base: "column", sm: "row" }}
-      px="4"
-      py="3"
-      borderBottomWidth="1px"
-      borderColor="border"
     >
       <InputGroup
         flex="1"

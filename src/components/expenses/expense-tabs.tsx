@@ -1,61 +1,55 @@
 "use client";
 
-import { Box, Button, Flex, Tabs } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import { Box } from "@chakra-ui/react";
+import { Plus, SlidersHorizontal } from "lucide-react";
 
-import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { ChipRow } from "@/components/ui/chip-menu";
+import { ICON } from "@/components/ui/icon";
+import { ToggleChip } from "@/components/ui/toggle-chip";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 
 export const MAIN_EXPENSE_TAB = "main";
 
-export function ExpenseTabs({
+/**
+ * The saved tabs as a sideways-scrolling row of chips: All (the month's ledger), each tab, "+ Tab"
+ * (left out while read-only) and Filters, which shows the open ledger's filters.
+ */
+export function ExpenseTabChips({
   tabs,
   value,
   onValueChange,
   onCreate,
-  children,
+  filtersOpen,
+  onFiltersOpenChange,
 }: {
-  tabs: ExpenseTab[];
+  tabs: readonly ExpenseTab[];
   value: string;
   onValueChange: (value: string) => void;
   /** Omitted while viewing another member: their tabs can be opened but not added to. */
   onCreate?: () => void;
-  children: ReactNode;
+  filtersOpen: boolean;
+  onFiltersOpenChange: (open: boolean) => void;
 }) {
   return (
-    <Tabs.Root
-      value={value}
-      onValueChange={({ value: nextValue }) => onValueChange(nextValue)}
-      lazyMount
-    >
-      <Flex align="flex-end" gap="2" minW="0" mb="4" borderBottomWidth="1px" borderColor="border">
-        <Box flex="1" minW="0" overflowX="auto" overflowY="hidden" overscrollBehaviorX="contain" mb="-1px">
-          <Tabs.List aria-label="Expense tabs" width="max-content" minW="full" borderBottomWidth="0">
-            <Tabs.Trigger value={MAIN_EXPENSE_TAB}>Expenses</Tabs.Trigger>
-            {tabs.map((tab) => (
-              <Tabs.Trigger key={tab.id} value={tab.id} maxW="14rem">
-                <Box as="span" overflow="hidden" textOverflow="ellipsis">{tab.name}</Box>
-              </Tabs.Trigger>
-            ))}
-          </Tabs.List>
-        </Box>
-        {onCreate ? (
-          <Button
-            flexShrink="0"
-            mb="1"
-            size="xs"
-            variant="ghost"
-            color="fg.muted"
-            onClick={onCreate}
-            aria-label="Create expense tab"
-          >
-            <Plus size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
-            <Box as="span" display={{ base: "none", sm: "inline" }}>New tab</Box>
-          </Button>
-        ) : null}
-      </Flex>
-      {children}
-    </Tabs.Root>
+    <ChipRow label="Expense tabs">
+      <ToggleChip flexShrink="0" pressed={value === MAIN_EXPENSE_TAB} onClick={() => onValueChange(MAIN_EXPENSE_TAB)}>
+        All
+      </ToggleChip>
+      {tabs.map((tab) => (
+        <ToggleChip key={tab.id} flexShrink="0" maxW="14rem" pressed={value === tab.id} onClick={() => onValueChange(tab.id)}>
+          <Box as="span" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+            {tab.name}
+          </Box>
+        </ToggleChip>
+      ))}
+      {onCreate ? (
+        <ToggleChip flexShrink="0" onClick={onCreate} aria-label="New expense tab">
+          <Plus size={ICON.xs} aria-hidden="true" /> Tab
+        </ToggleChip>
+      ) : null}
+      <ToggleChip flexShrink="0" pressed={filtersOpen} onClick={() => onFiltersOpenChange(!filtersOpen)}>
+        <SlidersHorizontal size={ICON.xs} aria-hidden="true" /> Filters
+      </ToggleChip>
+    </ChipRow>
   );
 }

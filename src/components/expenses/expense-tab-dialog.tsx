@@ -2,17 +2,14 @@
 
 import { Input, Stack } from "@chakra-ui/react";
 import { type FormEvent, useState } from "react";
-import { useSWRConfig } from "swr";
 
 import { ExpenseTabCategoryFields } from "@/components/expenses/expense-tab-category-fields";
+import { useExpenseWrites } from "@/components/expenses/use-expense-writes";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterTabSaved } from "@/lib/api/invalidate";
-import { EXPENSE_TABS_API_KEY, expenseTabApiKey, type SavedTabResponse } from "@/lib/api/keys";
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_SUBTYPES,
@@ -33,7 +30,7 @@ export function ExpenseTabDialog({
   tab?: ExpenseTab;
   onSaved: (tab: ExpenseTab) => void;
 }) {
-  const { mutate } = useSWRConfig();
+  const writes = useExpenseWrites();
   const [name, setName] = useState(tab?.name ?? "");
   const [categories, setCategories] = useState<ExpenseCategory[]>(tab?.categoryKeys ?? []);
   const [subtypes, setSubtypes] = useState<ExpenseSubtype[]>(tab?.subtypeKeys ?? []);
@@ -63,16 +60,7 @@ export function ExpenseTabDialog({
       subtypeKeys: EXPENSE_SUBTYPES.filter((subtype) => subtypes.includes(subtype)),
     };
     void form.submit(async () => {
-      const result = await apiRequest<SavedTabResponse>(
-        editing ? expenseTabApiKey(tab!.id) : EXPENSE_TABS_API_KEY,
-        {
-          method: editing ? "PATCH" : "POST",
-          body: JSON.stringify(payload),
-        },
-      );
-      const saved = result.tab;
-      await afterTabSaved(mutate, saved, { editing });
-      onSaved(saved);
+      onSaved(await writes.saveTab(payload, tab));
     }, { fallback: "Unable to save this tab." });
   }
 

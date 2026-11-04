@@ -29,9 +29,9 @@ describe("main Expenses request URLs", () => {
   afterEach(() => vi.useRealTimers());
 
   it("normalizes future selections before making its API and export URLs", () => {
-    expect(mainExpensesApiKey("2027-02")).toBe("/api/expenses?month=2027-01&context=main");
+    expect(mainExpensesApiKey("2027-02")).toBe("/api/expenses?month=2027-01");
     expect(mainExpensesExportUrl("2027-02")).toBe("/api/expenses/export?month=2027-01");
-    expect(mainExpensesApiKey("2026-12")).toBe("/api/expenses?month=2026-12&context=main");
+    expect(mainExpensesApiKey("2026-12")).toBe("/api/expenses?month=2026-12");
   });
 
   it("preserves Home's separate monthly API contract", () => {
@@ -57,7 +57,7 @@ describe("keys for another member's data", () => {
 
   it("adds the member after an existing query", () => {
     expect(expensesApiKey("2026-10", member)).toBe(`/api/expenses?month=2026-10&member=${member}`);
-    expect(mainExpensesApiKey("2026-10", member)).toBe(`/api/expenses?month=2026-10&member=${member}&context=main`);
+    expect(mainExpensesApiKey("2026-10", member)).toBe(`/api/expenses?month=2026-10&member=${member}`);
     expect(mainExpensesExportUrl("2026-10", member)).toBe(`/api/expenses/export?month=2026-10&member=${member}`);
     expect(dashboardApiKey({ period: "3m", granularity: "month", customDate: "2026-10" }, member)).toContain(`&member=${member}`);
     expect(expenseTabExpensesApiKey("t1", DEFAULT_EXPENSE_TAB_FILTERS, "rev", member)).toMatch(

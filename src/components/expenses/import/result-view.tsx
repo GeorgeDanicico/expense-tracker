@@ -11,7 +11,7 @@ import { UndoImportDialog } from "@/components/expenses/import/undo-dialog";
 import { Card } from "@/components/ui/card";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { useApiForm } from "@/hooks/use-api-form";
-import { afterImportChange } from "@/lib/api/invalidate";
+import { afterImportChange } from "@/components/expenses/expense-cache";
 import type { ImportConfirmResponse } from "@/lib/api/keys";
 import { formatMonth } from "@/lib/calendar";
 import { formatInstantDay } from "@/lib/imports/recent";

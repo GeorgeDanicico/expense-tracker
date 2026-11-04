@@ -84,6 +84,7 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   "GET /api/expense-tabs/[id]/expenses": expenses,
   "GET /api/expenses": expenses,
   "POST /api/expenses": expenses,
+  "PATCH /api/expenses/[id]": expenses,
   "DELETE /api/expenses/[id]": expenses,
   "GET /api/expenses/export": expenses,
   "GET /api/expenses/suggestions": expenses,
