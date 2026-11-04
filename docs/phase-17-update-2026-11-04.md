@@ -9,8 +9,9 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | --- | --- |
 | U1 Lint plugin | Merged earlier (#210) |
 | U2 Screen audit | Merged earlier (#211, with the date fixes in #212) |
-| **U3 Direction and mockups** | **Done in this session. Pushed, waiting for George's checkpoint.** |
-| U4 onwards | Not started. The plan blocks building until George signs off U3. |
+| **U3 Direction and mockups** | **Done. George approved it on 4 November, taking the recommended answers.** |
+| **U4 Theme refresh and mobile primitives** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
+| U5 onwards | Not started. U5 (navigation) depends on U4. |
 
 ## What U3 added
 
@@ -50,7 +51,12 @@ checks, commit and push myself.
 - Notifications is higher up in the Settings list.
 - The quick-add To-do takes 3 taps, not the plan's 2.
 
-## Questions for George (the U3 checkpoint)
+## Questions for George (the U3 checkpoint, now decided)
+
+George approved U3 and took the recommended answer for each question below. The answers are
+recorded under "Decisions" in `docs/ui-direction.md`. Only questions 1 and 4 named an explicit
+recommendation; for the other eight, the answer recorded is what the doc and mockups show.
+
 
 1. Should desktop use the same radii as phones?
 2. Is 40 px right for the quick-add amount?
@@ -65,16 +71,65 @@ checks, commit and push myself.
 
 ## Found along the way (not fixed here)
 
-- **Status backgrounds have no fill in production.** The raw `status.*Bg` tokens and the
-  semantic `status.*.bg` tokens compile to the same CSS variable, which ends up referring to
-  itself. So `StatusBadge`, `InlineAlert` and the `bg.error|success|warning|info` surfaces render
-  transparent. It's queued as a separate suggested task.
+- **Status backgrounds had no fill in production.** The raw `status.*Bg` tokens and the semantic
+  `status.*.bg` tokens compiled to the same CSS variable, which ended up referring to itself. So
+  `StatusBadge`, `InlineAlert` and the `bg.error|success|warning|info` surfaces rendered
+  transparent. **U4 fixed it:** the raw colours are renamed `signal.*` (values unchanged), and a
+  test fails if two tokens share a CSS variable or one refers to itself. The separate suggested
+  task is no longer needed.
+
+## What U4 added
+
+An opus agent did the work, as the plan says for this task. It pushed seven commits, from
+`83f7b94` to `934669f`.
+
+- **Theme:**
+  - the radii from the direction doc, and page spacing per breakpoint;
+  - motion tokens and keyframes in `theme/motion.ts`;
+  - press feedback in the button, chip and row recipes;
+  - 44 px controls and fields on phones;
+  - a single `prefers-reduced-motion` block in `global-css.ts`, and a `useReducedMotion()` hook;
+  - colours unchanged.
+- **`AppDialog`** is a bottom sheet below `md` and a centred dialog above it, with the same props,
+  so every existing dialog changes without edits. `ConfirmDialog` is a sheet on phones too.
+  - A form with unsaved changes asks "Discard your changes?" before it closes.
+  - New optional props: `pending` and `dirty`.
+  - It's built on Chakra's `Dialog` with a responsive recipe rather than `Drawer`, so rotating a
+    phone doesn't remount the form.
+- **New primitives:** `ActionBar`, `RowActions` (a `⋯` menu, plus long-press on phones),
+  `UndoToast` with `useUndo()`, `AmountInput` (decimal keypad, two decimals at most),
+  `ToggleChip`, `Disclosure`, `Collapse` and `IconTile`.
+- **Lint:** `local/motion-tokens` is now an error, with its 5 warnings fixed. New rule:
+  `local/no-reduced-motion-query`.
+- The gallery and the U3 mockups now use the real theme and primitives; the U3 proposals file is
+  deleted.
+- **Screenshots:** `docs/ui-styling/screenshots/u4-*-{390,1280}.jpg` (gallery motion, gallery
+  mobile, gallery sheet, dashboard, expenses, add-expense sheet, reminders, reminder dialog). All
+  the U3 mockups were taken again on the real theme.
+- **Checks:** lint has 0 errors and 0 warnings; `tsc` is clean; vitest passes 6334 tests
+  (1 skipped; 6283 before). The existing dialog tests pass untouched.
+- **Testing limits:** the tests have no jsdom, so "focus trapped and restored" is checked through
+  the props given to Zag. Focus, the discard prompt and swipe-to-close were also checked by hand
+  in Playwright.
+
+### Left over from U4 (good first steps for a later task)
+
+- Remove the 15 hand-written pending guards in dialogs now that `AppDialog` has `pending`, and
+  add a `local/no-dialog-pending-guard` rule.
+- Move the chips in 6 files to `ToggleChip`, and add a `local/no-raw-toggle-button` rule.
+- A `DataGate` helper.
+
+### For George's U4 sign-off
+
+- 44 px buttons and fields on phones.
+- Cards without borders, and list rows without lines.
+- How the sheets look, and the "Discard your changes?" prompt.
+- The 8 decisions that were inferred from the doc and mockups (above).
 
 ## Next steps
 
-1. George reviews the screenshots (or runs `/dev/preview/mockups` locally) and answers the
-   questions above.
-2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main`. It only touches `/dev`
-   routes and docs, plus exporting `CATEGORY_ICONS`.
-3. Then U4, the theme refresh and mobile primitives (opus), starting from `proposed-theme.ts`
-   and the checkpoint answers.
+1. George signs off the U4 screenshots, at 390 and 1280 px.
+2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U3 and U4. **Merging
+   changes every screen in production:** the new radii, bottom sheets and touch sizes.
+3. Then U5, navigation (sonnet): Home, Money, +, Planning and More; the sidebar to match; and
+   Settings as one list.
