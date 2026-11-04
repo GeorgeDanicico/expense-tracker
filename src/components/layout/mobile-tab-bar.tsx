@@ -106,7 +106,7 @@ export function MobileTabBar() {
             _focusVisible={{ outline: "2px solid", outlineColor: "fg.accent", outlineOffset: "-2px" }}
           >
             <Link href={section.href} aria-current={on ? "page" : undefined}>
-              <Stack align="center" gap="1" pt="1" color={on ? "fg" : "fg.subtle"} css={pressFeedback(PRESS_SCALE.icon)}>
+              <Stack align="center" gap="1" pt="1" color={on ? "fg" : "fg.muted"} css={pressFeedback(PRESS_SCALE.icon)}>
                 <Icon size={22} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 <Text as="span" fontSize="2xs" lineHeight="0.875rem" fontWeight="medium">
                   {section.label}

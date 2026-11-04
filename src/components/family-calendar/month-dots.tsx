@@ -94,7 +94,7 @@ export function MonthDots({
                   textStyle="label"
                   fontWeight={isToday || isSelected ? "semibold" : "medium"}
                   bg={isToday ? "brand.solid" : "transparent"}
-                  color={isToday ? "brand.contrast" : inMonth ? "fg" : "fg.subtle"}
+                  color={isToday ? "brand.contrast" : inMonth ? "fg" : "fg.muted"}
                   borderWidth="2px"
                   borderColor={isSelected ? "brand.solid" : "transparent"}
                 >

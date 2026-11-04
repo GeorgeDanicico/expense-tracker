@@ -159,11 +159,14 @@ export function isTypingTarget(target: EventTarget | null) {
 }
 
 /**
- * The desktop delete: a plain `Delete` on a focused row or card (or a button in it), never while
- * typing in a field. Deletes from it are undone from the toast, like the swipe.
+ * The desktop delete: a plain `Delete` (`Backspace` on Mac keyboards, which have no Delete key) on
+ * a focused row or card (or a button in it), never while typing in a field. Deletes from it are
+ * undone from the toast, like the swipe.
  */
+export const DELETE_KEYS = "Delete Backspace";
+
 export function isDeleteKey(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "repeat" | "defaultPrevented" | "target">) {
-  if (event.key !== "Delete" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat || event.defaultPrevented) return false;
+  if ((event.key !== "Delete" && event.key !== "Backspace") || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat || event.defaultPrevented) return false;
   return !isTypingTarget(event.target);
 }
 

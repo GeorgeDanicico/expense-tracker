@@ -188,8 +188,14 @@ describe("isDeleteKey", () => {
     ...overrides,
   });
 
-  it("is a plain Delete on a focused row or card", () => {
+  it("is a plain Delete, or Backspace (Mac keyboards), on a focused row or card", () => {
     expect(isDeleteKey(key())).toBe(true);
+    expect(isDeleteKey(key({ key: "Backspace" }))).toBe(true);
+  });
+
+  it("isn't Backspace while typing in a field, or with a modifier", () => {
+    expect(isDeleteKey(key({ key: "Backspace", target: { closest: () => ({}) } as unknown as EventTarget }))).toBe(false);
+    expect(isDeleteKey(key({ key: "Backspace", metaKey: true }))).toBe(false);
   });
 
   it("isn't while typing in a field, with a modifier, held down, or another key", () => {
@@ -197,7 +203,7 @@ describe("isDeleteKey", () => {
     expect(isDeleteKey(key({ metaKey: true }))).toBe(false);
     expect(isDeleteKey(key({ shiftKey: true }))).toBe(false);
     expect(isDeleteKey(key({ repeat: true }))).toBe(false);
-    expect(isDeleteKey(key({ key: "Backspace" }))).toBe(false);
+    expect(isDeleteKey(key({ key: "Enter" }))).toBe(false);
     expect(isDeleteKey(key({ defaultPrevented: true }))).toBe(false);
   });
 });

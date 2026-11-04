@@ -37,7 +37,7 @@ import { TodoCard } from "@/components/todos/todo-card";
 import { TodoQuickAdd } from "@/components/todos/todo-quick-add";
 import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
-import { focusNeighbour, isDeleteKey, SwipeRow } from "@/components/ui/row-actions";
+import { DELETE_KEYS, focusNeighbour, isDeleteKey, SwipeRow } from "@/components/ui/row-actions";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { revealRowActions } from "@/components/ui/theme/recipes/misc";
 import {
@@ -403,7 +403,7 @@ function SortableTodoCard({
         style={{ transform: CSS.Translate.toString(transform), transition }}
         {...attributes}
         aria-roledescription="draggable card"
-        aria-keyshortcuts={onDelete ? "Delete" : undefined}
+        aria-keyshortcuts={onDelete ? DELETE_KEYS : undefined}
         {...listeners}
         onKeyDown={handleKeyDown}
         onClick={() => onOpen(todo)}

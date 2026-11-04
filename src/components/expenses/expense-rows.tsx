@@ -9,7 +9,7 @@ import { Amount } from "@/components/ui/amount";
 import { Collapse } from "@/components/ui/disclosure";
 import { GroupLabel } from "@/components/ui/group-label";
 import { ListRow } from "@/components/ui/list-row";
-import { focusNeighbour, isDeleteKey, RowActions, SwipeRow, useRowActions, type RowAction } from "@/components/ui/row-actions";
+import { DELETE_KEYS, focusNeighbour, isDeleteKey, RowActions, SwipeRow, useRowActions, type RowAction } from "@/components/ui/row-actions";
 import { useMemberColors } from "@/hooks/use-member-colors";
 import { expenseClassificationLabel } from "@/lib/expenses/categories";
 import type { Expense, ListedExpense } from "@/lib/expenses/types";
@@ -52,11 +52,14 @@ function ExpenseRow({ expense, currency, accent, actions }: { expense: ListedExp
       {...(rowActions ? rowProps : {})}
       // Desktop: a focused row (or its hover icons) deletes on the Delete key, with Undo.
       {...(remove ? {
-        tabIndex: 0,
+        // Not a tab stop: the row's "more" button is the keyboard's way in (Edit, Delete), and Delete
+        // works from it too. Clicking the row focuses it for the key.
+        tabIndex: -1,
         "data-expense-row": "",
-        "aria-keyshortcuts": "Delete",
+        "aria-keyshortcuts": DELETE_KEYS,
         onKeyDown: (event: KeyboardEvent<HTMLLIElement>) => {
-          if (!isDeleteKey(event)) return;
+          // The open menu is portalled, but React events bubble out of it: only keys from inside the row count.
+          if (!event.currentTarget.contains(event.target as Node) || !isDeleteKey(event)) return;
           event.preventDefault();
           focusNeighbour(event.currentTarget, "[data-expense-row]");
           remove();

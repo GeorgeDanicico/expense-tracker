@@ -113,11 +113,11 @@ describe("deleting a card", () => {
   it("has a hover delete icon and the Delete key on desktop; a phone swipes (and keeps the dialog's Delete)", () => {
     const desktop = render([card({})], false, () => undefined);
     expect(desktop).toContain('aria-label="Delete: Buy milk"');
-    expect(desktop).toContain('aria-keyshortcuts="Delete"');
+    expect(desktop).toContain('aria-keyshortcuts="Delete Backspace"');
     expect(desktop).toContain("data-row-actions");
     const phone = render([card({})], true, () => undefined);
     expect(phone).not.toContain('aria-label="Delete: Buy milk"');
-    expect(phone).toContain('aria-keyshortcuts="Delete"');
+    expect(phone).toContain('aria-keyshortcuts="Delete Backspace"');
   });
 
   it("has no delete without a handler", () => {

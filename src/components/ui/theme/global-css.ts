@@ -26,7 +26,7 @@ export const globalCss = defineGlobalStyles({
     fontVariantNumeric: "tabular-nums",
   },
   "*::placeholder, *[data-placeholder]": {
-    color: "fg.subtle",
+    color: "fg.muted",
   },
   "*::selection": {
     bg: "bg.selected",

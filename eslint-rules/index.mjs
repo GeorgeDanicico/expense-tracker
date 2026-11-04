@@ -11,6 +11,7 @@ import noLocaleDateWithoutZone from "./no-locale-date-without-zone.mjs";
 import noRawDialog from "./no-raw-dialog.mjs";
 import noReducedMotionQuery from "./no-reduced-motion-query.mjs";
 import noRedundantSwrFetcher from "./no-redundant-swr-fetcher.mjs";
+import noSubtleText from "./no-subtle-text.mjs";
 import noWindowConfirm from "./no-window-confirm.mjs";
 import noZodFlatten from "./no-zod-flatten.mjs";
 import postgrestFilterString from "./postgrest-filter-string.mjs";
@@ -30,6 +31,7 @@ const plugin = {
     "no-raw-dialog": noRawDialog,
     "no-reduced-motion-query": noReducedMotionQuery,
     "no-redundant-swr-fetcher": noRedundantSwrFetcher,
+    "no-subtle-text": noSubtleText,
     "no-window-confirm": noWindowConfirm,
     "no-zod-flatten": noZodFlatten,
     "postgrest-filter-string": postgrestFilterString,

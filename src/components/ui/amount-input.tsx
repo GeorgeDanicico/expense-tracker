@@ -79,7 +79,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
   }
   return (
     <Flex align="baseline" justify="center" gap="1.5" pt="1" width="full">
-      <Text as="span" textStyle="amountLg" color="fg.subtle" aria-hidden="true">
+      <Text as="span" textStyle="amountLg" color="fg.muted" aria-hidden="true">
         {symbol}
       </Text>
       <chakra.input

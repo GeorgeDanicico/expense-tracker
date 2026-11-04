@@ -31,7 +31,7 @@ export function ChipMenu({
       <Menu.Trigger asChild>
         <ToggleChip selected={selected} aria-label={ariaLabel}>
           {label}
-          <Text as="span" aria-hidden="true" color="fg.subtle">
+          <Text as="span" aria-hidden="true" color="fg.muted">
             ▾
           </Text>
         </ToggleChip>
