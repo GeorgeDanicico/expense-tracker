@@ -8,9 +8,7 @@ import { withPermission } from "@/lib/http/permission";
 import { HttpError, json, notFound, parseId } from "@/lib/http/route";
 import { fieldErrorsOf } from "@/lib/validation/field-errors";
 
-type TabRouteContext = { params: Promise<{ id: string }> };
-
-export const GET = withPermission("expenses", "edit", async (request: NextRequest, user, context: TabRouteContext, member) => {
+export const GET = withPermission("expenses", "edit", async (request: NextRequest, user, context: RouteContext<"/api/expense-tabs/[id]/expenses">, member) => {
   const { userId, viewing } = await resolveViewedUserFor(request, user, member);
   const id = parseId((await context.params).id, "Invalid tab identifier.");
   const parsed = parseExpenseTabFilters(request.nextUrl.searchParams);

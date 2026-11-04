@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getDashboardData, getMonthlyLedger } from "@/lib/expenses/service";
+import { createExpense, getDashboardData, getMonthlyLedger, updateExpense } from "@/lib/expenses/service";
 import { CREATE, defineTool, DELETE, READ, UPDATE } from "@/lib/mcp/define-tool";
 import { parseAnalyticsFilters } from "@/lib/expenses/url-state";
 import { getRepositories } from "@/lib/repositories";
@@ -11,7 +11,7 @@ import {
   isValidDate,
   isValidMonth,
 } from "@/lib/calendar";
-import { expenseAmountInput, expensePatchSchema, expenseSchema } from "@/lib/validation/expense";
+import { expenseAmountInput, expensePatchSchema, expenseSchema, hasExpenseChange } from "@/lib/validation/expense";
 import { idSchema } from "@/lib/validation/primitives";
 
 const fields = expenseSchema.shape;
@@ -35,7 +35,7 @@ const addExpenseSchema = z.preprocess(
 );
 
 // The REST patch's own schema plus the id, so both transports check a change the same way.
-const updateExpenseSchema = expensePatchSchema.safeExtend({ id: idSchema() }).refine((value) => Object.entries(value).some(([key, field]) => key !== "id" && field !== undefined), "Provide at least one change.");
+const updateExpenseSchema = expensePatchSchema.safeExtend({ id: idSchema() }).refine(hasExpenseChange, "Provide at least one change.");
 
 export const expenseTools = [
   defineTool({
@@ -68,7 +68,7 @@ export const expenseTools = [
     shape: { ...fields, amount: expenseAmountInput, expenseDate: fields.expenseDate.optional() },
     annotations: CREATE,
     module: "expenses",
-    run: async (input, { userId }) => ({ expense: await getRepositories().expenses.create(userId, input) }),
+    run: async (input, { userId }) => ({ expense: await createExpense(userId, input) }),
   }),
   defineTool({
     name: "update_expense",
@@ -80,7 +80,7 @@ export const expenseTools = [
     module: "expenses",
     notFound: "Expense not found.",
     run: async ({ id, ...patch }, { userId }) => {
-      const expense = await getRepositories().expenses.update(userId, id, patch);
+      const expense = await updateExpense(userId, id, patch);
       return expense && { expense };
     },
   }),

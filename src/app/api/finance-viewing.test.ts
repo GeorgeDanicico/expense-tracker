@@ -26,7 +26,7 @@ import { GET as getTabs, POST as createTab } from "@/app/api/expense-tabs/route"
 import { DELETE as deleteTab, PATCH as updateTab } from "@/app/api/expense-tabs/[id]/route";
 import { GET as getTabExpenses } from "@/app/api/expense-tabs/[id]/expenses/route";
 import { GET as getExpenses, POST as createExpense } from "@/app/api/expenses/route";
-import { DELETE as deleteExpense } from "@/app/api/expenses/[id]/route";
+import { DELETE as deleteExpense, PATCH as updateExpense } from "@/app/api/expenses/[id]/route";
 import { GET as exportExpenses } from "@/app/api/expenses/export/route";
 import { GET as getInvestments } from "@/app/api/investments/route";
 import { GET as getTransactions, POST as createTransaction } from "@/app/api/investment-transactions/route";
@@ -342,7 +342,7 @@ describe("finance writes ignore ?member=", () => {
   });
 
   it("POST /api/expenses creates the expense for the caller", async () => {
-    const body = { selectedMonth: "2026-09", expenseDate: "2026-09-01", description: "Fuel", amount: "10.50", category: "car", subtype: "car_fuel" };
+    const body = { expenseDate: "2026-09-01", description: "Fuel", amount: "10.50", category: "car", subtype: "car_fuel" };
 
     const response = await call(createExpense as Handler, { method: "POST", url: asAna("/api/expenses"), body });
 
@@ -356,8 +356,18 @@ describe("finance writes ignore ?member=", () => {
       method: "DELETE", url: asAna(`/api/expenses/${ana.expense}`), params: { id: ana.expense },
     });
 
-    expect(response.status).toBe(200);
+    // Not the caller's expense, so it is missing (audit B3: no longer a 200 that deleted nothing).
+    expect(response).toMatchObject({ status: 404, body: { error: "Expense not found." } });
     expect(repositories.expenses.expenses.get(ANA.userId)?.map((expense) => expense.id)).toContain(ana.expense);
+  });
+
+  it("PATCH /api/expenses/[id] can't change the viewed member's expense", async () => {
+    const response = await call(updateExpense as Handler, {
+      method: "PATCH", url: asAna(`/api/expenses/${ana.expense}`), params: { id: ana.expense }, body: { amount: 1 },
+    });
+
+    expect(response).toMatchObject({ status: 404, body: { error: "Expense not found." } });
+    expect(repositories.expenses.expenses.get(ANA.userId)?.find((expense) => expense.id === ana.expense)?.amount).not.toBe(1);
   });
 
   it("POST /api/expense-tabs creates the tab for the caller", async () => {

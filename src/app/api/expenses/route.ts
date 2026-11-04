@@ -1,10 +1,9 @@
 import type { NextRequest } from "next/server";
 
-import { getFamilyMonthlyLedger, getMonthlyLedger } from "@/lib/expenses/service";
+import { createExpense, getFamilyMonthlyLedger, getMonthlyLedger } from "@/lib/expenses/service";
 import { FAMILY_VIEWING, resolveFamilyViewers, resolveViewedUserFor, wantsFamilyView } from "@/lib/family/viewed-user";
 import { withPermission } from "@/lib/http/permission";
-import { HttpError, json, parseInput, readJson } from "@/lib/http/route";
-import { getRepositories } from "@/lib/repositories";
+import { json, parseBody } from "@/lib/http/route";
 import { getBucharestMonth, isValidMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseSchema } from "@/lib/validation/expense";
 
@@ -40,16 +39,8 @@ export const GET = withPermission("expenses", "edit", async (request: NextReques
 
 // Writes never read `?member=`: they always act on the caller.
 
+/** A new expense; its own date decides its month (audit D10), as in MCP's `add_expense`. */
 export const POST = withPermission("expenses", "edit", async (request: NextRequest, user) => {
-  const payload = (await readJson(request)) as Record<string, unknown> | null;
-  const selectedMonth = typeof payload?.selectedMonth === "string" ? payload.selectedMonth : "";
-  const input = parseInput(payload, expenseSchema, "Check the highlighted details and try again.");
-
-  if (!isValidMonth(selectedMonth) || !input.expenseDate.startsWith(`${selectedMonth}-`)) {
-    throw new HttpError(422, "Choose a date inside the selected month.", {
-      expenseDate: ["Date is outside the selected month."],
-    });
-  }
-
-  return json({ expense: await getRepositories().expenses.create(user.id, input) }, 201);
+  const input = await parseBody(request, expenseSchema, "Check the highlighted details and try again.");
+  return json({ expense: await createExpense(user.id, input) }, 201);
 }, { failure: "The expense could not be saved." });

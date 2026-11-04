@@ -144,6 +144,14 @@ export const expensePatchSchema = z.object({
   }
 });
 
+/** Whether a patch (with or without an `id`) names at least one field to change. */
+export function hasExpenseChange(patch: Record<string, unknown>) {
+  return Object.entries(patch).some(([key, field]) => key !== "id" && field !== undefined);
+}
+
+/** A change sent to `PATCH /api/expenses/[id]`: the patch schema, with at least one field. */
+export const expenseChangeSchema = expensePatchSchema.refine(hasExpenseChange, "Provide at least one change.");
+
 /**
  * Checks each field the patch names with `expenseSchema`'s rules, and a subtype against a category
  * named with it, throwing a ZodError with the same field messages. Fields the patch doesn't name are
