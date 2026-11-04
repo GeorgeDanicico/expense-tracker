@@ -1,121 +1,163 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSWRConfig, type Cache, type ScopedMutator } from "swr";
 
-import { useExpenseApi, type ExpenseApi } from "@/components/expenses/expense-api";
-import { afterExpenseChange } from "@/lib/api/invalidate";
-import type { DashboardData, Expense, ExpensesData } from "@/lib/expenses/types";
+import { useExpenseApi } from "@/components/expenses/expense-api";
+import { applyExpenseChange, refreshExpenseViews, withoutTab, withTabSaved, type ExpenseChange } from "@/components/expenses/expense-cache";
+import { UNDO_MS, useUndo, type UndoEntry } from "@/components/ui/undo-toast";
+import { EXPENSE_TABS_API_KEY, expenseTabApiKey, type TabsResponse } from "@/lib/api/keys";
+import type { ExpenseTab, ExpenseTabInput } from "@/lib/expenses/tabs";
+import type { Expense } from "@/lib/expenses/types";
 import type { ExpenseInput } from "@/lib/validation/expense";
 
-/** The query of a cached key, when it is one of the caller's own reads at `path` (not a member's or the family's). */
-function ownQuery(key: string, path: string) {
-  if (!key.startsWith(`${path}?`)) return null;
-  const params = new URLSearchParams(key.slice(path.length + 1));
-  return params.has("member") ? null : params;
-}
-
-/** The month of a cached `/api/expenses?month=…` ledger of the caller's own, or null for any other key. */
-export function ownLedgerMonth(key: string) {
-  return ownQuery(key, "/api/expenses")?.get("month") ?? null;
-}
-
-/** Whether `key` is the caller's own dashboard (Home). */
-function isOwnDashboardKey(key: string) {
-  return ownQuery(key, "/api/dashboard") !== null;
-}
-
-/** A cached response that shows `expense` at once: its month's ledger, or the dashboard of its month. */
-function showsExpense(key: string, expense: Expense, data: unknown) {
-  const month = expense.expenseDate.slice(0, 7);
-  if (ownLedgerMonth(key) === month) return true;
-  return isOwnDashboardKey(key) && (data as DashboardData | undefined)?.currentMonth === month;
-}
-
-/** Newest first by date, as the lists sort; a new expense goes before others of its day. */
-function byDate(expenses: Expense[]) {
-  return expenses.toSorted((a, b) => b.expenseDate.localeCompare(a.expenseDate));
-}
-
-/** `current` (a month ledger or the dashboard) with `expense` added, or swapped for the one with `replacing`'s id. */
-export function withExpense(current: unknown, expense: Expense, replacing?: string): unknown {
-  if (!current || typeof current !== "object") return current;
-  if ("expenses" in current) {
-    const ledger = current as ExpensesData;
-    const others = ledger.expenses.filter((item) => item.id !== (replacing ?? expense.id));
-    const expenses = byDate([expense, ...others]);
-    const total = expenses.reduce((sum, item) => sum + item.amount, 0);
-    return { ...ledger, expenses, total, average: total / expenses.length };
-  }
-  if ("currentExpenses" in current) {
-    const dashboard = current as DashboardData;
-    const replaced = replacing !== undefined && dashboard.currentExpenses.some((item) => item.id === replacing);
-    const currentExpenses = byDate([expense, ...dashboard.currentExpenses.filter((item) => item.id !== replacing)]).slice(0, 5);
-    if (replaced) return { ...dashboard, currentExpenses };
-    const currentTotal = dashboard.currentTotal + expense.amount;
-    const currentCount = dashboard.currentCount + 1;
-    return {
-      ...dashboard,
-      currentExpenses,
-      currentTotal,
-      currentCount,
-      currentAverage: currentTotal / currentCount,
-      currentLargest: Math.max(dashboard.currentLargest, expense.amount),
-    };
-  }
-  return current;
-}
-
-/** Every view a new expense changes that isn't updated by hand: members' and family views, tab ledgers, suggestions. */
-function refreshDerivedViews(mutate: ScopedMutator) {
-  afterExpenseChange(mutate);
-  void mutate((key) => typeof key === "string" && key.startsWith("/api/expenses?") && ownLedgerMonth(key) === null);
-  void mutate((key) => typeof key === "string" && key.startsWith("/api/expenses/suggestions?"));
-}
+type Swr = { mutate: ScopedMutator; cache: Cache };
 
 /**
- * Adds an expense optimistically: it shows at once in every cached view of its month (the Expenses
- * ledger, the Monthly dashboard, Home), then the API is asked. On success the stored expense takes
- * its place and the views worked out on the server refetch; on failure every view goes back to what
- * it held and the error is thrown for the form to show.
+ * An optimistic write: `change` shows at once in every cached view it touches (the Expenses ledger,
+ * Insights' Monthly, Home), then `write` is sent. On success `settled(result)` swaps in what the
+ * server stored and the views worked out on the server refetch; on failure every touched view goes
+ * back to what it held and the error is thrown for the screen to show.
  */
-export async function addExpenseOptimistically({
+export async function writeOptimistically<T>({
   mutate,
   cache,
-  create,
-  input,
-  pendingId,
-}: {
-  mutate: ScopedMutator;
-  cache: Cache;
-  create: ExpenseApi["create"];
-  input: ExpenseInput;
-  /** The id the expense shows with until it is stored. */
-  pendingId: string;
-}): Promise<Expense> {
-  const pending: Expense = { id: pendingId, ...input, notes: input.notes || null };
-  const keys = [...cache.keys()].filter((key) => showsExpense(key, pending, cache.get(key)?.data));
-  const before = new Map(keys.map((key) => [key, cache.get(key)?.data]));
-  await Promise.all(keys.map((key) => mutate(key, (current: unknown) => withExpense(current, pending), { revalidate: false })));
+  change,
+  write,
+  settled,
+}: Swr & {
+  change: ExpenseChange;
+  write: () => Promise<T>;
+  settled?: (result: T) => ExpenseChange;
+}): Promise<T> {
+  const before = new Map<string, unknown>();
+  for (const key of cache.keys()) {
+    const data = cache.get(key)?.data;
+    if (applyExpenseChange(key, data, change) !== data) before.set(key, data);
+  }
+  const keys = [...before.keys()];
+  const update = (next: ExpenseChange) =>
+    Promise.all(keys.map((key) => mutate(key, (current: unknown) => applyExpenseChange(key, current, next), { revalidate: false })));
+  await update(change);
   try {
-    const stored = await create(input);
-    await Promise.all(keys.map((key) => mutate(key, (current: unknown) => withExpense(current, stored, pendingId), { revalidate: false })));
-    refreshDerivedViews(mutate);
-    return stored;
+    const result = await write();
+    if (settled) await update(settled(result));
+    refreshExpenseViews(mutate);
+    return result;
   } catch (caught) {
     await Promise.all(keys.map((key) => mutate(key, before.get(key), { revalidate: false })));
     throw caught;
   }
 }
 
-/** The expense writes, with their cache updates (audit D6). */
+/** The expense as stored from what a form checked: empty notes are null. */
+const asStored = (id: string, input: ExpenseInput): Expense => ({ id, ...input, notes: input.notes || null });
+
+const isLedgerOfTab = (id: string) => (key: unknown) => typeof key === "string" && key.startsWith(`${expenseTabApiKey(id)}/expenses?`);
+
+/**
+ * The expense writes with their cache updates (audit D6): optimistic add, edit and delete, and the
+ * saved tabs (which wait for the server, since it names a new tab). Only the caller's own views are
+ * changed by hand; a member's or the family's view is refetched (audit B4).
+ */
 export function useExpenseWrites() {
   const api = useExpenseApi();
   const { mutate, cache } = useSWRConfig();
   const counter = useRef(0);
-  const add = useCallback((input: ExpenseInput) => {
-    counter.current += 1;
-    return addExpenseOptimistically({ mutate, cache, create: api.create, input, pendingId: `pending-${counter.current}` });
+
+  return useMemo(() => {
+    const swr = { mutate, cache };
+    return {
+      /** Shows the new expense at once, under a pending id until it is stored. */
+      add(input: ExpenseInput) {
+        counter.current += 1;
+        const pending = asStored(`pending-${counter.current}`, input);
+        return writeOptimistically({ ...swr, change: { added: pending }, write: () => api.create(input), settled: (stored) => ({ removed: pending, added: stored }) });
+      },
+      /** Shows the change at once: a new date moves the expense to that month's ledger. */
+      edit(expense: Expense, input: ExpenseInput) {
+        const edited = asStored(expense.id, input);
+        return writeOptimistically({ ...swr, change: { removed: expense, added: edited }, write: () => api.update(expense.id, input), settled: (stored) => ({ removed: edited, added: stored }) });
+      },
+      /** Takes the expense out at once and deletes it; `useExpenseDelete` waits for Undo first. */
+      remove(expense: Expense) {
+        return writeOptimistically({ ...swr, change: { removed: expense }, write: () => api.remove(expense.id) });
+      },
+      async saveTab(input: ExpenseTabInput, tab?: ExpenseTab) {
+        const saved = await api.saveTab(input, tab?.id);
+        await mutate<TabsResponse>(EXPENSE_TABS_API_KEY, (current) => withTabSaved(current, saved), { revalidate: false });
+        if (tab) void mutate(isLedgerOfTab(saved.id));
+        return saved;
+      },
+      async removeTab(id: string) {
+        await api.removeTab(id);
+        await mutate<TabsResponse>(EXPENSE_TABS_API_KEY, (current) => withoutTab(current, id), { revalidate: false });
+        void mutate(isLedgerOfTab(id));
+      },
+    };
   }, [api, cache, mutate]);
-  return useMemo(() => ({ add }), [add]);
+}
+
+/**
+ * A delete with Undo instead of a confirmation (George's decision, "Undo for single rows"): the row
+ * hides at once and "Expense deleted · Undo" shows; the delete is sent when the toast expires (or the
+ * page is left), and Undo cancels it without a request. `hide` keeps the row out of every list until
+ * then, so a refetch in the meantime can't bring it back; a failed delete brings it back and says so.
+ */
+export function deleteWithUndo(
+  schedule: (entry: UndoEntry) => void,
+  expense: Expense,
+  { hide, remove, onFailure }: {
+    hide: (id: string, hidden: boolean) => void;
+    remove: (expense: Expense) => Promise<unknown>;
+    onFailure: (message: string) => void;
+  },
+) {
+  hide(expense.id, true);
+  schedule({
+    message: "Expense deleted",
+    commit: async () => {
+      try {
+        await remove(expense);
+      } catch {
+        onFailure(`Couldn't delete “${expense.description}”. Try again.`);
+      } finally {
+        hide(expense.id, false);
+      }
+    },
+    restore: () => hide(expense.id, false),
+  });
+}
+
+/**
+ * The Expenses screen's deletes: `remove(expense)` hides the row and offers Undo (`deleteWithUndo`).
+ * Lists leave out `hidden`; spread `toast` on an `UndoToast`.
+ */
+export function useExpenseDelete() {
+  const writes = useExpenseWrites();
+  const undo = useUndo();
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const [failure, setFailure] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!failure) return;
+    const timer = window.setTimeout(() => setFailure(null), UNDO_MS);
+    return () => window.clearTimeout(timer);
+  }, [failure]);
+
+  const hide = useCallback((id: string, hiding: boolean) => {
+    setHidden((current) => {
+      const next = new Set(current);
+      if (hiding) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+  const { schedule } = undo;
+  const remove = useCallback((expense: Expense) => {
+    setFailure(null);
+    deleteWithUndo(schedule, expense, { hide, remove: writes.remove, onFailure: setFailure });
+  }, [hide, schedule, writes.remove]);
+
+  return { hidden, remove, toast: failure ? { message: failure } : undo.toast };
 }

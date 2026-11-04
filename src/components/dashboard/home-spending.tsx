@@ -4,20 +4,19 @@ import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 import { Inbox } from "lucide-react";
 import useSWR from "swr";
 
-import { CATEGORY_ICONS } from "@/components/expenses/category-visual";
+import { CategoryTile } from "@/components/expenses/category-visual";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON } from "@/components/ui/icon";
-import { IconTile } from "@/components/ui/icon-tile";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { transition } from "@/components/ui/theme/motion";
 import { useAccount } from "@/hooks/use-account";
 import { dashboardApiKey } from "@/lib/api/keys";
-import { formatMonth, getBucharestMonth } from "@/lib/calendar";
+import { formatMonthName, getBucharestMonth } from "@/lib/calendar";
 import { expenseClassificationLabel } from "@/lib/expenses/categories";
 import type { DashboardData } from "@/lib/expenses/types";
 import { monthSoFar, relativeDay } from "@/lib/home/today";
@@ -33,10 +32,6 @@ function useHomeDashboard() {
   return useSWR<DashboardData>(dashboardApiKey({ period: "3m", granularity: "month", customDate: month }, null));
 }
 
-function monthName(month: string) {
-  return formatMonth(month).split(" ")[0];
-}
-
 /** This month's total against last month's, with a meter of how much of last month's it is. */
 export function MonthCard() {
   const { currency } = useAccount();
@@ -49,10 +44,10 @@ export function MonthCard() {
     );
   }
   const { previousMonth, previousTotal, share, over } = monthSoFar(data);
-  const previous = monthName(previousMonth);
+  const previous = formatMonthName(previousMonth);
   return (
     <Card size="sm">
-      <Card.Header title={`Spent in ${monthName(data.currentMonth)}`} actions={<SectionLink href={INSIGHTS_PATH}>Insights</SectionLink>} />
+      <Card.Header title={`Spent in ${formatMonthName(data.currentMonth)}`} actions={<SectionLink href={INSIGHTS_PATH}>Insights</SectionLink>} />
       <Card.Body>
         <Stack gap="2">
           <Flex align="baseline" gap="2.5" wrap="wrap">
@@ -103,7 +98,7 @@ export function RecentExpenses({ now }: { now: Date }) {
             {expenses.map((expense) => (
               <ListRow
                 key={expense.id}
-                leading={<IconTile icon={CATEGORY_ICONS[expense.category]} bg={`category.${expense.category}.bg`} color={`category.${expense.category}.fg`} />}
+                leading={<CategoryTile category={expense.category} />}
                 title={expense.description}
                 meta={`${relativeDay(expense.expenseDate, now)} · ${expenseClassificationLabel(expense.category, expense.subtype)}`}
                 trailing={<Amount value={expense.amount} currency={currency} size="sm" />}

@@ -1,13 +1,11 @@
 "use client";
 
-import { Box, SimpleGrid, Stack, Text } from "@chakra-ui/react";
+import { SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import useSWR from "swr";
 
 import { AmountComparison } from "@/components/dashboard/amount-comparison";
 import { CardLink } from "@/components/ui/card-link";
 import { MonthlyBarChart } from "@/components/dashboard/monthly-bar-chart";
-import { WriteOnly } from "@/components/family/write-only";
-import { AddExpenseButton } from "@/components/expenses/add-expense-button";
 import { ExpenseList } from "@/components/expenses/expense-list";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
@@ -63,11 +61,6 @@ export function SummaryDashboard({ params }: { params: URLSearchParams }) {
               <Stat size="sm" label="Average expense" value={<Amount value={data.currentAverage} currency={currency} />} />
               <Stat size="sm" label="Largest expense" value={<Amount value={data.currentLargest} currency={currency} />} />
             </StatGroup>
-            <WriteOnly>
-              <Box>
-                <AddExpenseButton selectedMonth={data.currentMonth} />
-              </Box>
-            </WriteOnly>
           </Stack>
         </Card.Body>
       </Card>
@@ -108,14 +101,14 @@ export function SummaryDashboard({ params }: { params: URLSearchParams }) {
           </Card.Body>
         </Card>
       </SimpleGrid>
-      <Card overflow="hidden">
+      <Card>
         <Card.Header
           title="Recent expenses"
           actions={<CardLink href={hrefFor(`/expenses?month=${data.currentMonth}`)}>View all</CardLink>}
         />
-        <Box mt="3" borderTopWidth="1px" borderColor="border">
-          <ExpenseList expenses={data.currentExpenses} currency={currency} compact />
-        </Box>
+        <Card.Body>
+          <ExpenseList expenses={data.currentExpenses} currency={currency} limit={5} emptyHint={null} />
+        </Card.Body>
       </Card>
     </Stack>
   );

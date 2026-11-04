@@ -16,7 +16,7 @@ import { SheetForm, useSheetSave } from "@/components/ui/save-button";
 import { ToggleChip } from "@/components/ui/toggle-chip";
 import { ApiError } from "@/lib/api/client";
 import { expenseSuggestionsApiKey } from "@/lib/api/keys";
-import { addDays, formatShortDate, getBucharestToday } from "@/lib/calendar";
+import { addDays, formatShortDate, getBucharestToday, lastDayOfMonth } from "@/lib/calendar";
 import { CATEGORY_LABELS, EXPENSE_CATEGORIES, subtypeForCategory, type ExpenseCategory } from "@/lib/expenses/categories";
 import type { Classification, SuggestionsResponse } from "@/lib/expenses/suggestions";
 import type { Expense } from "@/lib/expenses/types";
@@ -37,6 +37,15 @@ function useSettled(value: string, ms: number) {
     return () => window.clearTimeout(timer);
   }, [value, ms]);
   return settled;
+}
+
+/**
+ * The latest date the picker offers: the last day of the current month on the app's calendar, so an
+ * expense can't be dated where the Expenses screen doesn't reach. Plain date arithmetic, never the
+ * device's zone: east of UTC+12 a local `Date` made it a day early (audit B5).
+ */
+export function latestExpenseDate(today: string) {
+  return lastDayOfMonth(today.slice(0, 7));
 }
 
 /** What a date chip says: Today, Yesterday, or the day ("Nov 2"). */
@@ -68,35 +77,37 @@ const CATEGORY_ITEMS = EXPENSE_CATEGORIES.map((category) => ({ value: category, 
 
 /**
  * The fast expense form ("How the app becomes mobile first", point 3, in docs/ui-plan.md), the one
- * form for adding an expense, in the quick-add sheet: the amount first (decimal keypad, focused),
+ * expense form: in the quick-add sheet to add, and in the Expenses screen's edit sheet with
+ * `expense`. The amount first (decimal keypad, focused),
  * a description with suggestions from the caller's own expenses (picking one fills its category
  * and subtype), the category guessed from the description as a chip that changes in one tap, today
  * as the date, notes and subtype behind "More details", and Save at the bottom with "Save and add
- * another". Checked with the shared `expenseSchema` before anything is sent, then saved
- * optimistically (`useExpenseWrites`).
+ * another" (adding only). Checked with the shared `expenseSchema` before anything is sent, then
+ * saved optimistically (`useExpenseWrites`).
  */
 export function ExpenseForm({
   currency,
-  defaultDate,
+  expense,
   onSaved,
 }: {
   currency: string;
-  /** The date to start on; today when absent. */
-  defaultDate?: string;
+  /** The expense to change; a new one when absent. */
+  expense?: Expense;
   /** After a save: `another` is true when the form has cleared itself for the next expense. */
   onSaved: (expense: Expense, another: boolean) => void;
 }) {
   const today = getBucharestToday();
   const { form, saved, save: run } = useSheetSave();
-  const { add } = useExpenseWrites();
+  const writes = useExpenseWrites();
   const amountRef = useRef<HTMLInputElement>(null);
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [picked, setPicked] = useState<string | null>(null);
-  const [chosen, setChosen] = useState<Classification | null>(null);
-  const [expenseDate, setExpenseDate] = useState(defaultDate ?? today);
+  const [amount, setAmount] = useState(expense ? String(expense.amount) : "");
+  const [description, setDescription] = useState(expense?.description ?? "");
+  // An expense being edited keeps its own classification, and offers no suggestions until its description changes.
+  const [picked, setPicked] = useState<string | null>(expense?.description ?? null);
+  const [chosen, setChosen] = useState<Classification | null>(expense ? { category: expense.category, subtype: expense.subtype } : null);
+  const [expenseDate, setExpenseDate] = useState(expense?.expenseDate ?? today);
   const [pickingDate, setPickingDate] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(expense?.notes ?? "");
 
   const typed = description.trim();
   const query = useSettled(typed, SUGGEST_AFTER_MS);
@@ -120,7 +131,7 @@ export function ExpenseForm({
     run(another, async () => {
       const parsed = expenseSchema.safeParse({ description, amount, category, subtype, expenseDate, notes });
       if (!parsed.success) throw new ApiError("Check the highlighted details and try again.", 422, fieldErrorsOf(parsed.error));
-      return add(parsed.data);
+      return expense ? writes.edit(expense, parsed.data) : writes.add(parsed.data);
     }, (expense, cleared) => {
       if (cleared) clear();
       onSaved(expense, cleared);
@@ -134,7 +145,7 @@ export function ExpenseForm({
   ];
 
   return (
-    <SheetForm label="Save expense" form={form} saved={saved} onSave={save}>
+    <SheetForm label={expense ? "Save changes" : "Save expense"} form={form} saved={saved} onSave={save} another={!expense}>
       <FormField label={`Amount in ${currency}`} labelHidden error={form.fieldError("amount")}>
         <AmountInput
           ref={amountRef}
@@ -199,10 +210,10 @@ export function ExpenseForm({
       </Flex>
       {pickingDate || form.fieldError("expenseDate") ? (
         <FormField label="Date" error={form.fieldError("expenseDate")}>
-          <Input name="expenseDate" type="date" size="md" value={expenseDate} required onChange={(event) => setExpenseDate(event.target.value)} />
+          <Input name="expenseDate" type="date" size="md" value={expenseDate} max={latestExpenseDate(today)} required onChange={(event) => setExpenseDate(event.target.value)} />
         </FormField>
       ) : null}
-      <Disclosure label="More details">
+      <Disclosure label="More details" defaultOpen={Boolean(expense?.notes || expense?.subtype)}>
         <FormField label="Notes" labelHidden optional error={form.fieldError("notes")}>
           <Textarea name="notes" size="md" rows={2} maxLength={500} placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
         </FormField>

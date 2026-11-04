@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 
+import { CURRENCY_RELABEL, currencyRelabelMessage } from "@/lib/account/currency-change";
 import { DELETE_INVALID, deleteOwnAccount } from "@/lib/account/deletion";
 import type { AccountData, AccountMembership } from "@/lib/account/types";
 import type { AuthenticatedUser } from "@/lib/auth";
@@ -54,13 +55,25 @@ export const GET = withUser(async (_request, user) => json(await accountData(use
   allowPasswordChangeRequired: true,
 });
 
+/**
+ * `{ currency, confirmRelabel? }`. Expenses carry no currency of their own, so a change relabels every
+ * past amount (audit B10). While the user has expenses, a change without `confirmRelabel: true` is
+ * refused with 409 `currency_relabel`, its message saying how many; the expenses are only counted
+ * when the currency really changes.
+ */
 export const PATCH = withUser(async (request: NextRequest, user) => {
-  const payload = (await readJson(request)) as { currency?: unknown } | null;
+  const payload = (await readJson(request)) as { currency?: unknown; confirmRelabel?: unknown } | null;
   if (!isSupportedCurrency(payload?.currency)) {
     throw new HttpError(422, "Choose a supported currency.");
   }
+  const { account, expenses } = getRepositories();
 
-  await getRepositories().account.updateCurrency(user, payload.currency);
+  if (payload.confirmRelabel !== true && (await account.getCurrency(user.id)) !== payload.currency) {
+    const count = await expenses.count(user.id);
+    if (count > 0) return json({ error: currencyRelabelMessage(count, payload.currency), code: CURRENCY_RELABEL }, 409);
+  }
+
+  await account.updateCurrency(user, payload.currency);
 
   return json(await accountData(user, payload.currency));
 }, { failure: "The currency could not be saved. Please try again." });

@@ -1,7 +1,7 @@
 # Phase 17 update, 4 November 2026 (cloud session)
 
 Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-session-rk7uoj`.
-**PR #213 (U3, U4 and U5) and PR #214 (U6) merged on 4 November.** U7 is in progress on the same branch.
+**PR #213 (U3, U4 and U5), PR #214 (U6) and PR #215 (U7) merged on 4 November.** U8 is done and signed off on the same branch; U9 builds on it, and both go out in one PR.
 
 ## Where the tasks stand
 
@@ -13,8 +13,10 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U4 Theme refresh and mobile primitives** | **Done. George signed off the screenshots on 4 November.** |
 | **U5 Navigation** | **Done. George signed off the screenshots on 4 November; merged in #213 with U3 and U4.** |
 | **U6 Quick add and the fast expense form** | **Done. George signed off the screenshots on 4 November; merged in #214.** |
-| **U7 Home as "today"** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
-| U8 onwards | Not started. |
+| **U7 Home as "today"** | **Done. George signed off the screenshots on 4 November; merged in #215.** |
+| **U8 Expenses** | **Done. George signed it off on 4 November; it goes out with U9 in one PR.** |
+| **U9 Investments and Net worth** | **Done. George signed it off on 4 November; it goes out with U8 in one PR.** |
+| U10 onwards | Not started. |
 
 ## What U3 added
 
@@ -256,9 +258,102 @@ George settled the two open U8 questions on 4 November 2026:
 - **B10:** Settings warns and asks to confirm when the account currency changes while expenses
   exist. No migration.
 
+## What U8 added
+
+An opus agent did the work. It pushed five commits after the U7 note, from `2f0ed3f` to the docs.
+
+- **Expenses, to the mockup:**
+  - ‹ November 2026 › as the month control; the name opens a menu of the last twelve months and
+    "Another month…" (the old month field). The member is a "● Me ▾" chip on the same row ("Everyone"
+    for the family view).
+  - The saved tabs are a chip row: All, each tab, "+ Tab" and Filters. Filters shows the search and
+    category filter on the month, or the tab's own filters on a tab, so the figures come first.
+  - `⋯` beside the title holds Import a statement, Export this month, and on a saved tab its Edit
+    and Delete. The family view has none.
+  - One line with the total, the count and the change from last month ("18% less than October so
+    far"), then the rows grouped by day ("Today", "Yesterday", "Mon 2 Nov"). Desktop adds "By
+    category", or "By member" in the family view.
+  - Each row has Edit and Delete: `⋯` and long-press on phones, hover icons on desktop. Edit opens
+    the expense form in a sheet (the quick-add form, filled in, with Save changes). Delete hides the
+    row with "Expense deleted · Undo" for 5 s and sends the delete only then.
+  - The Expenses and Insights "Add expense" buttons are gone: + (or Add, or N) is the add.
+- **D6:** every expense and saved-tab write is in `expense-api.tsx`, called through
+  `useExpenseWrites` (optimistic add, edit and delete with rollback) and `useExpenseDelete` (Undo).
+  The cache code left `invalidate.ts` for `expense-cache.ts`. `local/no-fetch-in-components` is on
+  for `src/components/expenses` and `src/app/(app)/expenses`.
+- **B4:** only the caller's own views are edited in the cache; members' and the family's refetch.
+- **D10:** `POST /api/expenses` takes no `selectedMonth`: the date decides the month. REST and MCP
+  create and update through `createExpense` and `updateExpense`. **API changes:** a new
+  `PATCH /api/expenses/[id]` (MCP's patch schema), and `DELETE /api/expenses/[id]` answers 404 for
+  a missing expense (audit B3). An old page still sending `selectedMonth` keeps working.
+- **B10:** changing the account currency while expenses exist asks first ("Your 214 past expenses
+  will be shown as USD; amounts aren't converted."). The server refuses an unconfirmed change with
+  409 `currency_relabel`, counting expenses only when the currency really changes.
+- **B5, D9:** the date picker's maximum is plain date arithmetic, and calendar dates are formatted
+  in UTC. New rule `local/no-local-date-parse`.
+- **Simplification report:** proposals 1 to 4 and 6 done (one ledger panel, one cache key per
+  month, one list at every width, `RouteContext`); 7 (`useNow`) is left to U10.
+- **Screenshots:** `docs/ui-styling/screenshots/u8-{expenses,expenses-family,expenses-menu,expenses-edit,expenses-undo,settings-currency-warning}-{390,1280}.jpg`.
+- **Checks:** lint has 0 errors and 0 warnings; `tsc` is clean; vitest passes 6540 tests
+  (1 skipped); `npm run build` passes with the CI environment.
+- **Taps:** delete an expense **1** from `⋯` on desktop (hover icon), **2** on a phone (`⋯` →
+  Delete), undo **1**; switch to the family view **2** (Me ▾ → Everyone); export **2** (`⋯` →
+  Export).
+
+### Left over from U8
+
+- Swipe to delete is U12's.
+- The quick-add sheet no longer starts on a past month's date (D10: today, and the date decides).
+- The month comparison needs last month's ledger: one more request per month viewed (it also
+  makes ‹ instant).
+
+## What U9 added
+
+An agent did the work, on top of U8's commits (U8 is not merged yet).
+
+- **Investments, in the Money look:** a compact "Add investment" button beside the title (the one
+  primary action; quick add has no investment form, so the screen keeps it). An asset's orders are
+  one list at every width (side, quantity, date, price, amount); **Remove** is in each row's `⋯`
+  (hover icon on desktop, long-press on phones) and still asks first.
+- **Net worth, in the Money look:** the same compact "Add item". Each balance-sheet line is a list
+  row: name, a caption with the date and what needs attention, the change under it ("Since last
+  valuation +EUR 600"), the value on the right. A manual item's `⋯` holds **Add value** and **Edit
+  details**, each a bottom sheet (Archive stays in Edit details); investment lines show no menu. The
+  value fields use `AmountInput` (two decimals, the currency in front).
+- **D6:** `investment-api.tsx` + `use-investment-writes.ts` and `net-worth-api.tsx` +
+  `use-net-worth-writes.ts`, with preview providers (`/dev/preview/money-fixtures.ts`).
+  **Orders are not optimistic:** they wait for the server (a sell is checked against the units
+  held), the form shows its pending state and the server's refusal, and the views refresh only after
+  a success. **A net-worth dated value is optimistic:** the row shows it at once and goes back if the
+  save fails; the totals follow the refetch. Item create, edit and archive wait for the server.
+  `afterInvestmentChange` and `afterNetWorthChange` left `invalidate.ts`.
+  `local/no-fetch-in-components` is on for `src/components/{investments,net-worth}` and
+  `src/app/(app)/{investments,net-worth}`.
+- **D9:** `formatDateTime` and `formatInstantDate` take a `timeZone` (default Bucharest), so order
+  times, quote times and invite expiries read the same wherever the device is. The order form's
+  "Execution date and time" is Bucharest time (it was the browser's zone) and says so.
+- **Simplification reports:** investments proposal 1, net worth proposals 1 to 3 (one category
+  table, no `onSuccess` props, the API object), and one "incomplete" message in place of three. The
+  five redundant `apiFetcher` arguments were removed in U1.
+- **Screenshots:** `docs/ui-styling/screenshots/u9-{investments,investments-asset,order-form,net-worth,valuation-form}-{390,1280}.jpg`.
+- **Checks:** lint has 0 errors and 0 warnings; `tsc` is clean; vitest passes 6561 tests
+  (1 skipped); `npm run build` passes with the CI environment.
+
+### Left over from U9
+
+- A dated value can't be edited or deleted from the screen: net worth entries carry no valuation id,
+  and there is no DELETE route for valuations (only `PATCH /api/net-worth/valuations/[id]`). Not a
+  U9 change; say if you want a valuation history.
+- The order form still asks for quantity, unit price and amount separately (prefilling the amount is
+  a product question about fees and rounding).
+- The segmented control at the top of Money wraps "Net worth" on two lines at 1280 px beside the
+  sidebar; it comes from U5/U8, not U9.
+
 ## Next steps
 
-1. George signs off the U7 screenshots at 390 and 1280 px.
-2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U7. **Merging changes Home
-   in production.**
-3. Then U8, with D10 and B10 as decided above.
+1. George signs off the U8 and U9 screenshots at 390 and 1280 px (U8 includes the Settings currency
+   warning).
+2. **U8 and U9 go out in one PR** from `claude/phase-17-cloud-session-rk7uoj` to `main`, after
+   sign-off. **Merging changes Expenses, Investments, Net worth, Insights' add buttons, Settings'
+   currency save, date display and the expenses API in production.**
+3. Then U10 (Planning), with the same patterns.

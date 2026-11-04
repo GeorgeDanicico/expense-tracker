@@ -5,6 +5,7 @@ import { Bell, ChevronRight, KeyRound, ShieldCheck, Sparkles, UserCog, UserRound
 import Link from "next/link";
 
 import { useAppPathname } from "@/components/layout/use-app-pathname";
+import { GroupLabel } from "@/components/ui/group-label";
 import { ICON } from "@/components/ui/icon";
 import { IconTile } from "@/components/ui/icon-tile";
 import { transition } from "@/components/ui/theme/motion";
@@ -65,9 +66,7 @@ export function SettingsList({ groups }: { groups: readonly SettingsGroup[] }) {
     <Stack as="nav" aria-label="Settings" gap="4">
       {groups.map((group) => (
         <Stack key={group.label} gap="1.5">
-          <Text textStyle="label" color="fg.subtle" textTransform="uppercase" letterSpacing="0.04em" px="1" pt="2" pb="1">
-            {group.label}
-          </Text>
+          <GroupLabel>{group.label}</GroupLabel>
           <Box as="ul" listStyleType="none" m="0" p="0" bg="bg.surface" borderRadius="card" overflow="hidden" boxShadow="xs">
             {group.rows.map((row, index) => {
               const current = row === active;

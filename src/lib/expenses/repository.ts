@@ -54,6 +54,8 @@ export interface ExpenseRepository {
    * The caller resolves the tab with the user's ownership first. A tab with no selections lists nothing.
    */
   listForTab(userId: string, tab: ExpenseTab, filters: ExpenseTabFilters): Promise<Expense[]>;
+  /** How many expenses the user has, all dates: what an account currency change would relabel (audit B10). */
+  count(userId: string): Promise<number>;
   /** The user's recent expenses and totals for the dashboard's current and analytics ranges. */
   getDashboard(userId: string, ranges: { current: DateRange; analytics: DateRange }): Promise<ExpenseDashboardSnapshot>;
   /** Saves a new expense owned by the user, returning it as stored. */

@@ -11,6 +11,7 @@ export { Collapse, Disclosure } from "./disclosure";
 export { EmptyState } from "./empty-state";
 export { FormActions } from "./form-actions";
 export { FormField, FormRow } from "./form-field";
+export { GroupLabel } from "./group-label";
 export { ICON, ICON_STROKE } from "./icon";
 export { IconButton, type IconButtonProps } from "./icon-button";
 export { IconTile } from "./icon-tile";

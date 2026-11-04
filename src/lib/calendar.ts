@@ -6,7 +6,8 @@ import type { AnalyticsPeriod } from "@/lib/expenses/types";
  * Every "now" — the current month and today, on server and client — reads the
  * Europe/Bucharest application calendar: `getBucharestMonth`, `getBucharestToday`.
  * Month and day arithmetic is pure string/UTC math and never depends on the process time zone.
- * Only `formatMonth`/`formatDate`/`formatDateTime` touch the runtime's zone, for display.
+ * Calendar dates are formatted at noon UTC in UTC, so they read the same day in every zone; an
+ * instant (`formatDateTime`, `formatInstantDate`) is shown on the application's clock too.
  */
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -66,15 +67,6 @@ export function daysInMonth(month: string) {
 
 export function lastDayOfMonth(month: string) {
   return dateInMonth(month, daysInMonth(month));
-}
-
-/**
- * The date a new entry in `month` starts on: `today` when it falls in that month, else the month's
- * last day for a past month (the end of what is being looked at) or its first day for a future one.
- */
-export function defaultDateInMonth(month: string, today: string) {
-  if (today.startsWith(month)) return today;
-  return today > month ? lastDayOfMonth(month) : dateInMonth(month, 1);
 }
 
 /** Pure calendar arithmetic on a `YYYY-MM-DD` date; no time zone is involved. */
@@ -171,6 +163,11 @@ export function shiftMonth(month: string, amount: number) {
   return addMonths(getMonthRange(month).month, amount);
 }
 
+/** "October": a `YYYY-MM` month's name alone. */
+export function formatMonthName(month: string) {
+  return formatMonth(month).split(" ")[0];
+}
+
 export function formatMonth(month: string, locale = "en-US") {
   const { month: safeMonth } = getMonthRange(month);
   return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(
@@ -178,24 +175,32 @@ export function formatMonth(month: string, locale = "en-US") {
   );
 }
 
+/** "Nov 04, 2026": a `YYYY-MM-DD` date, never shifted by the device's time zone (audit D9). */
 export function formatDate(date: string, locale = "en-US") {
   return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(new Date(`${date}T12:00:00`));
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00Z`));
 }
 
-export function formatDateTime(date: string, locale = "en-US") {
+/**
+ * An instant as "Oct 12, 2026, 3:30 PM" on the application's clock (audit D9), so a member abroad
+ * reads order times and expiries in the same zone as "today" and the months. Pass `timeZone` to show
+ * another.
+ */
+export function formatDateTime(date: string, locale = "en-US", timeZone = APPLICATION_TIMEZONE) {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone,
   }).format(new Date(date));
 }
 
-/** The day of an instant (an ISO timestamp) in the viewer's zone, in `locale`: "12 Oct 2026". */
-export function formatInstantDate(iso: string, locale = "en-GB") {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso));
+/** The day of an instant (an ISO timestamp) on the application's clock, in `locale`: "12 Oct 2026". */
+export function formatInstantDate(iso: string, locale = "en-GB", timeZone = APPLICATION_TIMEZONE) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone }).format(new Date(iso));
 }
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -223,10 +228,10 @@ export function formatUtcDay(instant: Date) {
   return shortDateWithYearFormatter.format(instant);
 }
 
-const monthLabelFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
-const monthLabelWithYearFormatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" });
+const monthLabelFormatter = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" });
+const monthLabelWithYearFormatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit", timeZone: "UTC" });
 
-/** "Oct", or "Oct 26" with `withYear`: an axis label for a `YYYY-MM` month. */
+/** "Oct", or "Oct 26" with `withYear`: an axis label for a `YYYY-MM` month, never shifted by a time zone. */
 export function formatMonthLabel(month: string, withYear = false) {
-  return (withYear ? monthLabelWithYearFormatter : monthLabelFormatter).format(new Date(`${month}-01T12:00:00`));
+  return (withYear ? monthLabelWithYearFormatter : monthLabelFormatter).format(new Date(`${month}-01T12:00:00Z`));
 }

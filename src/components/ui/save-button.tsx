@@ -76,14 +76,15 @@ export function useSheetSave() {
 
 /**
  * A form in a sheet: its fields, the error when a save fails, and at the bottom, within thumb reach,
- * the big save button (a submit, so Enter saves too) and "Save and add another". Pair it with
- * `useSheetSave`: `onSave(another)` runs the save.
+ * the big save button (a submit, so Enter saves too) and "Save and add another" (left out with
+ * `another={false}`, for an edit). Pair it with `useSheetSave`: `onSave(another)` runs the save.
  */
 export function SheetForm({
   label,
   form,
   saved,
   onSave,
+  another = true,
   children,
 }: {
   /** What the save button says: "Save expense". */
@@ -91,6 +92,7 @@ export function SheetForm({
   form: Pick<ApiForm, "error" | "pendingAction">;
   saved: boolean;
   onSave: (another: boolean) => void;
+  another?: boolean;
   children: ReactNode;
 }) {
   const busy = form.pendingAction !== null;
@@ -110,9 +112,11 @@ export function SheetForm({
             <SaveButton type="submit" saved={saved} loading={form.pendingAction === "save"} disabled={busy && !saved}>
               {label}
             </SaveButton>
-            <Button type="button" variant="outline" size="md" loading={form.pendingAction === "another"} disabled={busy || saved} onClick={() => onSave(true)}>
-              Save and add another
-            </Button>
+            {another ? (
+              <Button type="button" variant="outline" size="md" loading={form.pendingAction === "another"} disabled={busy || saved} onClick={() => onSave(true)}>
+                Save and add another
+              </Button>
+            ) : null}
           </Flex>
         </ActionBar>
       </Stack>

@@ -102,7 +102,7 @@ export function AssetDetail({
         </Stack>
         <Flex align="center" gap="1" flexShrink="0" ms="auto">
           <WriteOnly>
-            <AddOrderDialog accountId={accountId} brokerId={brokerId} asset={asset} />
+            <AddOrderDialog brokerId={brokerId} asset={asset} />
           </WriteOnly>
           <IconButton aria-label={`Close ${asset.instrument} details`} size="xs" tooltip onClick={onClose}>
             <X size={ICON.sm} strokeWidth={ICON_STROKE} />
@@ -156,7 +156,6 @@ export function AssetDetail({
         ) : null}
         {data ? (
           <TransactionList
-            accountId={accountId}
             instrument={asset.instrument}
             transactions={data.transactions}
             currency={asset.currency}

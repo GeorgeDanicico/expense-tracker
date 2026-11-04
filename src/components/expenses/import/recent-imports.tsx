@@ -16,7 +16,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { useApiForm } from "@/hooks/use-api-form";
 import { ApiError } from "@/lib/api/client";
-import { afterImportChange, afterImportDraftChange } from "@/lib/api/invalidate";
+import { afterImportChange, afterImportDraftChange } from "@/components/expenses/expense-cache";
 import { IMPORTS_API_KEY, type ImportsResponse } from "@/lib/api/keys";
 import {
   discardDescription,

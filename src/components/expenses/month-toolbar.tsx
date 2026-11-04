@@ -1,81 +1,125 @@
 "use client";
 
-import { Button, Field, Flex, Input, Text } from "@chakra-ui/react";
+import { Box, Button, Field, Flex, Input, Menu, Portal, Text } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 
-import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { ICON } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
-import { formatMonth, isMonthAllowed, shiftMonth } from "@/lib/calendar";
+import { formatMonth, getBucharestMonth, isMonthAllowed, shiftMonth } from "@/lib/calendar";
 
-/** One 32px row: ‹ Month › stepper and a compact jump-to-month form. */
+const ANOTHER_MONTH = "another";
+/** How many months the month menu lists, newest first. */
+export const MONTH_MENU_LENGTH = 12;
+
+/** The months the menu offers: the newest `MONTH_MENU_LENGTH` up to `maxMonth` (or the current month), newest first. */
+export function monthMenuMonths(month: string, maxMonth?: string, currentMonth = getBucharestMonth()) {
+  const newest = maxMonth ?? (month > currentMonth ? month : currentMonth);
+  return Array.from({ length: MONTH_MENU_LENGTH }, (_, index) => shiftMonth(newest, -index));
+}
+
+/**
+ * The month as a compact control: ‹ November 2026 ›, where the name opens a menu of the last twelve
+ * months and "Another month…" (a month field, for anything older). `children` sits at the end of
+ * the row (the Expenses screen's member chip).
+ */
 export function MonthToolbar({
   month,
   href,
   maxMonth,
+  children,
 }: {
   month: string;
   href: (month: string) => string;
   maxMonth?: string;
+  children?: ReactNode;
 }) {
   const router = useRouter();
+  const [picking, setPicking] = useState(false);
   const nextMonth = shiftMonth(month, 1);
   const canAdvance = isMonthAllowed(nextMonth, maxMonth);
+
   function jumpToMonth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextMonth = new FormData(event.currentTarget).get("month");
-    if (typeof nextMonth === "string" && isMonthAllowed(nextMonth, maxMonth))
-      router.push(href(nextMonth));
+    const chosen = new FormData(event.currentTarget).get("month");
+    if (typeof chosen === "string" && isMonthAllowed(chosen, maxMonth)) {
+      setPicking(false);
+      router.push(href(chosen));
+    }
   }
+
   return (
-    <Flex align="center" justify="space-between" gap="2" wrap="wrap">
+    <Box>
       <Flex align="center" gap="0.5">
-        <IconButton asChild size="xs" aria-label="Previous month">
+        <IconButton asChild aria-label="Previous month">
           <Link href={href(shiftMonth(month, -1))}>
-            <ChevronLeft size={ICON.sm} strokeWidth={ICON_STROKE} />
+            <ChevronLeft size={ICON.nav} />
           </Link>
         </IconButton>
-        <Text minW="6.25rem" textAlign="center" textStyle="bodySm" fontWeight="medium">
-          {formatMonth(month)}
-        </Text>
+        <Menu.Root
+          positioning={{ placement: "bottom" }}
+          onSelect={({ value }) => {
+            if (value === ANOTHER_MONTH) setPicking(true);
+            else router.push(href(value));
+          }}
+        >
+          <Menu.Trigger asChild>
+            <Button variant="ghost" size="sm" minW="8rem" px="1.5" aria-label={`Month: ${formatMonth(month)}`}>
+              <Text as="span" textStyle="sectionTitle" aria-live="polite">
+                {formatMonth(month)}
+              </Text>
+            </Button>
+          </Menu.Trigger>
+          <Portal>
+            <Menu.Positioner>
+              <Menu.Content minW="44" maxH="72" overflowY="auto">
+                {monthMenuMonths(month, maxMonth).map((value) => (
+                  <Menu.Item key={value} value={value} fontWeight={value === month ? "semibold" : undefined}>
+                    {formatMonth(value)}
+                  </Menu.Item>
+                ))}
+                <Menu.Separator />
+                <Menu.Item value={ANOTHER_MONTH}>Another month…</Menu.Item>
+              </Menu.Content>
+            </Menu.Positioner>
+          </Portal>
+        </Menu.Root>
         {canAdvance ? (
-          <IconButton asChild size="xs" aria-label="Next month">
-            <Link
-              href={href(nextMonth)}
-              onClick={(event) => {
-                if (!isMonthAllowed(nextMonth, maxMonth)) event.preventDefault();
-              }}
-            >
-              <ChevronRight size={ICON.sm} strokeWidth={ICON_STROKE} />
+          <IconButton asChild aria-label="Next month">
+            <Link href={href(nextMonth)}>
+              <ChevronRight size={ICON.nav} />
             </Link>
           </IconButton>
         ) : (
-          <IconButton disabled size="xs" aria-label="Next month">
-            <ChevronRight size={ICON.sm} strokeWidth={ICON_STROKE} />
+          <IconButton disabled aria-label="Next month">
+            <ChevronRight size={ICON.nav} />
           </IconButton>
         )}
+        {children ? (
+          <>
+            <Box flex="1" />
+            {children}
+          </>
+        ) : null}
       </Flex>
-      <form onSubmit={jumpToMonth} style={{ maxWidth: "100%" }}>
-        <Flex gap="1" align="center">
-          <Field.Root minW="0" width={{ base: "9.5rem", md: "8.75rem" }}>
-            <Field.Label srOnly>Month</Field.Label>
-            <Input
-              key={month}
-              name="month"
-              type="month"
-              size="xs"
-              defaultValue={month}
-              max={maxMonth}
-              required
-            />
-          </Field.Root>
-          <Button type="submit" size="xs" variant="outline">
-            Go
-          </Button>
-        </Flex>
-      </form>
-    </Flex>
+      {picking ? (
+        <form onSubmit={jumpToMonth}>
+          <Flex gap="2" align="center" pt="2">
+            <Field.Root minW="0" width="11rem">
+              <Field.Label srOnly>Month</Field.Label>
+              <Input name="month" type="month" size="sm" defaultValue={month} max={maxMonth} required autoFocus />
+            </Field.Root>
+            <Button type="submit" size="sm" variant="outline">
+              Go
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setPicking(false)}>
+              Cancel
+            </Button>
+          </Flex>
+        </form>
+      ) : null}
+    </Box>
   );
 }

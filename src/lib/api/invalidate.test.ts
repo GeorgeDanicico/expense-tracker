@@ -2,24 +2,14 @@ import { mutate as globalMutate, type ScopedMutator } from "swr";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  afterExpenseDeleted,
-  afterImportChange,
-  afterImportDraftChange,
   afterFamilyDeleted,
   afterFamilyJoined,
   afterMemberRemoved,
-  afterInvestmentChange,
-  afterNetWorthChange,
   afterPasswordChange,
   afterSignIn,
   afterSignOut,
-  afterTabDeleted,
-  afterTabSaved,
 } from "@/lib/api/invalidate";
 import type { AccountData } from "@/lib/account/types";
-import type { ExpenseTab } from "@/lib/expenses/tabs";
-import type { ExpensesData } from "@/lib/expenses/types";
-import { aTab } from "@/test/builders";
 
 const CACHED_KEYS = [
   "/api/account",
@@ -50,95 +40,10 @@ function recorder() {
   return { mutate: mutate as unknown as ScopedMutator, calls };
 }
 
-const tab = aTab({ id: "tab-1", name: "Car" });
 const NO_REVALIDATE = { revalidate: false };
 
 describe("cache invalidation after mutations", () => {
-  it("afterImportChange refetches every month ledger, tab ledgers, dashboards and the list of imports", () => {
-    const { mutate, calls } = recorder();
-    afterImportChange(mutate);
-
-    expect(calls.map((call) => [call.keys, call.options])).toEqual([
-      [["/api/expenses?month=2026-10", "/api/expenses?month=2026-09&context=main"], undefined],
-      [["/api/expense-tabs/tab-1/expenses?revision=r1", "/api/expense-tabs/tab-2/expenses?revision=r2"], undefined],
-      [["/api/dashboard?period=1m&granularity=day&date=2026-10-14"], undefined],
-      [["/api/imports"], undefined],
-    ]);
-  });
-
-  it("afterImportDraftChange refetches only the list of imports", () => {
-    const { mutate, calls } = recorder();
-    afterImportDraftChange(mutate);
-
-    expect(calls.map((call) => [call.keys, call.options])).toEqual([[["/api/imports"], undefined]]);
-  });
-
-  it("afterExpenseDeleted removes the expense from every month ledger, then refreshes derived views", async () => {
-    const { mutate, calls } = recorder();
-    await afterExpenseDeleted(mutate, "e-1");
-
-    expect(calls.map((call) => [call.keys, call.options])).toEqual([
-      [["/api/expenses?month=2026-10", "/api/expenses?month=2026-09&context=main"], NO_REVALIDATE],
-      [["/api/expense-tabs/tab-1/expenses?revision=r1", "/api/expense-tabs/tab-2/expenses?revision=r2"], undefined],
-      [["/api/dashboard?period=1m&granularity=day&date=2026-10-14"], undefined],
-    ]);
-    const update = calls[0].data as (current?: ExpensesData) => ExpensesData | undefined;
-    const untouched = { expenses: [{ id: "e-9", amount: 5 }], total: 5, average: 5 } as ExpensesData;
-    expect(update(untouched)).toBe(untouched);
-    expect(update({ expenses: [{ id: "e-1", amount: 10 }], total: 10, average: 10 } as ExpensesData))
-      .toMatchObject({ expenses: [], total: 0, average: 0 });
-  });
-
-  it("afterTabSaved upserts the tab and refreshes only an edited tab's ledgers", async () => {
-    const created = recorder();
-    await afterTabSaved(created.mutate, tab, { editing: false });
-    expect(created.calls.map((call) => [call.keys, call.options])).toEqual([
-      [["/api/expense-tabs"], NO_REVALIDATE],
-    ]);
-    const append = created.calls[0].data as (current?: { tabs: ExpenseTab[] }) => { tabs: ExpenseTab[] };
-    expect(append(undefined)).toEqual({ tabs: [tab] });
-
-    const edited = recorder();
-    await afterTabSaved(edited.mutate, tab, { editing: true });
-    expect(edited.calls.map((call) => [call.keys, call.options])).toEqual([
-      [["/api/expense-tabs"], NO_REVALIDATE],
-      [["/api/expense-tabs/tab-1/expenses?revision=r1"], undefined],
-    ]);
-    const replace = edited.calls[0].data as (current?: { tabs: ExpenseTab[] }) => { tabs: ExpenseTab[] };
-    expect(replace({ tabs: [{ id: "tab-1", name: "Old" } as ExpenseTab] })).toEqual({ tabs: [tab] });
-  });
-
-  it("afterTabDeleted drops the tab and refreshes its ledgers", async () => {
-    const { mutate, calls } = recorder();
-    await afterTabDeleted(mutate, "tab-1");
-    expect(calls.map((call) => [call.keys, call.options])).toEqual([
-      [["/api/expense-tabs"], NO_REVALIDATE],
-      [["/api/expense-tabs/tab-1/expenses?revision=r1"], undefined],
-    ]);
-    const update = calls[0].data as (current?: { tabs: ExpenseTab[] }) => { tabs: ExpenseTab[] } | undefined;
-    expect(update(undefined)).toBeUndefined();
-    expect(update({ tabs: [tab] })).toEqual({ tabs: [] });
-  });
-
-  it("afterInvestmentChange refreshes investments, net worth and the optional transactions key", async () => {
-    const withDetail = recorder();
-    await afterInvestmentChange(withDetail.mutate, "/api/investment-transactions?accountId=a");
-    expect(withDetail.calls.map((call) => call.keys)).toEqual([
-      ["/api/investments"],
-      ["/api/net-worth"],
-      ["/api/investment-transactions?accountId=a"],
-    ]);
-
-    const without = recorder();
-    await afterInvestmentChange(without.mutate);
-    expect(without.calls.map((call) => call.keys)).toEqual([["/api/investments"], ["/api/net-worth"]]);
-  });
-
   it("single-key helpers revalidate their key; sign-out clears everything without refetching", async () => {
-    const netWorth = recorder();
-    await afterNetWorthChange(netWorth.mutate);
-    expect(netWorth.calls.map((call) => call.keys)).toEqual([["/api/net-worth"]]);
-
     const signIn = recorder();
     await afterSignIn(signIn.mutate);
     expect(signIn.calls.map((call) => call.keys)).toEqual([["/api/account"]]);

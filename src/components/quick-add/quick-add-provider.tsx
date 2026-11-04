@@ -22,11 +22,9 @@ import { initialKind, isQuickAddShortcut, quickAddKindsFor, readLastKind, rememb
 export type QuickAddOptions = {
   /** The form to open on; the last one used on this device otherwise. */
   kind?: QuickAddKind;
-  /** The new expense's date, from a screen showing another month; today otherwise. */
-  expenseDate?: string;
 };
 
-type QuickAddState = { kind: QuickAddKind; expenseDate?: string };
+type QuickAddState = { kind: QuickAddKind };
 /** What a save says, and where its View goes. */
 type Saved = { message: string; href: string };
 
@@ -65,7 +63,6 @@ function QuickAddSheet({
     expense: (
       <ExpenseForm
         currency={currency}
-        defaultDate={state.expenseDate}
         onSaved={(expense, another) => onSaved({ message: "Expense added", href: `/expenses?month=${expense.expenseDate.slice(0, 7)}` }, another)}
       />
     ),
@@ -121,7 +118,7 @@ export function QuickAddProvider({ initial = null, children }: { initial?: Quick
   // Kept while the sheet slides away, so its form doesn't change under it.
   const [asked, setAsked] = useState<QuickAddOptions>(initial ?? {});
   const [toast, setToast] = useState<Saved | null>(null);
-  const state: QuickAddState = { kind: initialKind(offered, asked.kind), expenseDate: asked.expenseDate };
+  const state: QuickAddState = { kind: initialKind(offered, asked.kind) };
 
   const open = useCallback((options: QuickAddOptions = {}) => {
     setAsked({ ...options, kind: initialKind(offered, options.kind, readLastKind()) });

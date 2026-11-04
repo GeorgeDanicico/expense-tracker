@@ -18,7 +18,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useAccount } from "@/hooks/use-account";
 import { useAiSettings } from "@/hooks/use-ai-settings";
 import { ApiError } from "@/lib/api/client";
-import { afterImportDraftChange } from "@/lib/api/invalidate";
+import { afterImportDraftChange } from "@/components/expenses/expense-cache";
 import type { ImportConfirmResponse } from "@/lib/api/keys";
 import { IMPORT_EXPIRED_NOTICE } from "@/lib/imports/recent";
 import type { ImportDraft } from "@/lib/imports/types";

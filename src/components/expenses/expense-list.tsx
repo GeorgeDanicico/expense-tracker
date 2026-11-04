@@ -1,87 +1,43 @@
 "use client";
 
 import { Inbox, Search } from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
 
-import { ExpenseFilters } from "@/components/expenses/expense-filters";
-import { ExpenseMobileList } from "@/components/expenses/expense-mobile-list";
-import { ExpenseTable } from "@/components/expenses/expense-table";
+import { ExpenseRows, type ExpenseRowActions } from "@/components/expenses/expense-rows";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useViewing } from "@/hooks/use-viewing";
-import { SUBTYPE_LABELS, CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
 import type { ListedExpense } from "@/lib/expenses/types";
 
-function NoExpenses({ filtered = false }: { filtered?: boolean }) {
-  const { readOnly } = useViewing();
-  return (
-    <EmptyState
-      size="sm"
-      titleAs="p"
-      icon={filtered ? <Search /> : <Inbox />}
-      title={filtered ? "No matching expenses" : "No recorded expenses"}
-      description={
-        filtered
-          ? "Try another search or choose a different category."
-          : readOnly
-            ? "Nothing has been recorded here yet."
-            : "Add your first expense to start building this month’s picture."
-      }
-    />
-  );
-}
-
+/**
+ * An expense list grouped by day, with its empty states. `filtered` says the rows were narrowed (the
+ * ledger's Filters, a saved tab's filters), for the empty state's wording. `limit` keeps the newest
+ * few (Insights' recent expenses).
+ */
 export function ExpenseList({
   expenses,
   currency,
-  compact = false,
-  allowDelete = false,
-  filterMode = "internal",
+  actions,
+  filtered = false,
+  limit,
+  emptyHint = "Tap + to add one.",
 }: {
-  expenses: ListedExpense[];
+  expenses: readonly ListedExpense[];
   currency: string;
-  compact?: boolean;
-  allowDelete?: boolean;
-  filterMode?: "internal" | "external";
+  actions?: ExpenseRowActions;
+  filtered?: boolean;
+  limit?: number;
+  /** What to say under "No recorded expenses"; nothing while read-only. */
+  emptyHint?: string | null;
 }) {
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<ExpenseCategory | "all">("all");
-  const deferredQuery = useDeferredValue(query.trim().toLocaleLowerCase());
-  const filtered = useMemo(() => {
-    if (compact) return expenses.slice(0, 5);
-    if (filterMode === "external") return expenses;
-
-    return expenses.filter((expense) => {
-      const categoryMatches = category === "all" || expense.category === category;
-      const queryMatches =
-        !deferredQuery ||
-        expense.description.toLocaleLowerCase().includes(deferredQuery) ||
-        expense.notes?.toLocaleLowerCase().includes(deferredQuery) ||
-        CATEGORY_LABELS[expense.category].toLocaleLowerCase().includes(deferredQuery) ||
-        (expense.subtype && SUBTYPE_LABELS[expense.subtype].toLocaleLowerCase().includes(deferredQuery));
-      return categoryMatches && Boolean(queryMatches);
-    });
-  }, [category, compact, deferredQuery, expenses, filterMode]);
-
-  if (!expenses.length) return <NoExpenses filtered={filterMode === "external"} />;
-
-  return (
-    <>
-      {compact || filterMode === "external" ? null : (
-        <ExpenseFilters
-          query={query}
-          onQueryChange={setQuery}
-          category={category}
-          onCategoryChange={setCategory}
-          shown={filtered.length}
-          total={expenses.length}
-        />
-      )}
-      {!filtered.length ? <NoExpenses filtered /> : (
-        <>
-          <ExpenseTable expenses={filtered} currency={currency} allowDelete={allowDelete} />
-          <ExpenseMobileList expenses={filtered} currency={currency} allowDelete={allowDelete} />
-        </>
-      )}
-    </>
-  );
+  const shown = limit ? expenses.slice(0, limit) : expenses;
+  if (!shown.length) {
+    return (
+      <EmptyState
+        size="sm"
+        titleAs="p"
+        icon={filtered ? <Search /> : <Inbox />}
+        title={filtered ? "No matching expenses" : "No recorded expenses"}
+        description={filtered ? "Try another search or choose a different category." : (emptyHint ?? undefined)}
+      />
+    );
+  }
+  return <ExpenseRows expenses={shown} currency={currency} actions={actions} />;
 }

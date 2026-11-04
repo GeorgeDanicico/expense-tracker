@@ -1,5 +1,7 @@
 # Simpler ways: investments
 
+**Done in U9 (4 November 2026):** proposal 1 (`investment-api.tsx`, `use-investment-writes.ts`, `afterInvestmentChange` removed from `invalidate.ts`, the lint rule on) and the order-time zone question (order times are Bucharest time, in the form and everywhere shown). Left: proposals 2 and 3 (they wait for the shared loading gate in the layout report) and 4 (the route isn't rebuilt).
+
 Looked at `src/components/investments/**` (10 files, ~1,000 lines), `src/app/(app)/investments`, `src/app/api/investments`, `src/app/api/investment-transactions`, `src/lib/investments/**` (~900 lines), `src/lib/validation/investment.ts` and `src/lib/mcp/tools/investments.ts`, with the `find-shapes` script and by reading the components in full. **The module is already fairly lean.** 4 proposals, about 50 lines; the one worth doing is **an `investment-api.ts` plus hook** (proposal 1), which U9 needs for D6 anyway. The rest are small.
 
 ## Map

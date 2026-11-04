@@ -1,20 +1,25 @@
 import { Flex, Heading, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-/** Page `<h1>` with optional description and actions (under the title on mobile). */
+/**
+ * Page `<h1>` with optional description and actions (under the title on mobile). `inline` keeps the
+ * actions beside the title on phones too, for a lone icon button such as a screen's `⋯`.
+ */
 export function PageHeader({
   title,
   description,
   actions,
+  inline = false,
 }: {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
+  inline?: boolean;
 }) {
   return (
     <Flex
-      direction={{ base: "column", sm: "row" }}
-      align={{ base: "stretch", sm: "center" }}
+      direction={inline ? "row" : { base: "column", sm: "row" }}
+      align={inline ? "center" : { base: "stretch", sm: "center" }}
       justify="space-between"
       gap="3"
     >

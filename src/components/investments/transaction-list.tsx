@@ -1,94 +1,82 @@
-import { Box, Flex, Stack, Table, Text } from "@chakra-ui/react";
+"use client";
+
+import { Stack } from "@chakra-ui/react";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
 
 import { RemoveOrderDialog } from "@/components/investments/remove-order-dialog";
-import { useViewing } from "@/hooks/use-viewing";
 import { Amount } from "@/components/ui/amount";
+import { ListRow } from "@/components/ui/list-row";
+import { RowActions, useRowActions } from "@/components/ui/row-actions";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useViewing } from "@/hooks/use-viewing";
+import { formatDateTime } from "@/lib/calendar";
 import type { InvestmentTransactionDto } from "@/lib/investments/types";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
-import { formatDateTime } from "@/lib/calendar";
 
 function SideBadge({ side }: { side: InvestmentTransactionDto["side"] }) {
   return <StatusBadge tone={side === "buy" ? "info" : "warning"}>{side === "buy" ? "Buy" : "Sell"}</StatusBadge>;
 }
 
+function OrderRow({
+  transaction,
+  currency,
+  onRemove,
+}: {
+  transaction: InvestmentTransactionDto;
+  currency: string;
+  /** Absent while read-only. */
+  onRemove?: (transaction: InvestmentTransactionDto) => void;
+}) {
+  const { rowProps, menu } = useRowActions();
+  const actions = onRemove ? [{ label: "Remove", icon: Trash2, tone: "danger" as const, onSelect: () => onRemove(transaction) }] : null;
+  const side = transaction.side === "buy" ? "Buy" : "Sell";
+  return (
+    <ListRow
+      {...(actions ? rowProps : {})}
+      leading={<SideBadge side={transaction.side} />}
+      title={`${transaction.quantity} units`}
+      meta={formatDateTime(transaction.executedAt)}
+      detail={`at ${formatInvestmentAmount(transaction.unitPrice, currency)} each`}
+      trailing={
+        <>
+          {actions ? <RowActions label={`${side} order of ${formatDateTime(transaction.executedAt)}`} actions={actions} {...menu} /> : null}
+          <Amount value={transaction.amount} currency={currency} size="sm" />
+        </>
+      }
+    />
+  );
+}
+
+/** An asset's orders, newest first: one list at every width, Remove in each row's `⋯` (hover icon on desktop). */
 export function TransactionList({
-  accountId,
   instrument,
   transactions,
   currency,
   onDeleted,
 }: {
-  accountId: string;
   instrument: string;
   transactions: InvestmentTransactionDto[];
   currency: string;
   onDeleted: () => void;
 }) {
   const { readOnly } = useViewing();
-  const remove = (transaction: InvestmentTransactionDto) => readOnly ? null : (
-    <RemoveOrderDialog
-      accountId={accountId}
-      instrument={instrument}
-      currency={currency}
-      transaction={transaction}
-      onDeleted={onDeleted}
-    />
-  );
+  const [removing, setRemoving] = useState<InvestmentTransactionDto | null>(null);
 
   return (
     <>
-      <Box display={{ base: "none", lg: "block" }} overflowX="auto">
-        <Table.Root interactive>
-          <Table.Caption className="sr-only">Investment transaction history</Table.Caption>
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader ps="4">Side</Table.ColumnHeader>
-              <Table.ColumnHeader>Executed</Table.ColumnHeader>
-              <Table.ColumnHeader data-numeric>Quantity</Table.ColumnHeader>
-              <Table.ColumnHeader data-numeric>Unit price</Table.ColumnHeader>
-              <Table.ColumnHeader data-numeric>Order value</Table.ColumnHeader>
-              {readOnly ? null : (
-                <Table.ColumnHeader width="6rem" pe="3"><span className="sr-only">Actions</span></Table.ColumnHeader>
-              )}
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {transactions.map((transaction) => (
-              <Table.Row key={transaction.id}>
-                <Table.Cell ps="4"><SideBadge side={transaction.side} /></Table.Cell>
-                <Table.Cell color="fg.muted" whiteSpace="nowrap">{formatDateTime(transaction.executedAt)}</Table.Cell>
-                <Table.Cell data-numeric fontWeight="medium">{transaction.quantity} units</Table.Cell>
-                <Table.Cell data-numeric color="fg.muted">{formatInvestmentAmount(transaction.unitPrice, currency)}</Table.Cell>
-                <Table.Cell data-numeric><Amount value={transaction.amount} currency={currency} size="sm" /></Table.Cell>
-                {readOnly ? null : (
-                  <Table.Cell pe="3" textAlign="end">
-                    <Box data-row-action display="inline-flex">{remove(transaction)}</Box>
-                  </Table.Cell>
-                )}
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Box>
-
-      <Box as="ul" display={{ base: "block", lg: "none" }} px="4" m="0" listStyleType="none" divideY="1px" divideColor="border">
+      <Stack as="ul" gap="0.5" m="0" px="2" py="1" aria-label="Investment transaction history">
         {transactions.map((transaction) => (
-          <Flex as="li" key={transaction.id} align="center" justify="space-between" gap="3" py="2.5">
-            <Stack minW="0" gap="0.5">
-              <Flex align="center" gap="2">
-                <SideBadge side={transaction.side} />
-                <Text textStyle="caption" truncate>{formatDateTime(transaction.executedAt)}</Text>
-              </Flex>
-              <Text textStyle="caption">{transaction.quantity} units at {formatInvestmentAmount(transaction.unitPrice, currency)}</Text>
-            </Stack>
-            <Flex flexShrink="0" align="center" gap="1">
-              <Amount value={transaction.amount} currency={currency} size="sm" />
-              {remove(transaction)}
-            </Flex>
-          </Flex>
+          <OrderRow key={transaction.id} transaction={transaction} currency={currency} onRemove={readOnly ? undefined : setRemoving} />
         ))}
-      </Box>
+      </Stack>
+      <RemoveOrderDialog
+        instrument={instrument}
+        currency={currency}
+        transaction={removing}
+        onClose={() => setRemoving(null)}
+        onDeleted={onDeleted}
+      />
     </>
   );
 }

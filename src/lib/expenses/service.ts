@@ -13,8 +13,22 @@ import type {
 import { formatMonth, getBucharestMonth, getMonthRange } from "@/lib/calendar";
 import type { FamilyViewer } from "@/lib/family/viewed-user";
 import { getRepositories } from "@/lib/repositories";
+import type { ExpenseInput, ExpensePatch } from "@/lib/validation/expense";
 
 // Use cases shared by the REST routes and the MCP tools; each transport only reshapes the result.
+
+/**
+ * Saves a new expense for the user (audit D10). Its own date decides the month it belongs to: no
+ * transport asks for a month as well, so REST and MCP can't disagree about where it goes.
+ */
+export function createExpense(userId: string, input: ExpenseInput) {
+  return getRepositories().expenses.create(userId, input);
+}
+
+/** Changes the fields `patch` names; null when the user owns no such expense. A new date moves it to that date's month. */
+export function updateExpense(userId: string, id: string, patch: ExpensePatch) {
+  return getRepositories().expenses.update(userId, id, patch);
+}
 
 export async function getMonthlyLedger(userId: string, month: string) {
   const expenses = await getRepositories().expenses.listMonth(userId, month);

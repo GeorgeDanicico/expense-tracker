@@ -25,7 +25,7 @@ export function NetWorthGroup({
         actions={category === "investments" ? <CardLink href={hrefFor("/investments")}>{readOnly ? "View investments" : "Manage investments"}</CardLink> : undefined}
       />
       <Card.Body pt="1" pb="1">
-        <Stack as="ul" gap="0" listStyleType="none" divideY="1px" divideColor="border">
+        <Stack as="ul" gap="0.5" m="0" p="0" listStyleType="none">
           {entries.map((entry) => <NetWorthEntryRow key={entry.id} entry={entry} />)}
         </Stack>
       </Card.Body>

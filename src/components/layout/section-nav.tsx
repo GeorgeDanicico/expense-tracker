@@ -23,7 +23,8 @@ export function SectionNav() {
   const current = section ? activeItem(section, pathname) : undefined;
   if (!section || !segments || !current) return null;
   return (
-    <Box mb={PAGE_SPACING.sectionGap} alignSelf={{ md: "flex-start" }}>
+    // Four segments don't fit a 320 px phone: the row scrolls sideways instead of the page.
+    <Box mb={PAGE_SPACING.sectionGap} alignSelf={{ md: "flex-start" }} maxW="full" overflowX="auto">
       <SegmentedControl
         aria-label={`${section.label} pages`}
         items={segments}

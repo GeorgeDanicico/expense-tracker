@@ -3,9 +3,9 @@
 import { Button, Flex, NativeSelect, Stack, Text } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { FormEvent, useId, useState } from "react";
-import { useSWRConfig } from "swr";
 
-import { OrderFields, submitInvestmentOrder } from "@/components/investments/order-fields";
+import { formText, OrderFields, orderInput } from "@/components/investments/order-fields";
+import { useInvestmentWrites } from "@/components/investments/use-investment-writes";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
@@ -13,8 +13,6 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useApiForm } from "@/hooks/use-api-form";
-import { afterInvestmentChange } from "@/lib/api/invalidate";
-import { investmentTransactionsApiKey } from "@/lib/api/keys";
 import {
   INVESTMENT_BROKER_LABELS,
   type InvestmentBrokerId,
@@ -22,15 +20,13 @@ import {
 } from "@/lib/investments/types";
 
 export function AddOrderDialog({
-  accountId,
   brokerId,
   asset,
 }: {
-  accountId: string;
   brokerId: InvestmentBrokerId;
   asset: InvestmentOverviewAsset;
 }) {
-  const { mutate } = useSWRConfig();
+  const writes = useInvestmentWrites();
   const [open, setOpen] = useState(false);
   const form = useApiForm();
   const formId = useId();
@@ -39,22 +35,15 @@ export function AddOrderDialog({
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     void form.submit(async () => {
-      await submitInvestmentOrder(
+      await writes.createOrder(orderInput(
         {
           brokerId,
           instrument: asset.instrument,
           currency: asset.currency,
-          side: formData.get("side"),
+          side: formText(formData, "side"),
         },
         formData,
-      );
-
-      const detailKey = investmentTransactionsApiKey({
-        accountId,
-        instrument: asset.instrument,
-        currency: asset.currency,
-      });
-      await afterInvestmentChange(mutate, detailKey);
+      ));
       setOpen(false);
     }, { fallback: "The order could not be saved." });
   }

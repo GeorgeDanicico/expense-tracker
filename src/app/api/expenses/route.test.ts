@@ -11,7 +11,7 @@ vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
 import { POST } from "@/app/api/expenses/route";
 
-const body = { selectedMonth: "2026-09", expenseDate: "2026-09-01", description: "Fuel", amount: "10.50", category: "car", subtype: "car_fuel" };
+const body = { expenseDate: "2026-09-01", description: "Fuel", amount: "10.50", category: "car", subtype: "car_fuel" };
 const stored = anExpense({ id: "expense", description: "Fuel", amount: 10.5, category: "car", subtype: "car_fuel", expenseDate: "2026-09-01" });
 const post = (data: unknown) => callRoute(POST, { method: "POST", url: "/api/expenses", body: data });
 
@@ -31,6 +31,21 @@ describe("POST /api/expenses", () => {
     expect(response.status).toBe(201);
     expect(create).toHaveBeenCalledWith(user.id, expect.objectContaining({ category: "car", subtype: "car_fuel", amount: 10.5 }));
     expect(create.mock.calls[0][1]).not.toHaveProperty("user_id");
+  });
+
+  // Audit D10: the expense's own date decides its month, as in MCP's add_expense.
+  it("saves a date in any month, with no month to match", async () => {
+    const response = await post({ ...body, expenseDate: "2024-02-29" });
+
+    expect(response.status).toBe(201);
+    expect(create).toHaveBeenCalledWith(user.id, expect.objectContaining({ expenseDate: "2024-02-29" }));
+  });
+
+  it("ignores a selectedMonth that an older page still sends, even one the date is outside", async () => {
+    const response = await post({ ...body, selectedMonth: "2026-10", expenseDate: "2026-09-30" });
+
+    expect(response.status).toBe(201);
+    expect(create.mock.calls[0][1]).not.toHaveProperty("selectedMonth");
   });
 
   it("writes null for an omitted subtype", async () => {

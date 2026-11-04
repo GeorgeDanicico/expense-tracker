@@ -40,7 +40,8 @@ export function SegmentedControl<T extends string>({
     >
       <SegmentGroup.Indicator />
       {items.map((item) => (
-        <SegmentGroup.Item key={item.value} value={item.value} flex={fullWidth ? "1" : undefined}>
+        <SegmentGroup.Item key={item.value} value={item.value} flex={fullWidth ? "1" : undefined} whiteSpace="nowrap">
+          {/* Labels stay on one line ("Net worth"); a parent that's too narrow scrolls instead. */}
           <SegmentGroup.ItemText aria-label={item.ariaLabel}>{item.label}</SegmentGroup.ItemText>
           <SegmentGroup.ItemHiddenInput />
         </SegmentGroup.Item>

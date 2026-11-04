@@ -17,9 +17,10 @@ Run them with `npm run lint`.
 | [`theme-control-size`](#theme-control-size) | error | none (moved unchanged) | U1 |
 | [`postgrest-filter-string`](#postgrest-filter-string) | error | none (moved unchanged) | U1 |
 | [`no-iso-date-slice`](#no-iso-date-slice) | error | 2 fixed | U1 |
+| [`no-local-date-parse`](#no-local-date-parse) | error | 2 fixed (`formatDate`, `formatMonthLabel`) | U8 |
 | [`no-locale-date-without-zone`](#no-locale-date-without-zone) | error | 7 fixed, 8 formatter modules exempt | U1 |
 | [`no-redundant-swr-fetcher`](#no-redundant-swr-fetcher) | error | 5 fixed | U1 |
-| [`no-fetch-in-components`](#no-fetch-in-components) | error, no module listed yet | 26 component and page files still call `apiRequest` or `fetch` (U8–U11) | U1 |
+| [`no-fetch-in-components`](#no-fetch-in-components) | error, on for expenses (U8), investments and net worth (U9) | 15 component files in other modules still call `apiRequest` or `fetch` (U10–U11) | U1 |
 | [`no-zod-flatten`](#no-zod-flatten) | error | 15 fixed (6 in code, 9 in tests) | U1 |
 | [`no-raw-dialog`](#no-raw-dialog) | error | none | U1 |
 | [`no-window-confirm`](#no-window-confirm) | error | none | U1 |
@@ -128,9 +129,28 @@ of UTC (audit D9, B5). Use `getBucharestToday()` for today and the helpers in `s
 application's today, and the expense form's latest date is `lastDayOfMonth` of the month.
 
 **Not caught:** a date sliced after being stored in a variable, and `.slice(0, 16)` to fill a
-`datetime-local` input from the browser's own zone (`order-fields.tsx`, deliberately local).
+`datetime-local` input from the browser's own zone (the order form fills it from the application's
+clock now, with `utcToZoned`).
 
 **Disable:** `// eslint-disable-next-line local/no-iso-date-slice -- <why UTC is meant>`.
+
+### `no-local-date-parse`
+
+**Catches:** `new Date(…)` and `Date.parse(…)` of a string or template literal that ends in a time
+with no `Z` or offset: `` new Date(`${date}T12:00:00`) ``, `new Date("2026-10-01T09:30")`.
+
+**Why:** JavaScript reads such a date and time in the device's zone, so the same calendar date is a
+different instant on every device, and formatting it elsewhere (or in another zone) can show another
+day (audit D9, B5). For a calendar date use noon UTC and format in UTC (`formatDate`,
+`formatShortDate`); for "today" and months, the helpers in `src/lib/calendar.ts`. A date-only string
+(`"2026-10-01"`) is read as UTC and isn't caught.
+
+**Added by:** U8, from its `/simplify` pass. **Existing cases:** 2, fixed: `formatDate` and
+`formatMonthLabel` in `src/lib/calendar.ts` now parse at noon UTC and format in UTC.
+
+**Not caught:** a string built in a variable first.
+
+**Disable:** `// eslint-disable-next-line local/no-local-date-parse -- <why the device's zone is meant>`.
 
 ### `no-locale-date-without-zone`
 
@@ -183,15 +203,20 @@ PR that converts it (U8 expenses, U9 investments and net worth, U10 planning, U1
 family):
 
 ```js
-const CONVERTED_MODULES = ["src/components/expenses", "src/app/(app)/expenses"];
+const CONVERTED_MODULES = ["src/components/expenses", "src/app/(app)/expenses", "src/components/investments", /* … */];
 ```
 
 U11 ends with every folder under `src/components` listed.
 
-**Added by:** U1, with an empty list, so it is on but matches nothing yet. **Left to U8–U11:** 26
-component and page files call `apiRequest` or `fetch` today: `expenses` 4, `family` 12,
-`investments` 2, `net-worth` 3, `auth` 1, `oauth` 1, `settings` 1 (components), and 2 pages under
-`src/app/(app)`.
+**Added by:** U1, with an empty list. **On for expenses since U8**: `src/components/expenses`
+(the import screens included) and `src/app/(app)/expenses`, whose requests are all in
+`expense-api.tsx` and `import/import-api.tsx`, called through `useExpenseWrites` and the import
+hooks. **On for investments and net worth since U9**: their components and pages
+(`src/components/{investments,net-worth}`, `src/app/(app)/{investments,net-worth}`), whose requests
+are in `investment-api.tsx` and `net-worth-api.tsx`, called through `useInvestmentWrites` and
+`useNetWorthWrites`. **Left to U10–U11:** 15 component files: `family` 12, `auth` 1, `oauth` 1,
+`settings` 1. No page under `src/app/(app)` makes a request of its own any more
+(Settings' currency change moved to `src/lib/api/account-requests.ts` in U8).
 
 **Disable:** `// eslint-disable-next-line local/no-fetch-in-components -- <reason>`.
 

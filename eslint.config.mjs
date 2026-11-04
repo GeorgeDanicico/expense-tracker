@@ -17,7 +17,14 @@ const localPlugin = { plugins: { local } };
  * object and hooks, like src/components/todos). Add a module's folders when it is converted, for
  * example "src/components/expenses" and "src/app/(app)/expenses" (U8 to U11 in docs/ui-plan.md).
  */
-const CONVERTED_MODULES = [];
+const CONVERTED_MODULES = [
+  "src/components/expenses",
+  "src/app/(app)/expenses",
+  "src/components/investments",
+  "src/app/(app)/investments",
+  "src/components/net-worth",
+  "src/app/(app)/net-worth",
+];
 
 /**
  * The modules that are the app's date formatters: the rule against `Intl.DateTimeFormat` and
@@ -41,6 +48,7 @@ const localRules = {
     // Injection guard (security plan S8): string-built PostgREST filters.
     "local/postgrest-filter-string": "error",
     "local/no-iso-date-slice": "error",
+    "local/no-local-date-parse": "error",
     "local/no-redundant-swr-fetcher": "error",
     "local/no-window-confirm": "error",
     "local/no-zod-flatten": "error",

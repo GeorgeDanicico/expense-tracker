@@ -1,4 +1,3 @@
-import { Flex } from "@chakra-ui/react";
 import {
   BusFront,
   Car,
@@ -14,7 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { IconTile } from "@/components/ui/icon-tile";
 import type { ExpenseCategory } from "@/lib/expenses/categories";
 
 export const CATEGORY_ICONS: Record<ExpenseCategory, LucideIcon> = {
@@ -31,20 +30,7 @@ export const CATEGORY_ICONS: Record<ExpenseCategory, LucideIcon> = {
   other: MoreHorizontal,
 };
 
-/** Category icon in a small neutral square, used as the leading visual in rows. */
-export function CategoryVisual({ category }: { category: ExpenseCategory }) {
-  const Icon = CATEGORY_ICONS[category];
-  return (
-    <Flex
-      boxSize="7"
-      flexShrink="0"
-      align="center"
-      justify="center"
-      borderRadius="control"
-      bg="bg.muted"
-      color="fg.muted"
-    >
-      <Icon size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
-    </Flex>
-  );
+/** The category's coloured tile in front of an expense row (Expenses, Home, Insights). */
+export function CategoryTile({ category }: { category: ExpenseCategory }) {
+  return <IconTile icon={CATEGORY_ICONS[category]} bg={`category.${category}.bg`} color={`category.${category}.fg`} />;
 }

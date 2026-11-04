@@ -3,10 +3,11 @@
 import { Button, chakra, Flex } from "@chakra-ui/react";
 import { Users } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import useSWR from "swr";
 
 import { MemberSwatch } from "@/components/family/member-swatch";
+import { ChipMenu } from "@/components/ui/chip-menu";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { useAccount } from "@/hooks/use-account";
 import { useViewing } from "@/hooks/use-viewing";
@@ -18,6 +19,8 @@ import { ALL_MEMBERS, MEMBER_PARAM } from "@/lib/family/viewing";
 import { can } from "@/lib/permissions";
 
 const ME = "";
+/** A menu item needs a non-empty value. */
+const ME_ITEM = "me";
 
 function memberLabel(member: FamilyMemberView) {
   return member.displayName ?? member.username ?? "Unnamed";
@@ -33,14 +36,14 @@ export function viewingHref(pathname: string, current: { toString(): string }, v
   return query ? `${pathname}?${query}` : pathname;
 }
 
+type ViewingChoice = { value: string; label: string; icon: ReactNode };
+
 /**
- * "Viewing: Me · Family · <member> …" for the finance pages: one chip per choice, each member's led by
- * their colour, so whose data is on screen is always visible. It shows for a parent, and for a kid with
- * Family finance on, and only when the family has someone else to look at. The choice lives in the URL
- * as `?member=`; "Me" removes it. A saved tab and its filters belong to one member, so switching drops them.
+ * Whose data a finance page can show: "Me", "Family" with `allowFamily`, then each other member led
+ * by their colour, and which one is chosen. Null when there is no one else to look at: for a member
+ * without Family finance, or a family of one.
  */
-export function ViewingPicker({ allowFamily = false }: { allowFamily?: boolean }) {
-  const labelId = useId();
+function useViewingChoices(allowFamily: boolean) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -59,12 +62,11 @@ export function ViewingPicker({ allowFamily = false }: { allowFamily?: boolean }
   const colors = memberColorTokens(data?.family?.members ?? []);
   const memberColor = (id: string) => colors.get(id.toLowerCase());
 
-  const familySelected = allowFamily && family;
-  const selected = familySelected
+  const selected = allowFamily && family
     ? ALL_MEMBERS
     : (others.find((entry) => entry.memberId.toLowerCase() === member?.toLowerCase())?.memberId ?? ME);
 
-  const choices = [
+  const choices: ViewingChoice[] = [
     { value: ME, label: "Me", icon: <MemberSwatch color={memberColor(membership.memberId)} /> },
     ...(allowFamily
       ? [{ value: ALL_MEMBERS, label: "Family", icon: <Users size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> }]
@@ -75,14 +77,30 @@ export function ViewingPicker({ allowFamily = false }: { allowFamily?: boolean }
       icon: <MemberSwatch color={memberColor(entry.memberId)} />,
     })),
   ];
+  const choose = (value: string) => {
+    if (value !== selected) router.push(viewingHref(pathname, searchParams, value), { scroll: false });
+  };
+  return { choices, selected, choose };
+}
+
+/**
+ * "Viewing: Me · Family · <member> …" for the finance pages: one chip per choice, each member's led by
+ * their colour, so whose data is on screen is always visible. It shows for a parent, and for a kid with
+ * Family finance on, and only when the family has someone else to look at. The choice lives in the URL
+ * as `?member=`; "Me" removes it. A saved tab and its filters belong to one member, so switching drops them.
+ */
+export function ViewingPicker({ allowFamily = false }: { allowFamily?: boolean }) {
+  const labelId = useId();
+  const viewing = useViewingChoices(allowFamily);
+  if (!viewing) return null;
 
   return (
     <Flex align="center" gap="2" wrap="wrap" maxW="full" role="group" aria-labelledby={labelId}>
       <chakra.span id={labelId} textStyle="label" flexShrink="0" me="1">
         Viewing
       </chakra.span>
-      {choices.map((choice) => {
-        const pressed = choice.value === selected;
+      {viewing.choices.map((choice) => {
+        const pressed = choice.value === viewing.selected;
         return (
           <Button
             key={choice.value || "me"}
@@ -90,9 +108,7 @@ export function ViewingPicker({ allowFamily = false }: { allowFamily?: boolean }
             variant={pressed ? "solid" : "outline"}
             colorPalette={pressed ? "brand" : undefined}
             aria-pressed={pressed}
-            onClick={() => {
-              if (!pressed) router.push(viewingHref(pathname, searchParams, choice.value), { scroll: false });
-            }}
+            onClick={() => viewing.choose(choice.value)}
           >
             {choice.icon}
             {choice.label}
@@ -100,6 +116,34 @@ export function ViewingPicker({ allowFamily = false }: { allowFamily?: boolean }
         );
       })}
     </Flex>
+  );
+}
+
+/**
+ * The same choice as a compact "● Me ▾" chip, for a screen whose month and member share one row
+ * (Expenses; George's decision 4 in docs/ui-direction.md). "Family" reads "Everyone" here.
+ */
+export function ViewingMenu({ allowFamily = false }: { allowFamily?: boolean }) {
+  const viewing = useViewingChoices(allowFamily);
+  if (!viewing) return null;
+  const items = viewing.choices.map((choice) => ({
+    value: choice.value || ME_ITEM,
+    label: (
+      <Flex as="span" align="center" gap="2">
+        {choice.icon}
+        {choice.value === ALL_MEMBERS ? "Everyone" : choice.label}
+      </Flex>
+    ),
+  }));
+  const current = items.find((item) => item.value === (viewing.selected || ME_ITEM)) ?? items[0];
+  const name = viewing.choices.find((choice) => choice.value === viewing.selected)?.label ?? "Me";
+  return (
+    <ChipMenu
+      aria-label={`Whose expenses: ${viewing.selected === ALL_MEMBERS ? "Everyone" : name}`}
+      label={current.label}
+      items={items}
+      onSelect={(value) => viewing.choose(value === ME_ITEM ? ME : value)}
+    />
   );
 }
 

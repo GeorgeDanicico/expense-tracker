@@ -1,31 +1,33 @@
 "use client";
 
-import { Button, Flex, Input, Stack, Text } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
-import { FormEvent, useId, useState } from "react";
-import { useSWRConfig } from "swr";
+import { Flex, Input, Stack, Text } from "@chakra-ui/react";
+import { FormEvent, useId } from "react";
 
+import { useNetWorthWrites } from "@/components/net-worth/use-net-worth-writes";
+import { AmountInput } from "@/components/ui/amount-input";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
-import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterNetWorthChange } from "@/lib/api/invalidate";
-import type { NetWorthEntry } from "@/lib/net-worth/types";
 import { formatDate, getBucharestToday } from "@/lib/calendar";
+import type { NetWorthEntry } from "@/lib/net-worth/types";
 import { formatInvestmentAmount } from "@/lib/utils/currency";
 
+/**
+ * A new dated value for a manual item, in a sheet opened from its row's actions. The row shows the
+ * value at once and goes back if the save fails (the one optimistic write here).
+ */
 export function AddNetWorthValuationDialog({
   entry,
-  onSuccess,
+  open,
+  onOpenChange,
 }: {
   entry: NetWorthEntry;
-  onSuccess: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const { mutate } = useSWRConfig();
-  const [open, setOpen] = useState(false);
+  const writes = useNetWorthWrites();
   const form = useApiForm();
   const formId = useId();
 
@@ -37,16 +39,8 @@ export function AddNetWorthValuationDialog({
 
     const formData = new FormData(event.currentTarget);
     void form.submit(async () => {
-      await apiRequest<{ valuation: unknown }>(`/api/net-worth/items/${encodeURIComponent(itemId)}/valuations`, {
-        method: "POST",
-        body: JSON.stringify({
-          value: formData.get("value"),
-          valuedOn: formData.get("valuedOn"),
-        }),
-      });
-      await afterNetWorthChange(mutate);
-      setOpen(false);
-      onSuccess();
+      await writes.addValuation(itemId, { value: String(formData.get("value") ?? ""), valuedOn: String(formData.get("valuedOn") ?? "") });
+      onOpenChange(false);
     }, { fallback: "The value could not be saved." });
   }
 
@@ -55,14 +49,12 @@ export function AddNetWorthValuationDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (next) form.reset();
+      }}
       title="Add a dated value"
       description="Correcting the same date replaces its observation instead of creating a duplicate."
-      trigger={
-        <Button type="button" size="xs" variant="outline">
-          <Plus size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add value
-        </Button>
-      }
       footer={<FormActions form={formId} closesDialog pending={form.pending} submitLabel="Save value" />}
     >
       <form id={formId} onSubmit={submit} aria-busy={form.pending}>
@@ -78,7 +70,7 @@ export function AddNetWorthValuationDialog({
           </Flex>
 
           <FormField label={entry.kind === "liability" ? "Amount owed" : "Current value"} error={fieldError("value")}>
-            <Input name="value" defaultValue={entry.currentValue ?? ""} type="number" inputMode="decimal" min="0" step="any" autoFocus required />
+            <AmountInput name="value" currency={entry.currency} autoFocus required />
           </FormField>
 
           <ValuedOnField latestObservation={entry.valuedOn} error={fieldError("valuedOn")} />

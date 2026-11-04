@@ -6,8 +6,9 @@ import {
   ANALYTICS_PERIODS,
   APPLICATION_TIMEZONE,
   dateInMonth,
-  defaultDateInMonth,
   daysInMonth,
+  formatDate,
+  formatDateTime,
   formatInstantDate,
   formatMonth,
   formatMonthLabel,
@@ -172,20 +173,33 @@ describe("date formatters", () => {
     expect(formatInstantDate("2026-10-12T12:00:00Z")).toBe("12 Oct 2026");
     expect(formatInstantDate("2026-10-12T12:00:00Z", "en-US")).toBe("Oct 12, 2026");
   });
+
+  // Audit D9: an instant reads the same wherever the device is.
+  it("shows an instant on the application's clock, not the viewer's", () => {
+    // 21:30 UTC is already the next day in Bucharest (UTC+3 in October).
+    expect(formatInstantDate("2026-10-12T21:30:00Z")).toBe("13 Oct 2026");
+    expect(formatInstantDate("2026-10-12T21:30:00Z", "en-GB", "UTC")).toBe("12 Oct 2026");
+    // Newer ICU puts a narrow no-break space before PM.
+    const plain = (text: string) => text.replace(/\s/g, " ");
+    expect(plain(formatDateTime("2026-10-12T12:30:00Z"))).toBe("Oct 12, 2026, 3:30 PM");
+    expect(plain(formatDateTime("2026-12-12T12:30:00Z"))).toBe("Dec 12, 2026, 2:30 PM");
+    expect(plain(formatDateTime("2026-10-12T12:30:00Z", "en-US", "America/New_York"))).toBe("Oct 12, 2026, 8:30 AM");
+  });
 });
 
-describe("defaultDateInMonth", () => {
-  it("is today when today falls in the month", () => {
-    expect(defaultDateInMonth("2026-11", "2026-11-04")).toBe("2026-11-04");
+// Audit D9: a calendar date reads the same day wherever the device is.
+describe("calendar dates in any time zone", () => {
+  const zone = process.env.TZ;
+  afterEach(() => {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
   });
 
-  it("is the last day of a past month", () => {
-    expect(defaultDateInMonth("2026-10", "2026-11-04")).toBe("2026-10-31");
-    expect(defaultDateInMonth("2025-12", "2026-01-01")).toBe("2025-12-31");
-  });
-
-  it("is the first day of a future month", () => {
-    expect(defaultDateInMonth("2026-12", "2026-11-04")).toBe("2026-12-01");
-    expect(defaultDateInMonth("2027-01", "2026-12-31")).toBe("2027-01-01");
+  it.each(["Pacific/Kiritimati", "Pacific/Auckland", "Europe/Bucharest", "America/Los_Angeles", "Pacific/Pago_Pago"])("formats the same day and month in %s", (tz) => {
+    process.env.TZ = tz;
+    expect(formatDate("2026-10-31")).toBe("Oct 31, 2026");
+    expect(formatDate("2026-01-01")).toBe("Jan 01, 2026");
+    expect(formatMonthLabel("2026-11")).toBe("Nov");
+    expect(formatMonthLabel("2026-01", true)).toBe("Jan 26");
   });
 });

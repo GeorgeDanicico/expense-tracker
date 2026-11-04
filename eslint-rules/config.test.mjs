@@ -52,3 +52,37 @@ describe("the local lint plugin", () => {
     expect(documented.sort()).toEqual([...ruleNames].sort());
   });
 });
+
+// U8 and U9 converted expenses, investments and net worth (audit D6): their components and pages make no request of their own.
+describe("no-fetch-in-components in eslint.config.mjs", () => {
+  const options = config
+    .filter((entry) => entry.rules?.["local/no-fetch-in-components"])
+    .map((entry) => entry.rules["local/no-fetch-in-components"][1]);
+
+  it("is on for the converted modules' components and pages", () => {
+    expect(options).toHaveLength(1);
+    expect(options[0].modules).toEqual(expect.arrayContaining([
+      "src/components/expenses", "src/app/(app)/expenses",
+      "src/components/investments", "src/app/(app)/investments",
+      "src/components/net-worth", "src/app/(app)/net-worth",
+    ]));
+  });
+
+  it.each(["investments", "net-worth"])("reports a request in a %s component", async (module) => {
+    const { ESLint } = await import("eslint");
+    const eslint = new ESLint({ cwd: new URL("..", import.meta.url).pathname });
+    const [result] = await eslint.lintText(`export async function f() { await fetch("/api/x"); }\n`, {
+      filePath: `src/components/${module}/some-panel.tsx`,
+    });
+    expect(result.messages.map((message) => message.ruleId)).toContain("local/no-fetch-in-components");
+  }, 60_000);
+
+  it("reports a request in an expenses component through the project config", async () => {
+    const { ESLint } = await import("eslint");
+    const eslint = new ESLint({ cwd: new URL("..", import.meta.url).pathname });
+    const [result] = await eslint.lintText(`export async function f() { await fetch("/api/expenses"); }\n`, {
+      filePath: "src/components/expenses/some-panel.tsx",
+    });
+    expect(result.messages.map((message) => message.ruleId)).toContain("local/no-fetch-in-components");
+  }, 60_000);
+});

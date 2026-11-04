@@ -51,6 +51,14 @@ describe("Settings → Account", () => {
     expect(html).not.toMatch(/name="currentPassword"/);
   });
 
+  it("keeps the display currency, saying amounts aren't converted (a change with expenses asks first: audit B10)", () => {
+    const html = render(anAccount("ana@example.com"));
+
+    expect(html).toContain("Display currency");
+    expect(html).toMatch(/<select[^>]*name="currency"/);
+    expect(html).toContain("Existing amounts are not converted.");
+  });
+
   it("offers Sign out everywhere behind a confirmation", () => {
     const html = render(anAccount("ana@example.com"));
 

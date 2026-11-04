@@ -22,8 +22,10 @@ import ChangePasswordPage from "@/app/change-password/page";
 import { ExpenseApiProvider } from "@/components/expenses/expense-api";
 import { ImportApiProvider } from "@/components/expenses/import/import-api";
 import { CalendarApiProvider } from "@/components/family-calendar/calendar-api";
+import { InvestmentApiProvider } from "@/components/investments/investment-api";
 import { AppShell } from "@/components/layout/app-shell";
 import { AppPathProvider } from "@/components/layout/use-app-pathname";
+import { NetWorthApiProvider } from "@/components/net-worth/net-worth-api";
 import type { QuickAddOptions } from "@/components/quick-add/quick-add-provider";
 import { ReminderApiProvider } from "@/components/reminders/reminder-api";
 import { TodoApiProvider } from "@/components/todos/todo-api";
@@ -31,6 +33,7 @@ import { TodoApiProvider } from "@/components/todos/todo-api";
 import { previewCalendarApi } from "../calendar-fixtures";
 import { previewExpenseApi } from "../expense-fixtures";
 import { fixtureFor } from "../fixtures";
+import { previewInvestmentApi, previewNetWorthApi } from "../money-fixtures";
 import { PREVIEW_READ_STATEMENT_FILE, previewImportApi, previewSampleStatement } from "../import-fixtures";
 import { previewReminderApi } from "../reminder-fixtures";
 import { previewTodoApi } from "../todo-fixtures";
@@ -121,17 +124,21 @@ function AiSettingsPreview() {
 
 /**
  * Every screen's writes, and the quick-add sheet's, kept in memory: expenses (`expense-fixtures.ts`),
- * the board (`todo-fixtures.ts`), reminders (`reminder-fixtures.ts`) and the calendar
+ * investments and net worth (`money-fixtures.ts`), the board (`todo-fixtures.ts`), reminders (`reminder-fixtures.ts`) and the calendar
  * (`calendar-fixtures.ts`).
  */
 function PreviewApis({ children }: { children: React.ReactNode }) {
   return (
     <ExpenseApiProvider api={previewExpenseApi}>
-      <TodoApiProvider api={previewTodoApi}>
-        <ReminderApiProvider api={previewReminderApi}>
-          <CalendarApiProvider api={previewCalendarApi}>{children}</CalendarApiProvider>
-        </ReminderApiProvider>
-      </TodoApiProvider>
+      <InvestmentApiProvider api={previewInvestmentApi}>
+        <NetWorthApiProvider api={previewNetWorthApi}>
+          <TodoApiProvider api={previewTodoApi}>
+            <ReminderApiProvider api={previewReminderApi}>
+              <CalendarApiProvider api={previewCalendarApi}>{children}</CalendarApiProvider>
+            </ReminderApiProvider>
+          </TodoApiProvider>
+        </NetWorthApiProvider>
+      </InvestmentApiProvider>
     </ExpenseApiProvider>
   );
 }

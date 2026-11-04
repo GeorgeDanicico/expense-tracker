@@ -447,6 +447,8 @@ expenses hooks (read only), tests.
 - Done and Snooze share `useReminderActions` with the Reminders page. Screenshots:
   `docs/ui-styling/screenshots/u7-*.jpg`.
 
+**Signed off (George, 4 November 2026)** and merged in #215.
+
 ### U8: Expenses
 
 **Files:** `src/app/(app)/expenses/**`, `src/components/expenses/**`, a new
@@ -469,6 +471,21 @@ expenses hooks (read only), tests.
 **Done when** the screen is signed off, expenses use the new data style with the lint rule on,
 and D9, D10, B4, B5 and B10 are closed.
 
+**Built (4 November 2026), waiting for George's sign-off:**
+- the screen to the mockup: ‹ month › with a month menu, a "● Me ▾" member chip, the saved tabs as
+  chips with "+ Tab" and Filters, import, export and tab edits behind `⋯`, and rows grouped by day
+  with Edit (a sheet with the expense form) and Delete with Undo. Desktop adds "By category" ("By
+  member" in the family view). The screen's and Insights' own Add expense buttons are gone;
+- `expense-api.tsx` and `useExpenseWrites` for every expense and tab write, with optimistic add,
+  edit and delete; `local/no-fetch-in-components` on for expenses;
+- D10 (`POST /api/expenses` without `selectedMonth`, `createExpense`/`updateExpense` shared with
+  MCP, a new `PATCH /api/expenses/[id]`), B10 (a confirmation in Settings), B4, B5 and D9;
+- `local/no-local-date-parse`.
+
+Screenshots: `docs/ui-styling/screenshots/u8-*.jpg`.
+
+**Signed off (George, 4 November 2026);** it goes out with U9 in one PR.
+
 ### U9: Investments and Net worth
 
 **Files:** `src/app/(app)/{investments,net-worth}/**`, `src/components/{investments,net-worth}/**`,
@@ -479,6 +496,8 @@ tests.
   `apiFetcher` arguments (U1's rule will already have flagged them).
 
 **Done when** the screens are signed off and both modules have the lint rule on.
+
+**Signed off (George, 4 November 2026);** it goes out with U8 in one PR.
 
 ### U10: Planning
 
