@@ -513,7 +513,7 @@ tests.
 
 **Done when** the screens are signed off. Built on 4 November 2026; awaiting George's sign-off.
 
-**Signed off (George, 4 November 2026).**
+**Signed off (George, 4 November 2026).** Merged in #217.
 
 ### U11: Settings and family
 
@@ -525,7 +525,10 @@ tests.
   `useApiForm`; turn on `local/no-fetch-in-components` for these folders.
 
 **Done when** the screens are signed off and the lint rule is on for every module (it then
-covers all of `src/components`).
+covers all of `src/components`). Built on 4 November 2026 (the rule now covers all of
+`src/components` and `src/app/(app)`); awaiting George's sign-off.
+
+**Signed off (George, 4 November 2026).**
 
 ### U12: Swipe actions
 

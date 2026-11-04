@@ -13,23 +13,13 @@ import local from "./eslint-rules/index.mjs";
 const localPlugin = { plugins: { local } };
 
 /**
- * Modules whose components no longer call `fetch` or `apiRequest` (their requests live in an API
- * object and hooks, like src/components/todos). Add a module's folders when it is converted, for
- * example "src/components/expenses" and "src/app/(app)/expenses" (U8 to U11 in docs/ui-plan.md).
+ * Components and pages no longer call `fetch` or `apiRequest`: their requests live in an API object
+ * and hooks (like src/components/todos) or in a helper under src/lib. Every module is converted (U8
+ * to U11 in docs/ui-plan.md), so the rule covers all of src/components and the app's pages.
  */
 const CONVERTED_MODULES = [
-  "src/components/expenses",
-  "src/app/(app)/expenses",
-  "src/components/investments",
-  "src/app/(app)/investments",
-  "src/components/net-worth",
-  "src/app/(app)/net-worth",
-  "src/components/reminders",
-  "src/app/(app)/reminders",
-  "src/components/todos",
-  "src/app/(app)/todos",
-  "src/components/family-calendar",
-  "src/app/(app)/calendar",
+  "src/components",
+  "src/app/(app)",
 ];
 
 /**

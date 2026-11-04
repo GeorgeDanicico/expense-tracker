@@ -3,20 +3,17 @@
 import { Button, Input, Stack } from "@chakra-ui/react";
 import { Users } from "lucide-react";
 import type { FormEvent } from "react";
-import { useSWRConfig } from "swr";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterFamilyJoined } from "@/lib/api/invalidate";
-import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 
 /** "Create a family": a name field. You become the family's first parent. */
 export function CreateFamilyForm() {
-  const { mutate } = useSWRConfig();
+  const writes = useFamilyWrites();
   const form = useApiForm();
   const nameError = form.fieldError("name");
 
@@ -26,8 +23,7 @@ export function CreateFamilyForm() {
     const name = String(new FormData(event.currentTarget).get("name") ?? "");
 
     void form.submit(async () => {
-      const created = await apiRequest<FamilyResponse>(FAMILY_API_KEY, { method: "POST", body: JSON.stringify({ name }) });
-      await afterFamilyJoined(mutate, created);
+      await writes.createFamily(name);
     }, { fallback: "Unable to create the family. Please try again." });
   }
 

@@ -2,8 +2,9 @@
 
 import { Box, Button, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import useSWR, { useSWRConfig } from "swr";
+import useSWR from "swr";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { CreateInviteDialog } from "@/components/family/create-invite-dialog";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -11,22 +12,19 @@ import { DataError, DataLoading } from "@/components/ui/data-state";
 import { ListRow } from "@/components/ui/list-row";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterInvitesChanged } from "@/lib/api/invalidate";
-import { FAMILY_INVITES_API_KEY, familyInviteApiUrl, type InvitesResponse } from "@/lib/api/keys";
+import { FAMILY_INVITES_API_KEY, type InvitesResponse } from "@/lib/api/keys";
 import { formatDateTime } from "@/lib/calendar";
 import type { FamilyInviteView } from "@/lib/family/views";
 
 function InviteRow({ invite }: { invite: FamilyInviteView }) {
-  const { mutate } = useSWRConfig();
+  const writes = useFamilyWrites();
   const form = useApiForm();
   const [revoking, setRevoking] = useState(false);
   const role = invite.role === "parent" ? "Parent" : "Kid";
 
   function revoke() {
     void form.submit(async () => {
-      await apiRequest<void>(familyInviteApiUrl(invite.inviteId), { method: "DELETE" });
-      await afterInvitesChanged(mutate);
+      await writes.revokeInvite(invite.inviteId);
       setRevoking(false);
     }, { fallback: "Unable to revoke the invite. Please try again." });
   }
@@ -49,9 +47,7 @@ function InviteRow({ invite }: { invite: FamilyInviteView }) {
           {revoking ? (
             <ConfirmDialog
               open
-              onOpenChange={(next) => {
-                if (!form.pending) setRevoking(next);
-              }}
+              onOpenChange={setRevoking}
               title="Revoke this invite?"
               description="The code and link stop working right away."
               confirmLabel="Revoke"

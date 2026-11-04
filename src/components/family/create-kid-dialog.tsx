@@ -2,8 +2,8 @@
 
 import { Input, Stack } from "@chakra-ui/react";
 import { useState, type FormEvent } from "react";
-import { useSWRConfig } from "swr";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { KidSignInDetails } from "@/components/family/kid-sign-in-details";
 import { PermissionsEditor } from "@/components/family/permissions-editor";
 import { AppDialog } from "@/components/ui/app-dialog";
@@ -11,14 +11,11 @@ import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterFamilyChanged } from "@/lib/api/invalidate";
-import { FAMILY_KIDS_API_URL, type FamilyResponse } from "@/lib/api/keys";
 import { DEFAULT_KID_PERMISSIONS, type Permissions } from "@/lib/permissions";
 
 /** Create a kid account: name, username, temporary password and permissions. Calls `POST /api/family/kids`. */
 export function CreateKidDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { mutate } = useSWRConfig();
+  const writes = useFamilyWrites();
   const form = useApiForm();
   const [permissions, setPermissions] = useState<Permissions>(DEFAULT_KID_PERMISSIONS);
   const [created, setCreated] = useState<{ name: string; username: string; password: string } | null>(null);
@@ -32,21 +29,16 @@ export function CreateKidDialog({ open, onOpenChange }: { open: boolean; onOpenC
     const password = String(data.get("password") ?? "");
 
     void form.submit(async () => {
-      const updated = await apiRequest<FamilyResponse>(FAMILY_KIDS_API_URL, {
-        method: "POST",
-        body: JSON.stringify({ displayName, username, password, permissions }),
-      });
+      await writes.createKid({ displayName, username, password, permissions });
       setCreated({ name: displayName, username, password });
-      await afterFamilyChanged(mutate, updated);
     }, { fallback: "Unable to create the account. Please try again." });
   }
 
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={created ? "Kid added" : "Add a kid"}
       description={created ? undefined : "Create an account for a kid. They sign in with a username, so no email is needed."}
       footer={

@@ -1,7 +1,7 @@
 # Phase 17 update, 4 November 2026 (cloud session)
 
 Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-session-rk7uoj`.
-**PR #213 (U3, U4 and U5), PR #214 (U6), PR #215 (U7) and PR #216 (U8 and U9) merged on 4 November.** U10 is in progress on the same branch.
+**PR #213 (U3, U4 and U5), PR #214 (U6), PR #215 (U7), PR #216 (U8 and U9) and PR #217 (U10) merged on 4 November.** U11 is done and signed off on the same branch.
 
 ## Where the tasks stand
 
@@ -16,8 +16,9 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U7 Home as "today"** | **Done. George signed off the screenshots on 4 November; merged in #215.** |
 | **U8 Expenses** | **Done. George signed it off on 4 November; merged in #216.** |
 | **U9 Investments and Net worth** | **Done. George signed it off on 4 November; merged in #216.** |
-| **U10 Planning** | **Done. George signed it off on 4 November.** |
-| U11 onwards | Not started. |
+| **U10 Planning** | **Done. George signed it off on 4 November; merged in #217.** |
+| **U11 Settings and the family pages** | **Done. George signed it off on 4 November.** |
+| U12 onwards | Not started. |
 
 ## What U3 added
 
@@ -390,10 +391,51 @@ An agent did the work, on top of the merged U8 and U9.
   not changed: it is a product call.
 - The shared family helpers (todos proposal 1) and `ToggleChip` for the lead-time chips are left.
 
+## What U11 added
+
+An agent did the work, on top of the merged U10.
+
+- **D6 (done for every module):** `family/family-api.tsx` (`FamilyApi`, `restFamilyApi`, a provider) with
+  `use-family-writes.ts` (`familyWrites(api, mutate)`: each write, then the refresh it needs; not
+  optimistic, since the server can refuse a name, a password or a code) replaces the `apiRequest` calls
+  and `after…` helpers in 12 family components. The profile picture's requests moved to
+  `settings/settings-api.tsx` (+ `use-settings-writes.ts`); the other Settings cards already called
+  helpers in `src/lib`. The OAuth consent screen is on `useApiForm` (`oauth/oauth-api.ts`; the 401
+  redirect stays in the callback) and sign-in's request is in `auth/auth-api.ts`.
+  **`local/no-fetch-in-components` is now on for all of `src/components` and `src/app/(app)`**
+  (`CONVERTED_MODULES` is two entries; a new folder is covered without a change).
+- **Family pages, to the mockup:** Manage family's table is gone; members are `ListRow`s (avatar in
+  their colour, role, `@username`, last active) with `RowActions` (Colour; for a kid Permissions,
+  Reset password, Delete account; Remove from family for the creator). The Family page uses the same
+  avatar-led rows. **Typed confirmations stay** for deleting a family and a kid's account (a test
+  checks the button stays off), as George decided.
+- **Settings:** the profile card (avatar, name, sign-in name, Change picture) replaces the "Profile
+  picture" header; the notifications switch says what it does ("Turn off to stop every notification on
+  all your devices") instead of a fixed "Off:". **My permissions** is only in the list for kids (and
+  people without a family): for a parent it said one line. Parent-only rows (Manage family) are
+  hidden from kids, as before; the list test covers each kind of user. The B10 currency warning in
+  Account is unchanged.
+- **U4 leftovers in these files:** the hand-written `if (!form.pending)` guards in 12 dialogs are gone;
+  `AppDialog` and `ConfirmDialog` take `pending` (a dismissed dirty form now asks first, like the other
+  dialogs). No hand-made chips were left in these modules.
+- **D9:** the join date uses `formatInstantDate` (the app's time zone) instead of the UTC day.
+- **Preview:** `/dev/preview/{family,manage-family,permissions}` with `previewFamilyApi` (`?kid=1` a kid).
+- **Checks:** lint 0 errors and 0 warnings; `tsc` clean; vitest 6578 passed (1 skipped); `npm run build` passes with the CI environment.
+- **Screenshots:** `docs/ui-styling/screenshots/u11-{more,account,notifications,family,manage-family,permissions,ai}-{390,1280}.jpg`.
+  No horizontal page scroll at 320 px on More, Family and Manage family.
+
+### Left over from U11
+
+- Family and Manage family are still two pages (family proposal 4 would merge them into one list).
+- The Account page keeps its cards (Currency, Sign out everywhere, Download, Delete) rather than the
+  mockup's rows with a chevron; there is still no "Change password" row (audit P5), and `useFamily()`,
+  `memberDisplayName` and `usePushSubscription` (proposals 1, 3, 5) are not done.
+- A parent opening `/settings/permissions` is sent to `/settings` (the row is gone for parents).
+
 ## Next steps
 
-1. George signs off the U10 screenshots (320, 390 and 1280 px): Reminders' grouped list with Done
-   and Snooze on the row, the board's look, and the Calendar's Agenda on phones.
-2. **U10 goes out in one PR** from `claude/phase-17-cloud-session-rk7uoj` to `main`, after sign-off.
-   **Merging changes the Reminders, To-dos and Calendar screens in production.**
-3. Then U11 (Settings and family), with the same patterns, and U12 (swipe actions).
+1. George signs off the U11 screenshots (390 and 1280 px): More, Account, Notifications, Family,
+   Manage family (rows with a menu instead of the table), My permissions and AI.
+2. **U11 goes out in one PR** from `claude/phase-17-cloud-session-rk7uoj` to `main`, after sign-off.
+   **Merging changes the Settings and family screens in production.**
+3. Then U12 (swipe actions).

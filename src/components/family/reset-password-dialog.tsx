@@ -3,14 +3,13 @@
 import { Input } from "@chakra-ui/react";
 import { useState, type FormEvent } from "react";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { KidSignInDetails } from "@/components/family/kid-sign-in-details";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { familyMemberPasswordApiUrl } from "@/lib/api/keys";
 import type { FamilyMemberView } from "@/lib/family/views";
 
 /** Give a kid a new temporary password. Calls `POST /api/family/members/[id]/password`. */
@@ -23,6 +22,7 @@ export function ResetPasswordDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const writes = useFamilyWrites();
   const form = useApiForm();
   const [done, setDone] = useState<string | null>(null);
   const name = member.displayName ?? member.username ?? "this kid";
@@ -33,10 +33,7 @@ export function ResetPasswordDialog({
     const password = String(new FormData(event.currentTarget).get("password") ?? "");
 
     void form.submit(async () => {
-      await apiRequest<unknown>(familyMemberPasswordApiUrl(member.memberId), {
-        method: "POST",
-        body: JSON.stringify({ password }),
-      });
+      await writes.resetKidPassword(member.memberId, password);
       setDone(password);
     }, { fallback: "Unable to reset the password. Please try again." });
   }
@@ -44,9 +41,8 @@ export function ResetPasswordDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={done ? "Password reset" : `Reset password for ${name}`}
       description={done ? undefined : "Set a temporary password. They'll choose a new one the next time they sign in."}
       footer={

@@ -2,16 +2,13 @@
 
 import { Input, List, Stack, Text } from "@chakra-ui/react";
 import { useState, type FormEvent } from "react";
-import { useSWRConfig } from "swr";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterFamilyChanged } from "@/lib/api/invalidate";
-import { familyMemberAccountApiUrl, type FamilyResponse } from "@/lib/api/keys";
 import type { FamilyMemberView } from "@/lib/family/views";
 
 /**
@@ -29,7 +26,7 @@ export function DeleteKidAccountDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { mutate } = useSWRConfig();
+  const writes = useFamilyWrites();
   const form = useApiForm();
   const [typed, setTyped] = useState("");
   const name = member.displayName ?? member.username ?? "";
@@ -42,11 +39,7 @@ export function DeleteKidAccountDialog({
     const currentPassword = String(new FormData(event.currentTarget).get("currentPassword") ?? "");
 
     void form.submit(async () => {
-      const response = await apiRequest<FamilyResponse>(familyMemberAccountApiUrl(member.memberId), {
-        method: "DELETE",
-        body: JSON.stringify({ currentPassword, confirmName: typed.trim() }),
-      });
-      await afterFamilyChanged(mutate, response);
+      await writes.deleteKidAccount(member.memberId, { currentPassword, confirmName: typed.trim() });
       onOpenChange(false);
     }, { fallback: "Unable to delete the account. Please try again." });
   }
@@ -54,9 +47,8 @@ export function DeleteKidAccountDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={`Delete ${name}'s account?`}
       description="This can't be undone."
       footer={

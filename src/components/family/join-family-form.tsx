@@ -3,17 +3,14 @@
 import { Button, Input, Stack, Text } from "@chakra-ui/react";
 import { KeyRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { useSWRConfig } from "swr";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormField } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterFamilyJoined } from "@/lib/api/invalidate";
-import { FAMILY_JOIN_API_URL, FAMILY_JOIN_PREVIEW_API_URL, type FamilyResponse } from "@/lib/api/keys";
 import type { InvitePreviewView } from "@/lib/family/views";
 
 /** The confirmation text for a previewed invite: who invited you, to which family, as what. */
@@ -27,7 +24,7 @@ export function joinSummary(preview: Pick<InvitePreviewView, "familyName" | "inv
  * `initialCode` fills the field (used by the `/join/[code]` link); `onJoined` runs after joining.
  */
 export function JoinFamilyForm({ initialCode = "", onJoined }: { initialCode?: string; onJoined?: () => void }) {
-  const { mutate } = useSWRConfig();
+  const writes = useFamilyWrites();
   const previewForm = useApiForm();
   const joinForm = useApiForm();
   const [code, setCode] = useState(initialCode);
@@ -39,10 +36,7 @@ export function JoinFamilyForm({ initialCode = "", onJoined }: { initialCode?: s
     if (previewForm.pending) return;
 
     void previewForm.submit(async () => {
-      const found = await apiRequest<InvitePreviewView>(FAMILY_JOIN_PREVIEW_API_URL, {
-        method: "POST",
-        body: JSON.stringify({ code }),
-      });
+      const found = await writes.previewInvite(code);
       joinForm.reset();
       setPreview(found);
     }, { fallback: "Unable to check the code. Please try again." });
@@ -50,9 +44,8 @@ export function JoinFamilyForm({ initialCode = "", onJoined }: { initialCode?: s
 
   function join() {
     void joinForm.submit(async () => {
-      const joined = await apiRequest<FamilyResponse>(FAMILY_JOIN_API_URL, { method: "POST", body: JSON.stringify({ code }) });
+      await writes.joinFamily(code);
       setPreview(null);
-      await afterFamilyJoined(mutate, joined);
       onJoined?.();
     }, { fallback: "Unable to join the family. Please try again." });
   }

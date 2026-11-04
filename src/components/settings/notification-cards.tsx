@@ -95,7 +95,7 @@ export function BrowserNotificationsCard({
         <Stack gap="3">
           <SwitchRow
             label={BROWSER_NOTIFICATIONS_LABEL}
-            description="Off: nothing is sent to any of your devices."
+            description="Turn off to stop every notification on all your devices."
             checked={settings.pushEnabled}
             disabled={pending}
             onChange={onChange}

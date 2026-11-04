@@ -6,7 +6,10 @@ import { apiFormError } from "@/hooks/use-api-form";
 import { ledgerSystem } from "@/components/ui/theme";
 import { ACCOUNT_AVATAR_API_URL } from "@/lib/api/keys";
 
-import { AvatarCard, avatarName, removeAvatar, uploadAvatar, validateAvatarFile } from "./avatar-card";
+import { AvatarCard, avatarName } from "./avatar-card";
+import { restSettingsApi, validateAvatarFile } from "./settings-api";
+
+const { uploadAvatar, removeAvatar } = restSettingsApi;
 
 // Component tests render static markup (no DOM), so the card's behaviour is tested through the
 // helpers it calls: the browser checks, and the requests `uploadAvatar` and `removeAvatar` send.
@@ -102,7 +105,7 @@ describe("avatarName", () => {
 describe("AvatarCard", () => {
   it("offers an upload, and no Remove, without a picture", () => {
     const html = render(null);
-    expect(html).toContain("Profile picture");
+    expect(html).toContain("Profile picture file");
     expect(html).toContain("Shown to your family. JPG or PNG, up to 5 MB.");
     expect(html).toContain("Upload picture");
     expect(html).not.toContain("Remove");

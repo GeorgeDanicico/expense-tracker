@@ -4,14 +4,13 @@ import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { formatUtcDay } from "@/lib/calendar";
+import { formatInstantDate } from "@/lib/calendar";
 import { memberColorTokens } from "@/lib/family/member-colors";
 import type { FamilyMemberView, FamilyView } from "@/lib/family/views";
 
-/** "Joined 12 Oct 2026", or an empty string when the date can't be read. */
+/** "Joined 12 Oct 2026" (the day on the app's clock), or an empty string when the date can't be read. */
 export function joinedLabel(joinedAt: string): string {
-  const date = new Date(joinedAt);
-  return Number.isNaN(date.getTime()) ? "" : `Joined ${formatUtcDay(date)}`;
+  return Number.isNaN(new Date(joinedAt).getTime()) ? "" : `Joined ${formatInstantDate(joinedAt)}`;
 }
 
 function MemberRow({ member, color }: { member: FamilyMemberView; color: string | undefined }) {
@@ -22,9 +21,9 @@ function MemberRow({ member, color }: { member: FamilyMemberView; color: string 
 
   return (
     <ListRow
+      leading={<Avatar size="md" name={name} src={member.avatarUrl} color={color} />}
       title={
         <Flex as="span" align="center" gap="2" minW="0">
-          <Avatar size="sm" name={name} src={member.avatarUrl} color={color} />
           <Text as="span" truncate>
             {name}
           </Text>

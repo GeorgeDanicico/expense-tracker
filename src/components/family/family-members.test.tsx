@@ -42,7 +42,7 @@ function render(value: FamilyView) {
 
 describe("joinedLabel", () => {
   it("formats the join date", () => {
-    expect(joinedLabel("2026-10-12T08:00:00Z")).toBe("Joined Oct 12, 2026");
+    expect(joinedLabel("2026-10-12T08:00:00Z")).toBe("Joined 12 Oct 2026");
   });
 
   it("is empty for an unreadable date", () => {

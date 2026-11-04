@@ -3,16 +3,13 @@
 import { Input, List, Text } from "@chakra-ui/react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { useSWRConfig } from "swr";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterFamilyDeleted } from "@/lib/api/invalidate";
-import { FAMILY_API_KEY } from "@/lib/api/keys";
 
 /** The creator types the family's name to delete it. Calls `DELETE /api/family { confirmName }`. */
 export function DeleteFamilyDialog({
@@ -25,7 +22,7 @@ export function DeleteFamilyDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const { mutate } = useSWRConfig();
+  const writes = useFamilyWrites();
   const form = useApiForm();
   const [typed, setTyped] = useState("");
   const formId = "delete-family";
@@ -35,8 +32,7 @@ export function DeleteFamilyDialog({
     if (typed.trim() !== familyName) return;
 
     void form.submit(async () => {
-      await apiRequest<void>(FAMILY_API_KEY, { method: "DELETE", body: JSON.stringify({ confirmName: typed.trim() }) });
-      await afterFamilyDeleted(mutate);
+      await writes.deleteFamily(typed.trim());
       onOpenChange(false);
       router.replace("/settings/family");
     }, { fallback: "Unable to delete the family. Please try again." });
@@ -45,9 +41,8 @@ export function DeleteFamilyDialog({
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={`Delete ${familyName}?`}
       description="This can't be undone."
       footer={

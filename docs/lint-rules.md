@@ -199,14 +199,16 @@ called through a hook with optimistic updates where a write nearly always succee
 can drive a screen with fixtures and cache updates sit next to the writes (audit D6).
 
 **How a module is turned on:** add its folders to `CONVERTED_MODULES` in `eslint.config.mjs`, in the
-PR that converts it (U8 expenses, U9 investments and net worth, U10 planning, U11 settings and
-family):
+PR that converts it. U8 to U11 did them one by one; U11 ended with all of `src/components` and
+`src/app/(app)` listed:
 
 ```js
-const CONVERTED_MODULES = ["src/components/expenses", "src/app/(app)/expenses", "src/components/investments", /* … */];
+const CONVERTED_MODULES = ["src/components", "src/app/(app)"];
 ```
 
-U11 ends with every folder under `src/components` listed.
+A new folder under `src/components` is covered without a change.
+
+**On for settings, family, auth and OAuth since U11** (so for every folder under `src/components`): family writes are in `family/family-api.tsx` (through `useFamilyWrites`), the profile picture's in `settings/settings-api.tsx`, sign-in in `auth/auth-api.ts` and the consent answer in `oauth/oauth-api.ts`; the other Settings cards call helpers in `src/lib`.
 
 **Added by:** U1, with an empty list. **On for expenses since U8**: `src/components/expenses`
 (the import screens included) and `src/app/(app)/expenses`, whose requests are all in

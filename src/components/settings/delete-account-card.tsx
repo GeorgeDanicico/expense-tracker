@@ -93,9 +93,8 @@ export function DeleteAccountCard({ membership }: { membership: AccountMembershi
       {open ? (
         <AppDialog
           open
-          onOpenChange={(next) => {
-            if (!form.pending) setOpen(next);
-          }}
+          onOpenChange={setOpen}
+          pending={form.pending}
           title="Delete your account?"
           description="This can't be undone."
           footer={

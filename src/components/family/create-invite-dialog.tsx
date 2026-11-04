@@ -2,17 +2,15 @@
 
 import { Box, Button, Stack, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { useSWRConfig } from "swr";
 
+import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { PermissionsEditor } from "@/components/family/permissions-editor";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { FormActions } from "@/components/ui/form-actions";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useApiForm } from "@/hooks/use-api-form";
-import { apiRequest } from "@/lib/api/client";
-import { afterInvitesChanged } from "@/lib/api/invalidate";
-import { FAMILY_INVITES_API_KEY, type CreatedInvite } from "@/lib/api/keys";
+import type { CreatedInvite } from "@/lib/api/keys";
 import { formatDateTime } from "@/lib/calendar";
 import { DEFAULT_KID_PERMISSIONS, type FamilyRole, type Permissions } from "@/lib/permissions";
 
@@ -93,7 +91,7 @@ export function CreateInviteDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { mutate } = useSWRConfig();
+  const writes = useFamilyWrites();
   const form = useApiForm();
   const [role, setRole] = useState<FamilyRole>("kid");
   const [permissions, setPermissions] = useState<Permissions>(DEFAULT_KID_PERMISSIONS);
@@ -102,21 +100,16 @@ export function CreateInviteDialog({
 
   function create() {
     void form.submit(async () => {
-      const invite = await apiRequest<CreatedInvite>(FAMILY_INVITES_API_KEY, {
-        method: "POST",
-        body: JSON.stringify(role === "kid" ? { role, permissions } : { role }),
-      });
+      const invite = await writes.createInvite({ role, permissions });
       setCreated({ invite, role });
-      await afterInvitesChanged(mutate);
     }, { fallback: "Unable to create the invite. Please try again." });
   }
 
   return (
     <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!form.pending) onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      pending={form.pending}
       title={created ? "Invite created" : "Invite someone"}
       description={created ? "Send them the code or the link. It is shown only once." : "They join your family with a code."}
       footer={
