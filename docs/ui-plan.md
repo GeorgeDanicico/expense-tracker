@@ -497,6 +497,8 @@ tests.
 
 **Done when** the screens are signed off and both modules have the lint rule on.
 
+**Signed off (George, 4 November 2026);** it goes out with U8 in one PR.
+
 ### U10: Planning
 
 **Files:** `src/app/(app)/{reminders,todos,calendar}/**`, `src/components/{reminders,todos,family-calendar}/**`,

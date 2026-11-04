@@ -15,7 +15,7 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U6 Quick add and the fast expense form** | **Done. George signed off the screenshots on 4 November; merged in #214.** |
 | **U7 Home as "today"** | **Done. George signed off the screenshots on 4 November; merged in #215.** |
 | **U8 Expenses** | **Done. George signed it off on 4 November; it goes out with U9 in one PR.** |
-| **U9 Investments and Net worth** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
+| **U9 Investments and Net worth** | **Done. George signed it off on 4 November; it goes out with U8 in one PR.** |
 | U10 onwards | Not started. |
 
 ## What U3 added
