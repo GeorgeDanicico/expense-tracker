@@ -63,7 +63,7 @@ function SegmentButton({
       borderRadius="sm"
       cursor="pointer"
       opacity={dimmed ? 0.3 : 1}
-      transition="opacity 0.15s"
+      transition="opacity {durations.fast} {easings.standard}"
       aria-pressed={isSelected}
       aria-label={`${segment.name}, ${context}, ${amount}`}
       onClick={() => onSelect(isSelected ? null : segment.memberId)}

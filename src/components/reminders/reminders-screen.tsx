@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useAccount } from "@/hooks/use-account";
 import { useIsPhone } from "@/hooks/use-is-phone";
+import { prefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { doneEntries, groupReminders, tabOf, type ListedReminder, type ReminderTab } from "@/lib/reminders/list";
 import { DONE_WINDOW_DAYS_LABEL } from "@/lib/reminders/format";
 
@@ -68,8 +69,7 @@ export const FOCUS_HIGHLIGHT_MS = 2500;
 /** Scrolls the reminder's first row into view, at once when the user prefers reduced motion. */
 function scrollToReminder(id: string) {
   const row = [...document.querySelectorAll<HTMLElement>("[data-reminder-id]")].find((element) => element.dataset.reminderId === id);
-  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-  row?.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  row?.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
 }
 
 /**

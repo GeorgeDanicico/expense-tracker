@@ -1,5 +1,10 @@
-import { Box, Flex, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+
+import { rowRecipe } from "@/components/ui/theme/recipes/misc";
+
+/** A list item with the theme's row recipe: 56px tall on phones, no line between rows. */
+const RowItem = chakra("li", rowRecipe);
 
 /**
  * Mobile list row: leading icon, title, meta line, trailing amount/actions.
@@ -24,16 +29,7 @@ export function ListRow({
   actions?: ReactNode;
 }) {
   return (
-    <Flex
-      as="li"
-      align="center"
-      gap="3"
-      py="2.5"
-      borderBottomWidth="1px"
-      borderColor="border"
-      _last={{ borderBottomWidth: "0" }}
-      listStyleType="none"
-    >
+    <RowItem listStyleType="none">
       {accent ? <Box alignSelf="stretch" flexShrink="0" width="1" borderRadius="full" bg={accent} aria-hidden="true" /> : null}
       {leading}
       <Flex direction="column" flex="1" minW="0" gap="0.5">
@@ -57,6 +53,6 @@ export function ListRow({
           {actions}
         </Flex>
       ) : null}
-    </Flex>
+    </RowItem>
   );
 }

@@ -6,6 +6,7 @@ import { Brand } from "@/components/layout/brand";
 import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { OfflineStatus } from "@/components/pwa/offline-status";
+import { PAGE_SPACING } from "@/components/ui/theme/layout";
 
 export function AppShell({
   children,
@@ -43,8 +44,8 @@ export function AppShell({
             id="main-content"
             tabIndex={-1}
             maxW="1200px"
-            px={{ base: "4", md: "6" }}
-            pt={{ base: "4", md: "5" }}
+            px={PAGE_SPACING.pageX}
+            pt={PAGE_SPACING.pageTop}
             pb={{ base: "calc(4.5rem + env(safe-area-inset-bottom))", md: "8" }}
           >
             <OfflineStatus />

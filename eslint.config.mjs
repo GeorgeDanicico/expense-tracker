@@ -76,13 +76,19 @@ const uiGuardrails = {
 };
 
 /**
- * Motion comes from the theme's tokens. No tokens exist yet (U4 in docs/ui-plan.md adds them), so
- * the few literal durations in components are warnings until then; see docs/lint-rules.md.
+ * Motion comes from the theme's tokens (src/components/ui/theme/motion.ts), and reduced motion is
+ * handled in one place: global-css.ts for CSS, useReducedMotion() for JavaScript.
  */
 const motion = {
   files: ["src/**/*.{ts,tsx}"],
   ignores: ["src/components/ui/theme/**"],
-  rules: { "local/motion-tokens": "warn" },
+  rules: { "local/motion-tokens": "error" },
+};
+
+const reducedMotion = {
+  files: ["src/**/*.{ts,tsx}"],
+  ignores: ["src/hooks/use-reduced-motion.ts"],
+  rules: { "local/no-reduced-motion-query": "error" },
 };
 
 /**
@@ -173,6 +179,7 @@ const eslintConfig = defineConfig([
   noFetchInComponents,
   uiGuardrails,
   motion,
+  reducedMotion,
   supabaseBoundary,
   workerBoundary,
   noConsole,

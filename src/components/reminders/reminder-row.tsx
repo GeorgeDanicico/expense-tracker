@@ -103,7 +103,7 @@ function RowFrame({
       borderColor="border"
       bg={focused ? "brand.muted" : highlight ? "brand.subtle" : undefined}
       boxShadow={focused ? "inset 0 0 0 2px {colors.brand.focusRing}" : undefined}
-      transition="background-color 0.6s ease, box-shadow 0.6s ease"
+      transition="background-color {durations.slow} {easings.standard}, box-shadow {durations.slow} {easings.standard}"
       scrollMarginBlock="6rem"
       _last={{ borderBottomWidth: "0" }}
     >

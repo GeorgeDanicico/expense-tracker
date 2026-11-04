@@ -51,7 +51,7 @@ export function AssetSelector({
                 textAlign="start"
                 cursor="pointer"
                 bg={selected ? "bg.selected" : "bg.surface"}
-                transition="background 120ms ease"
+                transition="background-color {durations.fast} {easings.standard}"
                 _hover={{ bg: selected ? "bg.selected" : "bg.subtle" }}
                 _focusVisible={{ outline: "2px solid", outlineColor: "fg.accent", outlineOffset: "-2px" }}
                 _before={selected ? {

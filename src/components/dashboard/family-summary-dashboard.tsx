@@ -109,7 +109,7 @@ export function FamilySummaryDashboard() {
                     borderRadius="sm"
                     cursor="pointer"
                     opacity={selected && selected !== share.memberId ? 0.3 : 1}
-                    transition="opacity 0.15s"
+                    transition="opacity {durations.fast} {easings.standard}"
                     aria-pressed={selected === share.memberId}
                     aria-label={`${share.name}, ${formatCurrency(share.total, activeCurrency)}, ${Math.round(share.share)}%`}
                     title={`${share.name}: ${formatCurrency(share.total, activeCurrency)}`}

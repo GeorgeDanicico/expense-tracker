@@ -43,7 +43,7 @@ export function NavItem({
       color={active ? "fg" : "fg.muted"}
       bg={active ? "bg.selected" : "transparent"}
       textDecoration="none"
-      transition="background 120ms ease, color 120ms ease"
+      transition="background-color {durations.fast} {easings.standard}, color {durations.fast} {easings.standard}"
       _hover={{ bg: active ? "bg.selected" : "bg.muted", color: "fg", textDecoration: "none" }}
       _before={
         active

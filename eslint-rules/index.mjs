@@ -7,6 +7,7 @@ import noFetchInComponents from "./no-fetch-in-components.mjs";
 import noIsoDateSlice from "./no-iso-date-slice.mjs";
 import noLocaleDateWithoutZone from "./no-locale-date-without-zone.mjs";
 import noRawDialog from "./no-raw-dialog.mjs";
+import noReducedMotionQuery from "./no-reduced-motion-query.mjs";
 import noRedundantSwrFetcher from "./no-redundant-swr-fetcher.mjs";
 import noWindowConfirm from "./no-window-confirm.mjs";
 import noZodFlatten from "./no-zod-flatten.mjs";
@@ -23,6 +24,7 @@ const plugin = {
     "no-iso-date-slice": noIsoDateSlice,
     "no-locale-date-without-zone": noLocaleDateWithoutZone,
     "no-raw-dialog": noRawDialog,
+    "no-reduced-motion-query": noReducedMotionQuery,
     "no-redundant-swr-fetcher": noRedundantSwrFetcher,
     "no-window-confirm": noWindowConfirm,
     "no-zod-flatten": noZodFlatten,
