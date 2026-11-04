@@ -1,237 +1,21 @@
 "use client";
 
-import { Button, Flex, Input, NativeSelect, Stack, Switch, Text, Textarea } from "@chakra-ui/react";
-import { Check, Trash2 } from "lucide-react";
-import { useId, useState } from "react";
+import { Button, Stack } from "@chakra-ui/react";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
 
-import { CategoryField, SubtypeField } from "@/components/expenses/expense-category-fields";
 import type { ReminderFields } from "@/components/reminders/reminder-api";
+import { draftFor, draftToFields, ReminderFormFields, useShowsExpenseSection, type ReminderDraft } from "@/components/reminders/reminder-form";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormActions } from "@/components/ui/form-actions";
-import { FormField, FormRow } from "@/components/ui/form-field";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useAccount } from "@/hooks/use-account";
 import { useApiForm } from "@/hooks/use-api-form";
 import { getBucharestToday } from "@/lib/calendar";
-import { subtypeForCategory, type ExpenseCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
-import { can } from "@/lib/permissions";
-import { formatDueAt, repeatLabel, repeatUnitName } from "@/lib/reminders/format";
+import { formatDueAt } from "@/lib/reminders/format";
 import type { ListedReminder } from "@/lib/reminders/list";
-import {
-  DEFAULT_LEAD_MINUTES,
-  DEFAULT_TIME_OF_DAY,
-  LEAD_TIME_PRESETS,
-  MAX_LEAD_TIMES,
-  MAX_REPEAT_INTERVAL,
-  MIN_REPEAT_INTERVAL,
-  type RepeatUnit,
-} from "@/lib/reminders/types";
-
-/** The optional Expense section as typed; the amount stays text until it's sent. */
-export type ExpenseDraft = {
-  /** "Log an expense when marked done" is on. */
-  enabled: boolean;
-  amount: string;
-  category: ExpenseCategory;
-  subtype: ExpenseSubtype | null;
-};
-
-/** The category a new reminder's expense starts on: reminders are mostly bills and rent. */
-export const DEFAULT_TEMPLATE_CATEGORY: ExpenseCategory = "housing";
-
-/** The form's fields as typed; the interval and the amount stay text until they're sent. */
-export type ReminderDraft = {
-  title: string;
-  notes: string;
-  startsOn: string;
-  timeOfDay: string;
-  repeatUnit: RepeatUnit;
-  repeatInterval: string;
-  leadMinutes: number[];
-  notificationsMuted: boolean;
-  expense: ExpenseDraft;
-};
-
-const REPEAT_OPTIONS: { value: RepeatUnit; label: string }[] = [
-  { value: "none", label: "Doesn't repeat" },
-  { value: "week", label: "By week" },
-  { value: "month", label: "By month" },
-  { value: "year", label: "By year" },
-];
-
-/** The form's starting values: the reminder's, or a new one's (today at 09:00, once, at the time). */
-export function draftFor(reminder: ListedReminder | undefined, today: string): ReminderDraft {
-  if (!reminder) {
-    return {
-      title: "",
-      notes: "",
-      startsOn: today,
-      timeOfDay: DEFAULT_TIME_OF_DAY,
-      repeatUnit: "none",
-      repeatInterval: String(MIN_REPEAT_INTERVAL),
-      leadMinutes: [...DEFAULT_LEAD_MINUTES],
-      notificationsMuted: false,
-      expense: { enabled: false, amount: "", category: DEFAULT_TEMPLATE_CATEGORY, subtype: null },
-    };
-  }
-  const template = reminder.expenseTemplate;
-  return {
-    title: reminder.title,
-    notes: reminder.notes,
-    startsOn: reminder.startsOn,
-    timeOfDay: reminder.timeOfDay.slice(0, 5),
-    repeatUnit: reminder.repeatUnit,
-    repeatInterval: String(reminder.repeatInterval),
-    leadMinutes: [...reminder.leadMinutes],
-    notificationsMuted: reminder.notificationsMuted,
-    expense: template
-      ? { enabled: true, amount: String(template.amount), category: template.category, subtype: template.subtype }
-      : { enabled: false, amount: "", category: DEFAULT_TEMPLATE_CATEGORY, subtype: null },
-  };
-}
-
-/**
- * Every field of the reminder as POST and PATCH take it. PATCH replaces the whole reminder, so
- * nothing is ever left out. Text is trimmed and the lead times sorted; a one-off's interval is 1.
- * The expense template, when on, is in `currency` (the account's: expenses are kept in it), and
- * null when off. The server validates the rest (an interval outside 1–12, or an amount that isn't
- * above zero, comes back as a field error).
- */
-export function draftToFields(draft: ReminderDraft, currency: string): ReminderFields {
-  const interval = Number(draft.repeatInterval.trim());
-  return {
-    title: draft.title.trim(),
-    notes: draft.notes.trim(),
-    startsOn: draft.startsOn,
-    timeOfDay: draft.timeOfDay,
-    repeatUnit: draft.repeatUnit,
-    repeatInterval: draft.repeatUnit === "none" ? MIN_REPEAT_INTERVAL : interval,
-    leadMinutes: [...draft.leadMinutes].sort((a, b) => a - b),
-    notificationsMuted: draft.notificationsMuted,
-    expenseTemplate: draft.expense.enabled
-      ? {
-        amount: Number(draft.expense.amount.trim()) || 0,
-        currency,
-        category: draft.expense.category,
-        subtype: subtypeForCategory(draft.expense.category, draft.expense.subtype),
-      }
-      : null,
-  };
-}
-
-/**
- * The optional Expense section: a switch, then the amount in the account's currency and the
- * expense form's category and subtype pickers. Marking the reminder done then offers to log it.
- */
-function ExpenseSection({
-  draft,
-  currency,
-  savedCurrency,
-  error,
-  onChange,
-}: {
-  draft: ExpenseDraft;
-  currency: string;
-  /** The currency the stored template is in, when it isn't `currency`. */
-  savedCurrency: string | null;
-  error?: string;
-  onChange: (next: ExpenseDraft) => void;
-}) {
-  return (
-    <Stack gap="3" borderTopWidth="1px" borderColor="border" pt="3" role="group" aria-label="Expense">
-      <Switch.Root
-        checked={draft.enabled}
-        onCheckedChange={(details) => onChange({ ...draft, enabled: details.checked })}
-        colorPalette="brand"
-        display="flex"
-        justifyContent="space-between"
-        gap="4"
-        width="full"
-      >
-        <Stack gap="0">
-          <Switch.Label textStyle="bodySm" fontWeight="medium">
-            Expense{" "}
-            <Text as="span" color="fg.muted" fontWeight="normal">(optional)</Text>
-          </Switch.Label>
-          <Text textStyle="caption">Marking it done offers to log this expense, dated on the day it was due.</Text>
-        </Stack>
-        <Switch.HiddenInput />
-        <Switch.Control>
-          <Switch.Thumb />
-        </Switch.Control>
-      </Switch.Root>
-      {draft.enabled ? (
-        <>
-          <FormField
-            label={`Amount (${currency})`}
-            error={error}
-            hint={savedCurrency ? `Saved in ${savedCurrency}; saving changes it to ${currency}, your expenses' currency.` : undefined}
-          >
-            <Input
-              name="expenseAmount"
-              type="number"
-              inputMode="decimal"
-              min="0.01"
-              max="9999999999.99"
-              step="0.01"
-              placeholder="0.00"
-              required
-              value={draft.amount}
-              onChange={(event) => onChange({ ...draft, amount: event.target.value })}
-            />
-          </FormField>
-          <FormRow>
-            <CategoryField
-              flex="1"
-              value={draft.category}
-              onChange={(category) => onChange({ ...draft, category, subtype: subtypeForCategory(category, draft.subtype) })}
-            />
-            <SubtypeField
-              flex="1"
-              category={draft.category}
-              value={draft.subtype}
-              onChange={(subtype) => onChange({ ...draft, subtype })}
-            />
-          </FormRow>
-        </>
-      ) : null}
-    </Stack>
-  );
-}
-
-/** `selected` with `minutes` toggled; adding is refused (unchanged) once `MAX_LEAD_TIMES` are on. */
-export function toggleLeadTime(selected: readonly number[], minutes: number): number[] {
-  if (selected.includes(minutes)) return selected.filter((value) => value !== minutes);
-  if (selected.length >= MAX_LEAD_TIMES) return [...selected];
-  return [...selected, minutes].sort((a, b) => a - b);
-}
-
-function LeadTimeChips({ selected, onChange }: { selected: number[]; onChange: (next: number[]) => void }) {
-  const full = selected.length >= MAX_LEAD_TIMES;
-  return (
-    <Flex gap="2" wrap="wrap">
-      {LEAD_TIME_PRESETS.map((preset) => {
-        const pressed = selected.includes(preset.minutes);
-        return (
-          <Button
-            key={preset.minutes}
-            size="xs"
-            variant={pressed ? "solid" : "outline"}
-            colorPalette={pressed ? "brand" : undefined}
-            aria-pressed={pressed}
-            disabled={!pressed && full}
-            onClick={() => onChange(toggleLeadTime(selected, preset.minutes))}
-          >
-            {pressed ? <Check size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" /> : null}
-            {preset.label}
-          </Button>
-        );
-      })}
-    </Flex>
-  );
-}
 
 /**
  * Add a reminder, or edit one (with Delete, after a confirmation): title, notes, first date, time,
@@ -254,16 +38,13 @@ export function ReminderDialog({
 }) {
   const form = useApiForm();
   const removal = useApiForm();
-  const { account, currency } = useAccount();
+  const { currency } = useAccount();
   const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState<ReminderDraft>(() => draftFor(reminder, getBucharestToday()));
-  const leadLabel = useId();
   const formId = `reminder-${reminder?.id ?? "new"}`;
   const editing = reminder !== undefined;
   const next = reminder ? formatDueAt(reminder) : null;
-  const interval = Number(draft.repeatInterval);
-  // Kids without expenses access don't get the section; a template already saved stays visible.
-  const showExpense = can(account?.membership ?? null, "expenses", "edit") || draft.expense.enabled;
+  const showExpense = useShowsExpenseSection(draft);
   const savedCurrency = reminder?.expenseTemplate && reminder.expenseTemplate.currency !== currency
     ? reminder.expenseTemplate.currency
     : null;
@@ -318,126 +99,14 @@ export function ReminderDialog({
           }}
         >
           <Stack gap="3">
-            <FormField label="Title" error={form.fieldError("title")}>
-              <Input
-                name="title"
-                value={draft.title}
-                maxLength={200}
-                required
-                placeholder="Pay the rent"
-                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-              />
-            </FormField>
-            <FormField label="Notes" optional error={form.fieldError("notes")}>
-              <Textarea
-                name="notes"
-                value={draft.notes}
-                maxLength={2000}
-                rows={3}
-                resize="vertical"
-                placeholder="Add details"
-                onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-              />
-            </FormField>
-            <FormRow>
-              <FormField flex="1" label="First date" error={form.fieldError("startsOn")}>
-                <Input
-                  name="startsOn"
-                  type="date"
-                  value={draft.startsOn}
-                  required
-                  onChange={(event) => setDraft({ ...draft, startsOn: event.target.value })}
-                />
-              </FormField>
-              <FormField flex="1" label="Time" error={form.fieldError("timeOfDay")}>
-                <Input
-                  name="timeOfDay"
-                  type="time"
-                  step={60}
-                  value={draft.timeOfDay}
-                  required
-                  onChange={(event) => setDraft({ ...draft, timeOfDay: event.target.value })}
-                />
-              </FormField>
-            </FormRow>
-            <FormRow>
-              <FormField
-                flex="1"
-                label="Repeat"
-                error={form.fieldError("repeatUnit")}
-                hint={draft.repeatUnit === "none" ? undefined : `${repeatLabel(draft.repeatUnit, Number.isInteger(interval) && interval > 0 ? interval : 1)}, counted from the first date.`}
-              >
-                <NativeSelect.Root>
-                  <NativeSelect.Field
-                    name="repeatUnit"
-                    value={draft.repeatUnit}
-                    onChange={(event) => setDraft({ ...draft, repeatUnit: event.target.value as RepeatUnit })}
-                  >
-                    {REPEAT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              </FormField>
-              {draft.repeatUnit === "none" ? null : (
-                <FormField flex="1" label="Every" error={form.fieldError("repeatInterval")}>
-                  <Flex align="center" gap="2">
-                    <Input
-                      name="repeatInterval"
-                      type="number"
-                      inputMode="numeric"
-                      min={MIN_REPEAT_INTERVAL}
-                      max={MAX_REPEAT_INTERVAL}
-                      step={1}
-                      required
-                      width="20"
-                      value={draft.repeatInterval}
-                      onChange={(event) => setDraft({ ...draft, repeatInterval: event.target.value })}
-                    />
-                    <Text textStyle="bodySm" color="fg.muted">
-                      {repeatUnitName(draft.repeatUnit, interval)}
-                    </Text>
-                  </Flex>
-                </FormField>
-              )}
-            </FormRow>
-            <FormField
-              label={<span id={leadLabel}>Notify me</span>}
-              error={form.fieldError("leadMinutes")}
-              hint={`Up to ${MAX_LEAD_TIMES}. ${draft.leadMinutes.length === 0 ? "With none, it only shows here." : ""}`.trim()}
-            >
-              <div role="group" aria-labelledby={leadLabel}>
-                <LeadTimeChips selected={draft.leadMinutes} onChange={(leadMinutes) => setDraft({ ...draft, leadMinutes })} />
-              </div>
-            </FormField>
-            <Switch.Root
-              checked={draft.notificationsMuted}
-              onCheckedChange={(details) => setDraft({ ...draft, notificationsMuted: details.checked })}
-              colorPalette="brand"
-              display="flex"
-              justifyContent="space-between"
-              gap="4"
-              width="full"
-            >
-              <Stack gap="0">
-                <Switch.Label textStyle="bodySm" fontWeight="medium">Mute notifications</Switch.Label>
-                <Text textStyle="caption">It still shows as due and overdue here.</Text>
-              </Stack>
-              <Switch.HiddenInput />
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-            </Switch.Root>
-            {showExpense ? (
-              <ExpenseSection
-                draft={draft.expense}
-                currency={currency}
-                savedCurrency={savedCurrency}
-                error={form.fieldError("expenseTemplate")}
-                onChange={(expense) => setDraft({ ...draft, expense })}
-              />
-            ) : null}
+            <ReminderFormFields
+              draft={draft}
+              onChange={setDraft}
+              fieldError={form.fieldError}
+              currency={currency}
+              showExpense={showExpense}
+              savedCurrency={savedCurrency}
+            />
             {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
           </Stack>
         </form>

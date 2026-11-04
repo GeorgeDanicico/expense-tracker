@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 
 import { Brand } from "@/components/layout/brand";
 import { NavItem, NavSectionGroup } from "@/components/layout/nav-item";
-import { useQuickAdd } from "@/components/layout/quick-add";
+import { useQuickAdd } from "@/components/quick-add/quick-add-provider";
 import { SignOutIconButton } from "@/components/layout/sign-out-button";
 import { useNavigation } from "@/components/layout/use-navigation";
 import { Avatar } from "@/components/ui/avatar";
@@ -50,7 +50,7 @@ export function SidebarNav({ signInName, avatarUrl = null }: { signInName: strin
       <Box px="2">
         <Brand />
       </Box>
-      <Button mt="5" size="md" bg="fg.accent" color="bg.surface" _hover={{ bg: "brand.fg" }} onClick={quickAdd.open}>
+      <Button mt="5" size="md" bg="fg.accent" color="bg.surface" _hover={{ bg: "brand.fg" }} onClick={() => quickAdd.open()}>
         <Plus size={ICON.sm} aria-hidden="true" /> Add
       </Button>
       <Stack as="nav" aria-label="Primary navigation" gap="3" mt="5" overflowY="auto">

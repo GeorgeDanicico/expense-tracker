@@ -4,14 +4,14 @@ import { Box, Button, Flex, Grid, Input, Stack, Text } from "@chakra-ui/react";
 import { AlarmClock, ArrowRightLeft, Check, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { AppDialog, Avatar, Card, Collapse, Disclosure, EmptyState, ICON, RowActions, SegmentedControl, ToggleChip } from "@/components/ui";
+import { AppDialog, Avatar, Card, ChipMenu, ChipRow, Collapse, Disclosure, EmptyState, ICON, RowActions, SegmentedControl, ToggleChip } from "@/components/ui";
 import { PAGE_SPACING } from "@/components/ui/theme/layout";
 import { revealRowActions } from "@/components/ui/theme/recipes/misc";
 
 import { useIdSet, useMockState } from "../mock-state";
 import { memberById, MOCK_EVENTS, MOCK_REMINDERS, MOCK_SNOOZE_CHOICES, MOCK_TODO_COLUMNS, MOCK_TODOS, type MockReminder, type MockTodo, type MockTodoColumn } from "../mockup-data";
 import { GroupLabel, MemberDot, PageTitle, ReminderTile, Rows } from "../mockup-parts";
-import { ChipMenu, ChipRow, MockRow, SwipeRow } from "../stand-ins";
+import { MockRow, SwipeRow } from "../stand-ins";
 
 const SECTIONS = [
   { value: "reminders", label: "Reminders" },

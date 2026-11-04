@@ -7,7 +7,7 @@ import { AmountComparison } from "@/components/dashboard/amount-comparison";
 import { CardLink } from "@/components/ui/card-link";
 import { MonthlyBarChart } from "@/components/dashboard/monthly-bar-chart";
 import { WriteOnly } from "@/components/family/write-only";
-import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
+import { AddExpenseButton } from "@/components/expenses/add-expense-button";
 import { ExpenseList } from "@/components/expenses/expense-list";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
@@ -65,7 +65,7 @@ export function SummaryDashboard({ params }: { params: URLSearchParams }) {
             </StatGroup>
             <WriteOnly>
               <Box>
-                <AddExpenseDialog selectedMonth={data.currentMonth} currency={currency} />
+                <AddExpenseButton selectedMonth={data.currentMonth} />
               </Box>
             </WriteOnly>
           </Stack>

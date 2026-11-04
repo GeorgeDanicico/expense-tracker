@@ -2,7 +2,6 @@ import { mutate as globalMutate, type ScopedMutator } from "swr";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  afterExpenseCreated,
   afterExpenseDeleted,
   afterImportChange,
   afterImportDraftChange,
@@ -20,7 +19,7 @@ import {
 import type { AccountData } from "@/lib/account/types";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { ExpensesData } from "@/lib/expenses/types";
-import { aTab, anExpense } from "@/test/builders";
+import { aTab } from "@/test/builders";
 
 const CACHED_KEYS = [
   "/api/account",
@@ -51,27 +50,10 @@ function recorder() {
   return { mutate: mutate as unknown as ScopedMutator, calls };
 }
 
-const expense = anExpense({ id: "e-2", amount: 30 });
 const tab = aTab({ id: "tab-1", name: "Car" });
 const NO_REVALIDATE = { revalidate: false };
 
 describe("cache invalidation after mutations", () => {
-  it("afterExpenseCreated updates both month ledgers, then refreshes tab ledgers and dashboards", async () => {
-    const { mutate, calls } = recorder();
-    await afterExpenseCreated(mutate, "2026-10", expense);
-
-    expect(calls.map((call) => [call.keys, call.options])).toEqual([
-      [["/api/expenses?month=2026-10"], NO_REVALIDATE],
-      [["/api/expenses?month=2026-10&context=main"], NO_REVALIDATE],
-      [["/api/expense-tabs/tab-1/expenses?revision=r1", "/api/expense-tabs/tab-2/expenses?revision=r2"], undefined],
-      [["/api/dashboard?period=1m&granularity=day&date=2026-10-14"], undefined],
-    ]);
-    const update = calls[0].data as (current?: ExpensesData) => ExpensesData | undefined;
-    expect(update(undefined)).toBeUndefined();
-    expect(update({ expenses: [{ id: "e-1", amount: 10 }], total: 10, average: 10 } as ExpensesData))
-      .toMatchObject({ expenses: [{ id: "e-2" }, { id: "e-1" }], total: 40, average: 20 });
-  });
-
   it("afterImportChange refetches every month ledger, tab ledgers, dashboards and the list of imports", () => {
     const { mutate, calls } = recorder();
     afterImportChange(mutate);

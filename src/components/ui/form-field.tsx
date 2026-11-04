@@ -6,6 +6,7 @@ import type { WithoutStyleOverrides } from "@/components/ui/types";
 /** Label + control + hint/error, with the shared "(optional)" marker. */
 export function FormField({
   label,
+  labelHidden = false,
   optional = false,
   error,
   hint,
@@ -13,6 +14,8 @@ export function FormField({
   ...props
 }: WithoutStyleOverrides<Omit<FieldRootProps, "invalid" | "children">> & {
   label: ReactNode;
+  /** Keeps the label for screen readers only, where a placeholder or the layout already says what the field is. */
+  labelHidden?: boolean;
   optional?: boolean;
   error?: string;
   hint?: ReactNode;
@@ -20,7 +23,7 @@ export function FormField({
 }) {
   return (
     <Field.Root invalid={Boolean(error)} {...props}>
-      <Field.Label>
+      <Field.Label srOnly={labelHidden}>
         {label}
         {optional ? (
           <Text as="span" color="fg.muted" fontWeight="normal" aria-hidden="true">

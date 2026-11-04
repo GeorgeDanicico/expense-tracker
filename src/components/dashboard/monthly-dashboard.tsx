@@ -10,7 +10,7 @@ import { MonthComparison } from "@/components/dashboard/month-comparison";
 import { MonthlyStats } from "@/components/dashboard/monthly-stats";
 import { TopExpenses } from "@/components/dashboard/top-expenses";
 import { WriteOnly } from "@/components/family/write-only";
-import { AddExpenseDialog } from "@/components/expenses/add-expense-dialog";
+import { AddExpenseButton } from "@/components/expenses/add-expense-button";
 import { MonthToolbar } from "@/components/expenses/month-toolbar";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
@@ -51,7 +51,7 @@ export function MonthlyDashboard({
       />
       <Flex gap="2" wrap="wrap" align="center">
         <WriteOnly>
-          <AddExpenseDialog selectedMonth={month} currency={currency} />
+          <AddExpenseButton selectedMonth={month} />
         </WriteOnly>
         <CardLink href={hrefFor(`/expenses?month=${month}`)}>View expenses</CardLink>
       </Flex>

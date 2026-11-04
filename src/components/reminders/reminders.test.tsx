@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { SWRConfig } from "swr";
 import { describe, expect, it } from "vitest";
 
-import { draftFor, draftToFields, toggleLeadTime } from "@/components/reminders/reminder-dialog";
+import { draftFor, draftToFields, toggleLeadTime } from "@/components/reminders/reminder-form";
 import { DoneRow, ReminderRow } from "@/components/reminders/reminder-row";
 import { RemindersScreen } from "@/components/reminders/reminders-screen";
 import { defaultSnoozeUntil, snoozeUntilInstant } from "@/components/reminders/snooze-dialog";

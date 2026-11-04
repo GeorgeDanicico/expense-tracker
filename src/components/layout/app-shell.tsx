@@ -3,7 +3,7 @@
 import { Box, Container, Flex } from "@chakra-ui/react";
 
 import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
-import { QuickAddProvider } from "@/components/layout/quick-add";
+import { QuickAddProvider, type QuickAddOptions } from "@/components/quick-add/quick-add-provider";
 import { SectionNav } from "@/components/layout/section-nav";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { OfflineStatus } from "@/components/pwa/offline-status";
@@ -13,14 +13,17 @@ export function AppShell({
   children,
   signInName,
   avatarUrl = null,
+  quickAdd = null,
 }: {
   children: React.ReactNode;
   signInName: string;
   /** The signed-in user's picture, or `null` for their initials. */
   avatarUrl?: string | null;
+  /** Opens the quick-add sheet straight away (`/dev/preview/…?quickAdd=expense`, tests). */
+  quickAdd?: QuickAddOptions | null;
 }) {
   return (
-    <QuickAddProvider>
+    <QuickAddProvider initial={quickAdd}>
       <Box minH="100dvh">
         <a href="#main-content" className="skip-link">
           Skip to content
