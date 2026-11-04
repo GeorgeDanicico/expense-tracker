@@ -1,7 +1,7 @@
 # Phase 17 update, 4 November 2026 (cloud session)
 
 Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-session-rk7uoj`.
-**No PR is open yet.**
+**PR #213 (U3, U4 and U5) merged on 4 November.** U6 continues on the same branch.
 
 ## Where the tasks stand
 
@@ -11,8 +11,9 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | U2 Screen audit | Merged earlier (#211, with the date fixes in #212) |
 | **U3 Direction and mockups** | **Done. George approved it on 4 November, taking the recommended answers.** |
 | **U4 Theme refresh and mobile primitives** | **Done. George signed off the screenshots on 4 November.** |
-| **U5 Navigation** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
-| U6 onwards | Not started. |
+| **U5 Navigation** | **Done. George signed off the screenshots on 4 November; merged in #213 with U3 and U4.** |
+| **U6 Quick add and the fast expense form** | **In progress in this session.** |
+| U7 onwards | Not started. |
 
 ## What U3 added
 
@@ -161,7 +162,4 @@ A sonnet agent did the work, as the plan says for this task.
 
 ## Next steps
 
-1. George signs off the U5 screenshots, at 320, 390 and 1280 px.
-2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U3, U4 and U5. **Merging
-   changes every screen in production:** the new radii, bottom sheets and touch sizes.
-3. Then U6, the quick-add sheet and the fast expense form (opus).
+1. Finish U6, the quick-add sheet and the fast expense form (opus).

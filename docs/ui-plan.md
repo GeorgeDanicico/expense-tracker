@@ -377,6 +377,8 @@ at most two taps from Home.
 moves), the quick-add placeholder, `/more`, and Settings as a grouped list. Screenshots:
 `docs/ui-styling/screenshots/u5-*.jpg`. Insights (a fourth Money segment) waits for U7.
 
+**Signed off (George, 4 November 2026)** and merged in #213 with U3 and U4.
+
 ### U6: Quick add and the fast expense form
 
 **Files:** new `src/components/quick-add/*`, `src/components/expenses/expense-form.tsx`,
