@@ -38,10 +38,21 @@ export const textStyles = defineTextStyles({
       color: "fg.muted",
     },
   },
+  /** The one number that matters on a screen (the month's total): 28px on phones too. */
   amountHero: {
     value: {
-      fontSize: { base: "3xl", md: "4xl" },
-      lineHeight: { base: "1.875rem", md: "2.125rem" },
+      fontSize: "4xl",
+      lineHeight: "2.25rem",
+      fontWeight: "semibold",
+      letterSpacing: "-0.02em",
+      ...tabular,
+    },
+  },
+  /** The quick-add amount being typed: 40px, the one size above the scale (George, 4 November 2026). */
+  amountInput: {
+    value: {
+      fontSize: "2.5rem",
+      lineHeight: "3rem",
       fontWeight: "semibold",
       letterSpacing: "-0.02em",
       ...tabular,

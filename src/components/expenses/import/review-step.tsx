@@ -7,6 +7,7 @@ import { useSWRConfig } from "swr";
 import { useImportApi } from "@/components/expenses/import/import-api";
 import { ReviewCards } from "@/components/expenses/import/review-cards";
 import { ReviewTable } from "@/components/expenses/import/review-table";
+import { ActionBar } from "@/components/ui/action-bar";
 import { Amount } from "@/components/ui/amount";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
@@ -164,19 +165,7 @@ export function ReviewStep({
         <ReviewTable items={items} accountCurrency={accountCurrency} rowErrors={rowErrors} dispatch={edit} />
       )}
 
-      <Stack
-        gap="3"
-        position="sticky"
-        bottom={{ base: "calc(3.5rem + env(safe-area-inset-bottom))", md: "0" }}
-        zIndex="docked"
-        bg="bg.surface"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="card"
-        shadow="xs"
-        px="4"
-        py="3"
-      >
+      <ActionBar>
         {form.error && !dialogOpen ? (
           <InlineAlert
             status="error"
@@ -225,7 +214,7 @@ export function ReviewStep({
             </Button>
           </Flex>
         </Flex>
-      </Stack>
+      </ActionBar>
 
       <ConfirmDialog
         open={confirming}

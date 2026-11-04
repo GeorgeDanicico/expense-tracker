@@ -97,5 +97,10 @@ export const rowRecipe = defineRecipe({
       ...pressFeedback(),
       _hover: { bg: "bg.subtle" },
     },
+    // `RowActions`' icon buttons show when the row is hovered or focused, on screens with a pointer.
+    "@media (hover: hover)": {
+      "& [data-row-actions]": { opacity: 0, transition: "opacity {durations.fast} {easings.standard}" },
+      "&:hover [data-row-actions], &:focus-within [data-row-actions]": { opacity: 1 },
+    },
   },
 });
