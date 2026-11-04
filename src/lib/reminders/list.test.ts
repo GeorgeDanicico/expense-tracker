@@ -89,6 +89,11 @@ describe("snoozeLocally", () => {
     // Tomorrow is after the autumn change: 09:00 EET is 07:00 UTC.
     expect(snoozeLocally(late, { kind: "tomorrow" }, NOW).snoozedUntil).toBe("2026-10-25T07:00:00.000Z");
   });
+
+  it("snoozes a reminder that isn't due yet for an hour after it is due", () => {
+    // Due 18:00 EEST (15:00Z) today; now is 09:00Z.
+    expect(snoozeLocally(reminder({ id: "later" }), { kind: "hour" }, NOW).snoozedUntil).toBe("2026-10-24T16:00:00.000Z");
+  });
 });
 
 describe("doneEntries", () => {

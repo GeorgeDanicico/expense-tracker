@@ -220,6 +220,16 @@ describe("reminders service", () => {
       });
     });
 
+    it("snoozes a reminder that isn't due yet for an hour after it is due, never before", async () => {
+      // Due 09:00 on 25 October (07:00Z, after the clocks changed); snoozed at 05:00Z, two hours before.
+      const early = new Date("2026-10-25T05:00:00Z");
+      const { id } = await createReminder(userId, input({ startsOn: "2026-10-25" }), early);
+
+      const snoozed = await snoozeReminder(id, { kind: "hour" }, early);
+
+      expect(snoozed).toMatchObject({ snoozedUntil: "2026-10-25T08:00:00.000Z", nextNotifyAt: "2026-10-25T08:00:00.000Z" });
+    });
+
     it("snoozes until tomorrow at 09:00 local time", async () => {
       const { id } = await createReminder(userId, input({ startsOn: "2026-10-25" }), now);
 

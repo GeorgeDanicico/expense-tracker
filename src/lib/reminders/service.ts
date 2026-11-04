@@ -231,7 +231,7 @@ export async function snoozeReminder(
   if (!current) throw notFound();
   if (current.nextDueOn === null) throw new DomainError(REMINDER_DONE_MESSAGE, 409);
 
-  const snoozedUntil = snoozeEnd(snooze, now, current.timezone).toISOString();
+  const snoozedUntil = snoozeEnd(snooze, now, current).toISOString();
   const nextNotify = nextNotifyAt({ ...current, snoozedUntil }, now);
   const snoozed = await reminders.update(id, { snoozedUntil, nextNotifyAt: nextNotify?.toISOString() ?? null });
   if (!snoozed) throw notFound();
