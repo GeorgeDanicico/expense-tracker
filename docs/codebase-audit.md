@@ -106,12 +106,14 @@ These were checked and are in good shape, so they don't need tasks:
 - **Where:** Bucharest for "today", months and last-active labels ([src/lib/calendar.ts:99](../src/lib/calendar.ts#L99), [src/lib/family/last-active-label.ts](../src/lib/family/last-active-label.ts)); the row's own `timezone` for events and reminders ([src/lib/time-zone.ts](../src/lib/time-zone.ts)); the browser's zone for `formatDateTime` ([src/lib/calendar.ts:180](../src/lib/calendar.ts#L180)), used for invite expiry, token last use and investment order times. Locales mix `en-US` and `en-GB`. One form does local `Date` maths ([src/components/expenses/expense-form.tsx:36](../src/components/expenses/expense-form.tsx#L36), see B5).
 - **What's wrong:** Both helper modules are sound. The problem is that callers pick a zone implicitly. A family member abroad sees order times in their zone but "due today" in Bucharest.
 - **Fix:** Make `formatDateTime` take the zone (default `APPLICATION_TIMEZONE`), pick one locale, and ban `toISOString().slice(0, 10)` on local dates with a lint rule. Phase 17.
+- **Closed in U8 for expenses (4 November 2026):** calendar dates are formatted at noon UTC in UTC (`formatDate`, `formatMonthLabel`), expense rows are dated by Home's day formatter, and `local/no-local-date-parse` stops a date and time without a zone. `formatDateTime`'s zone is left to the screens that use it (U9, U11).
 
 ### D10. REST and MCP apply different rules to the same expense write
 - **Severity:** low. **Confidence:** high.
 - **Where:** `POST /api/expenses` requires a `selectedMonth` and a date inside it ([src/app/api/expenses/route.ts:48](../src/app/api/expenses/route.ts#L48)). MCP `add_expense` accepts any date and defaults to today ([src/lib/mcp/tools/expenses.ts:31](../src/lib/mcp/tools/expenses.ts#L31)). Editing an expense exists only in MCP (`update_expense`, [src/lib/mcp/tools/expenses.ts:82](../src/lib/mcp/tools/expenses.ts#L82)); there is no `PATCH /api/expenses/[id]`.
 - **What's wrong:** Business rules live in the route instead of the shared service, so the two transports drift.
 - **Fix:** Put `createExpense` / `updateExpense` use cases in [src/lib/expenses/service.ts](../src/lib/expenses/service.ts) and call them from both. Decide whether the month rule is a UI concern (then drop it from the API) or a real rule (then MCP needs it too).
+- **Closed in U8 (4 November 2026):** George decided the expense's date decides its month. `selectedMonth` is gone from `POST /api/expenses`; both transports call `createExpense` and `updateExpense` in `src/lib/expenses/service.ts`, and `PATCH /api/expenses/[id]` uses MCP's patch schema.
 
 ---
 
@@ -221,18 +223,21 @@ These were checked and are in good shape, so they don't need tasks:
 - **Where:** [src/app/api/expenses/[id]/route.ts:7](../src/app/api/expenses/[id]/route.ts#L7) ignores the `false` from `expenses.delete`.
 - **Scenario:** `DELETE /api/expenses/<another user's id or a deleted id>` answers `{ success: true }`. MCP `delete_expense` for the same id answers "Expense not found." Every other delete route answers 404.
 - **Fix:** `if (!(await …delete(user.id, id))) notFound("Expense not found.")`.
+- **Closed in U8 (4 November 2026):** `DELETE /api/expenses/[id]` answers 404 "Expense not found." for an expense the caller doesn't own.
 
 ### B4. Deleting an expense corrupts the cached family view
 - **Severity:** low. **Confidence:** high.
 - **Where:** [src/lib/api/invalidate.ts:89](../src/lib/api/invalidate.ts#L89) applies `withExpenseRemoved` ([:43](../src/lib/api/invalidate.ts#L43)) to every key starting with `/api/expenses?`, which includes the family view `…&member=all` ([src/components/expenses/family-expenses-panel.tsx:21](../src/components/expenses/family-expenses-panel.tsx#L21)).
 - **Scenario:** A parent opens Expenses → Everyone, then switches to their own ledger and deletes an expense. The family cache loses the row, but its `totals` (per currency) stay the same, and stray `total` and `average` fields are added. Going back to Everyone shows a list and a total that disagree until the refetch finishes. Adding an expense doesn't touch the family view at all, so the two paths differ.
 - **Fix:** Skip keys with `member=` in the updater and revalidate them instead.
+- **Closed in U8 (4 November 2026):** `useExpenseWrites` only edits the caller's own cached views (`applyExpenseChange`); members' and the family's are refetched after every add, edit and delete.
 
 ### B5. The expense date picker's maximum is a day early east of UTC+12
 - **Severity:** low. **Confidence:** medium.
 - **Where:** [src/components/expenses/expense-form.tsx:36](../src/components/expenses/expense-form.tsx#L36).
 - **Scenario:** In Pacific/Auckland during daylight time (UTC+13), the selected month is October. `new Date("2026-11-01T12:00:00")` is local noon, minus one day is 31 October 12:00 local, and `toISOString()` turns that into `2026-10-30T23:00Z`. The picker's `max` becomes 30 October, so 31 October can't be chosen. Bucharest is not affected.
 - **Fix:** `lastDayOfMonth(selectedMonth)` from [src/lib/calendar.ts:67](../src/lib/calendar.ts#L67).
+- **Closed in U8 (4 November 2026):** the maximum is `latestExpenseDate(today)`, the last day of the current month by plain date arithmetic, tested in several zones.
 
 ### B6. Two sells at the same time can oversell a position
 - **Severity:** medium. **Confidence:** medium.
@@ -264,6 +269,7 @@ These were checked and are in good shape, so they don't need tasks:
 - **Where:** [src/app/api/account/route.ts:46](../src/app/api/account/route.ts#L46); `expenses` has no currency column.
 - **Scenario:** A user with a year of RON expenses switches to EUR. Every past amount is now shown and summed as EUR, family totals move them to the EUR group, and open import drafts in RON become "not importable".
 - **Fix:** Warn and confirm in Settings when expenses exist, or store the currency per expense. Decide in phase 17.
+- **Closed in U8 (4 November 2026):** George chose warn and confirm. `PATCH /api/account` answers 409 `currency_relabel` with the count while the user has expenses, until `confirmRelabel: true`; Settings shows it in a confirmation sheet. No migration.
 
 ### B11. Large histories are silently cut
 - **Severity:** low. **Confidence:** high (but only above the caps).

@@ -2,6 +2,11 @@
 
 Looked at the expenses module as U8 will rebuild it: `src/components/expenses/**` (import included), `src/components/dashboard/**`, `src/app/(app)/expenses/**`, `src/app/api/expenses/**`, `src/app/api/expense-tabs/**`, `src/lib/expenses/**`, `src/lib/validation/expense.ts`, `src/lib/mcp/tools/expenses.ts` and the expense half of `src/lib/api/invalidate.ts`: 83 files, about 5,200 lines of components and 1,900 of `src/lib/expenses`. Method: the `find-shapes` script, then reading every component and the files it paired them with. **7 proposals, about 150 lines in all.** The one most worth doing is **one ledger panel instead of two** (proposal 1), because U8 rebuilds that screen anyway; the most urgent is not a simplification but a bug found on the way: **the add-expense form dates every new expense on the last day of the month** (see "Found on the way").
 
+**Done in U8 (4 November 2026):** proposals 1, 2, 3, 4 and 6, the B4 fix and the tidy-ups
+(`IMPORT_PAGE_HREF` and `DeleteExpenseButton` are gone; `afterExpenseChange` too). Proposal 5 was
+done in U6. Proposal 7 (`useNow`) touches reminders and the calendar, so it is left to U10. The
+saved-tab filters now sit behind the Filters chip, so the figures come first on a phone.
+
 ## Map
 
 | Area | Files | Notes |
