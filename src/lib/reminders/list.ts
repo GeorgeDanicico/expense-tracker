@@ -95,7 +95,7 @@ export function pendingCompletion(reminder: ListedReminder, now: Date): Reminder
 /** What snoozing does, worked out the way the service does. The server's answer replaces it. */
 export function snoozeLocally(reminder: ListedReminder, snooze: SnoozeInput, now: Date): ListedReminder {
   if (reminder.nextDueOn === null) return reminder;
-  const snoozed = { ...reminder, snoozedUntil: snoozeEnd(snooze, now, reminder.timezone).toISOString() };
+  const snoozed = { ...reminder, snoozedUntil: snoozeEnd(snooze, now, reminder).toISOString() };
   return {
     ...snoozed,
     nextNotifyAt: nextNotifyAt(snoozed, now)?.toISOString() ?? null,

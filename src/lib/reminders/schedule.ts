@@ -139,13 +139,23 @@ export function stateOf(
   return utcToZoned(now, reminder.timezone).date === reminder.nextDueOn ? "due" : "upcoming";
 }
 
-/** When a snooze chosen at `now` ends: an hour later, or tomorrow at 09:00 in `timeZone`. */
-export function snoozeEnd(snooze: SnoozeInput, now: Date, timeZone: string): Date {
+/**
+ * When a snooze chosen at `now` ends: an hour after the later of `now` and the open occurrence's
+ * due time (so snoozing a reminder that isn't due yet never ends before it is due), or tomorrow at
+ * 09:00 in the reminder's time zone, or the chosen instant.
+ */
+export function snoozeEnd(
+  snooze: SnoozeInput,
+  now: Date,
+  reminder: Pick<ReminderSchedule, "timeOfDay" | "timezone" | "nextDueOn">,
+): Date {
   switch (snooze.kind) {
-    case "hour":
-      return new Date(now.getTime() + HOUR);
+    case "hour": {
+      const due = reminder.nextDueOn === null ? 0 : dueAt(reminder, reminder.nextDueOn).getTime();
+      return new Date(Math.max(now.getTime(), due) + HOUR);
+    }
     case "tomorrow":
-      return zonedTimeToUtc(addDays(utcToZoned(now, timeZone).date, 1), SNOOZE_TOMORROW_TIME, timeZone);
+      return zonedTimeToUtc(addDays(utcToZoned(now, reminder.timezone).date, 1), SNOOZE_TOMORROW_TIME, reminder.timezone);
     case "until":
       return new Date(snooze.until);
   }

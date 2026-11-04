@@ -68,6 +68,15 @@ export function lastDayOfMonth(month: string) {
   return dateInMonth(month, daysInMonth(month));
 }
 
+/**
+ * The date a new entry in `month` starts on: `today` when it falls in that month, else the month's
+ * last day for a past month (the end of what is being looked at) or its first day for a future one.
+ */
+export function defaultDateInMonth(month: string, today: string) {
+  if (today.startsWith(month)) return today;
+  return today > month ? lastDayOfMonth(month) : dateInMonth(month, 1);
+}
+
 /** Pure calendar arithmetic on a `YYYY-MM-DD` date; no time zone is involved. */
 export function addDays(date: string, amount: number) {
   const value = new Date(`${date}T00:00:00Z`);

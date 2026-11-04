@@ -292,21 +292,36 @@ describe("stateOf", () => {
 });
 
 describe("snoozeEnd", () => {
-  it("snoozes an hour", () => {
-    expect(snoozeEnd({ kind: "hour" }, at("2026-11-30T08:15:00Z"), BUCHAREST).toISOString())
+  // Due 09:00 on 1 January 2026, Bucharest (UTC+2): 07:00Z, long past at the times below.
+  const overdue = reminder();
+
+  it("snoozes an overdue reminder an hour from now", () => {
+    expect(snoozeEnd({ kind: "hour" }, at("2026-11-30T08:15:00Z"), overdue).toISOString())
+      .toBe("2026-11-30T09:15:00.000Z");
+  });
+
+  it("snoozes a reminder that isn't due yet an hour after it is due, never before", () => {
+    // Due 02:35 on 30 November (00:35Z); snoozed at 00:35 local (22:35Z the evening before).
+    const notYetDue = reminder({ timeOfDay: "02:35", nextDueOn: "2026-11-30" });
+    expect(snoozeEnd({ kind: "hour" }, at("2026-11-29T22:35:00Z"), notYetDue).toISOString())
+      .toBe("2026-11-30T01:35:00.000Z");
+  });
+
+  it("snoozes a one-off with no open occurrence an hour from now", () => {
+    expect(snoozeEnd({ kind: "hour" }, at("2026-11-30T08:15:00Z"), reminder({ nextDueOn: null })).toISOString())
       .toBe("2026-11-30T09:15:00.000Z");
   });
 
   it("snoozes until 09:00 tomorrow in local time, across the autumn change", () => {
     // 01:30 on 25 October in Bucharest (UTC+3); tomorrow 09:00 is UTC+2.
-    expect(snoozeEnd({ kind: "tomorrow" }, at("2026-10-24T22:30:00Z"), BUCHAREST).toISOString())
+    expect(snoozeEnd({ kind: "tomorrow" }, at("2026-10-24T22:30:00Z"), overdue).toISOString())
       .toBe("2026-10-26T07:00:00.000Z");
-    expect(snoozeEnd({ kind: "tomorrow" }, at("2026-10-25T21:00:00Z"), BUCHAREST).toISOString())
+    expect(snoozeEnd({ kind: "tomorrow" }, at("2026-10-25T21:00:00Z"), overdue).toISOString())
       .toBe("2026-10-26T07:00:00.000Z");
   });
 
   it("snoozes until a chosen time", () => {
-    expect(snoozeEnd({ kind: "until", until: "2026-12-01T10:00:00.000Z" }, at("2026-11-30T08:00:00Z"), BUCHAREST)
+    expect(snoozeEnd({ kind: "until", until: "2026-12-01T10:00:00.000Z" }, at("2026-11-30T08:00:00Z"), overdue)
       .toISOString()).toBe("2026-12-01T10:00:00.000Z");
   });
 });

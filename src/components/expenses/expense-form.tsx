@@ -12,7 +12,7 @@ import { apiRequest } from "@/lib/api/client";
 import { afterExpenseCreated } from "@/lib/api/invalidate";
 import { subtypeForCategory, type ExpenseCategory, type ExpenseSubtype } from "@/lib/expenses/categories";
 import type { Expense } from "@/lib/expenses/types";
-import { getMonthRange, lastDayOfMonth } from "@/lib/calendar";
+import { defaultDateInMonth, getBucharestToday, getMonthRange, lastDayOfMonth } from "@/lib/calendar";
 
 /** Add-expense form body. Submits to `/api/expenses` and updates the SWR caches. */
 export function ExpenseForm({
@@ -86,7 +86,7 @@ export function ExpenseForm({
             <Input
               name="expenseDate"
               type="date"
-              defaultValue={maxDate}
+              defaultValue={defaultDateInMonth(range.month, getBucharestToday())}
               min={range.start}
               max={maxDate}
               required

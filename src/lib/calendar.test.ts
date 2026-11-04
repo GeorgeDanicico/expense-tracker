@@ -6,6 +6,7 @@ import {
   ANALYTICS_PERIODS,
   APPLICATION_TIMEZONE,
   dateInMonth,
+  defaultDateInMonth,
   daysInMonth,
   formatInstantDate,
   formatMonth,
@@ -170,5 +171,21 @@ describe("date formatters", () => {
   it("formats the day of a timestamp in the chosen locale", () => {
     expect(formatInstantDate("2026-10-12T12:00:00Z")).toBe("12 Oct 2026");
     expect(formatInstantDate("2026-10-12T12:00:00Z", "en-US")).toBe("Oct 12, 2026");
+  });
+});
+
+describe("defaultDateInMonth", () => {
+  it("is today when today falls in the month", () => {
+    expect(defaultDateInMonth("2026-11", "2026-11-04")).toBe("2026-11-04");
+  });
+
+  it("is the last day of a past month", () => {
+    expect(defaultDateInMonth("2026-10", "2026-11-04")).toBe("2026-10-31");
+    expect(defaultDateInMonth("2025-12", "2026-01-01")).toBe("2025-12-31");
+  });
+
+  it("is the first day of a future month", () => {
+    expect(defaultDateInMonth("2026-12", "2026-11-04")).toBe("2026-12-01");
+    expect(defaultDateInMonth("2027-01", "2026-12-31")).toBe("2027-01-01");
   });
 });

@@ -81,17 +81,24 @@ export function AddNetWorthValuationDialog({
             <Input name="value" defaultValue={entry.currentValue ?? ""} type="number" inputMode="decimal" min="0" step="any" autoFocus required />
           </FormField>
 
-          <FormField
-            label="Valued on"
-            error={fieldError("valuedOn")}
-            hint={entry.valuedOn ? `Latest observation: ${formatDate(entry.valuedOn)}` : "Use the date you observed or estimated this value."}
-          >
-            <Input name="valuedOn" defaultValue={entry.valuedOn ?? getBucharestToday()} type="date" required />
-          </FormField>
+          <ValuedOnField latestObservation={entry.valuedOn} error={fieldError("valuedOn")} />
 
           {form.error ? <InlineAlert status="error">{form.error}</InlineAlert> : null}
         </Stack>
       </form>
     </AppDialog>
+  );
+}
+
+/** The date of a new value: today, so a quick save adds an observation instead of replacing the latest. */
+export function ValuedOnField({ latestObservation, error }: { latestObservation: string | null; error?: string }) {
+  return (
+    <FormField
+      label="Valued on"
+      error={error}
+      hint={latestObservation ? `Latest observation: ${formatDate(latestObservation)}` : "Use the date you observed or estimated this value."}
+    >
+      <Input name="valuedOn" defaultValue={getBucharestToday()} type="date" required />
+    </FormField>
   );
 }

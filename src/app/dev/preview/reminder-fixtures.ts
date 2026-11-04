@@ -83,7 +83,7 @@ function seed(): Reminder[] {
     }),
     sample("r-dentist", {
       title: "Book the dentist for Ana", nextDueOn: addDays(today, -1), timeOfDay: "16:00", repeatUnit: "month", repeatInterval: 6,
-      snoozedUntil: snoozeEnd({ kind: "tomorrow" }, now, TZ).toISOString(),
+      snoozedUntil: snoozeEnd({ kind: "tomorrow" }, now, { timeOfDay: "16:00", timezone: TZ, nextDueOn: null }).toISOString(),
     }),
     sample("r-plants", {
       title: "Water the plants", startsOn: addDays(today, -12), nextDueOn: addDays(today, 2), timeOfDay: "19:30",
@@ -191,7 +191,7 @@ export const previewReminderApi: ReminderApi = {
     await delay(600);
     refuseIfAsked();
     const current = find(id);
-    const snoozedUntil = snoozeEnd(snooze, new Date(), current.timezone).toISOString();
+    const snoozedUntil = snoozeEnd(snooze, new Date(), current).toISOString();
     return save(withDates({ ...current, snoozedUntil, updatedAt: new Date().toISOString() }));
   },
 };

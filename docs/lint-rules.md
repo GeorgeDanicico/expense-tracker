@@ -263,6 +263,7 @@ becomes a rule above.
 - **Motion is short and purposeful:** only `transform` and `opacity` are animated, and the action always still happens when reduced motion is on. No animation library.
 - **One data style:** an API object plus a hook per module, optimistic updates where a write nearly always succeeds (and never for orders or money moves that can fail for reasons the user must see).
 - **Dates go through the formatters,** and "today" and "this month" come from the application calendar (`getBucharestToday`, `getBucharestMonth`), never from the browser's zone.
+- **A date field for a new entry defaults to today** (`getBucharestToday`, or `defaultDateInMonth` inside a month view), not the end of the range or the last record's date, so a quick save never future-dates or overwrites. A "later" snooze or deadline is counted from the later of now and the thing's own due time.
 - **A form is one component,** shared by the full page and the quick-add sheet, not two copies.
 - **Copy says what happened or what to do,** in plain words: "Couldn't save. Try again.", not "Error 500".
 - **A destructive action** on one row is undone, not confirmed; deleting a family, an account or a kid keeps a typed confirmation.
