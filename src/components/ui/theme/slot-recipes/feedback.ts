@@ -77,7 +77,6 @@ export const dialogSlotRecipe = defineSlotRecipe({
       _closed: { animationName: "fade-out", animationDuration: "moderate", animationTimingFunction: "standard" },
     },
     positioner: {
-      alignItems: { base: "flex-end", md: "center" },
       px: { base: "0", md: "4" },
       pt: { base: "calc(0.75rem + env(safe-area-inset-top))", md: "4" },
       pb: { base: "0", md: "4" },
@@ -134,7 +133,11 @@ export const dialogSlotRecipe = defineSlotRecipe({
     closeTrigger: { top: "3", insetEnd: "3" },
   },
   variants: {
-    placement: { center: {}, bottom: {} },
+    // Both placements look the same now (Chakra's own would centre the sheet or push it down).
+    placement: {
+      center: { positioner: { alignItems: { base: "flex-end", md: "center" } } },
+      bottom: { positioner: { alignItems: { base: "flex-end", md: "center" } } },
+    },
     // Chakra's widths per size, from `md` up; a sheet is always the screen's width.
     size: {
       sm: { content: { maxW: { base: "full", md: "md" } } },
