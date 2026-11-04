@@ -3,12 +3,13 @@
 import { Box, chakra, Flex, Menu, Portal, Text } from "@chakra-ui/react";
 import { AlarmClock, BellOff, BellRing, Check, CircleAlert, CircleCheck, Receipt } from "lucide-react";
 import NextLink from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconTile } from "@/components/ui/icon-tile";
 import { ListRow } from "@/components/ui/list-row";
+import { SwipeRow } from "@/components/ui/row-actions";
 import { transition } from "@/components/ui/theme/motion";
 import { formatDay, formatDueAt, formatInstant, overdueText, repeatLabel, snoozedText } from "@/lib/reminders/format";
 import type { DoneEntry, ListedReminder } from "@/lib/reminders/list";
@@ -91,13 +92,23 @@ export function SnoozeMenu({
   title,
   disabled,
   onChoose,
+  open,
+  onOpenChange,
 }: {
   title: string;
   disabled: boolean;
   onChoose: (choice: SnoozeChoice) => void;
+  /** Controlled by a swipe left (`ReminderSwipe`), which opens the choices. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <Menu.Root positioning={{ placement: "bottom-end" }} onSelect={({ value }) => onChoose(value as SnoozeChoice)}>
+    <Menu.Root
+      positioning={{ placement: "bottom-end" }}
+      open={open}
+      onOpenChange={onOpenChange ? (details) => onOpenChange(details.open) : undefined}
+      onSelect={({ value }) => onChoose(value as SnoozeChoice)}
+    >
       <Menu.Trigger asChild>
         <IconButton aria-label={`Snooze ${title}`} disabled={disabled}>
           <AlarmClock size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
@@ -120,8 +131,47 @@ export function SnoozeMenu({
 }
 
 /**
+ * A reminder's swipes on a phone: right for Done, left for Snooze's three choices (the row's Snooze
+ * menu opens). Render `snoozeMenu` in the row; the row's own Done and Snooze buttons stay, so the
+ * swipe is never the only way. Nothing swipes while the reminder's write is in flight.
+ */
+export function ReminderSwipe({
+  reminder,
+  busy,
+  onComplete,
+  onSnooze,
+  children,
+}: {
+  reminder: ListedReminder;
+  busy: boolean;
+  onComplete: (reminder: ListedReminder) => void;
+  onSnooze: (reminder: ListedReminder, choice: SnoozeChoice) => void;
+  children: (snoozeMenu: ReactNode) => ReactNode;
+}) {
+  const [snoozing, setSnoozing] = useState(false);
+  const snoozeMenu = (
+    <SnoozeMenu
+      title={reminder.title}
+      disabled={busy}
+      open={snoozing}
+      onOpenChange={setSnoozing}
+      onChoose={(choice) => onSnooze(reminder, choice)}
+    />
+  );
+  return (
+    <SwipeRow
+      right={busy ? undefined : { label: "Done", icon: Check, tone: "success", commit: true, onSwipe: () => onComplete(reminder) }}
+      left={busy ? undefined : { label: "Snooze", icon: AlarmClock, tone: "warning", onSwipe: () => setSnoozing(true) }}
+    >
+      {children(snoozeMenu)}
+    </SwipeRow>
+  );
+}
+
+/**
  * One open reminder: a tile for where it stands, the title (opens the dialog), when it's due, how it
- * repeats, how late it is or until when it's snoozed, and Snooze and Done on the row.
+ * repeats, how late it is or until when it's snoozed, and Snooze and Done on the row (and as swipes
+ * on a phone).
  */
 export function ReminderRow({
   reminder,
@@ -146,42 +196,47 @@ export function ReminderRow({
   const snoozed = state === "snoozed" ? snoozedText(reminder, now) : null;
   return (
     <Item reminderId={reminder.id} focused={focused}>
-      <ListRow
-        as="div"
-        leading={<Tile state={state} />}
-        title={(
-          <Flex align="center" gap="1.5" minW="0">
-            <TitleButton title={reminder.title} onClick={() => onEdit(reminder)} />
-            {reminder.notificationsMuted ? (
-              <Box as="span" color="fg.subtle" flexShrink="0" title="Notifications muted">
-                <BellOff size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
-                <span className="sr-only">Notifications muted</span>
-              </Box>
-            ) : null}
-          </Flex>
+      <ReminderSwipe reminder={reminder} busy={busy} onComplete={onComplete} onSnooze={onSnooze}>
+        {(snoozeMenu) => (
+          <ListRow
+            as="div"
+            leading={<Tile state={state} />}
+            title={(
+              // A span: the title sits in a paragraph, which cannot hold a div.
+              <Flex as="span" align="center" gap="1.5" minW="0">
+                <TitleButton title={reminder.title} onClick={() => onEdit(reminder)} />
+                {reminder.notificationsMuted ? (
+                  <Box as="span" color="fg.subtle" flexShrink="0" title="Notifications muted">
+                    <BellOff size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
+                    <span className="sr-only">Notifications muted</span>
+                  </Box>
+                ) : null}
+              </Flex>
+            )}
+            meta={(
+              <>
+                <span className="sr-only">Due </span>
+                {formatDueAt(reminder, now)}
+                {reminder.repeatUnit === "none" ? null : ` · ${repeatLabel(reminder.repeatUnit, reminder.repeatInterval)}`}
+                {state === "overdue" && reminder.nextDueAt ? (
+                  <Text as="span" color="fg.error" fontWeight="medium"> · {overdueText(reminder.nextDueAt, now)}</Text>
+                ) : null}
+                {snoozed ? ` · ${snoozed}` : null}
+              </>
+            )}
+            trailing={(
+              <>
+                {snoozeMenu}
+                <IconButton aria-label={`Mark ${reminder.title} done`} disabled={busy} onClick={() => onComplete(reminder)}>
+                  <Box as="span" display="inline-flex" color="fg.success">
+                    <Check size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
+                  </Box>
+                </IconButton>
+              </>
+            )}
+          />
         )}
-        meta={(
-          <>
-            <span className="sr-only">Due </span>
-            {formatDueAt(reminder, now)}
-            {reminder.repeatUnit === "none" ? null : ` · ${repeatLabel(reminder.repeatUnit, reminder.repeatInterval)}`}
-            {state === "overdue" && reminder.nextDueAt ? (
-              <Text as="span" color="fg.error" fontWeight="medium"> · {overdueText(reminder.nextDueAt, now)}</Text>
-            ) : null}
-            {snoozed ? ` · ${snoozed}` : null}
-          </>
-        )}
-        trailing={(
-          <>
-            <SnoozeMenu title={reminder.title} disabled={busy} onChoose={(choice) => onSnooze(reminder, choice)} />
-            <IconButton aria-label={`Mark ${reminder.title} done`} disabled={busy} onClick={() => onComplete(reminder)}>
-              <Box as="span" display="inline-flex" color="fg.success">
-                <Check size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
-              </Box>
-            </IconButton>
-          </>
-        )}
-      />
+      </ReminderSwipe>
     </Item>
   );
 }

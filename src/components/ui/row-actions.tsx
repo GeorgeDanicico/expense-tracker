@@ -1,11 +1,13 @@
 "use client";
 
-import { Box, Flex, Menu, Portal } from "@chakra-ui/react";
+import { Box, Flex, Menu, Portal, Text, type BoxProps } from "@chakra-ui/react";
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
-import { useState, type MouseEvent, type PointerEvent } from "react";
+import { useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 
-import { ICON } from "@/components/ui/icon";
+import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
+import { transition } from "@/components/ui/theme/motion";
+import { SWIPE, useSwipe, type SwipeSide } from "@/components/ui/use-swipe";
 
 export type RowAction = { label: string; icon: LucideIcon; onSelect: () => void; tone?: "danger" };
 
@@ -147,5 +149,115 @@ export function RowActions({
         </Menu.Root>
       </Box>
     </>
+  );
+}
+
+/** Whether `target` takes typing, so a shortcut key belongs to it. */
+export function isTypingTarget(target: EventTarget | null) {
+  if (!target || typeof (target as Element).closest !== "function") return false;
+  return Boolean((target as Element).closest("input, textarea, select, [contenteditable=''], [contenteditable='true'], [role='textbox']"));
+}
+
+/**
+ * The desktop delete: a plain `Delete` (`Backspace` on Mac keyboards, which have no Delete key) on
+ * a focused row or card (or a button in it), never while typing in a field. Deletes from it are
+ * undone from the toast, like the swipe.
+ */
+export const DELETE_KEYS = "Delete Backspace";
+
+export function isDeleteKey(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "repeat" | "defaultPrevented" | "target">) {
+  if ((event.key !== "Delete" && event.key !== "Backspace") || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat || event.defaultPrevented) return false;
+  return !isTypingTarget(event.target);
+}
+
+/**
+ * Before a row leaves (a keyboard delete), focus the next row matching `selector` in `scope`, or the
+ * one before it when it was last, so focus stays in the list instead of falling to the page.
+ */
+export function focusNeighbour(row: Element, selector: string, scope: ParentNode = row.ownerDocument) {
+  const rows = [...scope.querySelectorAll<HTMLElement>(selector)];
+  const index = rows.findIndex((candidate) => candidate === row || candidate.contains(row));
+  (rows[index + 1] ?? rows[index - 1])?.focus();
+}
+
+/** One side of a `SwipeRow`: what it shows behind the row, and what it does. */
+export type SwipeAction = {
+  label: string;
+  icon: LucideIcon;
+  tone: "danger" | "success" | "warning";
+  onSwipe: () => void;
+  /** Fly the row out before acting (a delete, Done); otherwise it snaps back (Snooze's choices). */
+  commit?: boolean;
+};
+
+const SWIPE_TONES = {
+  danger: { bg: "bg.error", color: "fg.error" },
+  success: { bg: "bg.success", color: "fg.success" },
+  warning: { bg: "bg.warning", color: "fg.warning" },
+} as const;
+
+/**
+ * A row (or card) that swipes on a phone: left for `left`, right for `right` (`useSwipe`). The page
+ * still scrolls up and down through it (`touch-action: pan-y`), a long press (the menu, the board's
+ * drag, `holdMs`) still wins over a slow start, and a tap still opens the row. The swipe is never the
+ * only way: the same actions stay in the row's `⋯`, its buttons, or the hover icons on desktop.
+ * Reduced motion drops the slide and the fly-out, never the action. While it moves, the row takes
+ * `bg` (the surface it sits on) so the action behind it doesn't show through.
+ */
+export function SwipeRow({
+  left,
+  right,
+  holdMs = SWIPE.holdMs,
+  as = "div",
+  bg = "bg.surface",
+  borderRadius = "control",
+  children,
+  ...rest
+}: {
+  left?: SwipeAction;
+  right?: SwipeAction;
+  holdMs?: number;
+  as?: "div" | "li";
+  bg?: string;
+  borderRadius?: string;
+  children: ReactNode;
+} & Omit<BoxProps, "left" | "right" | "as" | "bg" | "borderRadius" | "children">) {
+  const { state, handlers } = useSwipe({ left, right }, holdMs);
+  const shown = state.side === "left" ? left : state.side === "right" ? right : undefined;
+  const offset = state.out ? `${state.out === "left" ? "-" : ""}100%` : `${state.dx}px`;
+  return (
+    <Box as={as} position="relative" listStyleType="none" borderRadius={borderRadius} overflow={shown ? "hidden" : undefined} {...rest}>
+      {shown ? <SwipeBackdrop action={shown} side={state.side as SwipeSide} /> : null}
+      <Box
+        position="relative"
+        bg={shown ? bg : undefined}
+        borderRadius={borderRadius}
+        touchAction="pan-y"
+        transition={state.dragging ? "none" : transition("transform", "moderate")}
+        style={{ transform: state.dx || state.out ? `translateX(${offset})` : undefined }}
+        {...handlers}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
+function SwipeBackdrop({ action, side }: { action: SwipeAction; side: SwipeSide }) {
+  return (
+    <Flex
+      position="absolute"
+      inset="0"
+      align="center"
+      justify={side === "left" ? "flex-end" : "flex-start"}
+      gap="2"
+      px="5"
+      borderRadius="inherit"
+      {...SWIPE_TONES[action.tone]}
+      aria-hidden="true"
+    >
+      <action.icon size={ICON.sm} strokeWidth={ICON_STROKE} />
+      <Text as="span" textStyle="bodySm" fontWeight="semibold">{action.label}</Text>
+    </Flex>
   );
 }

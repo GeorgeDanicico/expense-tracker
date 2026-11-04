@@ -30,14 +30,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge, Box, Flex, Heading, Menu, Portal, SimpleGrid, Stack, Text } from "@chakra-ui/react";
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoQuickAdd } from "@/components/todos/todo-quick-add";
 import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { DELETE_KEYS, focusNeighbour, isDeleteKey, SwipeRow } from "@/components/ui/row-actions";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { revealRowActions } from "@/components/ui/theme/recipes/misc";
 import {
   columnOf,
   columnsOf,
@@ -61,6 +63,9 @@ class MouseOrPenSensor extends PointerSensor {
   }];
 }
 
+/** How long a finger rests on a card before it drags; moving 10 px sideways sooner swipes instead. */
+export const TOUCH_DRAG_DELAY_MS = 200;
+
 const SCREEN_READER_INSTRUCTIONS = {
   draggable: "Press Enter to open this card. To move it, press Space to pick it up, use the arrow keys "
     + "to move it within a column or to another column, then press Space or Enter to drop it, or "
@@ -73,6 +78,11 @@ export type TodoBoardProps = {
   onAdd: (title: string, status: TodoStatus) => Promise<string | void>;
   onMove: (id: string, move: TodoMove) => Promise<unknown>;
   onOpen: (todo: Todo) => void;
+  /**
+   * Deletes a card with Undo: a swipe left on a phone, the hover icon or the `Delete` key on a focused
+   * card on desktop. The card dialog's Delete stays for everyone.
+   */
+  onDelete?: (todo: Todo) => void;
   /** Called with true when a drag starts and false when it ends, so polling can wait. */
   onDraggingChange?: (dragging: boolean) => void;
   /** Rendered under the Done column's cards: the "Show older" control. */
@@ -102,7 +112,7 @@ export function moveToTop(status: TodoStatus): TodoMove {
  * The three columns with drag and drop: pointer, long-press touch and keyboard, with screen-reader
  * announcements. A drop is reported as the card's column and the visible cards above and below it.
  */
-export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, doneFooter, singleColumn = false }: TodoBoardProps) {
+export function TodoBoard({ todos, onAdd, onMove, onOpen, onDelete, onDraggingChange, doneFooter, singleColumn = false }: TodoBoardProps) {
   const byId = useMemo(() => new Map(todos.map((todo) => [todo.id, todo])), [todos]);
   const saved = useMemo(() => columnsOf(todos), [todos]);
   const [draft, setDraft] = useState<BoardColumns | null>(null);
@@ -133,7 +143,7 @@ export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, done
 
   const sensors = useSensors(
     useSensor(MouseOrPenSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: TOUCH_DRAG_DELAY_MS, tolerance: 6 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
       keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space", "Enter"] },
@@ -250,6 +260,8 @@ export function TodoBoard({ todos, onAdd, onMove, onOpen, onDraggingChange, done
       onAdd={onAdd}
       onOpen={(todo) => { if (!justDragged.current) onOpen(todo); }}
       onMoveTo={singleColumn ? moveTo : undefined}
+      onDelete={onDelete}
+      hoverDelete={!singleColumn}
       footer={status === "done" ? doneFooter : null}
     />
   );
@@ -288,6 +300,8 @@ function TodoColumn({
   onAdd,
   onOpen,
   onMoveTo,
+  onDelete,
+  hoverDelete,
   footer,
 }: {
   status: TodoStatus;
@@ -295,6 +309,8 @@ function TodoColumn({
   onAdd: (title: string, status: TodoStatus) => Promise<string | void>;
   onOpen: (todo: Todo) => void;
   onMoveTo?: (todo: Todo, status: TodoStatus) => void;
+  onDelete?: (todo: Todo) => void;
+  hoverDelete: boolean;
   footer?: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
@@ -323,7 +339,7 @@ function TodoColumn({
       <SortableContext id={status} items={ids} strategy={verticalListSortingStrategy}>
         <Stack ref={setNodeRef} as="ul" gap="2" mt="2" minH="16" listStyleType="none" aria-labelledby={headingId}>
           {todos.map((todo) => (
-            <SortableTodoCard key={todo.id} todo={todo} onOpen={onOpen} onMoveTo={onMoveTo} />
+            <SortableTodoCard key={todo.id} todo={todo} onOpen={onOpen} onMoveTo={onMoveTo} onDelete={onDelete} hoverDelete={hoverDelete} />
           ))}
           {todos.length === 0 ? (
             <Text as="li" textStyle="caption" textAlign="center" py="4" borderWidth="1px" borderStyle="dashed" borderColor="border" borderRadius="l3">
@@ -341,12 +357,18 @@ function SortableTodoCard({
   todo,
   onOpen,
   onMoveTo,
+  onDelete,
+  hoverDelete,
 }: {
   todo: Todo;
   onOpen: (todo: Todo) => void;
   onMoveTo?: (todo: Todo, status: TodoStatus) => void;
+  onDelete?: (todo: Todo) => void;
+  /** Desktop: a delete icon that shows on hover or focus. */
+  hoverDelete: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: todo.id });
+  const remove = onDelete && !isDragging ? () => onDelete(todo) : undefined;
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Enter" && !isDragging) {
@@ -354,26 +376,47 @@ function SortableTodoCard({
       onOpen(todo);
       return;
     }
+    if (remove && event.target === event.currentTarget && isDeleteKey(event)) {
+      event.preventDefault();
+      const column = event.currentTarget.closest("ul");
+      if (column) focusNeighbour(event.currentTarget, "[data-todo-id]", column);
+      remove();
+      return;
+    }
     listeners?.onKeyDown?.(event);
   }
 
   return (
-    <Box as="li" position="relative">
+    <SwipeRow
+      as="li"
+      borderRadius="l3"
+      holdMs={TOUCH_DRAG_DELAY_MS}
+      left={remove ? { label: "Delete", icon: Trash2, tone: "danger", commit: true, onSwipe: remove } : undefined}
+      css={revealRowActions}
+    >
       <TodoCard
         ref={setNodeRef}
         todo={todo}
         data-todo-id={todo.id}
         placeholder={isDragging}
-        reserveCorner={Boolean(onMoveTo)}
+        reserveCorner={Boolean(onMoveTo) || (hoverDelete && Boolean(onDelete))}
         style={{ transform: CSS.Translate.toString(transform), transition }}
         {...attributes}
         aria-roledescription="draggable card"
+        aria-keyshortcuts={onDelete ? DELETE_KEYS : undefined}
         {...listeners}
         onKeyDown={handleKeyDown}
         onClick={() => onOpen(todo)}
       />
       {onMoveTo && !isDragging ? <MoveToMenu todo={todo} onMoveTo={onMoveTo} /> : null}
-    </Box>
+      {hoverDelete && remove ? (
+        <Box data-row-actions position="absolute" top="1.5" insetEnd="1.5">
+          <IconButton aria-label={`Delete: ${todo.title}`} tooltip size="xs" tone="danger" onClick={remove}>
+            <Trash2 size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
+          </IconButton>
+        </Box>
+      ) : null}
+    </SwipeRow>
   );
 }
 

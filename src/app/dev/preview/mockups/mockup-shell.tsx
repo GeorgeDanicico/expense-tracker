@@ -190,7 +190,7 @@ function Sidebar({ active }: { active: SidebarItem }) {
       {SIDEBAR.map((group, index) => (
         <Stack key={group.label ?? index} gap="0.5">
           {group.label ? (
-            <Text textStyle="label" color="fg.subtle" textTransform="uppercase" letterSpacing="0.05em" px="2.5" pb="1">
+            <Text textStyle="label" color="fg.muted" textTransform="uppercase" letterSpacing="0.05em" px="2.5" pb="1">
               {group.label}
             </Text>
           ) : null}
@@ -291,7 +291,7 @@ function BottomBar({ active }: { active: BarTab }) {
             aria-current={on ? "page" : undefined}
             style={{ gridColumn: column(index) + 1, gridRow: 1, position: "relative" }}
           >
-            <Stack align="center" gap="1" pt="1" color={on ? "fg" : "fg.subtle"} css={pressFeedback(PRESS_SCALE.icon)}>
+            <Stack align="center" gap="1" pt="1" color={on ? "fg" : "fg.muted"} css={pressFeedback(PRESS_SCALE.icon)}>
               <tab.icon size={22} aria-hidden="true" />
               <Text as="span" fontSize="2xs" lineHeight="0.875rem" fontWeight="medium">
                 {tab.label}

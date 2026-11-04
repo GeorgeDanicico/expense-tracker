@@ -71,20 +71,21 @@ export function MobileTabBar() {
       borderColor="border"
     >
       {activeIndex >= 0 ? (
+        // Covers the whole tab, icon and label, centred in the bar above the home indicator.
         <Box
           position="absolute"
-          top="2"
+          top="2.25rem"
           left="2"
           width={`calc((100% - 1rem) / ${sections.length + 1})`}
-          height="8"
+          height="3.25rem"
           display="flex"
           justifyContent="center"
           pointerEvents="none"
-          transform={`translateX(${column(activeIndex) * 100}%)`}
+          transform={`translate(${column(activeIndex) * 100}%, -50%)`}
           transition={transition("transform", "moderate")}
           aria-hidden="true"
         >
-          <Box width="3.25rem" height="full" borderRadius="pill" bg="bg.selected" />
+          <Box width="full" maxW="4.5rem" mx="0.5" height="full" borderRadius="card" bg="bg.selected" />
         </Box>
       ) : null}
       {sections.flatMap((section, index) => {
@@ -106,7 +107,7 @@ export function MobileTabBar() {
             _focusVisible={{ outline: "2px solid", outlineColor: "fg.accent", outlineOffset: "-2px" }}
           >
             <Link href={section.href} aria-current={on ? "page" : undefined}>
-              <Stack align="center" gap="1" pt="1" color={on ? "fg" : "fg.subtle"} css={pressFeedback(PRESS_SCALE.icon)}>
+              <Stack align="center" gap="1" pt="1" color={on ? "fg" : "fg.muted"} css={pressFeedback(PRESS_SCALE.icon)}>
                 <Icon size={22} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 <Text as="span" fontSize="2xs" lineHeight="0.875rem" fontWeight="medium">
                   {section.label}

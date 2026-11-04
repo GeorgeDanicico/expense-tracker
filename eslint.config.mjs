@@ -76,6 +76,7 @@ const uiGuardrails = {
     "local/theme-radius": "error",
     "local/theme-control-size": "error",
     "local/no-raw-dialog": "error",
+    "local/no-subtle-text": "error",
   },
 };
 

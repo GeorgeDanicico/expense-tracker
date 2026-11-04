@@ -24,6 +24,7 @@ Run them with `npm run lint`.
 | [`no-zod-flatten`](#no-zod-flatten) | error | 15 fixed (6 in code, 9 in tests) | U1 |
 | [`no-raw-dialog`](#no-raw-dialog) | error | none | U1 |
 | [`no-window-confirm`](#no-window-confirm) | error | none | U1 |
+| [`no-subtle-text`](#no-subtle-text) | error | fixed in U13 | U13 |
 | [`motion-tokens`](#motion-tokens) | error | 5 fixed in U4 (a `warn` until the tokens existed) | U1 |
 | [`no-reduced-motion-query`](#no-reduced-motion-query) | error | 1 fixed | U4 |
 | [`client-only-chakra-factory`](#client-only-chakra-factory) | error | none left (`list-row.tsx` was fixed by hand in #213) | U6 |
@@ -259,6 +260,22 @@ for a single row.
 **Added by:** U1 (U4 listed it). **Existing cases:** none.
 
 **Disable:** `// eslint-disable-next-line local/no-window-confirm -- <reason>`.
+
+### `no-subtle-text`
+
+**Catches:** a `Text` with `color="fg.subtle"` (also either side of a condition, such as
+`color={on ? "fg" : "fg.subtle"}`).
+
+**Why:** `fg.subtle` is 3.1 to 3.5:1 on the page's surfaces; text needs 4.5:1 (WCAG AA). axe found
+the pattern in group labels, the navigation's section labels, the tab bar, the calendar's days
+outside the month, and the placeholder. Use `fg.muted` (5.3:1 or more) for text; `fg.subtle` stays
+for icons, dots and other decoration (3:1). The theme's contrast test
+(`src/components/ui/theme/contrast.test.ts`) checks the pairs.
+
+**Added by:** U13. **Existing cases:** fixed in U13, including the tab bar's inactive labels and the
+placeholder colour in `global-css.ts` (neither is a `Text`, so the rule can't see them).
+
+**Disable:** `// eslint-disable-next-line local/no-subtle-text -- <reason>`.
 
 ### `motion-tokens`
 

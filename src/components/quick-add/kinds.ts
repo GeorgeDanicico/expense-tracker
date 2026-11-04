@@ -1,4 +1,5 @@
 import { NAV_ITEMS, type UserSection } from "@/components/layout/nav-items";
+import { isTypingTarget } from "@/components/ui/row-actions";
 
 export type QuickAddKind = "expense" | "todo" | "reminder" | "event";
 
@@ -47,12 +48,6 @@ export function rememberKind(kind: QuickAddKind) {
   } catch {
     // Private windows and blocked storage: the sheet just starts on the default next time.
   }
-}
-
-/** Whether `target` takes typing, so a shortcut key belongs to it. */
-function isTypingTarget(target: EventTarget | null) {
-  if (!target || typeof (target as Element).closest !== "function") return false;
-  return Boolean((target as Element).closest("input, textarea, select, [contenteditable=''], [contenteditable='true'], [role='textbox']"));
 }
 
 /**

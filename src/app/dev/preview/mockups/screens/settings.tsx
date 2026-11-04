@@ -89,7 +89,7 @@ function GroupedList({ entries, active }: { entries: ListEntry[]; active?: Page 
               {entry.label}
             </Text>
             {entry.value ? (
-              <Text as="span" textStyle="bodySm" color="fg.subtle" truncate maxW="45%">
+              <Text as="span" textStyle="bodySm" color="fg.muted" truncate maxW="45%">
                 {entry.value}
               </Text>
             ) : null}
@@ -210,7 +210,7 @@ function RowsCard({ title, rows }: { title?: string; rows: { label: string; icon
                   trailing={
                     <>
                       {row.value ? (
-                        <Text as="span" textStyle="bodySm" color="fg.subtle">
+                        <Text as="span" textStyle="bodySm" color="fg.muted">
                           {row.value}
                         </Text>
                       ) : null}

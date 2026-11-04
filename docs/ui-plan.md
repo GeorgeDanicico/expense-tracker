@@ -528,7 +528,7 @@ tests.
 covers all of `src/components`). Built on 4 November 2026 (the rule now covers all of
 `src/components` and `src/app/(app)`); awaiting George's sign-off.
 
-**Signed off (George, 4 November 2026).**
+**Signed off (George, 4 November 2026).** Merged in #218.
 
 ### U12: Swipe actions
 
@@ -547,6 +547,11 @@ events; undo; keyboard delete on desktop.
 
 **Done when** on a phone, swiping deletes with undo, and scrolling and dragging still work.
 
+Built on 4 November 2026 (also expense rows, and Home's reminder rows); awaiting George's sign-off
+on a real phone.
+
+**Signed off (George, 4 November 2026).**
+
 ### U13: Accessibility pass
 
 **Files:** a dev dependency on `axe-core` (pinned), a test helper, tests per main screen, fixes.
@@ -556,6 +561,8 @@ events; undo; keyboard delete on desktop.
   button without `aria-label`).
 
 **Done when** no axe violations on the main screens, and the checks run in CI.
+
+**Signed off (George, 4 November 2026).**
 
 ### U14: Measure and close
 

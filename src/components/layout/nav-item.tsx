@@ -60,7 +60,7 @@ export function NavSectionGroup({ section }: { section: UserSection }) {
         pt="2"
         pb="1"
         textStyle="label"
-        color="fg.subtle"
+        color="fg.muted"
         textTransform="uppercase"
         letterSpacing="0.05em"
       >

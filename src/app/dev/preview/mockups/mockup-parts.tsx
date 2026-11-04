@@ -47,7 +47,7 @@ export function SectionLink({ href, children }: { href: MockupId; children: Reac
 /** A small uppercase label above a group of rows ("Yesterday", "Upcoming"). */
 export function GroupLabel({ children, px = "2" }: { children: ReactNode; px?: string }) {
   return (
-    <Text textStyle="label" color="fg.subtle" textTransform="uppercase" letterSpacing="0.04em" px={px} pt="2" pb="1">
+    <Text textStyle="label" color="fg.muted" textTransform="uppercase" letterSpacing="0.04em" px={px} pt="2" pb="1">
       {children}
     </Text>
   );

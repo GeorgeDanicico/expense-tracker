@@ -2,19 +2,23 @@
 
 import { Box, Stack } from "@chakra-ui/react";
 import { Pencil, Trash2 } from "lucide-react";
+import type { KeyboardEvent } from "react";
 
 import { CategoryTile } from "@/components/expenses/category-visual";
 import { Amount } from "@/components/ui/amount";
 import { Collapse } from "@/components/ui/disclosure";
 import { GroupLabel } from "@/components/ui/group-label";
 import { ListRow } from "@/components/ui/list-row";
-import { RowActions, useRowActions, type RowAction } from "@/components/ui/row-actions";
+import { DELETE_KEYS, focusNeighbour, isDeleteKey, RowActions, SwipeRow, useRowActions, type RowAction } from "@/components/ui/row-actions";
 import { useMemberColors } from "@/hooks/use-member-colors";
 import { expenseClassificationLabel } from "@/lib/expenses/categories";
 import type { Expense, ListedExpense } from "@/lib/expenses/types";
 import { relativeDay } from "@/lib/home/today";
 
-/** What a row can do: Edit and Delete in its `⋯` (hover icons on desktop, long-press on phones). Absent while read-only. */
+/**
+ * What a row can do: Edit and Delete in its `⋯` (hover icons on desktop, long-press on phones), a
+ * swipe left to delete on phones and the Delete key on desktop. Absent while read-only.
+ */
 export type ExpenseRowActions = {
   edit: (expense: Expense) => void;
   remove: (expense: Expense) => void;
@@ -35,16 +39,32 @@ export function groupByDay<T extends Pick<Expense, "expenseDate">>(expenses: rea
 
 function ExpenseRow({ expense, currency, accent, actions }: { expense: ListedExpense; currency: string; accent?: string; actions?: ExpenseRowActions }) {
   const { rowProps, menu } = useRowActions();
-  const rowActions: RowAction[] | null = actions
+  const remove = actions ? () => actions.remove(expense) : undefined;
+  const rowActions: RowAction[] | null = actions && remove
     ? [
         { label: "Edit", icon: Pencil, onSelect: () => actions.edit(expense) },
-        { label: "Delete", icon: Trash2, tone: "danger", onSelect: () => actions.remove(expense) },
+        { label: "Delete", icon: Trash2, tone: "danger", onSelect: remove },
       ]
     : null;
-  return (
+  const row = (
     <ListRow
       as="div"
       {...(rowActions ? rowProps : {})}
+      // Desktop: a focused row (or its hover icons) deletes on the Delete key, with Undo.
+      {...(remove ? {
+        // Not a tab stop: the row's "more" button is the keyboard's way in (Edit, Delete), and Delete
+        // works from it too. Clicking the row focuses it for the key.
+        tabIndex: -1,
+        "data-expense-row": "",
+        "aria-keyshortcuts": DELETE_KEYS,
+        onKeyDown: (event: KeyboardEvent<HTMLLIElement>) => {
+          // The open menu is portalled, but React events bubble out of it: only keys from inside the row count.
+          if (!event.currentTarget.contains(event.target as Node) || !isDeleteKey(event)) return;
+          event.preventDefault();
+          focusNeighbour(event.currentTarget, "[data-expense-row]");
+          remove();
+        },
+      } : {})}
       accent={accent}
       leading={<CategoryTile category={expense.category} />}
       title={expense.description}
@@ -58,6 +78,8 @@ function ExpenseRow({ expense, currency, accent, actions }: { expense: ListedExp
       }
     />
   );
+  // Phones: swipe left to delete, with Undo.
+  return remove ? <SwipeRow left={{ label: "Delete", icon: Trash2, tone: "danger", commit: true, onSwipe: remove }}>{row}</SwipeRow> : row;
 }
 
 /**

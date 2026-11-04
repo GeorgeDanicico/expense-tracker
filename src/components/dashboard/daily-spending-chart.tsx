@@ -41,7 +41,7 @@ export function DailySpendingChart({
             gap="1.5"
             aria-label={`${formatDate(day.key)}: ${formatCurrency(day.total, currency)}`}
           >
-            <Text textStyle="caption" color={day.total ? "fg" : "fg.subtle"} textAlign="center" overflowWrap="anywhere">
+            <Text textStyle="caption" color={day.total ? "fg" : "fg.muted"} textAlign="center" overflowWrap="anywhere">
               {formatCurrency(day.total, currency)}
             </Text>
             <Box

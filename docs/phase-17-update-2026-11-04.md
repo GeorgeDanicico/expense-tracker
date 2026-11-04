@@ -1,7 +1,7 @@
 # Phase 17 update, 4 November 2026 (cloud session)
 
 Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-session-rk7uoj`.
-**PR #213 (U3, U4 and U5), PR #214 (U6), PR #215 (U7), PR #216 (U8 and U9) and PR #217 (U10) merged on 4 November.** U11 is done and signed off on the same branch.
+**PR #213 (U3, U4 and U5), PR #214 (U6), PR #215 (U7), PR #216 (U8 and U9), PR #217 (U10) and PR #218 (U11) merged on 4 November.** U12 and U13 are done and signed off on the same branch, with a fix that highlights the whole bottom-bar tab; they go out in one PR.
 
 ## Where the tasks stand
 
@@ -17,8 +17,10 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U8 Expenses** | **Done. George signed it off on 4 November; merged in #216.** |
 | **U9 Investments and Net worth** | **Done. George signed it off on 4 November; merged in #216.** |
 | **U10 Planning** | **Done. George signed it off on 4 November; merged in #217.** |
-| **U11 Settings and the family pages** | **Done. George signed it off on 4 November.** |
-| U12 onwards | Not started. |
+| **U11 Settings and the family pages** | **Done. George signed it off on 4 November; merged in #218.** |
+| **U12 Swipe actions** | **Done. George tried it locally and signed it off on 4 November.** |
+| **U13 Accessibility pass** | **Done. George signed it off on 4 November (small grey labels are a shade darker).** |
+| U14 | Not started. |
 
 ## What U3 added
 
@@ -432,10 +434,98 @@ An agent did the work, on top of the merged U10.
   `memberDisplayName` and `usePushSubscription` (proposals 1, 3, 5) are not done.
 - A parent opening `/settings/permissions` is sent to `/settings` (the row is gone for parents).
 
+## What U12 added
+
+An agent did the work, on top of the merged U11.
+
+- **`useSwipe`** (`src/components/ui/use-swipe.ts`): pointer events, touch only, no library. Moving
+  10 px sideways (more than up or down) before the long press starts a swipe; 10 px up or down first
+  is the page's scroll (`touch-action: pan-y` on the row); a finger still resting at the long press
+  (the row menu's 500 ms, the board's 200 ms drag) is left to it. Released past 80 px the action
+  runs; short of it the row snaps back. The click after a swipe is swallowed, so a tap still opens
+  the row. **Reduced motion** drops the slide and the fly-out, never the action.
+- **`SwipeRow`** in `row-actions.tsx` draws it: the action (icon and label, in its tone) behind the
+  row, the row sliding over it with the `moderate` token, a delete or Done flying out first.
+- **To-dos:** swipe a card left to delete, with "Card deleted · Undo" (the delete is sent after 5 s).
+  On desktop a delete icon shows on hover or focus, and `Delete` on a focused card deletes it (focus
+  moves to the next card). The long-press drag and "Move to…" are unchanged; the card dialog's
+  Delete still asks first.
+- **Reminders (the page and Home):** swipe right for Done, left to open Snooze's three choices.
+  The row's Snooze and Done buttons stay, so the swipe is never the only way.
+- **Expenses:** swipe left to delete with U8's Undo; `Delete` on a focused row (rows are now
+  focusable, with `aria-keyshortcuts`) does the same on desktop, never while typing in a field.
+- **Code:** delete-with-undo is one helper (`deleteWithUndo` and `useDeleteWithUndo` in
+  `undo-toast.tsx`) for expenses and to-dos; `isTypingTarget` moved beside the new `isDeleteKey`.
+- **Screenshots:** `docs/ui-styling/screenshots/u12-{todos-mid-swipe,todos-undo,reminders-mid-swipe,expenses-mid-swipe,expenses-undo}-390.jpg`
+  and `u12-{todos,expenses}-hover-1280.jpg`.
+- **Checked in Chromium** (touch emulation, 390 px): swipe-delete and Undo on to-dos and expenses,
+  a short swipe snapping back, a tap opening a card, the long-press drag on the board, swipe Done
+  and swipe Snooze, a vertical drag on a row scrolling the page, reduced motion; at 1280 px the
+  hover icons and the `Delete` key.
+- **Checks:** lint 0 errors and 0 warnings; `tsc` clean; vitest 6600 passed (1 skipped);
+  `npm run build` passes with the CI environment.
+- **Taps:** delete a to-do or an expense **1** swipe on a phone (1 on desktop: hover icon or
+  `Delete`), undo **1**; Done **1** swipe; Snooze **2** (swipe, choice).
+
+### Left over from U12
+
+- Done still has no Undo (no un-complete API), so a swipe Done is final, as the button is.
+- Only touch swipes: a pen uses the menu and the board's drag. No swipe on Done rows or on
+  investments and net worth rows.
+- The mockups keep their own stand-in `SwipeRow`.
+
+## What U13 added
+
+- **axe in CI, no browser:** `axe-core` 4.13.0 and `happy-dom` 21.0.4 (dev dependencies, pinned;
+  `happy-dom` is chosen per file with `// @vitest-environment happy-dom`, so every other test keeps
+  the Node environment). `src/test/axe.tsx` mounts a component with `react-dom/client`, waits for the
+  fixtures to load, and runs axe (WCAG 2 A and AA, 2.1, 2.2 AA and the best-practice rules).
+  `src/app/dev/preview/axe.test.tsx` does that for Home, Expenses, Insights, Investments, Net worth,
+  Reminders, To-dos, Calendar, More, Settings, Family and Manage family (their preview renders,
+  fixtures included) and for the four quick-add sheets. It runs in `npm test`, so in CI's `app` job.
+  A control test proves the helper does find a violation, and a screen test fails on React's
+  invalid-nesting warnings. This is the simplest option: no browser job, two small dev dependencies.
+  The production audit is unchanged (0 vulnerabilities; it only reads production dependencies).
+- **What happy-dom cannot check:** colour contrast, target size and scrolling regions need layout, so
+  those axe rules are off in the helper and covered otherwise. `contrast.test.ts` checks the theme's
+  text pairs from the tokens (4.5:1 for text on every surface, tones on their tints, filled buttons,
+  category tiles, the focus ring 3:1). Target sizes: buttons are 28 px at the smallest (`xs`, WCAG 2.2's
+  minimum is 24) and 44 px on phones, by the theme's button recipe. The quick-add check looks at the
+  dialog alone, because axe's `aria-hidden-focus` flags the page behind a modal that traps focus.
+- **Found and fixed:**
+  - Contrast: **text in `fg.subtle`** (3.1 to 3.5:1) in group labels, navigation section labels, the
+    tab bar's inactive labels, calendar days outside the month, empty chart-day captions, the amount
+    input's symbol, and the placeholder colour. All use `fg.muted` (5.3:1 or more). No new colour.
+  - Markup: a `div` inside the reminder title's paragraph.
+  - Labels, names, roles, landmarks, headings, duplicate ids, focus order (no positive tabindex): axe
+    found none. The reminder row's Snooze and Done icon buttons are named "Snooze X" and "Mark X done".
+- **Expense rows are no longer tab stops** (U12 had added `tabindex="0"`, 14 or more extra stops on
+  the page, next to each row's own menu button). Now `tabindex="-1"`: a click focuses the row for the
+  key, and a keyboard user tabs to the row's menu button (Edit, Delete), where `Delete` works too.
+  To-do cards stay tab stops: the card is the only control, and it is the keyboard drag handle.
+- **Backspace deletes like Delete** on a focused to-do card or expense row (Mac keyboards), never
+  while typing in a field, with a modifier, or held down (`aria-keyshortcuts="Delete Backspace"`).
+  Tests: `isDeleteKey`, and a DOM test of the expense rows (Delete, Backspace, from the row's
+  button, ignored in an input, focus moves to the neighbour).
+- **Lint rule `no-subtle-text`** (the one pattern found more than once): `Text` coloured
+  `fg.subtle`. RuleTester tests and a section in `docs/lint-rules.md`. An icon button without
+  `aria-label` needs no rule: `IconButton` already requires it in its types.
+- **Checks:** lint 0 errors and 0 warnings; `tsc` clean; vitest 6642 passed (1 skipped); build passes
+  with the CI environment.
+
+### Left over from U13
+
+- Contrast on the real rendered page (overlays, text on photos) is by token, not by pixel. The
+  screenshots in U14 are the place to look.
+- `orange`'s tint (4.1:1) is unused; do not use it for text.
+
 ## Next steps
 
-1. George signs off the U11 screenshots (390 and 1280 px): More, Account, Notifications, Family,
-   Manage family (rows with a menu instead of the table), My permissions and AI.
-2. **U11 goes out in one PR** from `claude/phase-17-cloud-session-rk7uoj` to `main`, after sign-off.
-   **Merging changes the Settings and family screens in production.**
-3. Then U12 (swipe actions).
+1. George tries U12 on a real phone: swipe a to-do card left (and Undo), swipe a reminder right
+   (Done) and left (Snooze), swipe an expense left (and Undo); check the page still scrolls when a
+   drag starts on a row, and a long press on a card still drags it. On desktop: the hover icons and
+   `Delete` on a focused card or expense row.
+2. **U12 and U13 go out in one PR** from `claude/phase-17-cloud-session-rk7uoj` to `main`, after
+   sign-off. **Merging changes how rows behave on phones in production.** On a keyboard, check
+   Tab on Expenses (one stop per row now) and Backspace on a focused to-do card.
+3. Then U14 (measure and close).
