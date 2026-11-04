@@ -513,6 +513,8 @@ tests.
 
 **Done when** the screens are signed off. Built on 4 November 2026; awaiting George's sign-off.
 
+**Signed off (George, 4 November 2026).**
+
 ### U11: Settings and family
 
 **Files:** `src/app/(app)/settings/**`, `src/components/{settings,family}/**`, tests.

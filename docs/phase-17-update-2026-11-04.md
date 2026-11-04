@@ -16,7 +16,7 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U7 Home as "today"** | **Done. George signed off the screenshots on 4 November; merged in #215.** |
 | **U8 Expenses** | **Done. George signed it off on 4 November; merged in #216.** |
 | **U9 Investments and Net worth** | **Done. George signed it off on 4 November; merged in #216.** |
-| **U10 Planning** | **Done. Awaiting George's sign-off of the screenshots.** |
+| **U10 Planning** | **Done. George signed it off on 4 November.** |
 | U11 onwards | Not started. |
 
 ## What U3 added
