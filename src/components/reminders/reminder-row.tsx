@@ -202,7 +202,8 @@ export function ReminderRow({
             as="div"
             leading={<Tile state={state} />}
             title={(
-              <Flex align="center" gap="1.5" minW="0">
+              // A span: the title sits in a paragraph, which cannot hold a div.
+              <Flex as="span" align="center" gap="1.5" minW="0">
                 <TitleButton title={reminder.title} onClick={() => onEdit(reminder)} />
                 {reminder.notificationsMuted ? (
                   <Box as="span" color="fg.subtle" flexShrink="0" title="Notifications muted">
