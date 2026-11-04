@@ -16,7 +16,7 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U7 Home as "today"** | **Done. George signed off the screenshots on 4 November; merged in #215.** |
 | **U8 Expenses** | **Done. George signed it off on 4 November; merged in #216.** |
 | **U9 Investments and Net worth** | **Done. George signed it off on 4 November; merged in #216.** |
-| **U10 Planning** | **In progress.** |
+| **U10 Planning** | **Done. Awaiting George's sign-off of the screenshots.** |
 | U11 onwards | Not started. |
 
 ## What U3 added
@@ -350,11 +350,50 @@ An agent did the work, on top of U8's commits (U8 is not merged yet).
 - The segmented control at the top of Money wraps "Net worth" on two lines at 1280 px beside the
   sidebar; it comes from U5/U8, not U9.
 
+## What U10 added
+
+An agent did the work, on top of the merged U8 and U9.
+
+- **Reminders, to the mockup:** one list in the Money look (rows, no lines, `ListRow`): **Today**
+  (overdue first, then due today), **Upcoming** (upcoming and snoozed), and **Done · N** folded.
+  Each open row has Snooze (an icon with its three choices) and Done (a check) on it at every width;
+  the title opens the edit dialog. The Upcoming/Overdue/Done tabs and the phone tab switcher are
+  gone, and so is the page's "Add reminder" button (+ is the add). `?focus=<id>` opens Done when the
+  reminder is there. A toast says "Marked done" / "Snoozed". `useReminderActions` is shared with
+  Home; `SnoozeMenu` is now always the icon button.
+- **To-dos:** the board stays. One column at a time with a segmented control on phones (decision 5,
+  already built), quick add at the top of each column, the long-press drag untouched. The columns
+  lose their border (a soft surface, as in Money); quick add is on `useApiForm` (todos proposal 2).
+- **Calendar:** Agenda on phones and Month on desktop (decision 8; this was already the code, with
+  a test). The header's "Add event" is gone (+ / Add / N add events); Subscribe is a lone icon
+  button beside the title.
+- **D6:** `subscribe-dialog.tsx` loads the feed link with SWR through the calendar API object
+  (calendar proposal 1). `local/no-fetch-in-components` is on for
+  `src/components/{reminders,todos,family-calendar}` and `src/app/(app)/{reminders,todos,calendar}`,
+  with no violations to fix.
+- **D9 and `useNow`:** these modules already used the one formatter; the reminder row's meta line
+  uses it too. `src/hooks/use-now.ts` replaces the four copies of `useNow` (reminders, Home, week view,
+  recent imports); the expenses report's proposal 7.
+- **Screenshots:** `docs/ui-styling/screenshots/u10-{reminders,todos,calendar}-{320,390,1280}.jpg`.
+  No horizontal page scroll at 320 px (the 3 px Reminders overflow is gone).
+- **Taps:** Done **1** (2 with an expense template, which asks first), Snooze **2**, add a to-do
+  **3** from anywhere (+ → To-do → Enter; 2 once To-do is the remembered kind) or **2** on the board
+  ("Add a card", type, Enter).
+
+### Left over from U10
+
+- A reminder cannot be deleted from its row (only from the edit dialog), and Done has no Undo (no
+  un-complete API). Swipe gestures are U12's.
+- At 320 px the reminder's title and date line truncate (two icon buttons take the right side);
+  the dialog shows them in full.
+- The "Snooze for an hour can end before the reminder is due" finding from the reminders report is
+  not changed: it is a product call.
+- The shared family helpers (todos proposal 1) and `ToggleChip` for the lead-time chips are left.
+
 ## Next steps
 
-1. George signs off the U8 and U9 screenshots at 390 and 1280 px (U8 includes the Settings currency
-   warning).
-2. **U8 and U9 go out in one PR** from `claude/phase-17-cloud-session-rk7uoj` to `main`, after
-   sign-off. **Merging changes Expenses, Investments, Net worth, Insights' add buttons, Settings'
-   currency save, date display and the expenses API in production.**
-3. Then U10 (Planning), with the same patterns.
+1. George signs off the U10 screenshots (320, 390 and 1280 px): Reminders' grouped list with Done
+   and Snooze on the row, the board's look, and the Calendar's Agenda on phones.
+2. **U10 goes out in one PR** from `claude/phase-17-cloud-session-rk7uoj` to `main`, after sign-off.
+   **Merging changes the Reminders, To-dos and Calendar screens in production.**
+3. Then U11 (Settings and family), with the same patterns, and U12 (swipe actions).

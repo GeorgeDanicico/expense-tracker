@@ -1,5 +1,7 @@
 # Simpler ways: reminders
 
+**Status (U10, 4 November 2026):** proposal 3 (`useNow`) done: `src/hooks/use-now.ts`. The rest touch files U10 did not rebuild.
+
 Looked at `src/components/reminders/**` (8 files, ~1,600 lines without tests), `src/app/(app)/reminders`, `src/app/api/reminders/**`, `src/lib/reminders/**` (~880 lines), `src/lib/validation/reminder.ts`, `src/lib/mcp/tools/reminders.ts` and the reminder preview fixture, with the `find-shapes` script (bare module name `reminders`) and by reading the screen, the row, the dialog and `src/lib/reminders`. **Reminders already use the target data style** (`reminder-api.tsx` + `use-reminders.ts`, optimistic, previewable), so the proposals are about helpers written twice: 5 proposals, about 45 lines. The one worth doing first is **one `daysBetween` and `monthsBetween`** (proposal 1), with a lint rule so hand date maths stops spreading.
 
 ## Map

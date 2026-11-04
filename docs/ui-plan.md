@@ -506,12 +506,12 @@ tests.
 
 - Under Planning, to the mockup. Reminders: grouped by today, upcoming, done, with Done and
   Snooze on the row. To-dos: the board stays (columns scroll sideways on a phone, one column per
-  screen width) with quick add at the top of each column. Calendar: the week view on phones,
-  month on desktop.
+  screen width) with quick add at the top of each column. Calendar: month on desktop; on phones
+  the Agenda, as George decided (the "Decisions" in `ui-direction.md`, 8), not the week view.
 - These modules already use the target data style; move `subscribe-dialog.tsx`'s raw
   `useEffect` load onto SWR (D6's leftover).
 
-**Done when** the screens are signed off.
+**Done when** the screens are signed off. Built on 4 November 2026; awaiting George's sign-off.
 
 ### U11: Settings and family
 

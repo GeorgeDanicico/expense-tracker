@@ -1,7 +1,7 @@
 "use client";
 
-import { Box, Button, chakra, Menu, Portal, Text } from "@chakra-ui/react";
-import { AlarmClock, BellOff, BellRing, CircleAlert, CircleCheck, Receipt } from "lucide-react";
+import { Box, chakra, Flex, Menu, Portal, Text } from "@chakra-ui/react";
+import { AlarmClock, BellOff, BellRing, Check, CircleAlert, CircleCheck, Receipt } from "lucide-react";
 import NextLink from "next/link";
 import type { ReactNode } from "react";
 
@@ -150,20 +150,21 @@ export function ReminderRow({
         as="div"
         leading={<Tile state={state} />}
         title={(
-          <>
+          <Flex align="center" gap="1.5" minW="0">
             <TitleButton title={reminder.title} onClick={() => onEdit(reminder)} />
             {reminder.notificationsMuted ? (
-              <Box as="span" color="fg.subtle" ms="1" title="Notifications muted">
+              <Box as="span" color="fg.subtle" flexShrink="0" title="Notifications muted">
                 <BellOff size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 <span className="sr-only">Notifications muted</span>
               </Box>
             ) : null}
-          </>
+          </Flex>
         )}
         meta={(
           <>
             <span className="sr-only">Due </span>
-            {formatDueAt(reminder, now)} · {repeatLabel(reminder.repeatUnit, reminder.repeatInterval)}
+            {formatDueAt(reminder, now)}
+            {reminder.repeatUnit === "none" ? null : ` · ${repeatLabel(reminder.repeatUnit, reminder.repeatInterval)}`}
             {state === "overdue" && reminder.nextDueAt ? (
               <Text as="span" color="fg.error" fontWeight="medium"> · {overdueText(reminder.nextDueAt, now)}</Text>
             ) : null}
@@ -173,9 +174,11 @@ export function ReminderRow({
         trailing={(
           <>
             <SnoozeMenu title={reminder.title} disabled={busy} onChoose={(choice) => onSnooze(reminder, choice)} />
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => onComplete(reminder)} aria-label={`Mark ${reminder.title} done`}>
-              Done
-            </Button>
+            <IconButton aria-label={`Mark ${reminder.title} done`} disabled={busy} onClick={() => onComplete(reminder)}>
+              <Box as="span" display="inline-flex" color="fg.success">
+                <Check size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
+              </Box>
+            </IconButton>
           </>
         )}
       />

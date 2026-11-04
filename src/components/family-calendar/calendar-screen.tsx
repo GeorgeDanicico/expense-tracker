@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Flex, Heading, Stack } from "@chakra-ui/react";
-import { CalendarDays, CalendarSync, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarDays, CalendarSync, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -165,22 +165,13 @@ export function CalendarScreen() {
   const visibleDays = view === "week" ? weekViewDays(date, weekLength) : null;
   const header = (
     <PageHeader
+      inline
       title="Calendar"
       description={account?.membership?.familyName ? `Shared by everyone in ${account.membership.familyName}` : undefined}
       actions={hasFamily ? (
-        <>
-          <Button size="sm" variant="outline" onClick={() => setSubscribing(true)}>
-            <CalendarSync size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Subscribe
-          </Button>
-          <Button
-            size="sm"
-            variant="solid"
-            colorPalette="brand"
-            onClick={() => openCreate(range.start <= today && today < range.endExclusive ? today : date)}
-          >
-            <Plus size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Add event
-          </Button>
-        </>
+        <IconButton aria-label="Show events in other calendar apps" tooltip onClick={() => setSubscribing(true)}>
+          <CalendarSync size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </IconButton>
       ) : undefined}
     />
   );
