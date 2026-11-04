@@ -13,5 +13,5 @@ export const PAGE_SPACING = {
   /** Between the two desktop columns. */
   columnGap: { base: "4", lg: "6" },
   /** The phone's bottom bar and the home indicator below it: what a sticky bar or a toast sits on. */
-  bottomBar: "calc(3.5rem + env(safe-area-inset-bottom))",
+  bottomBar: "calc(4.5rem + env(safe-area-inset-bottom))",
 } as const;

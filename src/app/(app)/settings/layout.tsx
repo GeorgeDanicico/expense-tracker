@@ -1,21 +1,30 @@
 "use client";
 
-import { Stack } from "@chakra-ui/react";
-import { usePathname, useRouter } from "next/navigation";
+import { Box, Flex, Grid, Stack, Text } from "@chakra-ui/react";
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
-import { SettingsNav, settingsTabs } from "@/components/settings/settings-nav";
+import { useAppPathname } from "@/components/layout/use-app-pathname";
+import { SettingsList, activeSettingsRow, settingsGroups } from "@/components/settings/settings-nav";
+import { ICON } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
+import { PAGE_SPACING } from "@/components/ui/theme/layout";
 import { useAccount } from "@/hooks/use-account";
 
+/**
+ * Settings: on a phone each page is its own screen with a way back to More (the list); from `md` up
+ * the list sits on the left of the open page.
+ */
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = useAppPathname();
   const { account } = useAccount();
-  const tabs = account ? settingsTabs(account) : [];
-  // With the family module off only the account and AI assistant pages exist (exactly the tabs); the
-  // family pages send you back to the account page.
-  const hidden = account !== undefined && !account.features.family && !tabs.some((tab) => tab.href === pathname);
+  const groups = account ? settingsGroups(account) : [];
+  // With the family module off the family pages don't exist (the list has no row for them): they
+  // send you back to the account page, as do a kid's visits to Manage family.
+  const hidden = account !== undefined && !groups.some((group) => group.rows.some((row) => row.href === pathname));
 
   useEffect(() => {
     if (hidden) router.replace("/settings");
@@ -24,10 +33,26 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   if (hidden) return null;
 
   return (
-    <Stack maxW="780px" gap={{ base: "4", md: "5" }}>
-      <PageHeader title="Settings" />
-      {tabs.length > 1 ? <SettingsNav tabs={tabs} /> : null}
-      {children}
-    </Stack>
+    <Grid
+      templateColumns={{ base: "minmax(0, 1fr)", md: "16rem minmax(0, 1fr)", lg: "19rem minmax(0, 1fr)" }}
+      gap={PAGE_SPACING.columnGap}
+      alignItems="start"
+    >
+      <Stack display={{ base: "none", md: "flex" }} gap={PAGE_SPACING.sectionGap}>
+        <Text textStyle="pageTitle">Settings</Text>
+        <SettingsList groups={groups} />
+      </Stack>
+      <Stack gap={PAGE_SPACING.sectionGap} maxW="44rem">
+        <Box display={{ md: "none" }}>
+          <Link href="/more">
+            <Flex align="center" gap="1" color="fg.accent" textStyle="body" fontWeight="medium" minH="11">
+              <ChevronLeft size={ICON.nav} aria-hidden="true" /> More
+            </Flex>
+          </Link>
+        </Box>
+        <PageHeader title={activeSettingsRow(groups, pathname)?.label ?? "Settings"} />
+        {children}
+      </Stack>
+    </Grid>
   );
 }

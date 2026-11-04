@@ -1,13 +1,15 @@
 "use client";
 
-import { Box, Flex, Separator, Stack, Text } from "@chakra-ui/react";
+import { Box, Button, Flex, Separator, Stack, Text } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
 
 import { Brand } from "@/components/layout/brand";
 import { NavItem, NavSectionGroup } from "@/components/layout/nav-item";
-import { NAV_ITEMS } from "@/components/layout/nav-items";
-import { useNavigation } from "@/components/layout/use-navigation";
+import { useQuickAdd } from "@/components/layout/quick-add";
 import { SignOutIconButton } from "@/components/layout/sign-out-button";
+import { useNavigation } from "@/components/layout/use-navigation";
 import { Avatar } from "@/components/ui/avatar";
+import { ICON } from "@/components/ui/icon";
 
 function AccountRow({ signInName, avatarUrl }: { signInName: string; avatarUrl: string | null }) {
   return (
@@ -21,9 +23,13 @@ function AccountRow({ signInName, avatarUrl }: { signInName: string; avatarUrl: 
   );
 }
 
-/** Desktop sidebar: brand, Home, the grouped sections, settings and the account row. */
+/**
+ * Desktop sidebar: brand, Add (the same quick-add sheet as the phone's +), Home, then Money,
+ * Planning and More, the same groups as the bottom bar, and the account row.
+ */
 export function SidebarNav({ signInName, avatarUrl = null }: { signInName: string; avatarUrl?: string | null }) {
   const { sections } = useNavigation();
+  const quickAdd = useQuickAdd();
   return (
     <Box
       as="aside"
@@ -31,27 +37,28 @@ export function SidebarNav({ signInName, avatarUrl = null }: { signInName: strin
       display={{ base: "none", md: "flex" }}
       position="sticky"
       top="0"
-      width="220px"
+      width="15rem"
       height="100dvh"
       flexShrink="0"
       flexDirection="column"
-      px="3"
-      py="4"
-      bg="bg.surface"
+      px="3.5"
+      py="5"
+      bg="bg.subtle"
       borderRightWidth="1px"
       borderColor="border"
     >
-      <Box px="2.5">
+      <Box px="2">
         <Brand />
       </Box>
-      <Stack as="nav" aria-label="Primary navigation" gap="0.5" mt="6">
-        <NavItem item={NAV_ITEMS.home} compact />
-        {sections.map((section) => (
-          <NavSectionGroup key={section.label} section={section} compact />
-        ))}
+      <Button mt="5" size="md" bg="fg.accent" color="bg.surface" _hover={{ bg: "brand.fg" }} onClick={quickAdd.open}>
+        <Plus size={ICON.sm} aria-hidden="true" /> Add
+      </Button>
+      <Stack as="nav" aria-label="Primary navigation" gap="3" mt="5" overflowY="auto">
+        {sections.map((section) =>
+          section.key === "home" ? <NavItem key={section.key} item={section.items[0]} /> : <NavSectionGroup key={section.key} section={section} />,
+        )}
       </Stack>
       <Stack mt="auto" gap="1">
-        <NavItem item={NAV_ITEMS.settings} compact />
         <Separator />
         <AccountRow signInName={signInName} avatarUrl={avatarUrl} />
       </Stack>

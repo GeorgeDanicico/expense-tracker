@@ -2,110 +2,159 @@ import { describe, expect, it } from "vitest";
 
 import type { AccountMembership } from "@/lib/account/types";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
-import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
+import { DEFAULT_KID_PERMISSIONS, type Permissions } from "@/lib/permissions";
 
-import { MORE_ITEMS, MORE_SECTIONS, NAV_ITEMS, NAV_SECTIONS, TAB_BAR_ITEMS, navigationFor } from "./nav-items";
+import { NAV_ITEMS, NAV_SECTIONS, activeItem, activeSection, navigationFor, segmentsFor } from "./nav-items";
 
 const hrefs = (items: { href: string }[]) => items.map((item) => item.href);
 const allHrefs = hrefs(Object.values(NAV_ITEMS)).sort();
 
-describe("navigation sections", () => {
-  it("reaches every destination exactly once on desktop", () => {
-    const desktop = [NAV_ITEMS.home, ...NAV_SECTIONS.flatMap((section) => section.items), NAV_ITEMS.settings];
-    expect(hrefs(desktop).sort()).toEqual(allHrefs);
-  });
-
-  it("reaches every destination exactly once on mobile", () => {
-    expect([...hrefs(TAB_BAR_ITEMS), ...hrefs(MORE_ITEMS)].sort()).toEqual(allHrefs);
-  });
-
-  it("drops tab-bar destinations from the More sheet but keeps the section", () => {
-    expect(MORE_SECTIONS).toEqual([
-      { label: "Finance", items: [NAV_ITEMS.investments, NAV_ITEMS.netWorth] },
-      { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] },
-    ]);
-  });
-
-  it("puts Reminders, To-dos then Calendar in a Planning section of the More sheet, not the tab bar", () => {
-    expect(NAV_SECTIONS.at(-1)).toEqual({ label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] });
-    expect(TAB_BAR_ITEMS).not.toContain(NAV_ITEMS.todos);
-    expect(TAB_BAR_ITEMS).not.toContain(NAV_ITEMS.calendar);
-    expect(TAB_BAR_ITEMS).not.toContain(NAV_ITEMS.reminders);
-    expect(NAV_ITEMS.todos).toMatchObject({ href: "/todos", label: "To-dos", requiresFamily: true });
-    expect(NAV_ITEMS.calendar).toMatchObject({ href: "/calendar", label: "Calendar", requiresFamily: true });
-  });
-
-  it("makes Reminders a badged destination for everyone", () => {
-    expect(NAV_ITEMS.reminders).toMatchObject({ href: "/reminders", label: "Reminders", badge: "reminders" });
-    expect(NAV_ITEMS.reminders).not.toHaveProperty("requiresFamily");
-    expect(NAV_ITEMS.reminders).not.toHaveProperty("module");
-  });
-
-  it("never lists an empty section", () => {
-    expect(NAV_SECTIONS.every((section) => section.items.length > 0)).toBe(true);
-  });
-});
-
-const kid = (permissions = DEFAULT_KID_PERMISSIONS): AccountMembership => ({
+const parent: AccountMembership = { memberId: "60000000-0000-4000-8000-000000000001", role: "parent", isCreator: true, familyName: "Popescu", permissions: PARENT_PERMISSIONS };
+const kid = (overrides: Partial<Permissions> = {}): AccountMembership => ({
   memberId: "60000000-0000-4000-8000-000000000002",
   role: "kid",
   isCreator: false,
   familyName: "Popescu",
-  permissions,
+  permissions: { ...DEFAULT_KID_PERMISSIONS, ...overrides },
 });
 
-const FINANCE = NAV_SECTIONS.filter((section) => section.label === "Finance");
-const FINANCE_MORE = MORE_SECTIONS.filter((section) => section.label === "Finance");
-const PLANNING_SOLO = { label: "Planning", items: [NAV_ITEMS.reminders] };
-const PLANNING = { label: "Planning", items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] };
+/** What a user sees as `section label: item labels`, in order. */
+const outline = (membership: AccountMembership | null | undefined) =>
+  navigationFor(membership).sections.map((section) => `${section.label}: ${section.items.map((item) => item.label).join(", ")}`);
+
+describe("navigation sections", () => {
+  it("is Home, Money, Planning and More, the bottom bar around its +", () => {
+    expect(NAV_SECTIONS.map((section) => section.key)).toEqual(["home", "money", "planning", "more"]);
+  });
+
+  it("reaches every destination exactly once", () => {
+    expect(hrefs(NAV_SECTIONS.flatMap((section) => section.items)).sort()).toEqual(allHrefs);
+  });
+
+  it("keeps every page at its existing URL", () => {
+    expect(hrefs(Object.values(NAV_ITEMS)).sort()).toEqual(
+      ["/calendar", "/dashboard", "/expenses", "/investments", "/net-worth", "/reminders", "/settings", "/todos"],
+    );
+  });
+
+  it("makes Reminders a badged destination for everyone, and To-dos and Calendar family-only", () => {
+    expect(NAV_ITEMS.reminders).toMatchObject({ href: "/reminders", label: "Reminders", badge: "reminders" });
+    expect(NAV_ITEMS.reminders).not.toHaveProperty("requiresFamily");
+    expect(NAV_ITEMS.reminders).not.toHaveProperty("module");
+    expect(NAV_ITEMS.todos).toMatchObject({ href: "/todos", requiresFamily: true });
+    expect(NAV_ITEMS.calendar).toMatchObject({ href: "/calendar", requiresFamily: true });
+  });
+});
 
 describe("navigationFor", () => {
-  it("shows a user without a family Reminders but not To-dos or Calendar", () => {
-    const nav = navigationFor(null);
-    expect(nav.sections).toEqual([...FINANCE, PLANNING_SOLO]);
-    expect(nav.tabBarItems).toEqual(TAB_BAR_ITEMS);
-    expect(nav.moreSections).toEqual([...FINANCE_MORE, PLANNING_SOLO]);
-    expect(nav.moreItems).toEqual(MORE_ITEMS.filter((item) => item !== NAV_ITEMS.todos && item !== NAV_ITEMS.calendar));
-    expect(nav.moreItems).not.toContain(NAV_ITEMS.calendar);
-    expect(nav.sections.flatMap((section) => section.items)).not.toContain(NAV_ITEMS.calendar);
-    expect(nav.moreItems).toContain(NAV_ITEMS.reminders);
+  it("gives a user without a family Planning with Reminders alone", () => {
+    expect(outline(null)).toEqual([
+      "Home: Home",
+      "Money: Expenses, Investments, Net worth",
+      "Planning: Reminders",
+      "More: Settings",
+    ]);
   });
 
   it("shows everything to a parent", () => {
-    const parent: AccountMembership = { memberId: "60000000-0000-4000-8000-000000000001", role: "parent", isCreator: true, familyName: "Popescu", permissions: PARENT_PERMISSIONS };
-    expect(navigationFor(parent).sections).toEqual(NAV_SECTIONS);
-    expect(navigationFor(parent).moreItems).toEqual(MORE_ITEMS);
+    expect(outline(parent)).toEqual([
+      "Home: Home",
+      "Money: Expenses, Investments, Net worth",
+      "Planning: Reminders, To-dos, Calendar",
+      "More: Settings",
+    ]);
   });
 
   it("shows the module items and Reminders but not To-dos or Calendar while the account is loading", () => {
-    const nav = navigationFor(undefined);
-    expect(nav.sections).toEqual([...FINANCE, PLANNING_SOLO]);
-    expect(nav.moreItems).not.toContain(NAV_ITEMS.todos);
-    expect(nav.moreItems).not.toContain(NAV_ITEMS.calendar);
-  });
-
-  it("leaves a kid with only expenses enabled with Home, Expenses, Reminders, To-dos, Calendar and Settings", () => {
-    const nav = navigationFor(kid());
-    expect(nav.sections).toEqual([
-      { label: "Finance", items: [NAV_ITEMS.expenses] },
-      PLANNING,
+    expect(outline(undefined)).toEqual([
+      "Home: Home",
+      "Money: Expenses, Investments, Net worth",
+      "Planning: Reminders",
+      "More: Settings",
     ]);
-    expect(nav.tabBarItems).toEqual(TAB_BAR_ITEMS);
-    expect(nav.moreSections).toEqual([PLANNING]);
-    expect(nav.moreItems).toEqual([NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar, NAV_ITEMS.settings]);
   });
 
-  it("drops the Finance section for a kid with every module off, keeping Planning", () => {
-    const nav = navigationFor(kid({ ...DEFAULT_KID_PERMISSIONS, expenses: "off" }));
-    expect(nav.sections).toEqual([PLANNING]);
-    expect(nav.tabBarItems).toEqual([NAV_ITEMS.home]);
+  it("leaves a kid with only expenses on Money with Expenses alone, and the family pages", () => {
+    expect(outline(kid())).toEqual(["Home: Home", "Money: Expenses", "Planning: Reminders, To-dos, Calendar", "More: Settings"]);
   });
 
-  it("shows the modules a kid has turned on", () => {
-    const nav = navigationFor(kid({ ...DEFAULT_KID_PERMISSIONS, net_worth: "edit" }));
-    expect(nav.moreSections).toEqual([
-      { label: "Finance", items: [NAV_ITEMS.netWorth] },
-      PLANNING,
+  it("shows each money module a kid has turned on, and no empty segments", () => {
+    expect(outline(kid({ investments: "edit" }))[1]).toBe("Money: Expenses, Investments");
+    expect(outline(kid({ net_worth: "edit" }))[1]).toBe("Money: Expenses, Net worth");
+    expect(outline(kid({ expenses: "off", investments: "edit" }))[1]).toBe("Money: Investments");
+    expect(outline(kid({ expenses: "off", net_worth: "edit" }))[1]).toBe("Money: Net worth");
+    expect(outline(kid({ investments: "edit", net_worth: "edit" }))[1]).toBe("Money: Expenses, Investments, Net worth");
+  });
+
+  it("drops Money for a kid with every money module off, keeping the other three", () => {
+    expect(outline(kid({ expenses: "off" }))).toEqual(["Home: Home", "Planning: Reminders, To-dos, Calendar", "More: Settings"]);
+  });
+
+  it("sends each tab to its first page, and More to /more", () => {
+    const tabs = (membership: AccountMembership | null | undefined) => navigationFor(membership).sections.map((section) => section.href);
+    expect(tabs(parent)).toEqual(["/dashboard", "/expenses", "/reminders", "/more"]);
+    expect(tabs(kid({ expenses: "off", investments: "edit" }))).toEqual(["/dashboard", "/investments", "/reminders", "/more"]);
+  });
+});
+
+describe("the active section", () => {
+  const sections = navigationFor(parent).sections;
+  const where = (pathname: string) => {
+    const section = activeSection(sections, pathname);
+    return [section?.key, section ? activeItem(section, pathname)?.label : undefined];
+  };
+
+  it.each([
+    ["/dashboard", "home", "Home"],
+    ["/expenses", "money", "Expenses"],
+    ["/expenses/import", "money", "Expenses"],
+    ["/investments", "money", "Investments"],
+    ["/investments/some-asset", "money", "Investments"],
+    ["/net-worth", "money", "Net worth"],
+    ["/reminders", "planning", "Reminders"],
+    ["/todos", "planning", "To-dos"],
+    ["/calendar", "planning", "Calendar"],
+    ["/settings", "more", "Settings"],
+    ["/settings/family/manage", "more", "Settings"],
+    ["/settings/notifications", "more", "Settings"],
+  ])("puts %s in %s, on %s", (pathname, key, label) => {
+    expect(where(pathname)).toEqual([key, label]);
+  });
+
+  it("puts /more in More with no page of its own", () => {
+    expect(where("/more")).toEqual(["more", undefined]);
+  });
+
+  it("doesn't match a path that only starts with a page's URL", () => {
+    expect(where("/expenses-old")).toEqual([undefined, undefined]);
+    expect(where("/")).toEqual([undefined, undefined]);
+  });
+});
+
+describe("segmentsFor", () => {
+  const sectionOf = (membership: AccountMembership | null, key: string) => navigationFor(membership).sections.find((section) => section.key === key)!;
+
+  it("lists a section's pages by their URLs", () => {
+    expect(segmentsFor(sectionOf(parent, "money"))).toEqual([
+      { value: "/expenses", label: "Expenses" },
+      { value: "/investments", label: "Investments" },
+      { value: "/net-worth", label: "Net worth" },
     ]);
+    expect(segmentsFor(sectionOf(parent, "planning"))).toEqual([
+      { value: "/reminders", label: "Reminders" },
+      { value: "/todos", label: "To-dos" },
+      { value: "/calendar", label: "Calendar" },
+    ]);
+  });
+
+  it("has no segmented control for a section with one page", () => {
+    expect(segmentsFor(sectionOf(null, "planning"))).toBeNull();
+    expect(segmentsFor(sectionOf(kid(), "money"))).toBeNull();
+    expect(segmentsFor(sectionOf(parent, "home"))).toBeNull();
+    expect(segmentsFor(sectionOf(parent, "more"))).toBeNull();
+  });
+
+  it("follows the permissions: a kid with investments gets two segments", () => {
+    expect(segmentsFor(sectionOf(kid({ investments: "edit" }), "money"))?.map((segment) => segment.value)).toEqual(["/expenses", "/investments"]);
   });
 });

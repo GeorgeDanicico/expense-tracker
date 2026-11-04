@@ -9,6 +9,7 @@ import DashboardPage from "@/app/(app)/dashboard/page";
 import ExpensesPage from "@/app/(app)/expenses/page";
 import ImportPage from "@/app/(app)/expenses/import/page";
 import InvestmentsPage from "@/app/(app)/investments/page";
+import MorePage from "@/app/(app)/more/page";
 import NetWorthPage from "@/app/(app)/net-worth/page";
 import RemindersPage from "@/app/(app)/reminders/page";
 import AiFeaturesSettingsPage from "@/app/(app)/settings/ai/page";
@@ -20,6 +21,7 @@ import ChangePasswordPage from "@/app/change-password/page";
 import { ImportApiProvider } from "@/components/expenses/import/import-api";
 import { CalendarApiProvider } from "@/components/family-calendar/calendar-api";
 import { AppShell } from "@/components/layout/app-shell";
+import { AppPathProvider } from "@/components/layout/use-app-pathname";
 import { ReminderApiProvider } from "@/components/reminders/reminder-api";
 import { TodoApiProvider } from "@/components/todos/todo-api";
 
@@ -32,10 +34,11 @@ import type { PreviewScreen } from "./screens";
 
 const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   dashboard: DashboardPage,
+  more: MorePage,
   expenses: ExpensesPage,
   investments: InvestmentsPage,
   "net-worth": NetWorthPage,
-  settings: SettingsPage,
+  settings: SettingsPreview,
   todos: TodosPreview,
   reminders: RemindersPreview,
   calendar: CalendarPreview,
@@ -43,6 +46,23 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   "ai-settings": AiSettingsPreview,
   import: ImportPreview,
   "change-password": ChangePasswordPage,
+};
+
+/** The app page each screen stands for, so the navigation highlights it though the URL is `/dev/preview/…`. */
+const APP_PATH: Record<PreviewScreen, string> = {
+  dashboard: "/dashboard",
+  more: "/more",
+  expenses: "/expenses",
+  investments: "/investments",
+  "net-worth": "/net-worth",
+  settings: "/settings",
+  todos: "/todos",
+  reminders: "/reminders",
+  calendar: "/calendar",
+  notifications: "/settings/notifications",
+  "ai-settings": "/settings/ai",
+  import: "/expenses/import",
+  "change-password": "/change-password",
 };
 
 /** Screens that are a page of their own, outside the app shell. */
@@ -66,7 +86,16 @@ function ImportPreview() {
   );
 }
 
-/** Settings → Notifications with its tabs. Its writes reach the real API (and fail when signed out). */
+/** Settings → Account with the list beside it. */
+function SettingsPreview() {
+  return (
+    <SettingsLayout>
+      <SettingsPage />
+    </SettingsLayout>
+  );
+}
+
+/** Settings → Notifications with the list beside it. Its writes reach the real API (and fail when signed out). */
 function NotificationsPreview() {
   return (
     <SettingsLayout>
@@ -75,7 +104,7 @@ function NotificationsPreview() {
   );
 }
 
-/** Settings → AI features with its tabs. `?ai=on` and `?ai=kid` preview the other states (see `fixtures.ts`). */
+/** Settings → AI features with the list beside it. `?ai=on` and `?ai=kid` preview the other states (see `fixtures.ts`). */
 function AiSettingsPreview() {
   return (
     <SettingsLayout>
@@ -126,7 +155,9 @@ export function ScreenPreview({ screen }: { screen: PreviewScreen }) {
   );
   return (
     <SWRConfig value={{ use: [fixtures], dedupingInterval: 60_000, revalidateOnFocus: false }}>
-      {WITHOUT_SHELL.has(screen) ? content : <AppShell signInName="preview@example.com">{content}</AppShell>}
+      {WITHOUT_SHELL.has(screen) ? content : <AppPathProvider value={APP_PATH[screen]}>
+          <AppShell signInName="preview@example.com">{content}</AppShell>
+        </AppPathProvider>}
     </SWRConfig>
   );
 }
