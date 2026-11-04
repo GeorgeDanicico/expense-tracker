@@ -547,6 +547,9 @@ events; undo; keyboard delete on desktop.
 
 **Done when** on a phone, swiping deletes with undo, and scrolling and dragging still work.
 
+Built on 4 November 2026 (also expense rows, and Home's reminder rows); awaiting George's sign-off
+on a real phone.
+
 ### U13: Accessibility pass
 
 **Files:** a dev dependency on `axe-core` (pinned), a test helper, tests per main screen, fixes.

@@ -4,7 +4,7 @@
  * Pieces only the mockups need, on the real theme. The primitives U4 built (AppDialog as a sheet,
  * ActionBar, UndoToast, AmountInput, ToggleChip, Disclosure, Collapse, IconTile, RowActions) are
  * imported from src/components/ui, and so are U6's ChipMenu, ChipRow and SaveButton; what's left here
- * is for later tasks (swipes for U12) or for the mockups' fixtures.
+ * is for the mockups' fixtures (the real swipe is `SwipeRow` in `src/components/ui/row-actions.tsx`, U12).
  */
 
 import { Box, chakra, Flex, Text } from "@chakra-ui/react";
