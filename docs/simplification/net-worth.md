@@ -1,5 +1,7 @@
 # Simpler ways: net worth
 
+**Done in U9 (4 November 2026):** proposals 1 (`NET_WORTH_CATEGORIES`), 2 (no `onSuccess` props) and 3 (`net-worth-api.tsx`, `use-net-worth-writes.ts`, optimistic dated values), the value inputs on `AmountInput`, and the single "incomplete" message. The "Add value" date bug was already fixed (`ValuedOnField`, tested). Left: proposals 4 and 5 (the layout report's gate, and routes that aren't rebuilt).
+
 Looked at `src/components/net-worth/**` (10 files, ~870 lines), `src/app/(app)/net-worth`, `src/app/api/net-worth/**`, `src/lib/net-worth/**` (~690 lines) and `src/lib/mcp/tools/net-worth.ts`, with the `find-shapes` script and by reading every component. 5 proposals, about 60 lines. The one most worth doing is **one list of categories** (proposal 1); the most urgent item is a bug: **"Add value" defaults its date to the last observation, so saving it without a look replaces that observation** (see "Found on the way").
 
 ## Map

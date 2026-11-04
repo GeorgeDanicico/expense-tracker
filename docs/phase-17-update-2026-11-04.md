@@ -15,7 +15,7 @@ Work for [the phase 17 plan](ui-plan.md), on branch `claude/phase-17-cloud-sessi
 | **U6 Quick add and the fast expense form** | **Done. George signed off the screenshots on 4 November; merged in #214.** |
 | **U7 Home as "today"** | **Done. George signed off the screenshots on 4 November; merged in #215.** |
 | **U8 Expenses** | **Done, pushed, waiting for George's sign-off.** |
-| **U9 Investments and Net worth** | **In progress.** |
+| **U9 Investments and Net worth** | **Done in this session. Pushed, waiting for George's screenshot sign-off.** |
 | U10 onwards | Not started. |
 
 ## What U3 added
@@ -307,9 +307,53 @@ An opus agent did the work. It pushed five commits after the U7 note, from `2f0e
 - The month comparison needs last month's ledger: one more request per month viewed (it also
   makes ‹ instant).
 
+## What U9 added
+
+An agent did the work, on top of U8's commits (U8 is not merged yet).
+
+- **Investments, in the Money look:** a compact "Add investment" button beside the title (the one
+  primary action; quick add has no investment form, so the screen keeps it). An asset's orders are
+  one list at every width (side, quantity, date, price, amount); **Remove** is in each row's `⋯`
+  (hover icon on desktop, long-press on phones) and still asks first.
+- **Net worth, in the Money look:** the same compact "Add item". Each balance-sheet line is a list
+  row: name, a caption with the date and what needs attention, the change under it ("Since last
+  valuation +EUR 600"), the value on the right. A manual item's `⋯` holds **Add value** and **Edit
+  details**, each a bottom sheet (Archive stays in Edit details); investment lines show no menu. The
+  value fields use `AmountInput` (two decimals, the currency in front).
+- **D6:** `investment-api.tsx` + `use-investment-writes.ts` and `net-worth-api.tsx` +
+  `use-net-worth-writes.ts`, with preview providers (`/dev/preview/money-fixtures.ts`).
+  **Orders are not optimistic:** they wait for the server (a sell is checked against the units
+  held), the form shows its pending state and the server's refusal, and the views refresh only after
+  a success. **A net-worth dated value is optimistic:** the row shows it at once and goes back if the
+  save fails; the totals follow the refetch. Item create, edit and archive wait for the server.
+  `afterInvestmentChange` and `afterNetWorthChange` left `invalidate.ts`.
+  `local/no-fetch-in-components` is on for `src/components/{investments,net-worth}` and
+  `src/app/(app)/{investments,net-worth}`.
+- **D9:** `formatDateTime` and `formatInstantDate` take a `timeZone` (default Bucharest), so order
+  times, quote times and invite expiries read the same wherever the device is. The order form's
+  "Execution date and time" is Bucharest time (it was the browser's zone) and says so.
+- **Simplification reports:** investments proposal 1, net worth proposals 1 to 3 (one category
+  table, no `onSuccess` props, the API object), and one "incomplete" message in place of three. The
+  five redundant `apiFetcher` arguments were removed in U1.
+- **Screenshots:** `docs/ui-styling/screenshots/u9-{investments,investments-asset,order-form,net-worth,valuation-form}-{390,1280}.jpg`.
+- **Checks:** lint has 0 errors and 0 warnings; `tsc` is clean; vitest passes 6561 tests
+  (1 skipped); `npm run build` passes with the CI environment.
+
+### Left over from U9
+
+- A dated value can't be edited or deleted from the screen: net worth entries carry no valuation id,
+  and there is no DELETE route for valuations (only `PATCH /api/net-worth/valuations/[id]`). Not a
+  U9 change; say if you want a valuation history.
+- The order form still asks for quantity, unit price and amount separately (prefilling the amount is
+  a product question about fees and rounding).
+- The segmented control at the top of Money wraps "Net worth" on two lines at 1280 px beside the
+  sidebar; it comes from U5/U8, not U9.
+
 ## Next steps
 
-1. George signs off the U8 screenshots at 390 and 1280 px, including the Settings currency warning.
-2. Open a PR from `claude/phase-17-cloud-session-rk7uoj` to `main` for U8. **Merging changes
-   Expenses, Insights' add buttons, Settings' currency save and the expenses API in production.**
-3. Then U9 (Investments and Net worth), with U8's patterns.
+1. George signs off the U8 and U9 screenshots at 390 and 1280 px (U8 includes the Settings currency
+   warning).
+2. **U8 and U9 go out in one PR** from `claude/phase-17-cloud-session-rk7uoj` to `main`, after
+   sign-off. **Merging changes Expenses, Investments, Net worth, Insights' add buttons, Settings'
+   currency save, date display and the expenses API in production.**
+3. Then U10 (Planning), with the same patterns.

@@ -1,17 +1,17 @@
-import { Button, Text } from "@chakra-ui/react";
+import { Text } from "@chakra-ui/react";
 import { Pencil, Plus } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { AddNetWorthValuationDialog } from "@/components/net-worth/add-net-worth-valuation-dialog";
 import { EditNetWorthItemDialog } from "@/components/net-worth/edit-net-worth-item-dialog";
-import { NetWorthValue } from "@/components/net-worth/net-worth-value";
 import type { StatusTone } from "@/components/ui/status-badge";
+import { changeColor, formatSignedAmount } from "@/components/ui/value-with-change";
 import { ListRow } from "@/components/ui/list-row";
 import { RowActions, useRowActions, type RowAction } from "@/components/ui/row-actions";
 import { useViewing } from "@/hooks/use-viewing";
 import type { NetWorthEntry } from "@/lib/net-worth/types";
 import { formatDate, formatDateTime } from "@/lib/calendar";
+import { formatInvestmentAmount } from "@/lib/utils/currency";
 
 export function entryAnchor(id: string) {
   return `net-worth-entry-${id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
@@ -38,7 +38,7 @@ function entryDate(entry: NetWorthEntry) {
  * to its page. A status that needs attention is said in the caption.
  */
 export function NetWorthEntryRow({ entry }: { entry: NetWorthEntry }) {
-  const { hrefFor, readOnly } = useViewing();
+  const { readOnly } = useViewing();
   const { rowProps, menu } = useRowActions();
   const [sheet, setSheet] = useState<"value" | "details" | null>(null);
   const status = entryStatus(entry);
@@ -57,16 +57,12 @@ export function NetWorthEntryRow({ entry }: { entry: NetWorthEntry }) {
       style={{ scrollMarginTop: "1rem" }}
       title={entry.name}
       meta={meta}
+      detail={entry.comparison ? <Text as="span" color={changeColor(entry.comparison.tone)}>{entry.comparison.label} {formatSignedAmount(entry.comparison.amount, entry.currency)}</Text> : null}
       trailing={
         <>
-          {entry.source === "investment" ? (
-            <Button asChild size="xs" variant="ghost" color="fg.muted" flexShrink="0">
-              <Link href={hrefFor("/investments")}>View →</Link>
-            </Button>
-          ) : null}
           {actions ? <RowActions label={entry.name} actions={actions} {...menu} /> : null}
-          <Text textStyle="amount" textAlign="end" wordBreak="break-word">
-            <NetWorthValue entry={entry} />
+          <Text textStyle="amountSm" whiteSpace="nowrap">
+            {entry.currentValue === null ? "No value" : formatInvestmentAmount(entry.currentValue, entry.currency)}
           </Text>
           {actions ? (
             <>

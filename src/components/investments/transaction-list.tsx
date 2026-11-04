@@ -35,8 +35,9 @@ function OrderRow({
     <ListRow
       {...(actions ? rowProps : {})}
       leading={<SideBadge side={transaction.side} />}
-      title={`${transaction.quantity} units at ${formatInvestmentAmount(transaction.unitPrice, currency)}`}
+      title={`${transaction.quantity} units`}
       meta={formatDateTime(transaction.executedAt)}
+      detail={`at ${formatInvestmentAmount(transaction.unitPrice, currency)} each`}
       trailing={
         <>
           {actions ? <RowActions label={`${side} order of ${formatDateTime(transaction.executedAt)}`} actions={actions} {...menu} /> : null}

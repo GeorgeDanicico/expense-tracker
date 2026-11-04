@@ -4,13 +4,13 @@ import { formatInvestmentAmount } from "@/lib/utils/currency";
 
 export type ValueChangeTone = "positive" | "negative" | "neutral";
 
-function changeColor(tone: ValueChangeTone) {
+export function changeColor(tone: ValueChangeTone) {
   if (tone === "positive") return "fg.success";
   if (tone === "negative") return "fg.error";
   return "fg.muted";
 }
 
-function formatSignedAmount(amount: string, currency: string) {
+export function formatSignedAmount(amount: string, currency: string) {
   const formatted = formatInvestmentAmount(amount, currency);
   const numericAmount = Number(amount);
   return Number.isFinite(numericAmount) && numericAmount > 0 ? `+${formatted}` : formatted;
