@@ -82,19 +82,31 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
       <Text as="span" textStyle="amountLg" color="fg.muted" aria-hidden="true">
         {symbol}
       </Text>
-      <chakra.input
-        ref={ref}
-        {...field}
-        // As wide as what's typed, so the symbol stays next to the number.
-        width={`${Math.max(4, text.length) + 0.5}ch`}
-        bg="transparent"
-        borderWidth="0"
-        outline="none"
-        textAlign="center"
-        caretColor="fg.accent"
-        fontVariantNumeric="tabular-nums"
-        textStyle="amountInput"
-      />
+      {/* The input is exactly as wide as what it shows (the typed amount, or the placeholder while
+          empty): a hidden copy of that text sizes the box, and the input covers it. So the symbol
+          stays next to the number and the row centres the pair. The input is start-aligned, not
+          centred, because an empty centred input puts its caret in the middle of the placeholder. */}
+      <chakra.span position="relative" display="inline-block" textStyle="amountInput">
+        <chakra.span visibility="hidden" whiteSpace="pre" pe="2px" aria-hidden="true">
+          {text || placeholder}
+        </chakra.span>
+        <chakra.input
+          ref={ref}
+          {...field}
+          position="absolute"
+          inset="0"
+          width="full"
+          height="full"
+          p="0"
+          bg="transparent"
+          borderWidth="0"
+          outline="none"
+          textAlign="start"
+          caretColor="fg.accent"
+          fontVariantNumeric="tabular-nums"
+          textStyle="amountInput"
+        />
+      </chakra.span>
     </Flex>
   );
 });
