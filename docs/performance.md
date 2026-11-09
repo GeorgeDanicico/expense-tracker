@@ -33,7 +33,8 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 
 | Task | What | Status | PR |
 | --- | --- | --- | --- |
-| PF1 | Baseline and budgets | in review (stacked on #225, the plan) | #226 |
+| PF1 | Baseline and budgets | done, except signed-in lab numbers (PF1b) and the VPS numbers (row 3 above) | #226 |
+| PF1b | A local lab: signed-in pages measured without touching live data | not started | |
 | PF2 | No endless loading | not started | |
 | PF3 | Skeletons and a boundary per section | not started | |
 | PF4 | Fewer round trips in the app | not started | |
