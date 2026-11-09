@@ -12,6 +12,7 @@
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run build",
     "test:db": "bash scripts/test-database.sh",
+    "size:routes": "node scripts/route-js-size.mjs",
     "eval:statements": "esbuild src/lib/imports/ai/__eval__/run.ts --bundle --platform=node --format=esm --target=node24 --conditions=react-server --log-level=warning --outfile=dist/eval-statements.mjs && node dist/eval-statements.mjs",
     "eval:statements:generate": "esbuild src/lib/imports/ai/__eval__/generate.ts --bundle --platform=node --format=esm --target=node24 --conditions=react-server --log-level=warning --outfile=dist/eval-generate.mjs && node dist/eval-generate.mjs",
     "feature-map": "node .claude/skills/feature-map/scripts/feature-map.mjs"

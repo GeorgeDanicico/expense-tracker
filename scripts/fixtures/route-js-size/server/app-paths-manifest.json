@@ -1,0 +1,9 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/api/todos/route": "app/api/todos/route.js",
+  "/page": "app/page.js",
+  "/(app)/dashboard/page": "app/(app)/dashboard/page.js",
+  "/(app)/todos/page": "app/(app)/todos/page.js",
+  "/(app)/todos/[id]/page": "app/(app)/todos/[id]/page.js",
+  "/dev/preview/[screen]/page": "app/dev/preview/[screen]/page.js"
+}
