@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.{ts,tsx}", "eslint-rules/**/*.test.mjs"],
+    include: ["src/**/*.test.{ts,tsx}", "eslint-rules/**/*.test.mjs", "scripts/**/*.test.mjs"],
     setupFiles: ["src/test/quiet-logs.ts"],
   },
 });

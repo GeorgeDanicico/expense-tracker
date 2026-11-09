@@ -3,7 +3,8 @@
 How to read the app's logs: what a line looks like, which events exist, what is never written, how
 long lines are kept, and the commands for the questions you will actually ask. Written for the
 operator (George, over SSH on the VPS). The design behind it is in
-[logging-plan.md](logging-plan.md).
+[logging-plan.md](logging-plan.md). The performance report built from these lines (Web Vitals per
+page, server time per route, Auth calls per request) is in [performance.md](performance.md).
 
 The short version: the web app and the worker write **one JSON object per line** to stdout and
 stderr. Docker's `journald` driver hands those lines to the host's journal, which keeps them for
