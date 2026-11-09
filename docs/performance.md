@@ -33,7 +33,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 
 | Task | What | Status | PR |
 | --- | --- | --- | --- |
-| PF1 | Baseline and budgets | in review (stacked on #225, the plan) | PR_NUMBER |
+| PF1 | Baseline and budgets | in review (stacked on #225, the plan) | #226 |
 | PF2 | No endless loading | not started | |
 | PF3 | Skeletons and a boundary per section | not started | |
 | PF4 | Fewer round trips in the app | not started | |
