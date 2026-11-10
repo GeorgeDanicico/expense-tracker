@@ -7,6 +7,7 @@ import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useApiForm } from "@/hooks/use-api-form";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { setAiEnabled, useAiSettings } from "@/hooks/use-ai-settings";
+import { AI_SETTINGS_API_KEY } from "@/lib/api/keys";
 
 export default function AiFeaturesSettingsPage() {
   useDocumentTitle("AI features");
@@ -21,7 +22,7 @@ export default function AiFeaturesSettingsPage() {
   }
 
   if (error && !settings) return <DataError retry={() => void mutate()} />;
-  if (!settings) return <DataLoading label="Loading your AI settings…" />;
+  if (!settings) return <DataLoading label="Loading your AI settings…" slowKey={AI_SETTINGS_API_KEY} />;
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>

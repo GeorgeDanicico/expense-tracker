@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { useAccount } from "@/hooks/use-account";
 import { useCan } from "@/hooks/use-can";
+import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 import type { ModuleKey, PermissionLevel } from "@/lib/permissions";
 
 /**
@@ -31,7 +32,7 @@ export function PermissionGate({
     return error && !isLoading ? (
       <DataError message="Your account could not be loaded." retry={() => void mutate()} />
     ) : (
-      <DataLoading label="Loading…" />
+      <DataLoading label="Loading…" slowKey={ACCOUNT_API_KEY} />
     );
   }
   return (

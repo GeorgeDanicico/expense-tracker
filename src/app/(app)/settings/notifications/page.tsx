@@ -25,6 +25,7 @@ import {
   type DeviceSupport,
 } from "@/lib/notifications/browser";
 import type { NotificationSettingsPatch } from "@/lib/notifications/settings-repository";
+import { NOTIFICATION_SETTINGS_API_KEY } from "@/lib/api/keys";
 
 export default function NotificationsSettingsPage() {
   useDocumentTitle("Notifications");
@@ -106,7 +107,7 @@ export default function NotificationsSettingsPage() {
   }
 
   if (error && !settings) return <DataError retry={() => void mutate()} />;
-  if (!settings) return <DataLoading label="Loading your notification settings…" />;
+  if (!settings) return <DataLoading label="Loading your notification settings…" slowKey={NOTIFICATION_SETTINGS_API_KEY} />;
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>

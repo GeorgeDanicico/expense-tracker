@@ -15,7 +15,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useViewing } from "@/hooks/use-viewing";
-import { dashboardApiKey } from "@/lib/api/keys";
+import { dashboardApiKey, FAMILY_API_KEY } from "@/lib/api/keys";
 import {
   dashboardHref,
   dashboardMonth,
@@ -57,7 +57,7 @@ function InsightsContent() {
         }
       />
       <ViewingControls noun="expenses" family />
-      {!viewing.ready ? <DataLoading label="Loading insights…" /> : null}
+      {!viewing.ready ? <DataLoading label="Loading insights…" slowKey={FAMILY_API_KEY} /> : null}
       {viewing.ready && viewing.family && view !== "summary" ? (
         <Text textStyle="bodySm" color="fg.muted">
           Monthly and History show one person at a time. Choose a member above, or go back to Summary.

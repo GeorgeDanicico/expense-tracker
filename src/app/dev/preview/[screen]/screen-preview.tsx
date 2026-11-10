@@ -27,6 +27,8 @@ import { FamilyApiProvider } from "@/components/family/family-api";
 import { ImportApiProvider } from "@/components/expenses/import/import-api";
 import { CalendarApiProvider } from "@/components/family-calendar/calendar-api";
 import { InvestmentApiProvider } from "@/components/investments/investment-api";
+import { ApiError } from "@/lib/api/client";
+import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 import { AppShell } from "@/components/layout/app-shell";
 import { AppPathProvider } from "@/components/layout/use-app-pathname";
 import { NetWorthApiProvider } from "@/components/net-worth/net-worth-api";
@@ -181,13 +183,27 @@ function PreviewApis({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Replaces every fetcher (including explicit ones) with the fixture resolver. */
-const fixtures: Middleware = (useSWRNext) => (key, _fetcher, config) => {
-  const fetcher = (resolved: string) => Promise.resolve(fixtureFor(resolved));
-  return useSWRNext(key, fetcher as typeof _fetcher, config);
+/**
+ * What the fixtures answer with. `?fixture=hang` never answers, so a screen shows its "taking longer
+ * than usual" state; `?fixture=fail` answers with a server error, so it shows its error and Retry.
+ * The account is always answered: in the app the layout only shows a page once it has loaded.
+ */
+export type FixtureMode = "ok" | "hang" | "fail";
+
+const FIXTURE_ANSWERS: Record<FixtureMode, (key: string) => Promise<unknown>> = {
+  ok: (key) => Promise.resolve(fixtureFor(key)),
+  hang: (key) => (key === ACCOUNT_API_KEY ? FIXTURE_ANSWERS.ok(key) : new Promise(() => undefined)),
+  fail: (key) => (key === ACCOUNT_API_KEY ? FIXTURE_ANSWERS.ok(key) : Promise.reject(new ApiError("Preview: this request is set to fail.", 500))),
 };
 
-export function ScreenPreview({ screen, quickAdd = null }: { screen: PreviewScreen; quickAdd?: QuickAddOptions | null }) {
+/** Replaces every fetcher (including explicit ones) with the fixture resolver. */
+const fixturesFor = (mode: FixtureMode): Middleware => (useSWRNext) => (key, _fetcher, config) => {
+  const fetcher = (resolved: string) => FIXTURE_ANSWERS[mode](resolved);
+  return useSWRNext(key, fetcher as typeof _fetcher, config);
+};
+const FIXTURE_MIDDLEWARE = { ok: fixturesFor("ok"), hang: fixturesFor("hang"), fail: fixturesFor("fail") };
+
+export function ScreenPreview({ screen, quickAdd = null, fixture = "ok" }: { screen: PreviewScreen; quickAdd?: QuickAddOptions | null; fixture?: FixtureMode }) {
   const Screen = SCREENS[screen];
   const content = (
     <Suspense>
@@ -195,7 +211,7 @@ export function ScreenPreview({ screen, quickAdd = null }: { screen: PreviewScre
     </Suspense>
   );
   return (
-    <SWRConfig value={{ use: [fixtures], dedupingInterval: 60_000, revalidateOnFocus: false }}>
+    <SWRConfig value={{ use: [FIXTURE_MIDDLEWARE[fixture]], dedupingInterval: 60_000, revalidateOnFocus: false }}>
       <PreviewApis>
         {WITHOUT_SHELL.has(screen) ? content : (
           <AppPathProvider value={APP_PATH[screen]}>

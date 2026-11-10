@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useAccount } from "@/hooks/use-account";
 import { ApiError } from "@/lib/api/client";
+import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 import { BRAND } from "@/lib/brand";
 
 export default function HomePage() {
@@ -21,5 +22,5 @@ export default function HomePage() {
     return <DataError message={error.message} retry={() => void mutate()} />;
   }
 
-  return <DataLoading layout="screen" label={`Opening ${BRAND.name}…`} />;
+  return <DataLoading layout="screen" label={`Opening ${BRAND.name}…`} slowKey={ACCOUNT_API_KEY} />;
 }

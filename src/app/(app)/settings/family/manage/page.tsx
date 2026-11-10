@@ -31,7 +31,7 @@ export default function ManageFamilyPage() {
 
   if (!isParent) return account && !notAllowed ? null : <DataLoading label="Loading…" />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading your family…" />;
+  if (!data) return <DataLoading label="Loading your family…" slowKey={FAMILY_API_KEY} />;
   if (!data.family) return null;
 
   return (

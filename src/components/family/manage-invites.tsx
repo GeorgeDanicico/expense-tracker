@@ -82,7 +82,7 @@ export function ManageInvites() {
         {error && !data ? (
           <DataError retry={() => void mutate()} />
         ) : !data ? (
-          <DataLoading label="Loading the invites…" />
+          <DataLoading label="Loading the invites…" slowKey={FAMILY_INVITES_API_KEY} />
         ) : data.invites.length === 0 ? (
           <Text textStyle="bodySm" color="fg.muted">
             No pending invites.

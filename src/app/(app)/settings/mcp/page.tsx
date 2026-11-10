@@ -11,6 +11,7 @@ import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useApiForm } from "@/hooks/use-api-form";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { setMcpEnabled, useMcpSettings } from "@/hooks/use-mcp-settings";
+import { MCP_SETTINGS_API_KEY } from "@/lib/api/keys";
 
 export default function AiAssistantsSettingsPage() {
   useDocumentTitle("AI assistants");
@@ -28,7 +29,7 @@ export default function AiAssistantsSettingsPage() {
   }
 
   if (error && !settings) return <DataError retry={() => void mutate()} />;
-  if (!settings) return <DataLoading label="Loading your AI assistant settings…" />;
+  if (!settings) return <DataLoading label="Loading your AI assistant settings…" slowKey={MCP_SETTINGS_API_KEY} />;
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>

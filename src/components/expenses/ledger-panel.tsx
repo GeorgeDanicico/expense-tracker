@@ -82,7 +82,7 @@ export function LedgerPanel({
     return (
       <Stack gap="3">
         {controls}
-        {error ? <DataError retry={() => void mutate()} /> : <DataLoading label="Loading expenses…" />}
+        {error ? <DataError retry={() => void mutate()} /> : <DataLoading label="Loading expenses…" slowKey={mainExpensesApiKey(month, viewing.member)} />}
       </Stack>
     );
   }

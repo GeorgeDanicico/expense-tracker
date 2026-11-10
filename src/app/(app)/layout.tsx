@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useAccount } from "@/hooks/use-account";
 import { ApiError } from "@/lib/api/client";
+import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   }, [data, error, router]);
 
   if ((isLoading && !data) || (error instanceof ApiError && error.status === 401) || data?.mustChangePassword) {
-    return <DataLoading layout="screen" label="Opening your ledger…" />;
+    return <DataLoading layout="screen" label="Opening your ledger…" slowKey={ACCOUNT_API_KEY} />;
   }
 
   if (!data) {

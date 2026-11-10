@@ -42,12 +42,13 @@ function groupedEntries(entries: NetWorthEntry[]) {
 function SingleNetWorthPanel() {
   useDocumentTitle("Net worth");
   const { member, currency, readOnly, name } = useViewing();
-  const { data, error, isLoading, isValidating, mutate } = useSWR<NetWorthOverview>(netWorthApiKey(member));
+  const key = netWorthApiKey(member);
+  const { data, error, isLoading, isValidating, mutate } = useSWR<NetWorthOverview>(key);
   const grouped = useMemo(() => groupedEntries(data?.entries ?? []), [data?.entries]);
 
-  if (isLoading && !data) return <DataLoading label="Loading your net worth…" />;
+  if (isLoading && !data) return <DataLoading label="Loading your net worth…" slowKey={key} />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading your net worth…" />;
+  if (!data) return <DataLoading label="Loading your net worth…" slowKey={key} />;
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>
@@ -93,11 +94,12 @@ function SingleNetWorthPanel() {
 /** The family view: the members' totals added per currency, then each member's balance sheet, read-only. */
 function FamilyNetWorthPanel() {
   useDocumentTitle("Net worth");
-  const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyNetWorthOverview>(netWorthApiKey("all"));
+  const key = netWorthApiKey("all");
+  const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyNetWorthOverview>(key);
 
-  if (isLoading && !data) return <DataLoading label="Loading the family's net worth…" />;
+  if (isLoading && !data) return <DataLoading label="Loading the family's net worth…" slowKey={key} />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading the family's net worth…" />;
+  if (!data) return <DataLoading label="Loading the family's net worth…" slowKey={key} />;
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>

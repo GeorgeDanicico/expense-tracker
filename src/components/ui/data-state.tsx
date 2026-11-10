@@ -2,22 +2,58 @@
 
 import { Box, Button, Flex, Skeleton, SimpleGrid, Spinner, Stack, Text } from "@chakra-ui/react";
 import { RefreshCw, TriangleAlert } from "lucide-react";
+import { useSWRConfig } from "swr";
 
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
+import { useOnline } from "@/hooks/use-online";
+import { OFFLINE_MESSAGE } from "@/lib/api/client";
+import { clearSlow, useSlowKeys } from "@/lib/api/slow-keys";
+
+export const SLOW_MESSAGE = "This is taking longer than usual.";
+
+/**
+ * "This is taking longer than usual." with a Retry, once a load has been waiting for the provider's
+ * `loadingTimeout` (8 s). `slowKey` is the SWR key being waited for; without one, any slow key counts
+ * and Retry reloads them all (a screen that waits on several things).
+ */
+export function SlowNotice({ slowKey }: { slowKey?: string | null }) {
+  const slowKeys = useSlowKeys();
+  const { mutate } = useSWRConfig();
+  const keys = slowKey ? slowKeys.filter((key) => key === slowKey) : slowKeys;
+  if (keys.length === 0) return null;
+  return (
+    <Flex align="center" gap="3" wrap="wrap" mb="3">
+      <Text textStyle="bodySm" color="fg.muted">{SLOW_MESSAGE}</Text>
+      <Button
+        size="xs"
+        variant="outline"
+        onClick={() => {
+          for (const key of keys) clearSlow(key);
+          void mutate((key) => typeof key === "string" && keys.includes(key));
+        }}
+      >
+        <RefreshCw size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Retry
+      </Button>
+    </Flex>
+  );
+}
 
 /**
  * Loading placeholder shaped like the content it replaces. `page` mimics a
  * metrics card plus a list; `section` is a few lines inside an existing card;
  * `screen` is a padded page skeleton for routes rendered before the app shell.
+ * `slowKey` (the SWR key it waits for) lets it say when the wait runs long.
  */
 export function DataLoading({
   label = "Loading your ledger…",
   layout = "page",
+  slowKey,
 }: {
   label?: string;
   layout?: "page" | "section" | "screen";
+  slowKey?: string | null;
 }) {
   return (
     <Box
@@ -28,6 +64,7 @@ export function DataLoading({
       {...(layout === "screen" ? { maxW: "1200px", mx: "auto", px: { base: "4", md: "6" }, py: { base: "5", md: "8" } } : {})}
     >
       <Text className="sr-only">{label}</Text>
+      <SlowNotice slowKey={slowKey} />
       {layout === "section" ? (
         <Stack gap="2.5" py="2" aria-hidden="true">
           <Skeleton height="4" width="40%" />
@@ -75,6 +112,8 @@ export function DataError({
   message?: string;
   retry: () => void;
 }) {
+  // With no connection, that is the reason, whatever the screen's own wording says.
+  const online = useOnline();
   return (
     <Box role="alert">
       <EmptyState
@@ -82,7 +121,7 @@ export function DataError({
         icon={<TriangleAlert />}
         titleAs="h2"
         title="Unable to load data"
-        description={message}
+        description={online ? message : OFFLINE_MESSAGE}
         action={
           <Button size="sm" variant="outline" onClick={retry}>
             <RefreshCw size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Try again

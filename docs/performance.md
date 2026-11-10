@@ -37,7 +37,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | --- | --- | --- | --- |
 | PF1 | Baseline and budgets | done, except the VPS numbers (row 3 above); the signed-in lab numbers came with PF1b | #226 |
 | PF1b | A local lab: signed-in pages measured without touching live data | done, except the VPS's round trip to Supabase (row 5) | #227 |
-| PF2 | No endless loading | not started | |
+| PF2 | No endless loading | done | #228 |
 | PF3 | Skeletons and a boundary per section | not started | |
 | PF4 | Fewer round trips in the app | not started | |
 | PF5 | Session gate and account on the server | not started | |
@@ -68,6 +68,12 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   prefetches each pay one; with asymmetric keys it makes **none**, and with 40 ms to Supabase the
   data appears 0.1 to 0.3 s sooner on a fast network. The lab also found that adding a kid
   probably fails in production (row 4 above).
+- **PF2, no endless loading.** A request that never answers used to show the loading skeleton
+  for 15 s, an error, then the skeleton again, then the error again: **36 s** before the second
+  error, and it kept going. Now the skeleton says "This is taking longer than usual." with a Retry
+  at **8 s**, the error comes at **15.3 s**, and a timeout isn't tried again. A session that ends
+  while the app is open sends you to `/login?next=<the page you were on>`; before, it bounced
+  between `/login` and `/dashboard` and ended on "Checking your session…".
 
 ## Baseline and budgets
 
@@ -1074,3 +1080,170 @@ About ten minutes, with Docker running:
   - **PF8**: a cold load fires 12 to 16 link prefetches (`?_rsc=`), each route twice, and with the
     shared secret each costs one Auth call. They start after `/api/account` and don't delay the
     data, but they are more than half of the Auth calls.
+
+### PF2: No endless loading
+
+#### 1. The problem
+
+When the server was slow or down, a screen could look like it was loading forever. I started the
+lab, opened Expenses signed in as the seed's parent, and froze the gateway so no request got an
+answer. Before this change (commit `07d12ce`, `main`):
+
+- The skeleton showed for 15 s, then "Unable to load data".
+- 6 s later the skeleton came back, because SWR (the library that loads each screen's data) tried
+  again. It waited 15 s again, showed the error at **36.4 s**, then started a third try at 42 s.
+  Nothing on screen said the wait was long, and a timeout that had already waited 15 s was tried
+  again anyway.
+- A server error (500) came back in 0.4 s and showed its error. SWR then retried 3 s later and
+  again 15 s later, and each retry replaced the error with the skeleton again.
+- If the session ended while the app was open (the cookie expired or was removed), the app sent you
+  to `/login` with nothing saying where you were, and then bounced: sign-in page, `/dashboard`,
+  sign-in page, 7 times in 4 s, and at 24 s it was on "Checking your session…". Only
+  `/api/account` was checked for a 401; every other read just failed.
+- With no connection the error said "Check your connection", the same as for any other failure.
+
+#### 2. What changed
+
+**What a person sees now**
+
+- A load still waiting after **8 s** adds "This is taking longer than usual." and a **Retry**
+  button above the skeleton. Retry loads it again. If the data then arrives, or the error comes,
+  the line goes.
+- A read that failed shows its error within **15 s of its first try**. Retries (up to 2, 3 s apart,
+  server errors and 429 only) share that 15 s: each retry's own timeout is cut to what's left of it,
+  and no retry starts if less than 2 s would be left. A timeout is not retried. A 4xx isn't either.
+- A **401 from any request** sends the browser to `/login?next=<the page and its query>`, once,
+  however many requests fail together. It does nothing on `/login`, `/join/*`, `/oauth/consent` and
+  `/change-password`, which handle their own 401s. It is a full page load, so the old signed-in data
+  is gone, which is what stops the bounce. The `(app)` layout's own 401 branch is still there
+  (PF5 replaces it).
+- With no connection the error says **"You're offline. Reconnect to load your data."** instead of
+  the screen's own wording. The same applies to a read that fails while `navigator.onLine` is false.
+- In `/dev/preview/<screen>`, `?fixture=hang` makes every request except the account never answer
+  and `?fixture=fail` makes them fail with a 500, to see the slow state and the error.
+
+**Files**
+
+- `src/lib/api/client.ts`: the timeout error carries `code: "timeout"`, an offline failure
+  `code: "offline"`; `retryDelay()` decides whether and when to retry; `apiFetcher` shortens a
+  retry's timeout to the budget left; `parseResponse` calls the 401 redirect (for reads and writes).
+- New `src/lib/api/auth-redirect.ts`: `loginUrlFor()` and `redirectToLoginIfUnauthorized()`.
+- New `src/lib/http/safe-next.ts`: `safeNextPath` moved here from `origin.ts` (which is
+  `server-only`), and `origin.ts` re-exports it. The browser now builds `next` with the very same
+  function the login page uses.
+- New `src/lib/api/slow-keys.ts`: the small store of keys whose load turned slow.
+- `src/components/ui/provider.tsx`: `loadingTimeout: 8_000`, `onLoadingSlow`, `onSuccess`/`onError`
+  clearing the mark, and an `onErrorRetry` that calls `retryDelay`.
+- `src/components/ui/data-state.tsx`: `DataLoading` takes `slowKey` and shows the notice;
+  `DataError` says offline. New `src/hooks/use-online.ts`, which `OfflineStatus` now uses too.
+- 27 of the 54 `DataLoading` calls got a `slowKey` (the screens whose key is a constant or already
+  in scope); the others fall back to "any slow load" (see 3). `asset-detail.tsx`, which draws its
+  own skeleton, shows the same notice.
+- `src/app/dev/preview/[screen]/screen-preview.tsx` and `page.tsx`: the two fixtures above.
+- Tests: `auth-redirect.test.ts`, `client.test.ts` (more), `data-state.test.tsx`,
+  `src/app/dev/preview/states.test.tsx`. `scripts/lab/states.mjs` and `states.sh` are the probe and
+  the scenarios behind the numbers below; `docs/lab.md` says how to hang or fail a request.
+
+#### 3. Why this way
+
+- **Design 5 and [S8]:** attention starts to drift at 10 s, so the slow notice comes at 8 s and the
+  error by 15 s. Both numbers are the plan's.
+- **The plan's premises, checked against the code.** Two were off:
+  - *"The error shows within 15 s of the first try" needed work, but not as described.* SWR already
+    sets the error when the first try fails; screens that check the error first show it at once. The
+    problem was the retries: SWR's default back-off (3 s, then up to about 18 s) put the skeleton
+    back over the error for a long time, because most screens test `isLoading && !data` before
+    `error`, and each retry could itself wait 15 s. So the fix is a budget, not only a retry count.
+  - *`subscribe-dialog.tsx` does not load in a raw `useEffect`.* It already uses `useSWR` and has
+    loading, error-with-retry and loaded states (audit D6 was fixed earlier). I left it alone; its
+    loading state gets the slow notice through the keyless fallback.
+  - *The count of 62 `useSWR` call sites*: I count 41 `useSWR(` calls in non-test source.
+- **Every screen already ended in content, an empty state or `DataError`.** I read the states of all
+  54 `DataLoading` uses and the screens that draw their own skeleton. Each has an `error` branch
+  (usually checked before `!data`); the only gap was that nothing said when a wait ran long. So I
+  added no new error branches. Screens that wait on the account are never reached in the app, since
+  the layout shows a page only after the account loaded.
+- **The redirect lives in `parseResponse`,** not in the SWR `onError` the plan names. `onError` sees
+  only reads; a write that gets a 401 (a to-do saved after the session ended) now redirects too, and
+  there is one place to maintain. The provider's `onError` keeps the password-change redirect.
+- **`next` is built with `safeNextPath`** itself, not a copy of its rule, so they can't drift.
+  That meant moving the function out of a `server-only` file. A pathname like `//evil.test` gives
+  `/login?next=%2Fdashboard`.
+- **Slow marks only count for a screen that was on display when they were made** (a sequence number).
+  SWR doesn't report the end of a load nobody is watching, so without that a page left mid-load
+  would show the notice the next time it opened.
+- **Wording.** "This is taking longer than usual." and Retry are the plan's. "You're offline" is the
+  plan's too; I added "Reconnect to load your data." and used a straight apostrophe, as the app's
+  other strings do (the offline page uses a curly one). The Retry button has the refresh icon and
+  `xs` size of the other retry buttons; nothing in `docs/ui-plan.md` said otherwise.
+- **Turned down:** retrying only by count (leaves the 36 s case); a per-page `slow` prop everywhere
+  (27 screens have a key in scope; the rest use the fallback, which says "slow" for any slow load and
+  Retry reloads those); converting the calendar dialog to anything else.
+
+#### 4. Numbers
+
+All from the lab (`docs/lab.md`) on George's laptop, 10 November 2026, signed in as the seed's parent,
+Expenses page, headless Chromium at 1280 px and 390 px. "Before" is the app built from `07d12ce`
+(`main`), "after" this branch. Times are milliseconds since the page started loading and are seen by
+polling the page text every 200 ms, so they're good to about 0.3 s. Not production numbers.
+
+| What | Before | After | Command |
+| --- | --- | --- | --- |
+| Request never answers (gateway frozen): when "taking longer" shows | never | 8.6 s at 1280, 8.3 s at 390 | `scripts/lab/states.sh <name>` (hang-1280, hang-390) |
+| … when the error shows | 15.3 s, then the skeleton again at 21.5 s, the error again at 36.4 s, the skeleton again at 42.3 s (45 s watched) | 15.7 s at 1280, 15.3 s at 390; nothing after, 45 s watched | same |
+| … requests made to `/api/account` in 45 s | 3 | 1 | same |
+| A 500 comes back at once (PostgREST stopped), 390 px | error at 0.6 s, back to the skeleton at the retry at 3.3 s, a third try at 18.4 s | error at 0.5 s, retry at 3.3 s, error again at 13.7 s, no third try | same (fail5xx-390) |
+| A 500 that takes 14 s to come back (the stopped PostgREST makes the gateway wait), 1280 px | error at 15.3 s (the first request hit the earlier freeze, see 7) | slow notice at 8.4 s, error at 14.7 s, no retry (the budget was gone) | same (fail5xx-1280) |
+| Signed out, open `/dashboard` | `/login` | `/login?next=%2Fdashboard` at 0.4 s | same (anon-1280, anon-390) |
+| Session removed at 17 s, then the app reloads its data | `/login` at 17.5 s, then 7 bounces `/login` ↔ `/dashboard` in 4 s, "Checking your session…" at 24 s | `/login?next=%2Fexpenses` at 17.4 s after one 401, no bounce | same (midsession401-1280) |
+| Slow but answering (`npm run lab -- delay 2500`), 390 px | no notice; content at about 23 s | "taking longer" at 18.8 s (the data request started at 10.6 s), content at 23.4 s | `npm run lab -- delay 2500`, then `node scripts/lab/states.mjs slow-then-loads-390 /expenses 390 --seconds 30` |
+| Offline error text | "Your data could not be loaded. Check your connection and try again." | "You're offline. Reconnect to load your data." at 3.1 s | same (offline-1280); see 7 |
+| Unit and component tests added | | 47, in four files (`npx vitest run src/lib/api src/components/ui src/app/dev/preview`) | |
+
+(In the "after" cell of the first 500 row, the retry at 3.3 s hung 10 s inside the gateway, got a 500
+at 13.6 s, and the error was back at 13.7 s: 13.2 s after the first try started, inside the 15 s. The
+slow notice showed at 11.4 s during that retry.)
+
+#### 5. How to check it yourself
+
+1. In a terminal: `npm run lab -- up`, then open <http://localhost:3110> and sign in with a name and
+   password from `.lab/users.json`.
+2. Open Expenses. In another terminal: `docker pause supabase_kong_expense-tracker-lab`, then
+   reload the page. After 8 s you see "This is taking longer than usual." with Retry; at about 15 s
+   the error. `docker unpause supabase_kong_expense-tracker-lab`, press Try again.
+3. Sign-out case: delete the site's cookies in the browser's devtools, then press Retry on any
+   screen or reload: you land on `/login?next=…` with the page you were on.
+4. Without the lab: run the app with `npm run dev` and open
+   `/dev/preview/todos?fixture=hang` (the slow state after 8 s) and `/dev/preview/todos?fixture=fail`
+   (the error with Try again). Turn Wi-Fi off on the `fail` one to see "You're offline".
+5. `npm run lab -- down` when you're done.
+
+#### 6. Risks and how to undo it
+
+- **A 401 now redirects from any request,** including a write. A screen that expected to handle a
+  401 itself, other than the four paths excluded, would be sent to sign in first. I found none: the
+  only 401s the API sends are "no session" (`withUser`) and a wrong password (`/api/auth`, on `/login`).
+  A future page that shows its own 401 needs adding to `OWN_401_PATHS` in `auth-redirect.ts`.
+- **A shorter retry,** only for server errors and 429, and stopping at 15 s. A flaky connection that
+  needed a third, late retry now shows the error sooner (and Try again works).
+- **The slow notice is by key.** Screens with no key use "any slow load", so a slow background read
+  elsewhere can put the notice on a screen that is itself fine. It's a notice with a Retry, not an error.
+- To undo: revert the PR. Nothing is stored and there is no migration.
+
+#### 7. Left open
+
+- **Offline is not tested with a real network drop.** My attempt to drop the network at the right
+  moment (Chrome's offline emulation) raced the page's own requests: the first try blocked the page's
+  scripts, the second let every request finish. The 3.1 s figure is with `navigator.onLine` forced
+  to false in the page, after the page had failed on a stopped PostgREST. The code path is the same
+  (`useOnline` and `fetchWithTimeout` read `navigator.onLine`), and the component test covers it.
+- **The 1280 px "500" run was contaminated** by the previous run: its first request hit the frozen
+  gateway. The clean 500 run is at 390 px.
+- **`use-account.ts` is unchanged.** Nothing needed it: the layout passes the account key to
+  `DataLoading`.
+- **The `(app)` layout still hides a failing account behind the skeleton** until its retries finish
+  (at most 15 s), because it tests `isLoading` first. PF5 replaces that layout.
+- **No lint rule.** "Every loading state has a way out" isn't something a machine can check
+  from syntax; the tests above cover each screen state I could reach.
+- The measuring script and scenarios are new files (`scripts/lab/states.*`); they aren't covered by
+  tests of their own, but I ran `states.mjs` once more after moving it into the repo.

@@ -10,6 +10,7 @@ import { JoinFamilyForm } from "@/components/family/join-family-form";
 import { Card } from "@/components/ui/card";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useAccount } from "@/hooks/use-account";
+import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { ApiError } from "@/lib/api/client";
 
@@ -31,7 +32,7 @@ export default function JoinLinkPage() {
   }, [signedOut, familyOff, code, router]);
 
   if ((isLoading && !account) || signedOut || familyOff) {
-    return <DataLoading layout="screen" label="Checking your invite…" />;
+    return <DataLoading layout="screen" label="Checking your invite…" slowKey={ACCOUNT_API_KEY} />;
   }
   if (!account) return <DataError retry={() => void mutate()} />;
 

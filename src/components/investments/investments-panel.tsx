@@ -43,12 +43,13 @@ function CalculationIssues({ overview }: { overview: InvestmentsOverview }) {
 function SingleInvestmentsPanel() {
   useDocumentTitle("Investments");
   const { member, readOnly, name } = useViewing();
-  const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentsOverview>(investmentsApiKey(member));
+  const key = investmentsApiKey(member);
+  const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentsOverview>(key);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  if (isLoading && !data) return <DataLoading label="Loading your investments…" />;
+  if (isLoading && !data) return <DataLoading label="Loading your investments…" slowKey={key} />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading your investments…" />;
+  if (!data) return <DataLoading label="Loading your investments…" slowKey={key} />;
 
   function selectAsset(accountId: string, asset: InvestmentOverviewAsset) {
     const nextKey = investmentAssetKey(accountId, asset.instrument, asset.currency);
@@ -139,12 +140,13 @@ function FamilyTotals({ data }: { data: FamilyInvestmentsOverview }) {
 /** The family view: one section per member, using the same broker sections, read-only. */
 function FamilyInvestmentsPanel() {
   useDocumentTitle("Investments");
-  const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyInvestmentsOverview>(investmentsApiKey("all"));
+  const key = investmentsApiKey("all");
+  const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyInvestmentsOverview>(key);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  if (isLoading && !data) return <DataLoading label="Loading the family's investments…" />;
+  if (isLoading && !data) return <DataLoading label="Loading the family's investments…" slowKey={key} />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading the family's investments…" />;
+  if (!data) return <DataLoading label="Loading the family's investments…" slowKey={key} />;
 
   function toggle(accountId: string, asset: InvestmentOverviewAsset) {
     const nextKey = investmentAssetKey(accountId, asset.instrument, asset.currency);
