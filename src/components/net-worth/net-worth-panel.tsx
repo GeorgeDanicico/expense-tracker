@@ -13,11 +13,12 @@ import { NetWorthAttention } from "@/components/net-worth/net-worth-attention";
 import { NetWorthGroup } from "@/components/net-worth/net-worth-group";
 import { NetWorthSummary } from "@/components/net-worth/net-worth-summary";
 import { Card } from "@/components/ui/card";
-import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
+import { DataError, DataRefresh } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { SectionHeader } from "@/components/ui/section-header";
 import { PageHeader } from "@/components/ui/page-header";
+import { PanelSkeleton } from "@/components/ui/skeletons";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useViewing } from "@/hooks/use-viewing";
 import { netWorthApiKey } from "@/lib/api/keys";
@@ -46,9 +47,9 @@ function SingleNetWorthPanel() {
   const { data, error, isLoading, isValidating, mutate } = useSWR<NetWorthOverview>(key);
   const grouped = useMemo(() => groupedEntries(data?.entries ?? []), [data?.entries]);
 
-  if (isLoading && !data) return <DataLoading label="Loading your net worth…" slowKey={key} />;
+  if (isLoading && !data) return <PanelSkeleton title="Net worth" label="Loading your net worth…" slowKey={key} />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading your net worth…" slowKey={key} />;
+  if (!data) return <PanelSkeleton title="Net worth" label="Loading your net worth…" slowKey={key} />;
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>
@@ -97,9 +98,9 @@ function FamilyNetWorthPanel() {
   const key = netWorthApiKey("all");
   const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyNetWorthOverview>(key);
 
-  if (isLoading && !data) return <DataLoading label="Loading the family's net worth…" slowKey={key} />;
+  if (isLoading && !data) return <PanelSkeleton title="Net worth" label="Loading the family's net worth…" slowKey={key} />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading the family's net worth…" slowKey={key} />;
+  if (!data) return <PanelSkeleton title="Net worth" label="Loading the family's net worth…" slowKey={key} />;
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>

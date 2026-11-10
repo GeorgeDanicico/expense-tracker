@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { ChakraProvider } from "@chakra-ui/react";
+import { ChakraProvider, defaultConfig } from "@chakra-ui/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -63,6 +63,12 @@ describe("reduced motion", () => {
     const block = css.slice(css.indexOf(`@media ${REDUCED_MOTION_QUERY}`));
     expect(block).not.toBe(css);
     expect(block).toMatch(/^@media \(prefers-reduced-motion: reduce\)\{html,\*,\*::before,\*::after\{[^}]*\banimation:none!important;[^}]*\btransition:none!important;/);
+  });
+
+  it("leaves a skeleton's shimmer to that block: it is the recipe's CSS animation, with no timer in JavaScript", () => {
+    const recipe = defaultConfig.theme?.recipes?.skeleton as unknown as { defaultVariants: { variant: string }; variants: { variant: Record<string, { animation?: string }> } };
+    expect(recipe.defaultVariants.variant).toBe("pulse");
+    expect(recipe.variants.variant.pulse.animation).toBe("pulse");
   });
 
   it("is not handled a second time in globals.css", () => {

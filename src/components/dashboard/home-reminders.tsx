@@ -9,7 +9,7 @@ import { useReminderActions } from "@/components/reminders/use-reminder-actions"
 import { REMINDERS_TICK_MS, useReminders } from "@/components/reminders/use-reminders";
 import { useNow } from "@/hooks/use-now";
 import { Card } from "@/components/ui/card";
-import { DataError, DataLoading } from "@/components/ui/data-state";
+import { DataError } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
@@ -17,6 +17,8 @@ import { IconTile } from "@/components/ui/icon-tile";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
+import { SkeletonFrame } from "@/components/ui/skeleton-frame";
+import { ListSkeleton } from "@/components/ui/skeletons";
 import { UndoToast } from "@/components/ui/undo-toast";
 import { dueReminders, dueTimeLabel } from "@/lib/home/today";
 import { formatDay, overdueText } from "@/lib/reminders/format";
@@ -56,7 +58,7 @@ export function DueReminders() {
       <Card size="sm">
         {header}
         <Card.Body>
-          {reminders.error ? <DataError message="Your reminders could not be loaded." retry={reminders.refresh} /> : <DataLoading layout="section" label="Loading your reminders…" />}
+          {reminders.error ? <DataError message="Your reminders could not be loaded." retry={reminders.refresh} /> : <SkeletonFrame label="Loading your reminders…"><ListSkeleton rows={3} actions gap="0" /></SkeletonFrame>}
         </Card.Body>
       </Card>
     );

@@ -9,7 +9,7 @@ import { DoneRow, ReminderRow } from "@/components/reminders/reminder-row";
 import { useReminderActions } from "@/components/reminders/use-reminder-actions";
 import { REMINDERS_TICK_MS, useReminders } from "@/components/reminders/use-reminders";
 import { useNow } from "@/hooks/use-now";
-import { DataError, DataLoading } from "@/components/ui/data-state";
+import { DataError } from "@/components/ui/data-state";
 import { Card } from "@/components/ui/card";
 import { Disclosure } from "@/components/ui/disclosure";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -18,8 +18,10 @@ import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { RemindersSkeleton } from "@/components/ui/skeletons";
 import { UndoToast } from "@/components/ui/undo-toast";
 import { prefersReducedMotion } from "@/hooks/use-reduced-motion";
+import { REMINDERS_API_KEY } from "@/lib/api/keys";
 import { doneEntries, groupOf, planReminders, type ListedReminder } from "@/lib/reminders/list";
 import { DONE_WINDOW_DAYS_LABEL } from "@/lib/reminders/format";
 
@@ -96,7 +98,7 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
       </Stack>
     );
   }
-  if (!reminders.reminders) return <DataLoading label="Loading your reminders…" />;
+  if (!reminders.reminders) return <RemindersSkeleton slowKey={REMINDERS_API_KEY} />;
 
   const openRows = (list: readonly ListedReminder[]) => list.map((reminder) => (
     <ReminderRow

@@ -6,12 +6,14 @@ import { useMemo } from "react";
 
 import { useTodoBoard } from "@/components/todos/use-todo-board";
 import { Card } from "@/components/ui/card";
-import { DataError, DataLoading } from "@/components/ui/data-state";
+import { DataError } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON } from "@/components/ui/icon";
 import { IconTile } from "@/components/ui/icon-tile";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
+import { SkeletonFrame } from "@/components/ui/skeleton-frame";
+import { ListSkeleton } from "@/components/ui/skeletons";
 import { relativeDay, openTodosFor } from "@/lib/home/today";
 import { isOverdue } from "@/lib/todos/filters";
 import { TODO_STATUS_LABELS } from "@/lib/todos/types";
@@ -26,7 +28,7 @@ export function FamilyTodos({ memberId, now }: { memberId: string; now: Date }) 
       <Card size="sm">
         {header}
         <Card.Body>
-          {board.error ? <DataError message="The board could not be loaded." retry={board.refresh} /> : <DataLoading layout="section" label="Loading your to-dos…" />}
+          {board.error ? <DataError message="The board could not be loaded." retry={board.refresh} /> : <SkeletonFrame label="Loading your to-dos…"><ListSkeleton rows={3} gap="0" /></SkeletonFrame>}
         </Card.Body>
       </Card>
     );

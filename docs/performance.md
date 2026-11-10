@@ -38,7 +38,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF1 | Baseline and budgets | done, except the VPS numbers (row 3 above); the signed-in lab numbers came with PF1b | #226 |
 | PF1b | A local lab: signed-in pages measured without touching live data | done, except the VPS's round trip to Supabase (row 5) | #227 |
 | PF2 | No endless loading | done | #228 |
-| PF3 | Skeletons and a boundary per section | not started | |
+| PF3 | Skeletons and a boundary per section | done, except the cold-load cost found (see PF3 section 7) | #229 |
 | PF4 | Fewer round trips in the app | not started | |
 | PF5 | Session gate and account on the server | not started | |
 | PF6 | First data on the server for Home | not started | |
@@ -74,6 +74,13 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   at **8 s**, the error comes at **15.3 s**, and a timeout isn't tried again. A session that ends
   while the app is open sends you to `/login?next=<the page you were on>`; before, it bounced
   between `/login` and `/dashboard` and ended on "Checking your session…".
+
+- **PF3, skeletons and a boundary per section.** Home's layout shift drops from **0.207 to 0.012**
+  (Lighthouse 0.137 to 0.012): the loading screens are now the same size as the content. Tapping a
+  tab shows its skeleton **63 to 74 ms** later; before, nothing changed for as long as the
+  server took (5 s watched). Each of the ten sections has its own `loading.tsx` and `error.tsx`.
+  The price: a cold load now also downloads about **58 KB** of other sections' scripts, and on the
+  emulated phone the data appears **0.1 to 0.4 s later**. PF8 has to schedule that.
 
 ## Baseline and budgets
 
@@ -1247,3 +1254,224 @@ slow notice showed at 11.4 s during that retry.)
   from syntax; the tests above cover each screen state I could reach.
 - The measuring script and scenarios are new files (`scripts/lab/states.*`); they aren't covered by
   tests of their own, but I ran `states.mjs` once more after moving it into the repo.
+
+### PF3: Skeletons and a boundary per section
+
+#### 1. The problem
+
+- **Home jumped while it loaded.** Each card on Home loaded to a three-line placeholder, then grew
+  to its real height, pushing the cards under it down. The lab measured a layout shift (CLS, how
+  much the page jumps; Google's "good" limit is 0.1) of 0.207 on the emulated phone (0.137 in
+  Lighthouse). In a 390 px load the culprits were "Recent expenses" (moved 118 px) and "To-dos for
+  you" (moved 118 px, then 196 px).
+- **Other pages swapped whole screens.** Expenses, To-dos and Reminders showed one generic card
+  skeleton, then replaced it with the page. The page's heading did not exist until the data came, so
+  on To-dos and Reminders the biggest thing on screen (LCP) was the subtitle, not the data, and it
+  appeared only when the data did.
+- **A tab tap did nothing at first.** With no `loading.tsx`, Next doesn't prefetch a dynamic page [N3].
+  I held the server's answer for the tapped page: for 5 s the old page stayed, unchanged.
+- **One error screen for everything.** An error in Investments replaced the whole app, shell and
+  navigation included.
+
+#### 2. What changed
+
+**What a person sees now**
+
+- Every loading state is shaped like its page: the page's real heading (and, on To-dos and
+  Reminders, the real subtitle), then grey blocks the size of the cards, rows and columns. When the
+  data arrives nothing moves on Home, Reminders and To-dos; on Expenses only the saved-tab chips
+  move a little (see 7).
+- Tapping a tab shows that page's skeleton at once.
+- An error in a section shows "We couldn't load this page" with **Try again** and **Go to Home**,
+  inside the shell. The bottom bar and sidebar keep working.
+- Loaded pages look the same as before (screenshots below). The skeleton still says "This is taking
+  longer than usual." with Retry after 8 s, and the error and offline states are unchanged (PF2).
+- The skeleton shimmer is Chakra's own CSS animation; the theme's one reduced-motion block turns it
+  off, as for every animation.
+
+**Files**
+
+- New `src/components/ui/skeletons.tsx`: `ListSkeleton`/`RowSkeleton` (built on the real row recipe),
+  `LedgerSkeleton`, `ExpensesSkeleton`, `TodosSkeleton`, `RemindersSkeleton`, `CalendarSkeleton`,
+  `InsightsSkeleton`, `PanelSkeleton` (Investments, Net worth, Settings, More), `RowsCardSkeleton`.
+  New `skeleton-frame.tsx`: the wrapper every loading state shares (busy, announced label, slow
+  notice). `slow-notice.tsx`: PF2's `SlowNotice` moved out of `data-state.tsx` so the two files don't
+  import each other. `DataLoading` now draws inside `SkeletonFrame`.
+- New `src/components/dashboard/home-layout.tsx` (`HomeGrid`, `useHomeBlocks`: the grid and which
+  blocks a person has, shared by Home and its skeleton) and `home-skeleton.tsx`.
+- `loading.tsx` and `error.tsx` in each of `dashboard, expenses, insights, investments, net-worth,
+  todos, reminders, calendar, settings, more` under `src/app/(app)/`. Each `error.tsx` is
+  `export default SectionError`; `src/components/ui/section-error.tsx` reports the error once
+  (`client_error`, as before) and offers the retry and the way home. `(app)/error.tsx` and
+  `src/app/error.tsx` use it too (the second without the Home link).
+- Each page's own loading state now draws the same skeleton: `todos`, `reminders`, `expenses` (page,
+  ledger, saved tabs), `calendar`, `insights`, `investments`, `net-worth`, and Home's four cards.
+- `ledger-panel.tsx`: the summary line keeps room for the "· 26% more than October" comparison
+  until it arrives (on a phone it wraps to a second line; without this the whole list dropped 18 px
+  when it landed). It is the only change to a loaded screen, and only while the comparison loads.
+- Tests: `skeletons.test.tsx` (each skeleton busy and labelled, the slow notice per `slowKey`, a
+  section error keeps the shell and tries again, every section folder has both files),
+  `theme.test.tsx` (the shimmer is a CSS animation), `error-boundaries.test.tsx` (updated).
+- `scripts/lab/skeletons.mjs`: the probe behind the numbers (see 4).
+
+#### 3. Why this way
+
+- **Plan, Design 4 and [N3][N4].** `loading.tsx` is what makes Next prefetch a dynamic route [N3],
+  and a skeleton the size of the content is what keeps CLS down [N4].
+- **The installed Next 16.4 calls the error boundary's prop `retry`, not `reset`** (docs
+  `error.md`); the repo already used `retry`. The plan said `reset`.
+- **Headings are real text, not grey bars.** The plan names a `PageHeaderSkeleton`; I used the real
+  `PageHeader`, because the title and the Reminders subtitle are fixed text, To-dos' subtitle comes
+  from the account that is already loaded, and real text paints sooner and can't shift. Only Home's
+  greeting (it depends on the time) and the month card's title are bars.
+- **Built from the real components,** not guessed sizes: the real card, the row recipe, the page
+  header and the same grids (`HomeGrid`, `LEDGER_COLUMNS` are shared with the screens). I then
+  compared heights in the browser and fixed what differed (rows that carry a button are 60 px, not 56;
+  Chakra's spacing scale has no `15` or `18`, so those two silently gave 0 height until I used rem).
+- **A skeleton fills the screen, not the data.** Expenses has 52 rows this month and a loaded page
+  3,800 px tall; the skeleton has 15 rows, enough to fill a phone. Only what is on screen can shift.
+- **One error component, ten files.** Next needs a file per segment; the component is shared.
+- **Turned down:** one `(app)/error.tsx` for everything (the plan wants one per section, and a test
+  now enforces it); changing the layout's own gate (PF5); a lint rule (a test checks the folders;
+  "same size as the content" can't be seen in syntax).
+
+#### 4. Numbers
+
+All from the lab on George's laptop, 10 November 2026, signed in as the seed's parent. "Before" is
+`main` at `c638761`; "after" is this branch. **Not production numbers.** Observed = the emulated
+phone on slow 4G (`docs/lab.md`); medians of three runs, ± half the spread in parentheses.
+
+**Layout shift (CLS)**
+
+| | Home | Expenses | To-dos | Reminders |
+| --- | ---: | ---: | ---: | ---: |
+| Observed, before | 0.207 | 0.000 | 0.000 | 0.000 |
+| Observed, after | **0.012** | 0.023 | 0.000 | 0.000 |
+| Lighthouse, before | 0.137 | 0.009 | 0.000 | 0.000 |
+| Lighthouse, after | **0.012** | 0.009 | 0.000 | 0.000 |
+
+`npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3`. Home's
+shifts, from the layout-shift entries (`scripts/lab/skeletons.mjs`): before, the "Recent expenses" and
+"To-dos for you" cards moved 118 px, then the to-dos card 196 px; after, the same two cards move
+30 and 22 px (the loaded cards show a "+1 more due" and a "+N more" line the skeleton doesn't). **Expenses
+got worse, from 0.000 to 0.023.** Before, the skeleton and the page shared no elements, so
+nothing counted as moved. Now the month and tab chips stay on screen, and "+ Tab" and "Filters"
+move right a few pixels when the saved tabs arrive.
+
+**Skeleton against content, in pixels** (`node scripts/lab/skeletons.mjs /<page> <width>`): the page's
+block, skeleton then loaded, at 390 px and at 1280 px. Before, the skeleton was one generic card.
+
+| | Home | Reminders | To-dos | Expenses |
+| --- | ---: | ---: | ---: | ---: |
+| 390 px, before | 626 / 1,044 | 356 / 756 | 356 / 1,172 | 524 / 3,800 |
+| 390 px, after | 1,002 / 1,044 | **756 / 756** | 964 / 1,172 | 1,266 / 3,800 |
+| 1280 px, before | 356 / 542 | 372 / 686 | 372 / 1,050 | 512 / 3,370 |
+| 1280 px, after | 500 / 542 | **686 / 686** | 842 / 1,050 | 1,108 / 3,370 |
+
+Home's cards, 390 px, skeleton / loaded: month 110 / 110, due 238 / 260, recent 338 / 338, to-dos
+226 / 246. To-dos and Expenses lists are longer than their skeletons below the fold (a phone shows
+the first 750 px or so); above it the blocks have the same tops and heights: header 44 / 46,
+filters 96 / 32, column heading and add button.
+
+**Taps** (`scripts/lab/skeletons.mjs /dashboard <width> --tap /<page>`, the server's answer held):
+
+| | Before | After |
+| --- | --- | --- |
+| Skeleton visible after the tap | never in 5 s (old page stays) | 66 ms (1280, Expenses), 63 ms (1280, To-dos), 74 ms (390, Expenses), 68 ms (390, Reminders) |
+| `?_rsc=` prefetch requests on a cold Home load | 16 | 16 |
+| Prefetch answer size | about 1.30 KB each (recorded for the ones that finished) | about 1.31 KB each |
+
+The request log (probe output): both builds send the same 16 prefetches (eight routes, each
+twice) right after the account arrives; the answers are as small as before. What differs is that the tapped
+page's tree now includes a loading boundary, so the router can show it with no new request. After
+the tap, the new page then prefetches `/dashboard` (2.65 KB).
+
+**Cold load on the emulated phone** (slow 4G). `npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3`:
+
+| | Home | Expenses | To-dos | Reminders |
+| --- | ---: | ---: | ---: | ---: |
+| Data on screen (placeholders gone), before | 7,513 | 8,104 | 7,617 | 7,502 |
+| … after | 7,719 | 8,537 | 7,906 | 7,623 |
+| FCP, before / after | 6,856 / 7,044 | 7,196 / 7,616 | 6,912 / 7,232 | 6,864 / 7,000 |
+| LCP, before / after | 7,540 / 7,680 | 8,248 / 8,280 | 7,708 / **7,232** | 7,428 / **7,000** |
+| LCP element, after | the month's total | the "% more" line | the subtitle, in the skeleton | the subtitle, in the skeleton |
+| JS on the wire, KiB, before / after | 411.7 / 475.4 | 439.8 / 481.1 | 429.5 / 490.6 | 410.6 / 469.8 |
+
+Noise on this pass is under 100 ms, so the later times are real. On the CPU-only pass (no network
+throttling, `--throttle cpu --no-lighthouse`) data appears at, before / after: Home 1,004 / 1,073,
+Expenses 1,609 / 1,453, To-dos 1,147 / 1,054; the noise there is 150 ms, so no change. **Reminders,
+before: not measured** (the run crashed at that page; I took the lab down before repeating it); after
+1,019.
+
+**What the skeletons do to FCP and LCP.** Observed, FCP moved *later* by 140 to 420 ms, not sooner:
+on a cold load the first text still comes from the shell once `/api/account` answers (6.9 s), and the
+extra scripts below delay it. LCP on To-dos and Reminders is the subtitle, which now paints with the
+skeleton about 0.45 s before the data (7.7 to 7.2 s, 7.4 to 7.0 s). Lighthouse's own FCP is still
+wrong for these pages (about 913 ms before and after, from its simulation); its LCP for To-dos and
+Reminders is now 912 ms in all three runs, because the subtitle is in the first render, but the
+phone doesn't show it that early. Don't read 912 ms as a result. Home and Expenses LCP is still data.
+
+**Why the cold load is slower: more scripts.** Lighthouse, run 0 of Home: before, 38 script files,
+411.7 KiB, all at the start. After, 41 files and 416.7 KiB at the start (+5 KiB: the skeletons and
+the `loading`/`error` files) and **21 more files, 57.9 KiB, loaded later**, when the sidebar and
+tab-bar links prefetch the other sections: each now brings its `loading` and `error` chunks and, for
+the two server pages (Net worth, Investments) and Settings' layout, their panel code. To-dos: 20
+files, 58.4 KiB. I didn't isolate the cause by switching prefetch off; the CPU-only pass, where
+bandwidth is free and nothing is slower, fits bandwidth being shared with the page's data.
+
+**Network panel** (the log above, not a screenshot): in a production build the `?_rsc=` requests go
+out as soon as the shell and its links appear, about 0.2 s after the account answers on the
+emulated phone (6.8 s and 6.97 s in the Home run), and the loading boundary needs no request of its own on a tap.
+
+**Screenshots** (loading state and loaded page, before and after, 390 and 1280 px; "loaded" pages
+are identical except the clock: "12 hours late" became "13 hours late" between runs): in
+`docs/performance/screenshots/pf3/`, named `before-` or `after-<page>-<width>-<loading|loaded>.jpg`,
+and `…-tap-<width>-<page>.jpg` for a tap with the answer held. Examples:
+[Home, 390, after](performance/screenshots/pf3/after-dashboard-390-loading.jpg) ·
+[Home, 390, before](performance/screenshots/pf3/before-dashboard-390-loading.jpg) ·
+[Expenses, 390, after](performance/screenshots/pf3/after-expenses-390-loading.jpg) ·
+[To-dos, 1280, after](performance/screenshots/pf3/after-todos-1280-loading.jpg) ·
+[Reminders, 1280, after](performance/screenshots/pf3/after-reminders-1280-loading.jpg) ·
+[a tap, Reminders, 390, after](performance/screenshots/pf3/after-tap-390-reminders.jpg) ·
+[the same tap, before](performance/screenshots/pf3/before-tap-390-reminders.jpg).
+
+Checks: `npm run lint`, `npx next typegen && npm run typecheck`, `npm test` (6,787 passed),
+`npm run build`: all pass.
+
+#### 5. How to check it yourself
+
+1. `npm run lab -- up`, sign in (`.lab/users.json`), open Home on a phone-sized window.
+2. Freeze the gateway: `docker pause supabase_kong_expense-tracker-lab`, then tap Money, Planning
+   and the sidebar items: the page's skeleton shows at once and stays. `docker unpause …`.
+3. `node scripts/lab/skeletons.mjs /todos 390` prints the skeleton and loaded heights and every layout
+   shift with the elements that moved; the screenshots land in `.lab/results/skeletons/`.
+   `… /dashboard 390 --tap /expenses` times the tap.
+4. Break a section: in `src/app/(app)/net-worth/page.tsx` throw in the component; the shell stays and
+   "Try again" and "Go to Home" show.
+5. `npm run lab -- down`.
+
+#### 6. Risks and how to undo it
+
+- **A cold load downloads about 58 KB more, and on the slow phone shows data 0.1 to 0.4 s later**
+  (4). Revert the PR to get the old timings back, or PF8 can hold the prefetches until the page's
+  data is in.
+- **Skeleton sizes can drift** from the screens when someone changes a row or card. Nothing checks
+  it automatically; `scripts/lab/skeletons.mjs` does it by hand.
+- **The count of rows in the skeleton is a guess** (3 reminders, 5 expenses, 15 ledger rows). A
+  family with fewer shows a skeleton taller than its page, which moves nothing on screen.
+- Nothing stored, no migration. To undo: revert the PR.
+
+#### 7. Left open
+
+- **The cold-load cost in 4 belongs to PF8** (what to prefetch and when) and PF9 (the panel code
+  that the two server pages bring along). I didn't change prefetching here.
+- **The first screen of a cold load is still PF5's.** Until `/api/account` answers, the layout shows
+  its own generic screen with no text, so FCP can't improve before PF5 moves that gate to the server.
+- **Expenses' CLS is 0.023** (the saved-tab chips). Fixing it means reserving room for the chips
+  while they load.
+- **Not changed:** Settings' and More's skeletons are generic (`PanelSkeleton`); the nested
+  Settings pages and Expenses → Import show their section's skeleton while they open; the
+  other `DataLoading` calls (Settings pages, import, dialogs) keep the generic skeleton.
+- **No skeleton-to-content fade** (`ui-direction.md` lists one for U4); I didn't add it.
+- **Before-numbers for Reminders on the CPU pass** are missing (4).
+- **The plan's `PageHeaderSkeleton`** isn't a component (3).

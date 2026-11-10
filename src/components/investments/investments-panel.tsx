@@ -12,12 +12,13 @@ import { ViewingControls } from "@/components/family/viewing-picker";
 import { WriteOnly } from "@/components/family/write-only";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Card } from "@/components/ui/card";
-import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
+import { DataError, DataRefresh } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InvestmentValue } from "@/components/investments/investment-value";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { PanelSkeleton } from "@/components/ui/skeletons";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useViewing } from "@/hooks/use-viewing";
 import { investmentsApiKey } from "@/lib/api/keys";
@@ -47,9 +48,9 @@ function SingleInvestmentsPanel() {
   const { data, error, isLoading, isValidating, mutate } = useSWR<InvestmentsOverview>(key);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  if (isLoading && !data) return <DataLoading label="Loading your investments…" slowKey={key} />;
+  if (isLoading && !data) return <PanelSkeleton title="Investments" label="Loading your investments…" slowKey={key} />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading your investments…" slowKey={key} />;
+  if (!data) return <PanelSkeleton title="Investments" label="Loading your investments…" slowKey={key} />;
 
   function selectAsset(accountId: string, asset: InvestmentOverviewAsset) {
     const nextKey = investmentAssetKey(accountId, asset.instrument, asset.currency);
@@ -144,9 +145,9 @@ function FamilyInvestmentsPanel() {
   const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyInvestmentsOverview>(key);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  if (isLoading && !data) return <DataLoading label="Loading the family's investments…" slowKey={key} />;
+  if (isLoading && !data) return <PanelSkeleton title="Investments" label="Loading the family's investments…" slowKey={key} />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading the family's investments…" slowKey={key} />;
+  if (!data) return <PanelSkeleton title="Investments" label="Loading the family's investments…" slowKey={key} />;
 
   function toggle(accountId: string, asset: InvestmentOverviewAsset) {
     const nextKey = investmentAssetKey(accountId, asset.instrument, asset.currency);

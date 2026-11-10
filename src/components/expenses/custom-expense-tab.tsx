@@ -9,7 +9,8 @@ import { ExpenseList } from "@/components/expenses/expense-list";
 import type { ExpenseRowActions } from "@/components/expenses/expense-rows";
 import { ExpenseTabFiltersForm } from "@/components/expenses/expense-tab-filters";
 import { Card } from "@/components/ui/card";
-import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
+import { DataError, DataRefresh } from "@/components/ui/data-state";
+import { RowsCardSkeleton } from "@/components/ui/skeletons";
 import { useViewing } from "@/hooks/use-viewing";
 import { expenseTabExpensesApiKey } from "@/lib/api/keys";
 import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/expenses/filters";
@@ -47,7 +48,7 @@ export function CustomExpenseTab({
         </Card>
       ) : null}
       {!ledger ? (
-        error ? <DataError retry={() => void mutate()} /> : <DataLoading label={`Loading ${tab.name} expenses…`} slowKey={key} />
+        error ? <DataError retry={() => void mutate()} /> : <RowsCardSkeleton label={`Loading ${tab.name} expenses…`} slowKey={key} />
       ) : (
         <>
           <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />

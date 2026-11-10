@@ -1,15 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { SectionError } from "@/components/ui/section-error";
 
-import { ErrorPage } from "@/components/ui/error-page";
-import { reportClientError } from "@/lib/client-log";
-
-/** The boundary for the pages outside `(app)` (sign-in, join, consent). Reports each error once, like `(app)/error.tsx`. */
-export default function RootError({ error, retry }: { error: unknown; retry: () => void }) {
-  useEffect(() => {
-    reportClientError(error, "boundary");
-  }, [error]);
-
-  return <ErrorPage onRetry={retry} />;
+/** The boundary for the pages outside `(app)` (sign-in, join, consent): the same component, with no link to Home. */
+export default function RootError(props: { error: unknown; retry: () => void }) {
+  return <SectionError {...props} homeHref={null} />;
 }
