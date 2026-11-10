@@ -49,7 +49,7 @@ function SingleInvestmentsPanel() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   if (isLoading && !data) return <PanelSkeleton title="Investments" label="Loading your investments…" slowKey={key} />;
-  if (error && !data) return <DataError retry={() => void mutate()} />;
+  if (error && !data) return <DataError error={error} retry={() => void mutate()} />;
   if (!data) return <PanelSkeleton title="Investments" label="Loading your investments…" slowKey={key} />;
 
   function selectAsset(accountId: string, asset: InvestmentOverviewAsset) {
@@ -146,7 +146,7 @@ function FamilyInvestmentsPanel() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   if (isLoading && !data) return <PanelSkeleton title="Investments" label="Loading the family's investments…" slowKey={key} />;
-  if (error && !data) return <DataError retry={() => void mutate()} />;
+  if (error && !data) return <DataError error={error} retry={() => void mutate()} />;
   if (!data) return <PanelSkeleton title="Investments" label="Loading the family's investments…" slowKey={key} />;
 
   function toggle(accountId: string, asset: InvestmentOverviewAsset) {

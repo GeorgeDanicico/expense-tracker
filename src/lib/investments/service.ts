@@ -1,5 +1,6 @@
 import "server-only";
 
+import { DomainError } from "@/lib/errors";
 import { aggregateInvestments } from "@/lib/investments/aggregate";
 import { getInvestmentQuoteAdapter } from "@/lib/investments/quotes/get-adapter";
 import type { Quote } from "@/lib/investments/quotes/types";
@@ -17,15 +18,32 @@ import { getRepositories } from "@/lib/repositories";
 
 /** The most investment accounts a user has: one per broker. */
 export const MAX_ACCOUNTS = 2;
-/** The most transactions read, and recalculated, per account or per asset. */
+/** The most transactions read, and recalculated, per account or per asset; more are refused, never cut off (B11). */
 export const MAX_TRANSACTIONS_PER_ACCOUNT = 5_000;
 
-/** The user's positions per broker, valued with current quotes where the price service has them. */
+/** The 409 for an account or asset over `MAX_TRANSACTIONS_PER_ACCOUNT`: retrying won't help, so it says what will. */
+export const TOO_MANY_ORDERS_MESSAGE =
+  `One broker account has more than ${new Intl.NumberFormat("en").format(MAX_TRANSACTIONS_PER_ACCOUNT)} orders, more than the app can show. Nothing is lost. Ask whoever runs the app to raise the limit.`;
+
+/**
+ * Throws the 409 for more than `MAX_TRANSACTIONS_PER_ACCOUNT` transactions: positions worked out
+ * from part of the history would be wrong, so none are shown.
+ */
+function refuseOverCap(transactions: readonly unknown[]) {
+  if (transactions.length > MAX_TRANSACTIONS_PER_ACCOUNT) throw new DomainError(TOO_MANY_ORDERS_MESSAGE, 409);
+}
+
+/**
+ * The user's positions per broker, valued with current quotes where the price service has them.
+ * Refuses (409, `TOO_MANY_ORDERS_MESSAGE`) an account with more than `MAX_TRANSACTIONS_PER_ACCOUNT` orders.
+ */
 export async function getInvestmentsOverview(userId: string): Promise<InvestmentsOverview> {
+  // One more than every account at its limit: if that many come back, one account is over its own.
   const accountRows = await getRepositories().investments.listAccountsWithTransactions(userId, {
     accounts: MAX_ACCOUNTS,
-    transactionsPerAccount: MAX_TRANSACTIONS_PER_ACCOUNT,
+    transactions: MAX_ACCOUNTS * MAX_TRANSACTIONS_PER_ACCOUNT + 1,
   });
+  for (const { transactions } of accountRows) refuseOverCap(transactions);
   const accounts = accountRows.map(({ account }) => account);
   const transactions = accountRows.flatMap(({ transactions: rows }) => rows);
   const aggregate = aggregateInvestments(accounts, transactions);
@@ -60,13 +78,17 @@ export async function getFamilyInvestmentsOverview(
   return { members };
 }
 
-/** One asset's orders, newest first, or null when the user holds no such asset. */
+/**
+ * One asset's orders, newest first, or null when the user holds no such asset. Refuses (409,
+ * `TOO_MANY_ORDERS_MESSAGE`) an asset with more than `MAX_TRANSACTIONS_PER_ACCOUNT` orders.
+ */
 export async function getInvestmentTransactions(
   userId: string,
   asset: InvestmentAsset,
 ): Promise<InvestmentTransactionsResponse | null> {
-  const history = await getRepositories().investments.getAssetHistory(userId, asset, MAX_TRANSACTIONS_PER_ACCOUNT);
+  const history = await getRepositories().investments.getAssetHistory(userId, asset, MAX_TRANSACTIONS_PER_ACCOUNT + 1);
   if (!history) return null;
+  refuseOverCap(history.transactions);
   const { brokerId } = history.account;
 
   return {

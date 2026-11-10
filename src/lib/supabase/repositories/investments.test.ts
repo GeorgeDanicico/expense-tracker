@@ -12,7 +12,7 @@ const userId = "10000000-0000-4000-8000-000000000081";
 const otherUserId = "10000000-0000-4000-8000-000000000082";
 const ACCOUNT_ID = "20000000-0000-4000-8000-000000000081";
 const asset = { accountId: ACCOUNT_ID, instrument: "VWCE.DE", currency: "EUR" };
-const limits = { accounts: 2, transactionsPerAccount: 5_000 };
+const limits = { accounts: 2, transactions: 10_001 };
 
 /** A transaction row as the database stores it. */
 function transactionRow(overrides: Record<string, unknown> = {}) {
@@ -34,6 +34,11 @@ function transactionRow(overrides: Record<string, unknown> = {}) {
 const transactionFor = (overrides: Partial<ReturnType<typeof aTransaction>> = {}) =>
   aTransaction({ id: "30000000-0000-4000-8000-000000000001", investmentAccountId: ACCOUNT_ID, ...overrides });
 
+/** A transaction row with its account's owner and broker embedded, as the inner join reads it. */
+function owned(row: ReturnType<typeof transactionRow>, owner = userId, brokerId = "xtb") {
+  return { ...row, investment_accounts: { user_id: owner, broker_id: brokerId } };
+}
+
 function useDatabase(tables: Record<string, Record<string, unknown>[]>, options?: FakeSupabaseOptions) {
   const database = fakeSupabase(tables, options);
   mocks.createClient.mockResolvedValue(database.client);
@@ -48,8 +53,13 @@ describe("Supabase investment repository", () => {
       const later = transactionRow({ id: "30000000-0000-4000-8000-000000000002", executed_at: "2026-02-01T10:00:00Z" });
       const { queries } = useDatabase({
         investment_accounts: [
-          { id: "other-account", user_id: otherUserId, broker_id: "xtb", investment_transactions: [] },
-          { id: ACCOUNT_ID, user_id: userId, broker_id: "xtb", investment_transactions: [later, transactionRow()] },
+          { id: "other-account", user_id: otherUserId, broker_id: "xtb" },
+          { id: ACCOUNT_ID, user_id: userId, broker_id: "xtb" },
+        ],
+        investment_transactions: [
+          owned(later),
+          owned(transactionRow()),
+          owned(transactionRow({ id: "30000000-0000-4000-8000-000000000009", investment_account_id: "other-account" }), otherUserId),
         ],
       });
 
@@ -59,16 +69,31 @@ describe("Supabase investment repository", () => {
         account: { id: ACCOUNT_ID, brokerId: "xtb" },
         transactions: [transactionFor(), transactionFor({ id: later.id, executedAt: later.executed_at })],
       }]);
-      expect(queries[0]).toMatchObject({
-        table: "investment_accounts",
+      expect(queries.find((query) => query.table === "investment_accounts")).toMatchObject({
         filters: [["eq", "user_id", userId]],
-        orders: ["broker_id", "investment_transactions.executed_at", "investment_transactions.id"],
-        limits: ["2", "investment_transactions:5000"],
+        orders: ["broker_id"],
+        limits: ["2"],
+      });
+      expect(queries.find((query) => query.table === "investment_transactions")).toMatchObject({
+        filters: [["eq", "investment_accounts.user_id", userId]],
+        orders: ["executed_at", "id"],
+        range: [0, 999],
       });
     });
 
+    it("reads every page, newest first, so a limit only ever leaves out the oldest transactions (B11)", async () => {
+      const rows = Array.from({ length: 5 }, (_, index) => owned(transactionRow({
+        id: `30000000-0000-4000-8000-00000000001${index}`, executed_at: `2026-0${index + 1}-01T10:00:00Z`,
+      })));
+      useDatabase({ investment_accounts: [{ id: ACCOUNT_ID, user_id: userId, broker_id: "xtb" }], investment_transactions: rows }, { pageCap: 2 });
+
+      const [{ transactions }] = await investments.listAccountsWithTransactions(userId, { accounts: 2, transactions: 3 });
+
+      expect(transactions.map((transaction) => transaction.executedAt)).toEqual(["2026-03-01T10:00:00Z", "2026-04-01T10:00:00Z", "2026-05-01T10:00:00Z"]);
+    });
+
     it("rejects an account with a broker this version does not know", async () => {
-      useDatabase({ investment_accounts: [{ id: ACCOUNT_ID, user_id: userId, broker_id: "unknown", investment_transactions: [] }] });
+      useDatabase({ investment_accounts: [{ id: ACCOUNT_ID, user_id: userId, broker_id: "unknown" }] });
 
       await expect(investments.listAccountsWithTransactions(userId, limits)).rejects.toThrow(new Error("Unable to load investments."));
     });
@@ -81,13 +106,12 @@ describe("Supabase investment repository", () => {
   });
 
   describe("getAssetHistory", () => {
-    const account = (owner: string, transactions = [transactionRow()]) =>
-      ({ id: ACCOUNT_ID, user_id: owner, broker_id: "xtb", investment_transactions: transactions });
+    const ownedBy = (owner: string, rows = [transactionRow()]) => ({ investment_transactions: rows.map((row) => owned(row, owner)) });
 
     it("reads one asset of the user's account, newest first", async () => {
       const later = transactionRow({ id: "30000000-0000-4000-8000-000000000002", executed_at: "2026-02-01T10:00:00Z" });
       const otherAsset = transactionRow({ id: "30000000-0000-4000-8000-000000000003", instrument: "AAPL.US", currency: "USD" });
-      const { queries } = useDatabase({ investment_accounts: [account(userId, [transactionRow(), otherAsset, later])] });
+      const { queries } = useDatabase(ownedBy(userId, [transactionRow(), otherAsset, later]));
 
       const history = await investments.getAssetHistory(userId, asset, 5_000);
 
@@ -96,32 +120,41 @@ describe("Supabase investment repository", () => {
         transactions: [transactionFor({ id: later.id, executedAt: later.executed_at }), transactionFor()],
       });
       expect(queries[0]).toMatchObject({
-        table: "investment_accounts",
+        table: "investment_transactions",
         filters: [
-          ["eq", "id", ACCOUNT_ID],
-          ["eq", "user_id", userId],
-          ["eq", "investment_transactions.instrument", "VWCE.DE"],
-          ["eq", "investment_transactions.currency", "EUR"],
+          ["eq", "investment_account_id", ACCOUNT_ID],
+          ["eq", "investment_accounts.user_id", userId],
+          ["eq", "instrument", "VWCE.DE"],
+          ["eq", "currency", "EUR"],
         ],
-        orders: ["investment_transactions.executed_at", "investment_transactions.id"],
-        limits: ["investment_transactions:5000"],
+        orders: ["executed_at", "id"],
+        range: [0, 999],
       });
     });
 
+    it("reads at most `limit` transactions, the newest", async () => {
+      const later = transactionRow({ id: "30000000-0000-4000-8000-000000000002", executed_at: "2026-02-01T10:00:00Z" });
+      useDatabase(ownedBy(userId, [transactionRow(), later]));
+
+      const history = await investments.getAssetHistory(userId, asset, 1);
+
+      expect(history?.transactions).toEqual([transactionFor({ id: later.id, executedAt: later.executed_at })]);
+    });
+
     it("returns null for another user's account", async () => {
-      useDatabase({ investment_accounts: [account(otherUserId)] });
+      useDatabase(ownedBy(otherUserId));
 
       expect(await investments.getAssetHistory(userId, asset, 5_000)).toBeNull();
     });
 
     it("returns null when the account holds no transactions for the asset", async () => {
-      useDatabase({ investment_accounts: [account(userId, [transactionRow({ instrument: "AAPL.US" })])] });
+      useDatabase(ownedBy(userId, [transactionRow({ instrument: "AAPL.US" })]));
 
       expect(await investments.getAssetHistory(userId, asset, 5_000)).toBeNull();
     });
 
     it("returns null for an account with a broker this version does not know", async () => {
-      useDatabase({ investment_accounts: [{ ...account(userId), broker_id: "unknown" }] });
+      useDatabase({ investment_transactions: [owned(transactionRow(), userId, "unknown")] });
 
       expect(await investments.getAssetHistory(userId, asset, 5_000)).toBeNull();
     });

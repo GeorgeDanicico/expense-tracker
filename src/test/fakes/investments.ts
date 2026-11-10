@@ -26,14 +26,20 @@ export class FakeInvestmentRepository implements InvestmentRepository {
   readonly accounts: FakeInvestmentAccount[] = [];
   readonly transactions: InvestmentTransaction[] = [];
 
-  async listAccountsWithTransactions(userId: string, limits: { accounts: number; transactionsPerAccount: number }) {
-    return this.accounts
-      .filter((account) => account.userId === userId)
+  async listAccountsWithTransactions(userId: string, limits: { accounts: number; transactions: number }) {
+    const owned = this.accounts.filter((account) => account.userId === userId);
+    // The newest `limits.transactions` of all the user's transactions, as the repository reads them.
+    const kept = new Set(this.transactions
+      .filter((transaction) => owned.some((account) => account.id === transaction.investmentAccountId))
+      .sort(byExecution)
+      .slice(-limits.transactions)
+      .map((transaction) => transaction.id));
+    return owned
       .sort((left, right) => left.brokerId.localeCompare(right.brokerId))
       .slice(0, limits.accounts)
       .map((account) => ({
         account: this.toAccount(account),
-        transactions: this.transactionsOf(account.id).slice(0, limits.transactionsPerAccount),
+        transactions: this.transactionsOf(account.id).filter((transaction) => kept.has(transaction.id)),
       }));
   }
 

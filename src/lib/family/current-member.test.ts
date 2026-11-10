@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 
 import { getCurrentMember } from "@/lib/family/current-member";
+import { runWithRequestMemo } from "@/lib/request-memo";
 import { can } from "@/lib/permissions";
 import { aKid, aParent } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
@@ -31,6 +32,17 @@ describe("getCurrentMember", () => {
 
     expect(await getCurrentMember()).toBeNull();
     expect(repositories.family.calls).toEqual([]);
+  });
+
+  it("reads the membership once per request, however many checks ask (PF4)", async () => {
+    repositories.family.membership = aParent();
+
+    await runWithRequestMemo(async () => {
+      await getCurrentMember();
+      await getCurrentMember();
+    });
+
+    expect(repositories.family.calls).toEqual(["getMembership"]);
   });
 
   it("returns null when the user has no family", async () => {

@@ -38,6 +38,8 @@ Other commands:
 | `npm run lab -- delay 40` | Add 40 ms to every call from the app to Supabase (see below); `delay 0` removes it |
 | `npm run lab -- stop-app` | Stop the app and the delay proxy, leave the database up |
 | `node scripts/lab/skeletons.mjs /<page> <width> [--tap /<page>]` | Compare a page's loading state with its loaded state (heights, layout shifts, screenshots) or time how soon a tab tap shows its skeleton; PF3 |
+| `node scripts/lab/search-compare.mjs > search.json` | The tab ledger's answer to 43 searches on two tabs (it adds a tab of every expense for the parent and a few awkward descriptions for the solo user); run it on two builds and `diff` the files. PF4 |
+| `node scripts/lab/route-probe.mjs .lab parent 5 > routes.json` | Calls 28 routes five times each (some write: titles, a card's place) and prints the median server ms, `dbCalls`, `dbMs`, Auth calls and `get_family()` per route. Run `search-compare.mjs` first. PF4 |
 | `npm run lab:baseline` | The full signed-in baseline: four pages, both JWT modes, 0 and 40 ms, both passes below (about 80 minutes; `LAB_BASELINE_PASS=cpu` for the second pass only) |
 
 `up` is safe to run twice: if the lab is already up and seeded it only prints the status, and if a

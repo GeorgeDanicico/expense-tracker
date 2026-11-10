@@ -7,7 +7,9 @@ import { fakeSupabase, type FakeSupabaseOptions } from "@/test/fake-supabase";
 const mocks = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => mocks);
 
+import { supabaseFamilyRepository } from "@/lib/supabase/repositories/family";
 import { supabaseTodoRepository as todos, translateTodoWriteError } from "@/lib/supabase/repositories/todos";
+import { runWithRequestMemo } from "@/lib/request-memo";
 
 const familyId = "70000000-0000-4000-8000-000000000161";
 const userId = "10000000-0000-4000-8000-000000000161";
@@ -67,7 +69,48 @@ describe("Supabase to-do repository", () => {
     nextId = 1;
   });
 
+  describe("the family, once per request (PF4)", () => {
+    it("is read once across a move's two calls, and again after a family write in the same request", async () => {
+      const row = aRow();
+      const { rpcs } = useDatabase([row]);
+
+      await runWithRequestMemo(async () => {
+        await todos.get(row.id);
+        await todos.setPosition(row.id, "in_progress", "a1");
+        expect(rpcs.map((call) => call.fn)).toEqual(["get_family"]);
+
+        await supabaseFamilyRepository.setMemberColor(kidMemberId, 2);
+        await todos.get(row.id);
+      });
+
+      expect(rpcs.map((call) => call.fn)).toEqual(["get_family", "set_member_color", "get_family"]);
+    });
+
+    it("is read again in the next request", async () => {
+      const row = aRow();
+      const { rpcs } = useDatabase([row]);
+
+      await runWithRequestMemo(() => todos.get(row.id));
+      await runWithRequestMemo(() => todos.get(row.id));
+
+      expect(rpcs.map((call) => call.fn)).toEqual(["get_family", "get_family"]);
+    });
+  });
+
   describe("list", () => {
+    it("reads every page when the board is longer than the server's row cap (D7)", async () => {
+      const rows = Array.from({ length: 7 }, (_, index) => aRow({ position: `a${index}` }));
+      const { queries } = useDatabase(rows, { pageCap: 3 });
+
+      const board = await todos.list({ doneSince: "2026-10-01T00:00:00Z" });
+
+      expect(board).toHaveLength(7);
+      // The open cards in three pages, the (empty) done column in one, side by side.
+      const ranges = queries.filter((query) => query.table === "todos").map((query) => query.range);
+      expect(ranges).toHaveLength(4);
+      expect(ranges).toEqual(expect.arrayContaining([[0, 999], [3, 1002], [6, 1005]]));
+    });
+
     it("returns open cards and recent Done cards by status then position, with assignees from one get_family", async () => {
       const progress = aRow({ status: "in_progress", position: "a0" });
       const second = aRow({ position: "a1", assignee_member_id: kidMemberId });

@@ -1,10 +1,9 @@
 import "server-only";
 
-import { cache } from "react";
-
 import type { AuthAdmin } from "@/lib/auth/admin";
 import type { OAuthConsent } from "@/lib/auth/oauth-consent";
 import type { AuthenticatedUser, AuthService } from "@/lib/auth/service";
+import { MEMO_KEYS, oncePerRequest } from "@/lib/request-memo";
 import { supabaseAuth } from "@/lib/supabase/auth";
 import { createSupabaseAuthAdmin } from "@/lib/supabase/auth-admin";
 import { supabaseOAuthConsent, supabaseOAuthIssuer } from "@/lib/supabase/oauth-consent";
@@ -39,5 +38,11 @@ export function getOAuthIssuer(): string {
   return supabaseOAuthIssuer();
 }
 
-/** The signed-in user, read once per request. */
-export const getAuthenticatedUser = cache(async (): Promise<AuthenticatedUser | null> => getAuth().getCurrentUser());
+/**
+ * The signed-in user, read once per request (`oncePerRequest`): `withUser` reads it, and the
+ * repositories that check the caller themselves (avatars, the AI gate, the MCP switch) get the same
+ * answer without asking Supabase Auth again.
+ */
+export function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
+  return oncePerRequest(MEMO_KEYS.user, () => getAuth().getCurrentUser());
+}

@@ -156,8 +156,8 @@ describe("routes behind withPermission", () => {
     repositories.family.membership = kidWith({ off: module });
 
     expect(await call(key)).toEqual(REFUSED);
-    // The background last-activity touch, the must-change-password flag, then the membership check.
-    expect(mocks.accessed).toEqual(["family", "account", "family"]);
+    // The background last-activity touch, then the membership, read alongside the must-change-password flag.
+    expect(mocks.accessed).toEqual(["family", "family", "account"]);
   });
 
   it.each(cases)("refuses %s with 403 password_change_required to an account that must change its password", async (key) => {
@@ -165,8 +165,8 @@ describe("routes behind withPermission", () => {
     repositories.account.mustChangePassword.add(signedInAs().id);
 
     expect(await call(key)).toMatchObject({ status: 403, body: { code: "password_change_required" } });
-    // Refused before the membership check and the handler.
-    expect(mocks.accessed).toEqual(["family", "account"]);
+    // Refused before the permission check and the handler: the membership was read alongside the flag, never used.
+    expect(mocks.accessed).toEqual(["family", "family", "account"]);
   });
 
   it.each(cases)("lets %s through for a kid with only %s", async (key, module) => {
@@ -205,7 +205,8 @@ describe("routes behind withParent", () => {
     repositories.family.membership = kidWith({ only: "nothing" });
 
     expect(await call(key, {})).toEqual(REFUSED);
-    expect(mocks.accessed).toEqual(["family", "account", "family"]);
+    // The last-activity touch, then the membership, read alongside the must-change-password flag.
+    expect(mocks.accessed).toEqual(["family", "family", "account"]);
   });
 
   it.each(cases)("refuses %s to a user without a family", async (key) => {

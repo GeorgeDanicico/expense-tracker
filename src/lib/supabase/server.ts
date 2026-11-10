@@ -8,6 +8,7 @@ import { cookies, headers } from "next/headers";
 
 import type { Database } from "@/lib/database.types";
 import { tracedFetch } from "@/lib/log/traced-fetch";
+import { runWithRequestMemo } from "@/lib/request-memo";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { authCookieOptions } from "@/lib/supabase/cookie-options";
 
@@ -15,8 +16,9 @@ import { authCookieOptions } from "@/lib/supabase/cookie-options";
 
 const scopedClient = new AsyncLocalStorage<SupabaseClient<Database>>();
 
+/** Runs `fn` acting as `client`'s user, with its own memo of once-per-request reads (`oncePerRequest`). */
 export function runWithSupabaseClient<T>(client: SupabaseClient<Database>, fn: () => T): T {
-  return scopedClient.run(client, fn);
+  return scopedClient.run(client, () => runWithRequestMemo(fn));
 }
 
 /**

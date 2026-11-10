@@ -1,4 +1,5 @@
-import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
+import { CATEGORY_LABELS, EXPENSE_CATEGORIES, EXPENSE_SUBTYPES, SUBTYPE_LABELS } from "@/lib/expenses/categories";
+import { NO_SUBTYPE_LABEL } from "@/lib/expenses/filters";
 
 /**
  * Guards for the few PostgREST filters that are built from strings (security plan S8).
@@ -44,4 +45,34 @@ function assertKnown(kind: string, keys: readonly string[], known: readonly stri
  */
 export function escapeLikePattern(text: string): string {
   return text.replace(/[\\%_]/g, "\\$&").replace(/\*/g, "_");
+}
+
+/**
+ * A value for a string-built filter, in PostgREST's double quotes, so a `,` `.` `:` `(` or `)` in it
+ * is part of the value. Inside the quotes PostgREST reads `\\` as `\` and `\"` as `"`, so both get a
+ * backslash.
+ */
+function quoted(value: string): string {
+  return `"${value.replace(/[\\"]/g, "\\$&")}"`;
+}
+
+/**
+ * The `.or()` string for the tab ledger's search, on the server (audit P9): the expenses whose
+ * description or notes contain `term` (ignoring case), or whose category or subtype label does,
+ * the same fields as `matchesExpenseSearch`. `term` is the user's text, lower-cased and not empty.
+ *
+ * The text is escaped (`escapeLikePattern`, then `quoted`), so it only ever matches literally; the
+ * labels are matched here, against the catalogue, and only their keys reach the string. A `*` can
+ * only be sent as "any one character", so the database may return a few extra rows: run
+ * `matchesExpenseSearch` over the result to keep exactly the same ones.
+ */
+export function expenseSearchFilter(term: string): string {
+  const pattern = quoted(`%${escapeLikePattern(term)}%`);
+  const clauses = [`description.ilike.${pattern}`, `notes.ilike.${pattern}`];
+  const categories = EXPENSE_CATEGORIES.filter((key) => CATEGORY_LABELS[key].toLowerCase().includes(term));
+  const subtypes = EXPENSE_SUBTYPES.filter((key) => SUBTYPE_LABELS[key].toLowerCase().includes(term));
+  if (categories.length) clauses.push(`category.in.(${categories.join(",")})`);
+  if (subtypes.length) clauses.push(`subtype.in.(${subtypes.join(",")})`);
+  if (NO_SUBTYPE_LABEL.toLowerCase().includes(term)) clauses.push("subtype.is.null");
+  return clauses.join(",");
 }

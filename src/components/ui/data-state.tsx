@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { SkeletonFrame } from "@/components/ui/skeleton-frame";
 import { useOnline } from "@/hooks/use-online";
-import { OFFLINE_MESSAGE } from "@/lib/api/client";
+import { ApiError, OFFLINE_MESSAGE } from "@/lib/api/client";
 
 /**
  * Loading placeholder shaped like the content it replaces. `page` mimics a
@@ -73,13 +73,17 @@ export function DataLoading({
 
 export function DataError({
   message = "Your data could not be loaded. Check your connection and try again.",
+  error,
   retry,
 }: {
   message?: string;
+  /** The failed request's error. A 409 is a refusal the server explains and a retry won't change (B11), so its message replaces `message`. */
+  error?: unknown;
   retry: () => void;
 }) {
   // With no connection, that is the reason, whatever the screen's own wording says.
   const online = useOnline();
+  const refused = error instanceof ApiError && error.status === 409 ? error.message : null;
   return (
     <Box role="alert">
       <EmptyState
@@ -87,7 +91,7 @@ export function DataError({
         icon={<TriangleAlert />}
         titleAs="h2"
         title="Unable to load data"
-        description={online ? message : OFFLINE_MESSAGE}
+        description={online ? (refused ?? message) : OFFLINE_MESSAGE}
         action={
           <Button size="sm" variant="outline" onClick={retry}>
             <RefreshCw size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" /> Try again

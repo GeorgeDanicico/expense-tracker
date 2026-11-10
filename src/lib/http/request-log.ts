@@ -5,6 +5,7 @@ import { errorFields, log, type LogFields, type LogLevel } from "@/lib/log";
 import { createRequestContext, currentRequest, runWithRequestContext, type RequestContext } from "@/lib/log/request-context";
 import { REQUEST_ID_HEADER } from "@/lib/log/request-id";
 import { spanSummary } from "@/lib/log/span";
+import { runWithRequestMemo } from "@/lib/request-memo";
 
 /**
  * One `request` line per API request (logging plan, L2). The route wrappers (`withUser`,
@@ -101,7 +102,8 @@ function writeRequestLine(context: RequestContext, status: number, quiet: boolea
  * request id), then sets `x-request-id` on its response and writes one `request` line
  * `{ method, route, status, ms, userId?, slow?, spans, dbMs, dbCalls, slowestSpan?, ...fields }`
  * (see `span.ts`: `dbMs` and `dbCalls` add up the Supabase calls, and `slowestSpan` names the slowest
- * single call of a slow request). The level is `info`, `warn` when the request took longer than
+ * single call of a slow request). It also gets its own memo of the reads made once per request
+ * (`oncePerRequest`). The level is `info`, `warn` when the request took longer than
  * `LOG_SLOW_MS` (with `slow: true`) or answered 429, and `error` for 5xx.
  *
  * An error `handle` throws is logged as `request_failed` (unless already logged), counted as a 500
@@ -116,7 +118,7 @@ export async function logRequest(
   if (currentRequest()) return handle();
 
   const context = createRequestContext(request);
-  return runWithRequestContext(context, async () => {
+  return runWithRequestContext(context, () => runWithRequestMemo(async () => {
     let response: Response;
     try {
       response = await handle();
@@ -128,5 +130,5 @@ export async function logRequest(
     const tagged = withRequestIdHeader(response, context.requestId);
     writeRequestLine(context, tagged.status, quiet);
     return tagged;
-  });
+  }));
 }

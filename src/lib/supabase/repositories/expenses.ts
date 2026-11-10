@@ -11,12 +11,14 @@ import type { ExpenseRepository } from "@/lib/expenses/repository";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { Expense } from "@/lib/expenses/types";
 import { getMonthRange } from "@/lib/calendar";
-import { expenseTabMembershipFilter } from "@/lib/supabase/filters";
-import { isUserFacing, translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
+import { expenseSearchFilter, expenseTabMembershipFilter } from "@/lib/supabase/filters";
+import { isUserFacing, translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import { validateExpensePatch, type ExpenseChanges, type ExpenseInput } from "@/lib/validation/expense";
 
 const EXPENSE_COLUMNS = "id, description, amount, category, subtype, expense_date, notes";
+const LOAD_ERROR = "Unable to load expenses.";
 /** Postgres' check_violation. */
 const CHECK_VIOLATION = "23514";
 
@@ -45,8 +47,6 @@ type ExpenseQuery = {
   filters?: ExpenseTabFilters;
 };
 
-const EXPENSE_PAGE_SIZE = 500;
-
 type ExpenseFilterQuery = ReturnType<typeof selectOwnedExpensePage>;
 
 function selectOwnedExpensePage(supabase: SupabaseClient<Database>, userId: string) {
@@ -55,13 +55,16 @@ function selectOwnedExpensePage(supabase: SupabaseClient<Database>, userId: stri
     .eq("user_id", userId);
 }
 
-/** Narrows an owner-scoped query by tab membership, date bounds, category and subtype. */
-function applyExpenseScope(query: ExpenseFilterQuery, options: ExpenseQuery) {
+/** Narrows an owner-scoped query by tab membership, date bounds, category, subtype and the search (`search`, lower-cased). */
+function applyExpenseScope(query: ExpenseFilterQuery, options: ExpenseQuery, search: string) {
   if (options.tab) {
     // Throws for a key outside the category and subtype catalogue: nothing unchecked reaches `.or()`.
     // eslint-disable-next-line local/postgrest-filter-string -- the string comes from expenseTabMembershipFilter, which checks every key
     query = query.or(expenseTabMembershipFilter(options.tab.categoryKeys, options.tab.subtypeKeys));
   }
+  // A second `.or()` is ANDed with the first. The user's text is escaped and quoted, and only catalogue keys are added.
+  // eslint-disable-next-line local/postgrest-filter-string -- the string comes from expenseSearchFilter, which escapes the text and checks every key
+  if (search) query = query.or(expenseSearchFilter(search));
   if (options.start) query = query.gte("expense_date", options.start);
   if (options.endExclusive) query = query.lt("expense_date", options.endExclusive);
   if (options.filters?.category) query = query.eq("category", options.filters.category);
@@ -70,40 +73,23 @@ function applyExpenseScope(query: ExpenseFilterQuery, options: ExpenseQuery) {
   return query;
 }
 
-type Page<Row> = { data: Row[] | null; error: DatabaseError | null; count: number | null };
-
-/** Reads every page, failing the whole read when any page errors or the total comes up short. */
-async function fetchAllPages<Row>(fetchPage: (from: number, to: number) => PromiseLike<Page<Row>>) {
-  const rows: Row[] = [];
-  let offset = 0;
-  while (true) {
-    const { data, error, count } = await fetchPage(offset, offset + EXPENSE_PAGE_SIZE - 1);
-    if (error) throw translateDatabaseError(error, "Unable to load expenses.");
-    const page = data ?? [];
-    if (!page.length) {
-      if (count !== null && offset < count) throw new Error("Unable to load complete expenses.");
-      break;
-    }
-    rows.push(...page);
-    offset += page.length;
-    // Advance by actual rows, so a server cap smaller than our page size cannot truncate history.
-    if (count !== null && offset >= count) break;
-  }
-  return rows;
-}
-
+/**
+ * The user's expenses that `options` select, newest first, read page by page. The search runs
+ * in the database, so only the matching rows are read; `matchesExpenseSearch` then checks them
+ * again, which keeps exactly the rows it always kept (see `expenseSearchFilter`).
+ */
 async function queryExpensesForUser(userId: string, options: ExpenseQuery) {
   const supabase = await createClient();
   // An empty selection must never turn into an unrestricted expense query.
   if (options.tab && !options.tab.categoryKeys.length && !options.tab.subtypeKeys.length) return [];
+  const search = options.filters?.search.toLowerCase() ?? "";
   const rows = await fetchAllPages((from, to) =>
-    applyExpenseScope(selectOwnedExpensePage(supabase, userId), options)
+    applyExpenseScope(selectOwnedExpensePage(supabase, userId), options, search)
       .order("expense_date", { ascending: false })
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
-      .range(from, to));
+      .range(from, to), LOAD_ERROR);
   const expenses = rows.map(toExpense);
-  const search = options.filters?.search.toLowerCase() ?? "";
   return search ? expenses.filter((expense) => matchesExpenseSearch(expense, search)) : expenses;
 }
 
@@ -157,7 +143,7 @@ export const supabaseExpenseRepository: ExpenseRepository = {
         .order("expense_date", { ascending: false })
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
-        .range(from, to));
+        .range(from, to), LOAD_ERROR);
     return rows.map((row) => ({
       description: row.description,
       category: row.category as ExpenseCategory,
@@ -176,7 +162,7 @@ export const supabaseExpenseRepository: ExpenseRepository = {
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(limit);
-    if (error) throw translateDatabaseError(error, "Unable to load expenses.");
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return (data ?? []).map((row) => ({
       description: row.description,
       category: row.category as ExpenseCategory,
@@ -192,7 +178,7 @@ export const supabaseExpenseRepository: ExpenseRepository = {
   async count(userId) {
     const supabase = await createClient();
     const { count, error } = await supabase.from("expenses").select("id", { count: "exact", head: true }).eq("user_id", userId);
-    if (error) throw translateDatabaseError(error, "Unable to load expenses.");
+    if (error) throw translateDatabaseError(error, LOAD_ERROR);
     return count ?? 0;
   },
 

@@ -25,7 +25,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 
 | # | What | Why it matters | Where it's explained |
 | --- | --- | --- | --- |
-| 1 | Move the Supabase project to asymmetric JWT signing keys (dashboard → JWT Signing Keys) | Removes one or two calls to Supabase Auth from every signed-in request, with no code change. Measured in the lab (PF1b): a cold Home load goes from 30 Auth calls to 0, and with 40 ms to Supabase its data appears about 0.23 s sooner on the lab's CPU-only pass | Plan, "Decisions for George"; PF4 below; "Signed-in lab baseline" |
+| 1 | Move the Supabase project to asymmetric JWT signing keys (dashboard → JWT Signing Keys) | Removes one or two calls to Supabase Auth from every signed-in request, with no code change. Measured in the lab (PF1b): a cold Home load goes from 30 Auth calls to 0. Measured again after PF4, which didn't change the Auth calls: with 40 ms to Supabase the data appears 150 to 254 ms sooner on all four daily pages (Home 1,056 → 906 ms) on the lab's CPU-only pass. PF4 left the code alternative (option 2) unbuilt until you decide | Plan, "Decisions for George"; PF4 below; "Signed-in lab baseline" |
 | 2 | Agree or change the budgets | They decide what "fast enough" means for PF13. I'm using them as working budgets until you change them | "Proposed budgets" under "Baseline and budgets", and PF1 below |
 | 3 | On the VPS, run `sudo scripts/perf-report.sh 5 expense-tracker-web` and the two delivery checks (streaming through the proxy, compression), and paste the output into the PR or send it to me | It is the real-use half of the baseline: Web Vitals per page, server time per route, Auth calls per request, whether the proxy streams. I have no access to production, so those cells say "not measured: needs the VPS" | "Real use" and "Delivery checks" under "Baseline and budgets" |
 | 4 | Check whether "Add a kid" works in production, and decide the fix | The lab found that creating a kid account fails on a database built from the migrations (`permission denied for function my_kid_ai_permitted`, from the AI gate migration's profile trigger). If production has the same grants, nobody can add a kid. It needs a migration, which only goes live with your go-ahead | PF1b, "Left open"; [lab.md](lab.md), "What the lab found while seeding" |
@@ -39,7 +39,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF1b | A local lab: signed-in pages measured without touching live data | done, except the VPS's round trip to Supabase (row 5) | #227 |
 | PF2 | No endless loading | done | #228 |
 | PF3 | Skeletons and a boundary per section | done, except the cold-load cost found (see PF3 section 7) | #229 |
-| PF4 | Fewer round trips in the app | not started | |
+| PF4 | Fewer round trips in the app | done, except one getClaims per request: waiting on row 1 | #230 |
 | PF5 | Session gate and account on the server | not started | |
 | PF6 | First data on the server for Home | not started | |
 | PF7 | The same for Expenses, To-dos and Reminders | not started | |
@@ -81,6 +81,14 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   server took (5 s watched). Each of the ten sections has its own `loading.tsx` and `error.tsx`.
   The price: a cold load now also downloads about **58 KB** of other sections' scripts, and on the
   emulated phone the data appears **0.1 to 0.4 s later**. PF8 has to schedule that.
+
+- **PF4, fewer round trips.** The data requests behind Expenses, the tabs, Home's month card,
+  Investments and Net worth answer **55 to 70 ms sooner** on the server (one wait fewer in a row), a
+  saved tab's search **0.71 → 0.23 s** on 3,724 expenses (same results, 172 searches compared), and
+  no request reads the family twice. Long lists are now complete or refused with a message: an
+  investment account showed only its **oldest 1,000 orders**; now all of them, up to 5,000. Pages
+  don't show their data measurably sooner (within the 150 ms noise); asymmetric keys still would,
+  by 150 to 254 ms (row 1).
 
 ## Baseline and budgets
 
@@ -1475,3 +1483,377 @@ Checks: `npm run lint`, `npx next typegen && npm run typecheck`, `npm test` (6,7
 - **No skeleton-to-content fade** (`ui-direction.md` lists one for U4); I didn't add it.
 - **Before-numbers for Reminders on the CPU pass** are missing (4).
 - **The plan's `PageHeaderSkeleton`** isn't a component (3).
+
+### PF4: Fewer round trips in the app
+
+#### 1. The problem
+
+- **Each data request waited in a queue on the server before it read any data.** For Home's month
+  card (`/api/dashboard`) the server asked, one after the other: Supabase Auth in the proxy, Auth
+  again in the route, your profile (must you change your password?), your family membership (may
+  you see expenses?), and only then the expenses. With 40 ms to Supabase that's five waits in a
+  row. The same queue is in front of Expenses, the saved tabs, Investments, Net worth and Imports.
+- **Some requests read the family list two or three times.** Saving a calendar event read it twice
+  (three times for "every event in the series"), and moving a to-do card read it twice. PF1 and PF1b
+  had found that the four daily pages read it at most once, so this was the only place the plan's
+  "`get_family()` runs several times per request" was true.
+- **Searching a saved tab read the whole tab.** Searching "zzz" in a tab of all 3,724 of Alex's
+  expenses fetched all 3,724, in eight requests one after another, then threw away the ones that
+  didn't match: 0.7 s on the server for an empty result (audit P9).
+- **Some lists could be quietly incomplete** (audit D7, B11):
+  - the calendar, the open to-dos, the reminders and the import counts read one page and relied on
+    Supabase's 1,000-row cap never being reached;
+  - **an investment account with more than 1,000 orders showed only its oldest 1,000**, so its
+    positions were wrong. The code asked for up to 5,000 (audit B11 assumed that was the cap), but the
+    orders came as a list inside the account, and Supabase's REST layer cuts such a list at its
+    1,000-row limit without saying so. I found this in the lab: with 5,001 orders seeded, the query
+    `main` sends returns 1,000, the oldest ones. More than 500 net-worth items would also have dropped
+    some from the total. Nobody was told.
+- **A long list read page by page broke if a row was deleted in between.** I checked it in the lab:
+  when a deletion leaves the next page's start past the end, PostgREST (Supabase's REST layer)
+  answers "416 Requested range not satisfiable" and the whole request failed with a 500.
+
+#### 2. What changed
+
+**What a person notices**
+
+- **Expenses, saved tabs, Home's month card, Investments, Net worth and Imports answer about 60 ms
+  sooner** (at 40 ms to Supabase): the membership is now read at the same time as the password
+  check instead of after it. The other routes are unchanged (numbers in 4).
+- **Searching a saved tab is three times quicker on a big tab** (0.71 s to 0.23 s on the server for
+  3,724 expenses): the database does the search and sends only the matches. The results are the
+  same, in the same order (172 searches compared, 4).
+- **Big lists are complete or say why not.** The calendar, the to-do board, the reminders, the
+  import counts and every expense list now read every page. An investment account with 1,001 to
+  5,000 orders now shows all of them (it showed the oldest 1,000); past 5,000 orders, or past 500
+  net-worth items, the page says so instead of showing wrong numbers. The two new messages are below.
+- **A row deleted while a long list loads no longer breaks it**: the read starts over (at most three
+  times) and returns a consistent list.
+- **Unchanged: the Auth calls.** A cold Home load still makes 30 calls to Supabase Auth, 2 per API
+  request. Removing them is the signing-keys decision (row 1 of "Waiting for George"); the code
+  alternative is not built (7).
+
+**The messages** (both new, both a 409 with `{ error }`, shown in place of "Your data could not be
+loaded…" on the Investments and Net worth pages, and returned as the tool error over MCP):
+
+- Investments, and one asset's order history: "One broker account has more than 5,000 orders, more
+  than the app can show. Nothing is lost. Ask whoever runs the app to raise the limit."
+- Net worth: "There are more than 500 net-worth items, more than the app can show. Nothing is lost.
+  Ask whoever runs the app to raise the limit."
+
+Checked against `docs/ui-direction.md` ("Copy", which the UI plan points to): short, plain, sentence
+case, says what to do next, no exclamation mark, no "Oops". "Whoever runs the app" is my wording
+because the app has no admin role to name; change it if you'd rather it said you.
+
+**How it works**
+
+- **Once per request** (`src/lib/request-memo.ts`, new): `oncePerRequest(key, load)` keeps a read's
+  promise for the rest of the request in an `AsyncLocalStorage`; `forgetPerRequest(key)` drops it.
+  `logRequest` (every API request, MCP included) opens a new memo, and so does
+  `runWithSupabaseClient` (an MCP call acting as a token's user), so a read is only shared between
+  calls acting as the same caller. Three reads use it: who is signed in (`getAuthenticatedUser`,
+  `src/lib/auth/index.ts`), the membership (`getCurrentMember`, `src/lib/family/current-member.ts`)
+  and the family (`get_family()`, in `src/lib/supabase/repositories/family.ts`). Every family write
+  there runs inside `changingFamily`, which forgets the membership and the family afterwards, and so
+  do the two account deletions in `account-data.ts` (a kid's, your own). Both React `cache()` wrappers are gone: they
+  only work while React renders, never in a route handler.
+- **Membership alongside the password check**: `withUser` takes a `readAlongside` read and starts it
+  with the password check (`src/lib/http/route.ts`); `withPermission` and `withParent` pass
+  `getCurrentMember` (`src/lib/http/permission.ts`). The handler's own call then gets the same
+  promise. The membership is read even for an account that must change its password; it's then
+  thrown away.
+- **Search on the server**: `expenseSearchFilter` (`src/lib/supabase/filters.ts`) builds the `or()`:
+  `description` and `notes` with `ilike`, plus the category and subtype keys whose label contains the
+  text, plus `subtype is null` when the text is part of "No subtype": the same fields as
+  `matchesExpenseSearch` (both take "No subtype" from one constant). The text goes through S8's `escapeLikePattern` (it was written and tested
+  for this but never used) and inside PostgREST's double quotes. The repository runs
+  `matchesExpenseSearch` over what comes back, so the result is exactly what it was.
+- **One paging helper** (`src/lib/supabase/fetch-all-pages.ts`, new): pages of 1,000 (Supabase's
+  usual cap), advancing by the rows that came back, with the exact count on every page. If the
+  count changes between pages, or PostgREST answers PGRST103 (the 416), it starts over, up to three
+  times, then fails with the list's own message. With `limit` it reads only the first rows, for the
+  caps. Used by the expense lists (pages were 500 before), the import counts (its own loop is gone),
+  the to-do board, the reminders and completions, the calendar, the investment orders and the
+  net-worth items. To-dos and reminders gained `id` as the last sort column, so the order is total.
+- **Caps that refuse**: the investment orders are no longer a list embedded in the account (cut at
+  1,000), but their own paged read, newest first, joined to the account to check its owner
+  (`src/lib/supabase/repositories/investments.ts`): the accounts and the orders in parallel, so no
+  extra wait. `src/lib/investments/service.ts` reads at most 10,001 orders (one more than two
+  accounts at 5,000 each, so if that many come back, one account is over) and refuses with the 409
+  when an account has more than 5,000; one asset's history reads 5,001 and refuses the same way.
+  Newest first means a limit could only ever leave out the oldest. `src/lib/net-worth/service.ts`
+  reads 501 items and refuses past 500 (the limit moved there from the repository, which pages too).
+  The messages are built from the two limits, so raising one changes its message.
+  `DataError` (`src/components/ui/data-state.tsx`) takes the failed request's `error` and shows a
+  409's message; the Investments and Net worth panels pass it.
+- Tests: `request-memo.test.ts`, `fetch-all-pages.test.ts`, `src/lib/auth/index.test.ts` (new); in
+  the existing files, the family read once across a to-do move's two calls and again after a family
+  write (`todos.test.ts`), the membership once per request (`current-member.test.ts`), the
+  membership started before the password check answers (`permission.test.ts`), the escaping and the
+  search on the server (`filters.test.ts`, `expenses.test.ts`, with literal `%`, `_`, `\`, `*`, `,`,
+  `(`, `"` and diacritics), paging past a server cap (`todos.test.ts`, `reminders.test.ts`), the
+  refusals and the newest-first reads (`investments` service and repository tests,
+  `net-worth.test.ts`, `net-worth/route.test.ts`, `data-state.test.tsx`).
+  The test fake for Supabase learned `ilike`, quoted values and `is.null` inside `or()`.
+- `docs/lint-rules.md`: the search is the third allowed disable of `local/postgrest-filter-string`.
+
+#### 3. Why this way
+
+- **I checked the plan's premises first, and fixed what the lab showed rather than what the plan
+  assumed.** PF1 and PF1b had found that `get_family()` runs at most once on the four daily pages
+  and that the repeated cost there is the Auth calls. So I timed 28 routes in the lab before
+  changing anything (4). `get_family()` was repeated only by saving a calendar event (2, or 3 for a
+  whole series) and moving a to-do card (2); the membership was never read twice. What did cost the
+  daily pages a round trip was the *order*: the membership waited for the password check although
+  neither needs the other. That one isn't in the plan's list; it's the change that moves Home's and
+  Expenses' data requests, so I made it.
+- **Once per request with `AsyncLocalStorage`, not React's `cache()`.** `cache()` only deduplicates
+  while React renders a server component; in a route handler it calls through every time (audit
+  P11, and the comment in `viewed-user.ts` already said so). The plan offered L2's request context
+  or a small store of its own; I used a store of its own, because the request context is described
+  as logging only, and because an MCP call switches who the caller is inside one request: each
+  `runWithSupabaseClient` run gets a fresh memo, so nothing read as one caller is reused as
+  another. That is also why the keys don't carry the user id, as the plan suggested: within one memo
+  the caller can't change.
+- **The membership's memo sits in `getCurrentMember`, the family's in the Supabase repository.** The
+  to-do and calendar repositories call the Supabase family repository directly, so the family has to
+  be kept there. The membership is only read through `getCurrentMember`, and keeping it there means
+  the route tests' fake repositories see one read too, as production does.
+- **A failed read stays failed for the rest of the request.** Reading again would double the load on
+  a database that is already failing, and the request fails either way.
+- **Search: `ilike` inside one `or()`, then the old check over the matches.** The plan asks for the
+  same fields and the same results. Category and subtype names aren't stored (only their keys), so
+  the names are matched in the app and only catalogue keys reach the query. PostgREST turns `*` into
+  `%` before the query runs and no escape stops it (tried in the lab), so `escapeLikePattern` sends a
+  `*` as `_`, one character; the database can return a few extra rows and `matchesExpenseSearch`
+  drops them. The check can't add a row the database left out: a letter whose lower case Postgres
+  and JavaScript disagree on could in theory be missed. The 172 searches compared in 4 include
+  "İstanbul", "Straße", "Ș" and "Ş" and found no difference.
+  Turned down: a full-text index (different results; the plan says same results) and a new SQL
+  function (a migration for something PostgREST can already do).
+- **Paging with the count on every page.** Without a total, a short page from a server cap can't be
+  told from the last page (the old code's own test covers a cap of 113 rows). With it, a changed total
+  between pages shows the list moved, and starting over gives a list with no row missing or twice.
+  Turned down: keyset paging ("after this date and id"), which needs a cursor per query and the
+  sort columns in every one; it's worth it only for lists far longer than these. Page size 1,000,
+  because Supabase's default `max-rows` is 1,000 and the old 500 doubled the requests for long
+  ledgers.
+- **Refuse rather than page through, for investments and net worth.** Positions and totals worked
+  out from part of the history are wrong, so a cut list is worse than an error; and the plan and the
+  audit (B11) ask for a refusal. **409, not 422**: the request is fine, what's stored is past what the
+  app handles. The investments read is newest first anyway, so if anyone ever removes the refusal,
+  only the oldest orders could be left out.
+- **One `getClaims` per request: not built, as the plan says** while the signing-keys decision is open.
+  Option 2 (skip the proxy's refresh for `/api/*`) changes how sessions are refreshed; the numbers for
+  both modes are in 4 and 7.
+
+#### 4. Numbers
+
+All from the lab on George's laptop, 10 November 2026, signed in as the seed's parent (Alex), with
+40 ms added to every call to Supabase (`npm run lab -- delay 40`) and the shared-secret JWT like
+production, unless a row says otherwise. "Before" is `main` at `e4189a1`, "after" this branch.
+**Not production numbers.**
+
+**Per route: the server's time and calls.** Each route called five times in a row from a script
+that signs in through `POST /api/auth`, as the lab's measuring script does; the median of the five
+`request` lines in `.lab/app.log` (`ms`, `dbCalls`, `dbMs`) and of the calls the delay proxy logged
+(`.lab/supabase-calls.jsonl`: Auth calls, `get_family()`). "Auth calls" counts the proxy's own,
+which no request line shows; `dbCalls` includes the route's one. Writes ran on the seed's own
+events and cards. The last column is the same after-build with asymmetric keys
+(`npm run lab -- jwt asymmetric`); its Investments and Net worth rows are from the build before the
+order reads were rewritten (the page-by-page read below), the rest is the same code.
+
+| Route | Server ms | `dbCalls` | `dbMs` | Auth calls | `get_family()` | Server ms, asymmetric keys |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `GET /api/account` | 116 → 111 | 5 | 265 → 254 | 2 | 0 | 60 |
+| `GET /api/dashboard` | 229 → **164** | 5 | 270 → 257 | 2 | 0 | 113 |
+| `GET /api/expenses` | 224 → **162** | 4 | 214 → 204 | 2 | 0 | 112 |
+| `GET /api/expense-tabs` | 224 → **159** | 4 | 213 → 202 | 2 | 0 | 109 |
+| `GET /api/family` | 169 → 159 | 3 | 161 → 152 | 2 | 1 | 110 |
+| `GET /api/todos` | 171 → 166 | 5 | 267 → 263 | 2 | 1 | 111 |
+| `GET /api/reminders` | 170 → 156 | 4 | 214 → 201 | 2 | 0 | 112 |
+| `GET /api/reminders/summary` | 169 → 158 | 3 | 160 → 150 | 2 | 0 | 107 |
+| `GET /api/account/notices` | 166 → 158 | 3 | 159 → 151 | 2 | 0 | 109 |
+| `GET /api/dashboard?member=<Sam>` | 227 → **162** | 5 | 267 → 255 | 2 | 0 | 113 |
+| `GET /api/dashboard?member=all` | 359 → **288** | 10 | 636 → 624 | 2 | 1 | 246 |
+| `GET /api/expenses?member=all` | 304 → **242** | 7 | 399 → 385 | 2 | 1 | 193 |
+| tab ledger, Alex's first saved tab | 288 → **219** | 5 | 272 → 260 | 2 | 0 | 168 |
+| … searched for "zzz" | 284 → **215** | 5 | 270 → 256 | 2 | 0 | 166 |
+| tab ledger, a tab of all 3,724 expenses | 733 → **411** | 12 → **8** | 694 → 431 | 2 | 0 | 377 |
+| … searched for "fuel" (139 found) | 716 → **229** | 12 → **5** | 683 → 267 | 2 | 0 | 178 |
+| … searched for "groc" (1,129 found) | 722 → **303** | 12 → **6** | 686 → 337 | 2 | 0 | 260 |
+| … searched for "zzz" (none) | 706 → **227** | 12 → **5** | 675 → 270 | 2 | 0 | 178 |
+| `GET /api/calendar/events` (80 days) | 223 → 215 | 5 | 266 → 258 | 2 | 1 | 163 |
+| `GET /api/calendar/events/:id` | 170 → 159 | 4 | 214 → 202 | 2 | 1 | 110 |
+| `PATCH /api/calendar/events/:id`, one event | 287 → 273 | 7 → **6** | 380 → 312 | 2 | 2 → **1** | 229 |
+| … `scope: "all"`, a weekly series | 459 → 433 | 11 → **9** | 595 → 468 | 2 | 3 → **1** | 398 |
+| `PATCH /api/todos/:id` | 170 → 162 | 4 | 216 → 206 | 2 | 1 | 114 |
+| `POST /api/todos/:id/move` | 333 → 315 | 9 → **8** | 471 → 401 | 2 | 2 → **1** | 278 |
+| `GET /api/investments` | 225 → **159** | 4 → **5** | 215 → 248 | 2 | 0 | 112 |
+| `GET /api/net-worth` | 230 → **159** | 5 → **6** | 272 → 302 | 2 | 0 | 113 |
+| `GET /api/imports` | 217 → **158** | 5 | 261 → 251 | 2 | 0 | 108 |
+
+```bash
+npm run lab -- up && npm run lab -- delay 40
+node scripts/lab/search-compare.mjs > search.json      # creates the 3,724-expense tab the probe uses
+node scripts/lab/route-probe.mjs .lab parent 5 > routes.json
+```
+
+What it says:
+
+- **The `withPermission` routes save one round trip each: 55 to 70 ms** (`/api/dashboard`,
+  `/api/expenses`, `/api/expense-tabs`, the member views, the tab ledger, Investments, Net worth,
+  Imports). Same number of calls, one fewer wait in a row. With asymmetric keys they'd save the
+  Auth call on top: `/api/dashboard` 229 → 164 → 113 ms.
+- **`get_family()` is now read once in every route measured** (calendar edits 2 and 3 → 1, a to-do
+  move 2 → 1). Those routes' time barely moves (287 → 273, 459 → 433 ms), because the repeated reads
+  ran alongside other reads; what they save is calls to Supabase (7 → 6, 11 → 9, 9 → 8).
+- **Search reads only the matches.** Searching a tab of all 3,724 expenses: 0.71 s → 0.23 s, 12
+  calls → 5, and 0.68 s → 0.27 s spent waiting on Supabase. The tab itself, unsearched, reads in 4
+  pages of 1,000 instead of 8 of 500: 0.73 → 0.41 s.
+- **Investments and Net worth make one more call** (4 → 5, 5 → 6: the orders are now their own
+  read, beside the accounts) **and still answer sooner** (225 → 159, 230 → 159 ms), because that
+  read runs in parallel and the membership no longer waits.
+- **Auth calls per request: unchanged, 2.** Routes whose repositories checked the caller again now
+  ask Auth once less (below).
+
+**Routes that asked Auth twice in the same request** (same script, five calls each):
+
+| Route | Auth calls, before → after | Server ms |
+| --- | ---: | ---: |
+| `DELETE /api/account/avatar` (remove picture) | 3 → **2** | 269 → 214 |
+| `PATCH /api/account/mcp` (the AI-assistants switch) | 4 → **3** | 279 → 220 |
+
+The MCP switch answers 500 in the lab, before and after: its last step asks Auth for the OAuth
+grants, and the lab's Auth has no OAuth server (404). The count is up to that point. The AI gate
+(`src/lib/supabase/repositories/ai.ts`) checks the caller the same way; the lab has AI off, so it
+wasn't measured.
+
+**Pages: time until the data is on screen.** CPU-only pass (the phone's screen and 4× slower CPU, no
+network throttling, the pass where server time shows), median of three, ms:
+
+| | Home | Expenses | To-dos | Reminders |
+| --- | ---: | ---: | ---: | ---: |
+| Before (`main`), shared secret | 1,045 | 2,022 | 1,447 | 1,403 |
+| After, shared secret | 1,056 | 1,897 | 1,463 | 1,374 |
+| After, asymmetric keys | **906** | **1,704** | **1,209** | **1,195** |
+| Auth calls per cold load, before and after (shared) | 30 | 29 | 26 | 22 |
+| … with asymmetric keys | 0 | 0 | 0 | 0 |
+| Supabase calls / logged `dbCalls` / `get_family()` per cold load, before and after | 49 / 25 / 1 | 48 / 26 / 1 | 40 / 19 / 2 | 33 / 15 / 0 |
+
+```bash
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3 --throttle cpu --no-lighthouse
+npm run lab -- jwt asymmetric   # then the same
+```
+
+- **No page got measurably faster from this task.** The differences (+11, −125, +16, −29 ms) are
+  inside the 150 ms noise of this pass. On Home the month card's request is now as quick as the
+  other four that load beside it (164 against about 150 to 166 ms), so the last of them still
+  lands at the same time; Expenses' two requests are 50 to 60 ms quicker, which fits its −125 but
+  doesn't prove it.
+- **The before and after rows were run back to back.** A first pair, run an hour apart, said
+  943 → 1,066 on Home: the "before" had been taken while the laptop was quieter. Run again next to
+  each other, `main` measured 1,045. In both runs the browser itself started `/api/account` 70 to
+  90 ms later (660 → 745 ms after the tap), before any server change could matter: that was the
+  machine, not the code. Compare only rows run side by side.
+- **Asymmetric keys still matter after this task: 150 to 254 ms sooner on every page** (Home 150,
+  Expenses 193, To-dos 254, Reminders 179), with 0 Auth calls. PF1b measured 97 to 324 ms on the
+  older `main`. This is the case for row 1 of "Waiting for George".
+
+**The search returns the same results.** Before and after, 43 searches, each with and without a
+year
+filter, on two tabs: Alex's tab of all 3,724 expenses, and a tab of 16 awkward descriptions I added
+for the solo user (`100% cotton`, `a_b`, `back\slash`, `star*shop`, `comma, (x)`, `quote "q"`,
+`ŞTIRBEI Ștefan`, `İstanbul`, `Straße`, …), searched for `%`, `_`, `\`, `*`, `r*s`, `,`, `(x)`,
+`"q"`, `ștefan`, `STRASSE`, `no sub`, `Groceries` and so on: **all 172 answers identical** (the same
+ids in the same order): `node scripts/lab/search-compare.mjs > before.json` on `main`, the same on
+this branch, then `diff`.
+
+**The caps, in the lab** (data added to the solo user with the lab's secret key):
+
+| | Before | After |
+| --- | --- | --- |
+| 5,001 orders on one account | the query `main` sends returns the oldest **1,000** (curl of PostgREST with the same parameters) | Investments shows the 409 message ([390](performance/screenshots/pf4/investments-409-390.jpg), [1280](performance/screenshots/pf4/investments-409-1280.jpg)) |
+| 5,000 orders on one account | not run separately; the same query, so the same 1,000-row cut | "5000 units", all of them, in 5 pages (467 ms at 40 ms) |
+| 501 net-worth items | not measured (not seeded while `main` ran; its `.limit(500)` would have dropped one) | Net worth shows the 409 message ([390](performance/screenshots/pf4/net-worth-409-390.jpg), [1280](performance/screenshots/pf4/net-worth-409-1280.jpg)) |
+
+**A row deleted between two pages**, checked directly against the lab's PostgREST 16.5: asking for
+an offset past the last row with the count on answers `416` `PGRST103`
+("An offset of 300 was requested, but there are only 263 rows"); without the count, `200 []`. The
+old loop turned the 416 into a 500; the helper starts over (tested in `fetch-all-pages.test.ts`).
+
+**Checks:** `npm run lint`, `npx next typegen && npm run typecheck`, `npm test` (6,846 passed),
+`npm run build`, `npm run test:db` (2,051 assertions): all pass. Loaded screens are unchanged (no
+loaded component changed; the 409 state is the existing `DataError` with the server's sentence).
+After measuring: `npm run lab -- down`; `docker ps -a` and `docker volume ls` list nothing of the
+lab, and `.lab/` holds only `results/`.
+
+#### 5. How to check it yourself
+
+1. `npm run lab -- up`, then `npm run lab -- delay 40`.
+2. `node scripts/lab/search-compare.mjs > after.json`. Then `git switch --detach origin/main`,
+   `npm run lab -- app`, the same into `before.json`, and `diff before.json after.json`: no output.
+   (Switch back and `npm run lab -- app` again.) Or by hand: sign in at <http://localhost:3110> as
+   Alex (`.lab/users.json`) and search the tab "Everything (PF4 probe)" for "fuel", "100%", "a_b".
+3. Watch the request lines while you use the app: `tail -f .lab/app.log | grep '"event":"request"'`.
+   `GET /api/dashboard` and `GET /api/expenses` show `rpc.get_my_membership` next to
+   `db.profiles.get`, not after it, and are about 60 ms quicker than on `main`. Edit a repeating
+   calendar event for "every event": one `rpc.get_family` in its line (three on `main`).
+4. The refusal, in the lab only: give the solo user 501 net-worth items with the lab's secret key,
+   then sign in as Casey and open Net worth: the message from 2 instead of the generic error.
+
+   ```bash
+   set -a; . .lab/app.env; set +a; U=$(jq -r .users.solo.userId .lab/users.json)
+   jq -n --arg u "$U" '[range(501) | {user_id: $u, name: "Item \(.)", kind: "asset", category: "cash", currency: "EUR"}]' |
+     curl -s -X POST "$LAB_SUPABASE_DIRECT_URL/rest/v1/net_worth_items" -H "apikey: $SUPABASE_SECRET_KEY" \
+       -H "Authorization: Bearer $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d @-
+   ```
+5. `npx vitest run src/lib/request-memo.test.ts src/lib/supabase/fetch-all-pages.test.ts
+   src/lib/supabase/filters.test.ts src/lib/supabase/repositories/expenses.test.ts` (the new tests).
+6. `npm run lab -- down`.
+
+#### 6. Risks and how to undo it
+
+- **A read kept for the rest of a request can be out of date after a write in the same request.**
+  Every write that changes the family or the membership forgets both (the family repository's
+  writes, and the two account deletions). A new write path that changes them must do the same; a
+  write that changes a member's name, colour or picture from somewhere else (today none reads the
+  family afterwards in the same request) would need it too. Only three reads are kept, so the risk
+  stays small and easy to list.
+- **The membership is read before the password check answers.** For an account that must change its
+  password, one extra read (its own membership, under RLS) happens and is thrown away. Nothing
+  reaches the response.
+- **Search depends on PostgREST's quoting and `ilike`.** Checked against the lab's PostgREST 16.5
+  with awkward text (4). A future PostgREST that changed how quoted values are read would show up
+  as wrong search results, not as a security hole: the text never leaves the quotes (tested, a
+  quote in the text is escaped).
+- **Each page of a complete list now also asks for the exact count.** For the to-do board,
+  reminders and calendar that's a count over a few dozen rows; for expenses it was already asked.
+- **The 409 has no way out inside the app**: past 5,000 orders or 500 items the page shows the
+  message until the limit is raised in code. Before, it showed wrong numbers instead. The family
+  view refuses as a whole if one member is past a limit.
+- No migration, nothing stored. To undo: revert the PR.
+
+#### 7. Left open
+
+- **One `getClaims` per request: waiting on row 1 of "Waiting for George".** Not built, as the plan
+  says (option 2 only if you decline asymmetric keys). Every API request still makes 2 Auth calls
+  (the proxy's and the route's), a cold Home load 30. The numbers for the decision are in 4.
+- **`/api/account` reads your `profiles` row three times** (currency, the password flag, the
+  picture), at the same time, so it costs Supabase two calls but no waiting. One `select` of the
+  three columns would fix it; I left it because it doesn't make anything sooner and changes three
+  repository methods.
+- **Server components don't get the memo.** It opens in `logRequest` and in MCP calls; a page that
+  PF5 to PF7 renders on the server has neither, so there `getCurrentMember()` and the family are
+  read on every call. Those tasks should wrap their loaders in `runWithRequestMemo`, or add
+  `cache()` back for the server-component path.
+- **The link prefetches' Auth calls** (16 of Home's 30) are PF8's.
+- **The calendar's series-length count** (`withSeriesLengths`) still reads without paging. It
+  can't reach the cap: 50 series per read at most 10 events each is 500 rows.
+- **Pages after the first are read one after another.** A list of 3,724 rows takes 4 requests in a
+  row (0.41 s at 40 ms). Once the first page gives the total, the rest could be asked for together;
+  I left that for when a list that long is on a daily page (none is: the ledgers are a month).
+- **Not done from the `/simplify` review:** clearing the whole memo on any write at the client
+  layer instead of per write (Supabase's RPC reads are POSTs too, so a write can't be told from a
+  read there); showing a 409's message in every `DataError` (no other read answers 409); one helper
+  for "read cap + 1 and refuse" (two places, different messages).

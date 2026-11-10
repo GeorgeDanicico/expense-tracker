@@ -48,7 +48,7 @@ function SingleNetWorthPanel() {
   const grouped = useMemo(() => groupedEntries(data?.entries ?? []), [data?.entries]);
 
   if (isLoading && !data) return <PanelSkeleton title="Net worth" label="Loading your net worth…" slowKey={key} />;
-  if (error && !data) return <DataError retry={() => void mutate()} />;
+  if (error && !data) return <DataError error={error} retry={() => void mutate()} />;
   if (!data) return <PanelSkeleton title="Net worth" label="Loading your net worth…" slowKey={key} />;
 
   return (
@@ -99,7 +99,7 @@ function FamilyNetWorthPanel() {
   const { data, error, isLoading, isValidating, mutate } = useSWR<FamilyNetWorthOverview>(key);
 
   if (isLoading && !data) return <PanelSkeleton title="Net worth" label="Loading the family's net worth…" slowKey={key} />;
-  if (error && !data) return <DataError retry={() => void mutate()} />;
+  if (error && !data) return <DataError error={error} retry={() => void mutate()} />;
   if (!data) return <PanelSkeleton title="Net worth" label="Loading the family's net worth…" slowKey={key} />;
 
   return (

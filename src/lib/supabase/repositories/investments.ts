@@ -2,10 +2,7 @@ import "server-only";
 
 import type { Database } from "@/lib/database.types";
 import { DomainError } from "@/lib/errors";
-import type {
-  InvestmentAccountWithTransactions,
-  InvestmentRepository,
-} from "@/lib/investments/repository";
+import type { InvestmentRepository } from "@/lib/investments/repository";
 import {
   isInvestmentBrokerId,
   type InvestmentAccount,
@@ -14,6 +11,7 @@ import {
   type InvestmentTransactionSide,
 } from "@/lib/investments/types";
 import { isUserFacing, translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createClient } from "@/lib/supabase/server";
 
 type Tables = Database["public"]["Tables"];
@@ -21,16 +19,15 @@ type Tables = Database["public"]["Tables"];
 const TRANSACTION_COLUMNS =
   "id, investment_account_id, instrument, currency, side, amount, quantity, unit_price, executed_at";
 const ACCOUNT_COLUMNS = "id, broker_id";
+const LOAD_INVESTMENTS_ERROR = "Unable to load investments.";
 /** Postgres' check_violation. */
 const CHECK_VIOLATION = "23514";
 
 type InvestmentTransactionRow = Tables["investment_transactions"]["Row"];
 type InvestmentAccountRow = Pick<Tables["investment_accounts"]["Row"], "id" | "broker_id">;
 
-/** Embedded selects are untyped because the generated types declare no relationships. */
-type InvestmentAccountWithTransactionsRow = InvestmentAccountRow & {
-  investment_transactions: InvestmentTransactionRow[] | null;
-};
+/** A transaction with its account's broker; embedded selects are untyped because the generated types declare no relationships. */
+type AssetTransactionRow = InvestmentTransactionRow & { investment_accounts: { broker_id: string } };
 
 function toTransaction(row: InvestmentTransactionRow): InvestmentTransaction {
   return {
@@ -51,13 +48,6 @@ function toTransaction(row: InvestmentTransactionRow): InvestmentTransaction {
 function toAccount(row: InvestmentAccountRow, failure: string): InvestmentAccount {
   if (!isInvestmentBrokerId(row.broker_id)) throw new Error(failure);
   return { id: row.id, brokerId: row.broker_id };
-}
-
-function parseAccountRow(row: InvestmentAccountWithTransactionsRow): InvestmentAccountWithTransactions {
-  return {
-    account: toAccount(row, "Unable to load investments."),
-    transactions: (row.investment_transactions ?? []).map(toTransaction),
-  };
 }
 
 /** Reads an account only when it belongs to `userId`. */
@@ -88,7 +78,9 @@ function translateOrderError(error: DatabaseError, fallback: string) {
 
 /**
  * `InvestmentRepository` on the `investment_accounts` and `investment_transactions` tables. Every
- * read filters by owner: accounts on `user_id`, transactions through their account. Orders are
+ * read filters by owner: accounts on `user_id`, transactions through their account (an inner join).
+ * Transactions are read page by page (`fetchAllPages`), never as a list embedded under the account:
+ * PostgREST's `max-rows` cuts an embedded list at 1,000 rows without saying so. Orders are
  * written by `record_investment_order` and `delete_investment_order`, which lock the account, check
  * that it is the caller's and check the position inside the same transaction. Database errors go through `translateDatabaseError`: a known code is its status (a unique violation
  * a 409) with the generic message, anything else a 500.
@@ -96,54 +88,44 @@ function translateOrderError(error: DatabaseError, fallback: string) {
 export const supabaseInvestmentRepository: InvestmentRepository = {
   async listAccountsWithTransactions(userId, limits) {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("investment_accounts")
-      .select(`${ACCOUNT_COLUMNS}, investment_transactions(${TRANSACTION_COLUMNS})`)
-      .eq("user_id", userId)
-      .order("broker_id", { ascending: true })
-      .order("executed_at", {
-        foreignTable: "investment_transactions",
-        ascending: true,
-      })
-      .order("id", {
-        foreignTable: "investment_transactions",
-        ascending: true,
-      })
-      .limit(limits.accounts)
-      .limit(limits.transactionsPerAccount, { foreignTable: "investment_transactions" });
+    const [accounts, rows] = await Promise.all([
+      supabase.from("investment_accounts").select(ACCOUNT_COLUMNS).eq("user_id", userId)
+        .order("broker_id", { ascending: true }).limit(limits.accounts),
+      fetchAllPages((from, to) => supabase
+        .from("investment_transactions")
+        .select(`${TRANSACTION_COLUMNS}, investment_accounts!inner(user_id)`, { count: "exact" })
+        .eq("investment_accounts.user_id", userId)
+        .order("executed_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to), LOAD_INVESTMENTS_ERROR, { limit: limits.transactions }),
+    ]);
 
-    if (error) throw translateDatabaseError(error, "Unable to load investments.");
-    return (data as unknown as InvestmentAccountWithTransactionsRow[]).map(parseAccountRow);
+    if (accounts.error) throw translateDatabaseError(accounts.error, LOAD_INVESTMENTS_ERROR);
+    // Read newest first, so a limit only ever leaves out the oldest; each account's list is oldest first.
+    const byAccount = Map.groupBy((rows as unknown as InvestmentTransactionRow[]).map(toTransaction).reverse(),
+      (transaction) => transaction.investmentAccountId);
+    return accounts.data.map((row) => {
+      const account = toAccount(row, LOAD_INVESTMENTS_ERROR);
+      return { account, transactions: byAccount.get(account.id) ?? [] };
+    });
   },
 
   async getAssetHistory(userId, { accountId, instrument, currency }, limit) {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("investment_accounts")
-      .select(`${ACCOUNT_COLUMNS}, investment_transactions!inner(${TRANSACTION_COLUMNS})`)
-      .eq("id", accountId)
-      .eq("user_id", userId)
-      .eq("investment_transactions.instrument", instrument)
-      .eq("investment_transactions.currency", currency)
-      .order("executed_at", {
-        foreignTable: "investment_transactions",
-        ascending: false,
-      })
-      .order("id", {
-        foreignTable: "investment_transactions",
-        ascending: false,
-      })
-      .limit(limit, { foreignTable: "investment_transactions" })
-      .maybeSingle();
+    const rows = await fetchAllPages((from, to) => supabase
+      .from("investment_transactions")
+      .select(`${TRANSACTION_COLUMNS}, investment_accounts!inner(user_id, broker_id)`, { count: "exact" })
+      .eq("investment_account_id", accountId)
+      .eq("investment_accounts.user_id", userId)
+      .eq("instrument", instrument)
+      .eq("currency", currency)
+      .order("executed_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to), "Unable to load investment transactions.", { limit }) as unknown as AssetTransactionRow[];
 
-    if (error) throw translateDatabaseError(error, "Unable to load investment transactions.");
-    const row = data as unknown as InvestmentAccountWithTransactionsRow | null;
-    if (!row || !isInvestmentBrokerId(row.broker_id)) return null;
-
-    return {
-      account: { id: row.id, brokerId: row.broker_id },
-      transactions: (row.investment_transactions ?? []).map(toTransaction),
-    };
+    const brokerId = rows[0]?.investment_accounts.broker_id;
+    if (brokerId === undefined || !isInvestmentBrokerId(brokerId)) return null;
+    return { account: { id: accountId, brokerId }, transactions: rows.map(toTransaction) };
   },
 
   async getOrCreateAccount(userId, brokerId) {

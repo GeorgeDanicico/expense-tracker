@@ -197,6 +197,13 @@ export type WithUserOptions = {
    * the flag there) and `POST /api/account/password` (where it chooses one) set it.
    */
   allowPasswordChangeRequired?: boolean;
+  /**
+   * A read the handler makes first anyway, started together with the password check instead of
+   * after it, so the handler doesn't wait for one more round trip (PF4). `withPermission` and
+   * `withParent` pass the membership. It must be a read that `oncePerRequest` keeps, so the handler's
+   * own call gets the same answer, and only a read: it runs even when the check then refuses.
+   */
+  readAlongside?: () => Promise<unknown>;
 };
 
 /**
@@ -232,6 +239,8 @@ export function withUser<Req extends Request = Request, Ctx = unknown>(
       const overLimit = refuseOverLimit(READ_METHODS.has(request?.method.toUpperCase() ?? "GET") ? userReadRequests : userWriteRequests, user.id);
       if (overLimit) return overLimit;
       touchLastActiveInBackground(user.id);
+      // Its failure, if any, reaches the handler when it reads the same thing; here it would be unhandled.
+      options.readAlongside?.().catch(() => undefined);
 
       try {
         if (!options.allowPasswordChangeRequired && (await getRepositories().account.getMustChangePassword(user.id))) {

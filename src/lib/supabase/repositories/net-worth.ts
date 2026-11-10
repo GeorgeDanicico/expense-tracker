@@ -9,11 +9,11 @@ import {
   type NetWorthValuation,
 } from "@/lib/net-worth/types";
 import { translateDatabaseError } from "@/lib/supabase/errors";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createClient } from "@/lib/supabase/server";
 
 const CREATE_ITEM_ERROR = "The net-worth item could not be created.";
 const VALUATION_EXISTS = "A valuation for this date already exists.";
-const MAX_ACTIVE_ITEMS = 500;
 
 type Tables = Database["public"]["Tables"];
 
@@ -64,16 +64,18 @@ function toManualItem(row: NetWorthItemRow): NetWorthManualItemSource {
  * by owner: items by `user_id`, and valuations (which have no `user_id`) through their owner's item.
  */
 export const supabaseNetWorthRepository: NetWorthRepository = {
-  async listActiveItems(userId) {
+  async listActiveItems(userId, limit) {
     const supabase = await createClient();
-    // The valuations are embedded under the owner's items, so they are filtered through them.
-    const { data, error } = await supabase
+    // The valuations are embedded under the owner's items, so they are filtered through them. Read
+    // page by page up to `limit`: a plain `.limit()` would be cut at PostgREST's `max-rows` unnoticed.
+    const rows = await fetchAllPages((from, to) => supabase
       .from("net_worth_items")
-      .select(`${ITEM_COLUMNS}, net_worth_valuations(${VALUATION_COLUMNS})`)
+      .select(`${ITEM_COLUMNS}, net_worth_valuations(${VALUATION_COLUMNS})`, { count: "exact" })
       .eq("user_id", userId)
       .is("archived_at", null)
       .order("category", { ascending: true })
       .order("name", { ascending: true })
+      .order("id", { ascending: true })
       .order("valued_on", {
         foreignTable: "net_worth_valuations",
         ascending: false,
@@ -82,11 +84,10 @@ export const supabaseNetWorthRepository: NetWorthRepository = {
         foreignTable: "net_worth_valuations",
         ascending: false,
       })
-      .limit(MAX_ACTIVE_ITEMS)
-      .limit(2, { foreignTable: "net_worth_valuations" });
+      .limit(2, { foreignTable: "net_worth_valuations" })
+      .range(from, to), "Unable to load net-worth items.", { limit });
 
-    if (error) throw translateDatabaseError(error, "Unable to load net-worth items.");
-    return (data as unknown as NetWorthItemRow[]).map(toManualItem);
+    return (rows as unknown as NetWorthItemRow[]).map(toManualItem);
   },
 
   async getItem(userId, itemId) {
