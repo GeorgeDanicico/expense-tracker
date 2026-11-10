@@ -1,0 +1,95 @@
+# The local performance lab's Supabase stack (docs/lab.md). Read only by the Supabase CLI, through
+# scripts/lab.sh, which copies it to .lab/cli/supabase/config.toml and runs the CLI there.
+#
+# It is deliberately NOT at supabase/config.toml: that is where every `supabase` command run in this
+# repo looks, and a `supabase link` + `supabase config push` would send these local settings (a
+# localhost site URL, signup on) to the hosted project. Kept here, only the lab ever reads it, and
+# the CLI's own state (.temp) stays inside .lab/ instead of touching supabase/.temp.
+#
+# This stack is throwaway and lives on this machine only. There is no `supabase link`, and
+# scripts/lab.sh refuses to start the app unless SUPABASE_URL is a loopback address.
+#
+# Only what the app needs to sign in and read data runs: Postgres, Auth (GoTrue), PostgREST, the
+# API gateway (Kong) and Storage (below). Everything else is off here or excluded with
+# `supabase start -x` in lab.sh.
+#
+# The schema is NOT applied by the CLI: migrations and seed are off, and lab.sh replays
+# supabase/tests/support/legacy-bootstrap.sql and then every migration, the same route as
+# scripts/test-database.sh, then seeds with scripts/lab/seed.mjs.
+
+project_id = "expense-tracker-lab"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+[db.migrations]
+enabled = false
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[local_smtp]
+enabled = false
+
+# On, but only for the schema: the profile-pictures migration inserts its bucket into
+# storage.buckets, and in the CLI's stack only the Storage service creates that table (the
+# standalone image npm run test:db uses ships an old copy; this one ships none). Tried with it off
+# on 10 November 2026: the replay stops at 20261018000100_add_profile_avatars.sql. No target page
+# calls Storage (the seed users have no picture; the delay proxy logs 0 storage calls).
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+[storage.s3_protocol]
+enabled = false
+
+[storage.vector]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
+
+[auth]
+enabled = true
+# The lab app's address (scripts/lab.sh, LAB_APP_PORT).
+site_url = "http://localhost:3110"
+additional_redirect_urls = ["http://localhost:3110"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+minimum_password_length = 8
+
+[auth.rate_limit]
+# The measuring script signs in once per user and run; the defaults (30 per 5 minutes) are too low.
+sign_in_sign_ups = 1000
+token_refresh = 1000
+token_verifications = 1000
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+double_confirm_changes = false
+secure_password_change = false
