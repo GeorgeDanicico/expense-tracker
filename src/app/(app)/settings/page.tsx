@@ -18,6 +18,7 @@ import { useAccount } from "@/hooks/use-account";
 import { useApiForm } from "@/hooks/use-api-form";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { changeEmail } from "@/lib/api/account-requests";
+import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 
 export default function SettingsPage() {
   useDocumentTitle("Settings");
@@ -40,9 +41,9 @@ export default function SettingsPage() {
     }, { fallback: "Unable to save your email. Please try again." });
   }
 
-  if (isLoading && !data) return <DataLoading label="Loading your settings…" />;
+  if (isLoading && !data) return <DataLoading label="Loading your settings…" slowKey={ACCOUNT_API_KEY} />;
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading your settings…" />;
+  if (!data) return <DataLoading label="Loading your settings…" slowKey={ACCOUNT_API_KEY} />;
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>

@@ -24,7 +24,7 @@ import { useApiForm } from "@/hooks/use-api-form";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useExpenseTabRouting } from "@/hooks/use-expense-tab-routing";
 import { useViewing } from "@/hooks/use-viewing";
-import { expenseTabsApiKey, mainExpensesExportUrl, type TabsResponse } from "@/lib/api/keys";
+import { expenseTabsApiKey, FAMILY_API_KEY, mainExpensesExportUrl, type TabsResponse } from "@/lib/api/keys";
 import { getBucharestMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 import type { Expense } from "@/lib/expenses/types";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
@@ -127,7 +127,7 @@ function ExpensesContent() {
 
       {activeTabId || !viewing.ready ? controls : null}
       {!viewing.ready ? (
-        <DataLoading label="Loading expenses…" />
+        <DataLoading label="Loading expenses…" slowKey={FAMILY_API_KEY} />
       ) : !activeTabId ? (
         <LedgerPanel month={month} currency={viewing.currency} filtersOpen={filtersOpen} actions={actions} controls={controls} />
       ) : openTab ? (
@@ -135,7 +135,7 @@ function ExpensesContent() {
       ) : !tabsResult ? (
         tabsError ? (
           <DataError message="Saved expense tabs could not be loaded." retry={() => void mutateTabs()} />
-        ) : <DataLoading label="Loading saved tabs…" />
+        ) : <DataLoading label="Loading saved tabs…" slowKey={expenseTabsApiKey(viewing.member)} />
       ) : (
         <Box py="8" role="status">
           <Text textStyle="bodySm" color="fg.muted">This tab is no longer available. Returning to Expenses…</Text>

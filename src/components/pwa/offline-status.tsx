@@ -1,27 +1,15 @@
 "use client";
 
 import { Box, Button } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
 
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { useOnline } from "@/hooks/use-online";
 
 export function OfflineStatus() {
-  const [offline, setOffline] = useState(false);
+  const online = useOnline();
   const { mutate } = useSWRConfig();
-  useEffect(() => {
-    function update() {
-      setOffline(!navigator.onLine);
-    }
-    update();
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
-  }, []);
-  if (!offline) return null;
+  if (online) return null;
   return (
     <Box role="status" mb="4">
       <InlineAlert
@@ -30,10 +18,7 @@ export function OfflineStatus() {
           <Button
             size="xs"
             variant="outline"
-            onClick={() => {
-              setOffline(!navigator.onLine);
-              void mutate(() => true);
-            }}
+            onClick={() => void mutate(() => true)}
           >
             Retry
           </Button>

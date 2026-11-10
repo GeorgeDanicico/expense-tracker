@@ -8,7 +8,7 @@ import { WriteOnly } from "@/components/family/write-only";
 import { AddOrderDialog } from "@/components/investments/add-order-dialog";
 import { InvestmentValue } from "@/components/investments/investment-value";
 import { TransactionList } from "@/components/investments/transaction-list";
-import { DataRefresh } from "@/components/ui/data-state";
+import { DataRefresh, SlowNotice } from "@/components/ui/data-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
 import { InlineAlert } from "@/components/ui/inline-alert";
@@ -43,9 +43,10 @@ function gainStatTone(gain: InvestmentGainPresentation) {
   return "muted";
 }
 
-function DetailLoading() {
+function DetailLoading({ slowKey }: { slowKey: string }) {
   return (
     <Stack gap="3" p="4" aria-busy="true" aria-live="polite">
+      <SlowNotice slowKey={slowKey} />
       <Skeleton height="4" width="12rem" />
       {["one", "two", "three"].map((item) => <Skeleton key={item} height="9" borderRadius="control" />)}
     </Stack>
@@ -137,7 +138,7 @@ export function AssetDetail({
         {isLoading && !data ? (
           <>
             <Text className="sr-only" role="status">Loading transaction history…</Text>
-            <DetailLoading />
+            <DetailLoading slowKey={key} />
           </>
         ) : null}
         {error && !data ? (

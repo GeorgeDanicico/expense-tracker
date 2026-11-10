@@ -3,30 +3,38 @@
 import { ChakraProvider } from "@chakra-ui/react";
 import { LucideProvider } from "lucide-react";
 import { ThemeProvider } from "next-themes";
-import { SWRConfig } from "swr";
+import { SWRConfig, type SWRConfiguration } from "swr";
 
-import { ApiError, apiFetcher } from "@/lib/api/client";
+import { apiFetcher, retryDelay } from "@/lib/api/client";
 import { redirectIfPasswordChangeRequired } from "@/lib/api/password-change";
+import { clearSlow, markSlow } from "@/lib/api/slow-keys";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { ledgerSystem } from "@/components/ui/theme";
 import { PwaInstallProvider } from "@/components/pwa/install-instructions";
 
-const swrConfig = {
+/** A first load still waiting after this long is "slow": `DataLoading` says so and offers a retry (PF2). */
+const LOADING_SLOW_MS = 8_000;
+
+const swrConfig: SWRConfiguration = {
   fetcher: apiFetcher,
   keepPreviousData: false,
   revalidateOnFocus: false,
   dedupingInterval: 15_000,
   errorRetryCount: 2,
-  errorRetryInterval: 3_000,
-  // A 403 `password_change_required` sends the browser to choose a new password (audit P4).
-  onError: (error: unknown) => {
+  loadingTimeout: LOADING_SLOW_MS,
+  onLoadingSlow: (key) => markSlow(key),
+  onSuccess: (_data, key) => clearSlow(key),
+  // A 403 `password_change_required` sends the browser to choose a new password (audit P4). A 401 sends
+  // it to sign in from `apiFetcher`, which every request goes through.
+  onError: (error, key) => {
+    clearSlow(key);
     redirectIfPasswordChangeRequired(error);
   },
-  shouldRetryOnError: (error: unknown) =>
-    !(
-      error instanceof ApiError &&
-      (error.status === 401 || error.status === 403)
-    ),
+  // Which errors are worth another try, and for how long, is `retryDelay`'s to say.
+  onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
+    const delay = retryDelay(key, error, retryCount, config.errorRetryCount ?? 0);
+    if (delay !== null) setTimeout(revalidate, delay, { retryCount, dedupe: true });
+  },
 };
 
 /** `nonce`: the request's CSP nonce, for next-themes' inline script (see `src/app/layout.tsx`). */

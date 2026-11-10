@@ -14,7 +14,8 @@ export default async function ScreenPreviewPage({ params, searchParams }: PagePr
   const { screen } = await params;
   if (!isPreviewScreen(screen)) notFound();
   // `?quickAdd=expense` (or todo, reminder, event; empty for the last kind used) opens the quick-add sheet.
-  const { quickAdd } = await searchParams;
+  const { quickAdd, fixture } = await searchParams;
   const kind = typeof quickAdd === "string" && isQuickAddKind(quickAdd) ? quickAdd : undefined;
-  return <ScreenPreview screen={screen} quickAdd={typeof quickAdd === "string" ? { kind } : null} />;
+  // `?fixture=hang` or `?fixture=fail` preview the slow and error states (see `ScreenPreview`).
+  return <ScreenPreview screen={screen} quickAdd={typeof quickAdd === "string" ? { kind } : null} fixture={fixture === "hang" || fixture === "fail" ? fixture : "ok"} />;
 }

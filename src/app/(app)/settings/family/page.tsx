@@ -15,7 +15,7 @@ export default function FamilySettingsPage() {
   const { data, error, mutate } = useSWR<FamilyResponse>(FAMILY_API_KEY);
 
   if (error && !data) return <DataError retry={() => void mutate()} />;
-  if (!data) return <DataLoading label="Loading your family…" />;
+  if (!data) return <DataLoading label="Loading your family…" slowKey={FAMILY_API_KEY} />;
 
   if (!data.family) {
     return (

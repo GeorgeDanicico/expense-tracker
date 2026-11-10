@@ -47,7 +47,7 @@ export function CustomExpenseTab({
         </Card>
       ) : null}
       {!ledger ? (
-        error ? <DataError retry={() => void mutate()} /> : <DataLoading label={`Loading ${tab.name} expenses…`} />
+        error ? <DataError retry={() => void mutate()} /> : <DataLoading label={`Loading ${tab.name} expenses…`} slowKey={key} />
       ) : (
         <>
           <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { AuthForm } from "@/components/auth/auth-form";
 import { DataLoading } from "@/components/ui/data-state";
 import { useAccount } from "@/hooks/use-account";
+import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 
 /** The sign-in screen. `next` is already a safe same-site path; signed-in visitors go straight there. */
 export function LoginView({ next }: { next: string }) {
@@ -21,7 +22,7 @@ export function LoginView({ next }: { next: string }) {
     return (
       <Center minH="100dvh" px="4">
         <Box width="full" maxW="360px">
-          <DataLoading layout="section" label="Checking your session…" />
+          <DataLoading layout="section" label="Checking your session…" slowKey={ACCOUNT_API_KEY} />
         </Box>
       </Center>
     );

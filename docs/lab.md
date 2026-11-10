@@ -117,6 +117,22 @@ args=(); for i in $(seq 21); do args+=(-o /dev/null "$U"); done
 curl -s -w '%{time_starttransfer}\n' "${args[@]}" | tail -n +2 | sort -n | sed -n 10,11p
 ```
 
+`delay` takes 0 to 5000 ms, so it can slow a request but not make one wait past the app's 15 s
+timeout. To make a request hang, freeze the gateway after you've signed in, and thaw it when you
+are done (every call from the app then waits until its own timeout); for a server error, stop
+PostgREST:
+
+```bash
+docker pause supabase_kong_expense-tracker-lab     # requests hang;  docker unpause … to undo
+docker stop supabase_rest_expense-tracker-lab      # data requests fail with a 500;  docker start … to undo
+```
+
+Sign in first: a paused gateway stops the sign-in route too, and the cookies keep working for an hour. Too many wrong sign-ins lock the sign-in
+route for a few minutes (it counts in the app's memory: `npm run lab -- app --no-build` clears it).
+`scripts/lab/states.sh <name>` runs both, a signed-out visit, a session that ends mid-visit and an
+offline error against Expenses at 1280 and 390 px and times what the page shows
+(`scripts/lab/states.mjs` is the probe). PF2 used it ([performance.md](performance.md), PF2).
+
 ## The seed
 
 `scripts/lab/seed.mjs`, run by `up`. Deterministic: a fixed random seed, and every date counted

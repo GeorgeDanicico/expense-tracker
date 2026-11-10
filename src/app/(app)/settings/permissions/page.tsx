@@ -7,13 +7,14 @@ import { Card } from "@/components/ui/card";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { useAccount } from "@/hooks/use-account";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 
 export default function MyPermissionsPage() {
   useDocumentTitle("My permissions");
   const { account, error, mutate } = useAccount();
 
   if (error && !account) return <DataError retry={() => void mutate()} />;
-  if (!account) return <DataLoading label="Loading your permissions…" />;
+  if (!account) return <DataLoading label="Loading your permissions…" slowKey={ACCOUNT_API_KEY} />;
 
   const membership = account.membership;
 
