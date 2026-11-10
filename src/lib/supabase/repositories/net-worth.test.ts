@@ -37,17 +37,18 @@ describe("Supabase net-worth repository", () => {
   beforeEach(() => vi.resetAllMocks());
 
   describe("listActiveItems", () => {
-    it("reads only the user's own unarchived items", async () => {
+    it("reads only the user's own unarchived items, at most the limit it is given", async () => {
       const { queries } = useDatabase({ net_worth_items: [itemRow] });
 
-      await netWorth.listActiveItems(userId);
+      await netWorth.listActiveItems(userId, 501);
 
       expect(queries[0]).toMatchObject({
         table: "net_worth_items",
         operation: "select",
         filters: [["eq", "user_id", userId], ["is", "archived_at", null]],
-        orders: ["category", "name", "net_worth_valuations.valued_on", "net_worth_valuations.id"],
-        limits: ["500", "net_worth_valuations:2"],
+        orders: ["category", "name", "id", "net_worth_valuations.valued_on", "net_worth_valuations.id"],
+        limits: ["net_worth_valuations:2"],
+        range: [0, 500],
       });
     });
 
@@ -55,7 +56,7 @@ describe("Supabase net-worth repository", () => {
       const older = { ...valuationRow, id: "older", value: 200000, valued_on: "2026-08-19" };
       useDatabase({ net_worth_items: [{ ...itemRow, net_worth_valuations: [older, valuationRow] }] });
 
-      expect(await netWorth.listActiveItems(userId)).toEqual([{
+      expect(await netWorth.listActiveItems(userId, 501)).toEqual([{
         id: itemId,
         name: "Home",
         kind: "asset",
@@ -73,7 +74,7 @@ describe("Supabase net-worth repository", () => {
     it("hides a database error behind a generic message", async () => {
       useDatabase({}, { fail: () => true });
 
-      await expect(netWorth.listActiveItems(userId)).rejects.toThrow(new Error("Unable to load net-worth items."));
+      await expect(netWorth.listActiveItems(userId, 501)).rejects.toThrow(new Error("Unable to load net-worth items."));
     });
   });
 

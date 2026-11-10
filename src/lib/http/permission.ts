@@ -33,8 +33,8 @@ export async function requirePermission<M extends ModuleKey>(module: M, level: M
  * handler error.
  *
  * The handler gets the membership it was checked against as its fourth argument (`null` without a
- * family or while the flag is off), so it needn't read it again; finance reads pass it to
- * `resolveViewedUser`.
+ * family or while the flag is off); finance reads pass it to `resolveViewedUser`. The membership is
+ * read alongside `withUser`'s password check (`readAlongside`), not after it.
  */
 export function withPermission<M extends ModuleKey, Req extends Request = Request, Ctx = unknown>(
   module: M,
@@ -45,7 +45,7 @@ export function withPermission<M extends ModuleKey, Req extends Request = Reques
   return withUser<Req, Ctx>(async (request, user, context) => {
     const member = await requirePermission(module, level);
     return handler(request, user, context, member);
-  }, options);
+  }, { ...options, readAlongside: getCurrentMember });
 }
 
 /**
@@ -66,5 +66,5 @@ export function withParent<Req extends Request = Request, Ctx = unknown>(
     const member = await getCurrentMember();
     if (member?.role !== "parent") throw new DomainError(FORBIDDEN_MESSAGE, 403);
     return handler(request, user, context, member);
-  }, options);
+  }, { ...options, readAlongside: getCurrentMember });
 }

@@ -31,11 +31,11 @@ export class FakeNetWorthRepository implements NetWorthRepository {
     }
   }
 
-  async listActiveItems(userId: string) {
+  async listActiveItems(userId: string, limit: number) {
     return [...this.items.values()]
       .filter((item) => item.userId === userId && item.archivedAt === null)
       .sort((left, right) => left.category.localeCompare(right.category) || left.name.localeCompare(right.name))
-      .slice(0, 500)
+      .slice(0, limit)
       .map((item): NetWorthManualItemSource => ({
         id: item.id,
         name: item.name,

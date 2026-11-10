@@ -16,6 +16,7 @@ import {
   getInvestmentTransactions,
   MAX_ACCOUNTS,
   MAX_TRANSACTIONS_PER_ACCOUNT,
+  TOO_MANY_ORDERS_MESSAGE,
 } from "@/lib/investments/service";
 
 const USER = "owner";
@@ -43,6 +44,18 @@ const order = {
 const quote: Quote = { instrument: "VWCE.DE", price: "120", currency: "EUR", asOf: "2026-10-01T00:00:00Z", source: "YAHOO_FINANCE" };
 
 let repositories: FakeRepositories;
+
+/** `count` buys of one unit, a second apart. */
+function manyBuys(count: number) {
+  return Array.from({ length: count }, (_, index) => aTransaction({
+    id: `30000000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`,
+    investmentAccountId: XTB,
+    amount: "100",
+    quantity: "1",
+    unitPrice: "100",
+    executedAt: new Date(Date.UTC(2026, 0, 1) + index * 1000).toISOString(),
+  }));
+}
 
 function seedAccount(userId: string, transactions = [buy]) {
   repositories.investments.accounts.push({ id: XTB, userId, brokerId: "xtb" });
@@ -74,12 +87,26 @@ describe("getInvestmentsOverview", () => {
     expect(await getInvestmentsOverview(USER)).toEqual({ brokers: [], calculationIssues: [] });
   });
 
-  it("reads within the account and transaction limits", async () => {
+  it("reads one transaction more than every account at its limit, so a cut history shows (B11)", async () => {
     const list = vi.spyOn(repositories.investments, "listAccountsWithTransactions");
 
     await getInvestmentsOverview(USER);
 
-    expect(list).toHaveBeenCalledWith(USER, { accounts: MAX_ACCOUNTS, transactionsPerAccount: MAX_TRANSACTIONS_PER_ACCOUNT });
+    expect(list).toHaveBeenCalledWith(USER, { accounts: MAX_ACCOUNTS, transactions: MAX_ACCOUNTS * MAX_TRANSACTIONS_PER_ACCOUNT + 1 });
+  });
+
+  it("refuses with a 409, instead of positions from part of the history, an account over the limit (B11)", async () => {
+    seedAccount(USER, manyBuys(MAX_TRANSACTIONS_PER_ACCOUNT + 1));
+
+    await expect(getInvestmentsOverview(USER)).rejects.toEqual(new DomainError(TOO_MANY_ORDERS_MESSAGE, 409));
+  });
+
+  it("shows an account at exactly the limit", async () => {
+    seedAccount(USER, manyBuys(MAX_TRANSACTIONS_PER_ACCOUNT));
+
+    const overview = await getInvestmentsOverview(USER);
+
+    expect(overview.brokers[0].assets[0]).toMatchObject({ quantity: String(MAX_TRANSACTIONS_PER_ACCOUNT) });
   });
 
   it("marks prices unavailable when the price service is down", async () => {
@@ -108,6 +135,12 @@ describe("getInvestmentTransactions", () => {
     seedAccount("someone-else");
 
     expect(await getInvestmentTransactions(USER, asset)).toBeNull();
+  });
+
+  it("refuses with a 409 an asset with more orders than the limit, instead of leaving the oldest out (B11)", async () => {
+    seedAccount(USER, manyBuys(MAX_TRANSACTIONS_PER_ACCOUNT + 1));
+
+    await expect(getInvestmentTransactions(USER, asset)).rejects.toEqual(new DomainError(TOO_MANY_ORDERS_MESSAGE, 409));
   });
 });
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AccountDataRepository, ExportRow } from "@/lib/account/data-repository";
 import { translateDatabaseError } from "@/lib/supabase/errors";
+import { changingFamily } from "@/lib/supabase/repositories/family";
 import { createClient } from "@/lib/supabase/server";
 
 const DELETE_FAILURE = "Unable to delete your data. Please try again.";
@@ -15,13 +16,15 @@ const EXPORT_FAILURE = "Unable to prepare your data. Please try again.";
  * the migration, each RPC is unknown: a plain error (500), and nothing is deleted.
  */
 export const supabaseAccountDataRepository: AccountDataRepository = {
-  async deleteMyData(confirm) {
+  // You leave the family.
+  deleteMyData: (confirm) => changingFamily(async () => {
     const supabase = await createClient();
     const { error } = await supabase.rpc("delete_my_data", { p_confirm: confirm });
     if (error) throw translateDatabaseError(error, DELETE_FAILURE);
-  },
+  }),
 
-  async deleteManagedKidData(memberId, confirmName) {
+  // The kid leaves the family, and the route answers with the family read again.
+  deleteManagedKidData: (memberId, confirmName) => changingFamily(async () => {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("delete_managed_kid_data", {
       p_member_id: memberId,
@@ -30,7 +33,7 @@ export const supabaseAccountDataRepository: AccountDataRepository = {
     if (error) throw translateDatabaseError(error, DELETE_KID_FAILURE);
     if (typeof data !== "string") throw new Error(DELETE_KID_FAILURE);
     return data;
-  },
+  }),
 
   /**
    * One client for the whole export, made while the request is still being handled: the stream reads

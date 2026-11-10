@@ -29,12 +29,13 @@ export type InvestmentAsset = {
  */
 export interface InvestmentRepository {
   /**
-   * The user's accounts by broker id, at most `limits.accounts` of them, each with its oldest
-   * `limits.transactionsPerAccount` transactions, oldest first.
+   * The user's accounts by broker id, at most `limits.accounts` of them, each with its transactions,
+   * oldest first. At most `limits.transactions` transactions are read in all, newest first, so when
+   * there are more, the ones left out are the oldest.
    */
   listAccountsWithTransactions(
     userId: string,
-    limits: { accounts: number; transactionsPerAccount: number },
+    limits: { accounts: number; transactions: number },
   ): Promise<InvestmentAccountWithTransactions[]>;
   /**
    * One of the user's accounts with its newest `limit` transactions for one asset, newest first.

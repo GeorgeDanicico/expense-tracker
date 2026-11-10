@@ -71,6 +71,18 @@ describe("Supabase reminder repository", () => {
   });
 
   describe("list", () => {
+    it("reads every page of a list longer than the server's row cap, in a total order (D7)", async () => {
+      const rows = Array.from({ length: 5 }, () => aRow());
+      const { queries } = useDatabase({ reminders: rows }, { pageCap: 2 });
+
+      const listed = await reminders.list({ doneSince: "2026-09-25T00:00:00.000Z" });
+
+      expect(listed.reminders).toHaveLength(5);
+      const reads = queries.filter((query) => query.table === "reminders");
+      expect(reads.map((query) => query.range)).toEqual([[0, 999], [2, 1001], [4, 1003]]);
+      expect(reads[0].orders).toEqual(["next_due_at", "created_at", "id"]);
+    });
+
     it("returns reminders by due time (done one-offs last) and completions since doneSince, newest first", async () => {
       const later = aRow({ next_due_on: "2026-11-30", next_due_at: "2026-11-30T07:00:00+00:00" });
       const done = aRow({ repeat_unit: "none", next_due_on: null, next_due_at: null, next_notify_at: null });

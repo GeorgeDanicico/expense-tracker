@@ -23,6 +23,7 @@ import {
   type ImportStatus,
 } from "@/lib/imports/types";
 import { translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createClient } from "@/lib/supabase/server";
 
 const LOAD_ERROR = "Unable to load your imports.";
@@ -36,9 +37,6 @@ const BATCH_COLUMNS =
   "id, status, source_kind, parser_id, currency, period_start, period_end, row_count, skipped_credits, created_at, expires_at, confirmed_at, confirmed_count, undone_at";
 const ROW_COLUMNS =
   "id, position, expense_date, description, amount, currency, category, subtype, rule_matched, category_source, notes";
-
-/** How many link rows one request reads, under PostgREST's usual `max-rows` of 1,000. */
-const LINK_PAGE_SIZE = 1000;
 
 type BatchRow = Omit<Database["public"]["Tables"]["import_batches"]["Row"], "user_id" | "content_hash">;
 type RowRow = Omit<Database["public"]["Tables"]["import_rows"]["Row"], "batch_id">;
@@ -163,37 +161,25 @@ type LinkRow = { batch_id: string; expenses: { created_at: string; updated_at: s
 
 /**
  * How many expenses each batch still has, and how many of them were edited since (`updated_at >
- * created_at`; the table's trigger only moves `updated_at` on an update). Reads the link rows with
- * their expenses' timestamps, page by page, advancing by the rows actually returned.
+ * created_at`; the table's trigger only moves `updated_at` on an update), from the link rows with
+ * their expenses' timestamps, every page of them (`fetchAllPages`).
  */
 async function expenseCounts(batchIds: readonly string[]): Promise<Map<string, { count: number; changed: number }>> {
   const counts = new Map<string, { count: number; changed: number }>();
   if (batchIds.length === 0) return counts;
 
   const supabase = await createClient();
-  let offset = 0;
-  while (true) {
-    const { data, error, count } = await supabase
-      .from("import_expenses")
-      .select("batch_id, expenses!inner(created_at, updated_at)", { count: "exact" })
-      .in("batch_id", [...batchIds])
-      .order("expense_id")
-      .range(offset, offset + LINK_PAGE_SIZE - 1);
-    if (error) throw translateDatabaseError(error, LOAD_ERROR);
-
-    const page = (data ?? []) as unknown as LinkRow[];
-    if (!page.length) {
-      if (count !== null && offset < count) throw new Error(LOAD_ERROR);
-      break;
-    }
-    for (const link of page) {
-      const entry = counts.get(link.batch_id) ?? { count: 0, changed: 0 };
-      entry.count += 1;
-      if (link.expenses.updated_at > link.expenses.created_at) entry.changed += 1;
-      counts.set(link.batch_id, entry);
-    }
-    offset += page.length;
-    if (count !== null && offset >= count) break;
+  const links = await fetchAllPages((from, to) => supabase
+    .from("import_expenses")
+    .select("batch_id, expenses!inner(created_at, updated_at)", { count: "exact" })
+    .in("batch_id", [...batchIds])
+    .order("expense_id")
+    .range(from, to), LOAD_ERROR) as unknown as LinkRow[];
+  for (const link of links) {
+    const entry = counts.get(link.batch_id) ?? { count: 0, changed: 0 };
+    entry.count += 1;
+    if (link.expenses.updated_at > link.expenses.created_at) entry.changed += 1;
+    counts.set(link.batch_id, entry);
   }
   return counts;
 }

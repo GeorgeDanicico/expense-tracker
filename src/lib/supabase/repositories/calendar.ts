@@ -12,6 +12,7 @@ import {
 } from "@/lib/family-calendar/repository";
 import { SERIES_REPEATS, type CalendarEvent, type SeriesRepeat } from "@/lib/family-calendar/types";
 import { isUserFacing, translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { supabaseFamilyRepository } from "@/lib/supabase/repositories/family";
 import { createClient } from "@/lib/supabase/server";
 
@@ -118,21 +119,22 @@ export function translateCalendarWriteError(error: DatabaseError, fallback: stri
  * `CalendarRepository` on `calendar_events`, `calendar_event_attendees` and the two save functions
  * (supabase/migrations/20261028000100_create_family_calendar.sql), acting as the request's caller.
  * RLS limits every row to the caller's family, which is the only rule, so queries never filter by
- * family. Each method reads the family once through `get_family()` (in parallel with its own query)
- * to join attendee names, colours and avatars, and counts a series' length with one more query per
- * 50 repeating series: a handful of round trips per call, never one per event.
+ * family. The attendee names, colours and avatars come from `get_family()`, read once per request
+ * however many methods ask (in parallel with the first one's own query), and a series' length is
+ * counted with one more query per 50 repeating series: a handful of round trips per call, never one
+ * per event.
  */
 export const supabaseCalendarRepository: CalendarRepository = {
   async listBetween(from, to) {
     const supabase = await createClient();
-    const [family, { data, error }] = await Promise.all([
+    // Every page, so a busy range is never cut short at the server's row cap.
+    const [family, rows] = await Promise.all([
       supabaseFamilyRepository.getFamily(),
-      supabase.from("calendar_events").select(WITH_ATTENDEES).lt("starts_at", to).gt("ends_at", from)
-        .order("starts_at").order("id"),
+      fetchAllPages((start, end) => supabase.from("calendar_events").select(WITH_ATTENDEES, { count: "exact" })
+        .lt("starts_at", to).gt("ends_at", from).order("starts_at").order("id").range(start, end), LOAD_ERROR),
     ]);
     if (!family) throw noFamilyError();
-    if (error) throw translateDatabaseError(error, LOAD_ERROR);
-    return withSeriesLengths(supabase, data as unknown as EventRowWithAttendees[], family.members);
+    return withSeriesLengths(supabase, rows as unknown as EventRowWithAttendees[], family.members);
   },
 
   async get(id) {

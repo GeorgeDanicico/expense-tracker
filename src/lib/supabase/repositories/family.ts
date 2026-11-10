@@ -22,6 +22,7 @@ import {
   type Permissions,
 } from "@/lib/permissions";
 import { MEMBER_COLOR_COUNT } from "@/lib/family/member-colors";
+import { MEMO_KEYS, forgetPerRequest, oncePerRequest } from "@/lib/request-memo";
 import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeCurrency } from "@/lib/utils/currency";
@@ -133,7 +134,24 @@ function assertCodeHash(codeHash: string, failure: string) {
   if (!CODE_HASH_PATTERN.test(codeHash)) throw new Error(failure);
 }
 
-/** `FamilyRepository` on the family RPCs, which act as the request's caller. */
+/**
+ * Runs a write that may change the membership or the family, then forgets this request's reads of
+ * both (`getCurrentMember`, `getFamily`), whether it succeeded or not, so the next ask reads them again.
+ */
+export async function changingFamily<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } finally {
+    forgetPerRequest(MEMO_KEYS.membership, MEMO_KEYS.family);
+  }
+}
+
+/**
+ * `FamilyRepository` on the family RPCs, which act as the request's caller. The family is read once
+ * per request (`oncePerRequest`), however many checks and repositories ask for it, and so is the
+ * membership, through `getCurrentMember`; every write that can change either forgets both. Callers
+ * share the answer, so never change it.
+ */
 export const supabaseFamilyRepository: FamilyRepository = {
   async getMembership(): Promise<CurrentMember | null> {
     const supabase = await createClient();
@@ -154,56 +172,66 @@ export const supabaseFamilyRepository: FamilyRepository = {
     };
   },
 
-  async getFamily(): Promise<FamilyData | null> {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("get_family");
+  getFamily(): Promise<FamilyData | null> {
+    return oncePerRequest(MEMO_KEYS.family, async () => {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc("get_family");
 
-    if (error) throw translateDatabaseError(error, FAMILY_ERROR);
-    if (!data) return null;
+      if (error) throw translateDatabaseError(error, FAMILY_ERROR);
+      if (!data) return null;
 
-    const { family, members } = data as unknown as FamilyJson;
-    return {
-      family: { id: family.id, name: family.name, createdAt: family.createdAt },
-      members: members.map(toMember),
-    };
-  },
-
-  async createFamily(name: string): Promise<string> {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("create_family", { p_name: name });
-
-    if (error) throw translateDatabaseError(error, CREATE_FAMILY_ERROR);
-    if (!data) throw new Error(CREATE_FAMILY_ERROR);
-    return data;
-  },
-
-  async setMemberPermissions(memberId: string, permissions: Permissions): Promise<void> {
-    const supabase = await createClient();
-    const { error } = await supabase.rpc("set_member_permissions", {
-      p_member_id: memberId,
-      p_permissions: permissions,
+      const { family, members } = data as unknown as FamilyJson;
+      return {
+        family: { id: family.id, name: family.name, createdAt: family.createdAt },
+        members: members.map(toMember),
+      };
     });
-
-    if (error) throw translateDatabaseError(error, SET_PERMISSIONS_ERROR);
   },
 
-  async setMemberColor(memberId: string, color: number | null): Promise<void> {
-    const supabase = await createClient();
-    const { error } = await supabase.rpc("set_member_color", { p_member_id: memberId, p_color: color });
+  createFamily(name: string): Promise<string> {
+    return changingFamily(async () => {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc("create_family", { p_name: name });
 
-    if (error) throw translateDatabaseError(error, SET_COLOR_ERROR);
-  },
-
-  async addManagedKid(userId: string, permissions: Permissions): Promise<string> {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("add_managed_kid", {
-      p_user_id: userId,
-      p_permissions: permissions,
+      if (error) throw translateDatabaseError(error, CREATE_FAMILY_ERROR);
+      if (!data) throw new Error(CREATE_FAMILY_ERROR);
+      return data;
     });
+  },
 
-    if (error) throw translateDatabaseError(error, ADD_KID_ERROR);
-    if (!data) throw new Error(ADD_KID_ERROR);
-    return data;
+  setMemberPermissions(memberId: string, permissions: Permissions): Promise<void> {
+    return changingFamily(async () => {
+      const supabase = await createClient();
+      const { error } = await supabase.rpc("set_member_permissions", {
+        p_member_id: memberId,
+        p_permissions: permissions,
+      });
+
+      if (error) throw translateDatabaseError(error, SET_PERMISSIONS_ERROR);
+    });
+  },
+
+  setMemberColor(memberId: string, color: number | null): Promise<void> {
+    return changingFamily(async () => {
+      const supabase = await createClient();
+      const { error } = await supabase.rpc("set_member_color", { p_member_id: memberId, p_color: color });
+
+      if (error) throw translateDatabaseError(error, SET_COLOR_ERROR);
+    });
+  },
+
+  addManagedKid(userId: string, permissions: Permissions): Promise<string> {
+    return changingFamily(async () => {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc("add_managed_kid", {
+        p_user_id: userId,
+        p_permissions: permissions,
+      });
+
+      if (error) throw translateDatabaseError(error, ADD_KID_ERROR);
+      if (!data) throw new Error(ADD_KID_ERROR);
+      return data;
+    });
   },
 
   async requirePasswordChange(memberId: string): Promise<string> {
@@ -215,18 +243,22 @@ export const supabaseFamilyRepository: FamilyRepository = {
     return data;
   },
 
-  async removeMember(memberId: string): Promise<void> {
-    const supabase = await createClient();
-    const { error } = await supabase.rpc("remove_family_member", { p_member_id: memberId });
+  removeMember(memberId: string): Promise<void> {
+    return changingFamily(async () => {
+      const supabase = await createClient();
+      const { error } = await supabase.rpc("remove_family_member", { p_member_id: memberId });
 
-    if (error) throw translateDatabaseError(error, REMOVE_MEMBER_ERROR);
+      if (error) throw translateDatabaseError(error, REMOVE_MEMBER_ERROR);
+    });
   },
 
-  async deleteFamily(confirmName: string): Promise<void> {
-    const supabase = await createClient();
-    const { error } = await supabase.rpc("delete_family", { p_confirm_name: confirmName });
+  deleteFamily(confirmName: string): Promise<void> {
+    return changingFamily(async () => {
+      const supabase = await createClient();
+      const { error } = await supabase.rpc("delete_family", { p_confirm_name: confirmName });
 
-    if (error) throw translateDatabaseError(error, DELETE_FAMILY_ERROR);
+      if (error) throw translateDatabaseError(error, DELETE_FAMILY_ERROR);
+    });
   },
 
   async touchLastActive(): Promise<void> {
@@ -287,14 +319,16 @@ export const supabaseFamilyRepository: FamilyRepository = {
     };
   },
 
-  async redeemInvite(codeHash: string): Promise<string> {
-    assertCodeHash(codeHash, REDEEM_INVITE_ERROR);
+  redeemInvite(codeHash: string): Promise<string> {
+    return changingFamily(async () => {
+      assertCodeHash(codeHash, REDEEM_INVITE_ERROR);
 
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("redeem_family_invite", { p_code_hash: codeHash });
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc("redeem_family_invite", { p_code_hash: codeHash });
 
-    if (error) throw translateDatabaseError(error, REDEEM_INVITE_ERROR);
-    if (!data) throw new Error(REDEEM_INVITE_ERROR);
-    return data;
+      if (error) throw translateDatabaseError(error, REDEEM_INVITE_ERROR);
+      if (!data) throw new Error(REDEEM_INVITE_ERROR);
+      return data;
+    });
   },
 };

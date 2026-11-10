@@ -113,7 +113,8 @@ injection (security plan S8). Pass values to `.eq`, `.in`, `.gte`, or check each
 catalogue first (`src/lib/supabase/filters.ts`).
 
 **Added by:** moved from `no-restricted-syntax` in U1. The only disables are the tab membership
-filter (every key is checked by `expenseTabMembershipFilter`) and a test fake.
+filter (every key is checked by `expenseTabMembershipFilter`), the tab ledger's search (PF4: the
+user's text is escaped and quoted, and every key checked, by `expenseSearchFilter`) and a test fake.
 
 **Disable:** `// eslint-disable-next-line local/postgrest-filter-string -- <where the parts are checked>`.
 

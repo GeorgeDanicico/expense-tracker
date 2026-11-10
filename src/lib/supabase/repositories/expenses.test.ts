@@ -235,7 +235,7 @@ describe("listForTab", () => {
 
       expect(new Set(ids(expenses)).size).toBe(1207);
       expect(queries).toHaveLength(11);
-      expect(queries[1].range).toEqual([113, 612]);
+      expect(queries[1].range).toEqual([113, 1112]);
     });
 
     it("searches after retrieving every page", async () => {
@@ -246,6 +246,48 @@ describe("listForTab", () => {
       const expenses = await repository.listForTab("owner", tab, filters({ search: "rare" }));
 
       expect(ids(expenses)).toEqual(["0000"]);
+    });
+
+    it("searches in the database, so only the matches are read (P9)", async () => {
+      const rows = history();
+      rows[0].description = "Rare last-page match";
+      const { queries } = useDatabase(rows, { pageCap: 113 });
+
+      await repository.listForTab("owner", tab, filters({ search: "RARE" }));
+
+      expect(queries).toHaveLength(1);
+      expect(queries[0].filters).toContainEqual(["or", "", 'description.ilike."%rare%",notes.ilike."%rare%"']);
+    });
+  });
+
+  describe("the search, on the server (P9)", () => {
+    const awkward = ["100% cotton", "100 percent", "a_b", "axb", "back\\slash", "star*shop", "starXshop", "comma, (x)", 'quote "q"', "Ștefan"];
+    const rows = () => awkward.map((description, index) => car(`r${index}`, null, "2026-01-01", { description }));
+
+    it.each([
+      ["%", ["100% cotton"]],
+      ["_", ["a_b"]],
+      ["\\", ["back\\slash"]],
+      ["*", ["star*shop"]],
+      ["r*s", ["star*shop"]],
+      [", (x)", ["comma, (x)"]],
+      ['"q"', ['quote "q"']],
+      ["ștefan", ["Ștefan"]],
+      ["100", ["100% cotton", "100 percent"]],
+    ])("matches %j literally", async (search, expected) => {
+      useDatabase(rows());
+
+      const expenses = await repository.listForTab("owner", tab, filters({ search }));
+
+      expect(expenses.map((expense) => expense.description).sort()).toEqual([...expected].sort());
+    });
+
+    it("finds expenses by their category or subtype label, as before", async () => {
+      useDatabase(fixtures());
+
+      expect(ids(await repository.listForTab("owner", tab, filters({ search: "car repairs" })))).toEqual(["d"]);
+      expect(ids(await repository.listForTab("owner", tab, filters({ search: "no sub" })))).toEqual(["e", "a"]);
+      expect(ids(await repository.listForTab("owner", tab, filters({ search: "Car" })))).toEqual(["e", "d", "c", "b", "a"]);
     });
   });
 

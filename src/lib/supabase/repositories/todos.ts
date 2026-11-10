@@ -3,6 +3,7 @@ import "server-only";
 import type { Database } from "@/lib/database.types";
 import type { FamilyMember } from "@/lib/family/repository";
 import { isUserFacing, translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { supabaseFamilyRepository } from "@/lib/supabase/repositories/family";
 import { createClient } from "@/lib/supabase/server";
 import { positionBetween } from "@/lib/todos/position";
@@ -87,25 +88,25 @@ async function familyMembers(): Promise<FamilyMember[]> {
 /**
  * `TodoRepository` on the `todos` table, acting as the request's caller. RLS limits every row to the
  * caller's family, which is the only rule, so queries don't filter by family themselves (except to
- * find the top of a column for a new card, which needs the family id anyway). Each method reads the
- * family once through `get_family()` (in parallel with its own query) to join assignee names,
- * colours and avatars: two round trips per call, never one per card.
+ * find the top of a column for a new card, which needs the family id anyway). The assignee names,
+ * colours and avatars come from `get_family()`, read once per request however many methods ask (in
+ * parallel with the first one's own query), never once per card.
  */
 export const supabaseTodoRepository: TodoRepository = {
   async list({ doneSince }) {
     const supabase = await createClient();
     // Two queries rather than one `or` across status and completed_at: PostgREST's `or` would need the
-    // timestamp quoted, and two indexed range reads are as cheap.
+    // timestamp quoted, and two indexed range reads are as cheap. Each reads every page, so a board
+    // past the server's row cap is never cut short; `id` last makes the order total, as paging needs.
     const [family, open, done] = await Promise.all([
       supabaseFamilyRepository.getFamily(),
-      supabase.from("todos").select(TODO_COLUMNS).or("status.in.(todo,in_progress)").order("position"),
-      supabase.from("todos").select(TODO_COLUMNS).eq("status", "done").gte("completed_at", doneSince)
-        .order("position"),
+      fetchAllPages((from, to) => supabase.from("todos").select(TODO_COLUMNS, { count: "exact" })
+        .or("status.in.(todo,in_progress)").order("position").order("id").range(from, to), LOAD_ERROR),
+      fetchAllPages((from, to) => supabase.from("todos").select(TODO_COLUMNS, { count: "exact" })
+        .eq("status", "done").gte("completed_at", doneSince).order("position").order("id").range(from, to), LOAD_ERROR),
     ]);
     if (!family) throw noFamilyError();
-    if (open.error) throw translateDatabaseError(open.error, LOAD_ERROR);
-    if (done.error) throw translateDatabaseError(done.error, LOAD_ERROR);
-    return [...open.data, ...done.data].map((row) => toTodo(row, family.members)).sort(compareTodos);
+    return [...open, ...done].map((row) => toTodo(row, family.members)).sort(compareTodos);
   },
 
   async get(id) {

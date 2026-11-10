@@ -166,6 +166,20 @@ describe("what a failing read shows", () => {
     expect(container.textContent).toContain("Your reminders could not be loaded.");
   });
 
+  it("shows the server's reason for a 409 refusal instead of the screen's wording (B11)", async () => {
+    const { ApiError } = await import("@/lib/api/client");
+    const refusal = new ApiError("There are more than 500 net-worth items, more than the app can show.", 409);
+    const container = await mount(<DataError message="Your net worth could not be loaded." error={refusal} retry={() => undefined} />);
+    expect(container.textContent).toContain("more than 500 net-worth items");
+    expect(container.textContent).not.toContain("Your net worth could not be loaded.");
+  });
+
+  it("keeps the screen's wording for any other failed request", async () => {
+    const { ApiError } = await import("@/lib/api/client");
+    const container = await mount(<DataError message="Your net worth could not be loaded." error={new ApiError("Unable to load net worth. (ref abc)", 500)} retry={() => undefined} />);
+    expect(container.textContent).toContain("Your net worth could not be loaded.");
+  });
+
   it("sends a 401 from any read to sign in", async () => {
     const replace = vi.fn();
     vi.stubGlobal("window", Object.assign(window, { location: { pathname: "/reminders", search: "", replace } }));

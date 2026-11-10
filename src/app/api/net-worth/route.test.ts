@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { InvestmentsOverview } from "@/lib/investments/types";
 import { buildNetWorthOverview } from "@/lib/net-worth/calculation";
+import { MAX_ACTIVE_ITEMS, TOO_MANY_ITEMS_MESSAGE } from "@/lib/net-worth/service";
 import { aManualItem, aValuation } from "@/test/builders";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { callRoute, signedInAs } from "@/test/route";
@@ -42,6 +43,25 @@ describe("GET /api/net-worth", () => {
 
     expect(response).toMatchObject({ status: 200, body: buildNetWorthOverview(noInvestments, [own]) });
     expect(mocks.getInvestmentsOverview).toHaveBeenCalledWith(user.id);
+  });
+
+  const manyItems = (count: number) => Array.from({ length: count }, (_, index) => aManualItem({
+    id: `40000000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`, name: `Item ${index}`,
+  }));
+
+  it("answers 409 with what to do, instead of a total that leaves items out, past the limit (B11)", async () => {
+    repositories.netWorth.seed(user.id, ...manyItems(MAX_ACTIVE_ITEMS + 1));
+
+    expect(await callRoute(getOverview)).toMatchObject({ status: 409, body: { error: TOO_MANY_ITEMS_MESSAGE } });
+  });
+
+  it("shows every item at exactly the limit", async () => {
+    repositories.netWorth.seed(user.id, ...manyItems(MAX_ACTIVE_ITEMS));
+
+    const response = await callRoute(getOverview);
+
+    expect(response.status).toBe(200);
+    expect((response.body as { entries: unknown[] }).entries).toHaveLength(MAX_ACTIVE_ITEMS);
   });
 });
 

@@ -94,6 +94,34 @@ describe("withPermission", () => {
     expect(repositories.family.calls).toEqual(["touchLastActive", "getMembership"]);
   });
 
+  it("starts reading the membership before the password check answers, not after it (PF4)", async () => {
+    let answerPasswordCheck: (flagged: boolean) => void = () => undefined;
+    vi.spyOn(repositories.account, "getMustChangePassword").mockReturnValue(new Promise((resolve) => (answerPasswordCheck = resolve)));
+
+    const response = call();
+    await vi.waitFor(() => expect(repositories.family.calls).toContain("getMembership"));
+    expect(handler).not.toHaveBeenCalled();
+    answerPasswordCheck(false);
+
+    expect(await response).toEqual({ status: 200, body: { ok: true } });
+    expect(repositories.family.calls.filter((name) => name === "getMembership")).toHaveLength(1);
+  });
+
+  it("still refuses an account that must change its password, though its membership was read alongside", async () => {
+    repositories.family.membership = aParent();
+    repositories.account.mustChangePassword.add(user.id);
+
+    expect(await call()).toMatchObject({ status: 403, body: { code: "password_change_required" } });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("answers the password check first when the membership read fails alongside it", async () => {
+    vi.spyOn(repositories.family, "getMembership").mockRejectedValue(new Error("private failure"));
+    repositories.account.mustChangePassword.add(user.id);
+
+    expect(await call()).toMatchObject({ status: 403, body: { code: "password_change_required" } });
+  });
+
   it("maps a failure to read the membership to the route's failure message", async () => {
     vi.spyOn(repositories.family, "getMembership").mockRejectedValue(new Error("private failure"));
 

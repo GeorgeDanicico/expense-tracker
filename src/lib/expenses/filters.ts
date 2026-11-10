@@ -40,10 +40,13 @@ export function expenseTabDateBounds(filters: ExpenseTabFilters) {
   return { start: filters.startDate, endExclusive: addDays(filters.endDate, 1) };
 }
 
+/** What the search calls an expense without a subtype. The server's search (`expenseSearchFilter`) uses it too. */
+export const NO_SUBTYPE_LABEL = "No subtype";
+
 /** Whether the expense's text, category or subtype contains `term`, which is already lower-cased. */
 export function matchesExpenseSearch(expense: Expense, term: string) {
   return [expense.description, expense.notes ?? "", CATEGORY_LABELS[expense.category],
-    expense.subtype ? SUBTYPE_LABELS[expense.subtype] : "No subtype"]
+    expense.subtype ? SUBTYPE_LABELS[expense.subtype] : NO_SUBTYPE_LABEL]
     .some((value) => value.toLowerCase().includes(term));
 }
 

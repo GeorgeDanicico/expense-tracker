@@ -39,10 +39,10 @@ export type NetWorthValuationInput = {
  */
 export interface NetWorthRepository {
   /**
-   * The user's unarchived items, by category and then name (at most 500), each with its two
-   * newest valuations, newest first.
+   * The user's unarchived items, by category and then name, at most `limit` of them, each with its
+   * two newest valuations, newest first. Ask for one more than you can use to tell a full list from a cut one.
    */
-  listActiveItems(userId: string): Promise<NetWorthManualItemSource[]>;
+  listActiveItems(userId: string, limit: number): Promise<NetWorthManualItemSource[]>;
   /** The user's item, archived or not, or `null` when it is not theirs. */
   getItem(userId: string, itemId: string): Promise<NetWorthItemState | null>;
   /** Creates an item for the signed-in caller together with its first valuation. */

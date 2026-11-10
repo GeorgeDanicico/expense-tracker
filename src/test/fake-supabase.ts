@@ -101,9 +101,64 @@ function matches(row: Row, [operator, column, value]: Filter) {
   if (operator === "lt") return String(read(row, column)) < String(value);
   // Like SQL, a null never matches a comparison.
   if (operator === "lte") return read(row, column) != null && String(read(row, column)) <= String(value);
-  // `or` holds PostgREST `column.in.(a,b)` predicates; a row matches any of them.
-  return [...String(value).matchAll(/(\w+)\.in\.\(([^)]*)\)/g)]
-    .some(([, key, list]) => list.split(",").includes(String(row[key])));
+  // `or` holds a PostgREST list of `column.in.(a,b)`, `column.ilike.<pattern>` and `column.is.null`; a row matches any of them.
+  return orClauses(String(value)).some((clause) => matchesOrClause(row, clause));
+}
+
+/** Splits a PostgREST `or` list at its top-level commas, keeping quoted values and `in` lists whole. */
+function orClauses(list: string): string[] {
+  const clauses: string[] = [];
+  let current = "";
+  let depth = 0;
+  let inQuotes = false;
+  for (let index = 0; index < list.length; index++) {
+    const char = list[index];
+    if (inQuotes) {
+      current += char;
+      if (char === "\\") current += list[++index] ?? "";
+      else if (char === '"') inQuotes = false;
+      continue;
+    }
+    if (char === "," && depth === 0) {
+      clauses.push(current);
+      current = "";
+      continue;
+    }
+    if (char === '"') inQuotes = true;
+    else if (char === "(") depth += 1;
+    else if (char === ")") depth -= 1;
+    current += char;
+  }
+  return [...clauses, current];
+}
+
+/** A value as PostgREST reads it: inside double quotes, a backslash makes the next character literal. */
+function unquote(value: string): string {
+  return value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1).replace(/\\(.)/gs, "$1") : value;
+}
+
+const regExpLiteral = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** `ilike` as Postgres runs it, after PostgREST turned `*` into `%`: `%` any text, `_` one character, `\` escapes. */
+function ilike(text: string, pattern: string): boolean {
+  let source = "";
+  for (let index = 0; index < pattern.length; index++) {
+    const char = pattern[index];
+    if (char === "\\") source += regExpLiteral(pattern[++index] ?? "");
+    else if (char === "%") source += "[\\s\\S]*";
+    else if (char === "_") source += "[\\s\\S]";
+    else source += regExpLiteral(char);
+  }
+  return new RegExp(`^${source}$`, "iu").test(text);
+}
+
+function matchesOrClause(row: Row, clause: string): boolean {
+  const [, column, operator, value] = /^(\w+)\.(in|ilike|is)\.(.*)$/s.exec(clause) ?? [];
+  if (operator === "in") return value.replace(/^\(|\)$/g, "").split(",").includes(String(row[column]));
+  if (operator === "is" && value === "null") return row[column] == null;
+  // Like SQL, a null never matches.
+  if (operator === "ilike") return row[column] != null && ilike(String(row[column]), unquote(value).replace(/\*/g, "%"));
+  throw new Error(`The fake doesn't know the \`or\` clause ${clause}`);
 }
 
 export function fakeSupabase(tables: Record<string, Row[]> = {}, options: FakeSupabaseOptions = {}) {

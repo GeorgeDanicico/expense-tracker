@@ -13,11 +13,23 @@ import type { netWorthItemPatchSchema } from "@/lib/validation/net-worth";
 
 export type NetWorthItemPatchInput = z.output<typeof netWorthItemPatchSchema>;
 
-/** The user's net worth: their investments combined with their active manual items. */
+/** The most active manual items in one overview; more are refused, never cut off (B11). */
+export const MAX_ACTIVE_ITEMS = 500;
+
+/** The 409 for more than `MAX_ACTIVE_ITEMS` items: retrying won't help, so it says what will. */
+export const TOO_MANY_ITEMS_MESSAGE =
+  `There are more than ${new Intl.NumberFormat("en").format(MAX_ACTIVE_ITEMS)} net-worth items, more than the app can show. Nothing is lost. Ask whoever runs the app to raise the limit.`;
+
+/**
+ * The user's net worth: their investments combined with their active manual items. Refuses (409)
+ * more than `MAX_ACTIVE_ITEMS` items, since a total that leaves some out would be wrong, and an
+ * investment account over its own cap (`getInvestmentsOverview`).
+ */
 export async function getNetWorthOverview(userId: string) {
   const investmentsPromise = getInvestmentsOverview(userId);
-  const manualItemsPromise = getRepositories().netWorth.listActiveItems(userId);
+  const manualItemsPromise = getRepositories().netWorth.listActiveItems(userId, MAX_ACTIVE_ITEMS + 1);
   const [investments, manualItems] = await Promise.all([investmentsPromise, manualItemsPromise]);
+  if (manualItems.length > MAX_ACTIVE_ITEMS) throw new DomainError(TOO_MANY_ITEMS_MESSAGE, 409);
 
   return buildNetWorthOverview(investments, manualItems);
 }

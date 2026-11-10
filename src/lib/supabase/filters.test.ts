@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
-import { escapeLikePattern, expenseTabMembershipFilter } from "@/lib/supabase/filters";
+import { escapeLikePattern, expenseSearchFilter, expenseTabMembershipFilter } from "@/lib/supabase/filters";
 
 describe("expenseTabMembershipFilter", () => {
   it("builds the clause for categories, subtypes or both", () => {
@@ -68,5 +68,39 @@ describe("escapeLikePattern", () => {
     expect(pattern.test("paid 100%_ today")).toBe(true);
     expect(pattern.test("paid 1000 today")).toBe(false);
     expect(pattern.test("paid 100x today")).toBe(false);
+  });
+});
+
+describe("expenseSearchFilter", () => {
+  it("searches the description and the notes, ignoring case", () => {
+    expect(expenseSearchFilter("lidl")).toBe('description.ilike."%lidl%",notes.ilike."%lidl%"');
+  });
+
+  it.each([
+    ["a percent sign and an underscore", "50%_", 'description.ilike."%50\\\\%\\\\_%"'],
+    ["a backslash", "a\\b", 'description.ilike."%a\\\\\\\\b%"'],
+    ["a double quote", 'say "hi"', 'description.ilike."%say \\"hi\\"%"'],
+    ["a comma, parentheses, a dot and a colon, inside the quotes", "a,b(c).d:e", 'description.ilike."%a,b(c).d:e%"'],
+    ["a star, as one character", "a*b", 'description.ilike."%a_b%"'],
+  ])("escapes %s and quotes the value", (_label, term, start) => {
+    expect(expenseSearchFilter(term).startsWith(`${start},notes.ilike.`)).toBe(true);
+  });
+
+  it("adds the categories and subtypes whose label contains the text, by key", () => {
+    expect(expenseSearchFilter("car")).toBe(
+      'description.ilike."%car%",notes.ilike."%car%",category.in.(car),subtype.in.(car_maintenance,car_fuel,car_repairs)',
+    );
+    expect(expenseSearchFilter("ent")).toContain("category.in.(entertainment)");
+  });
+
+  it("adds the expenses without a subtype when the text is part of \"No subtype\"", () => {
+    expect(expenseSearchFilter("no sub")).toBe('description.ilike."%no sub%",notes.ilike."%no sub%",subtype.is.null');
+    expect(expenseSearchFilter("subtype")).toContain("subtype.is.null");
+  });
+
+  it("never lets the text add a clause of its own", () => {
+    const filter = expenseSearchFilter('x",id.not.is.null,description.ilike."');
+
+    expect(filter.startsWith('description.ilike."%x\\",id.not.is.null,description.ilike.\\"%"')).toBe(true);
   });
 });

@@ -10,6 +10,7 @@ import {
 } from "@/lib/reminders/repository";
 import { REPEAT_UNITS, type ExpenseTemplate, type Reminder, type RepeatUnit } from "@/lib/reminders/types";
 import { translateDatabaseError } from "@/lib/supabase/errors";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createClient } from "@/lib/supabase/server";
 import { expenseTemplateSchema } from "@/lib/validation/reminder";
 
@@ -114,16 +115,17 @@ function columns(values: Partial<ReminderValues>): ReminderWrite {
 export const supabaseReminderRepository: ReminderRepository = {
   async list({ doneSince }) {
     const supabase = await createClient();
+    // Every page of both, so a long list is never cut short at the server's row cap; `id` last makes
+    // the order total, as paging needs.
     const [reminders, completions] = await Promise.all([
-      supabase.from("reminders").select(REMINDER_COLUMNS).order("next_due_at", { nullsFirst: false }).order("created_at"),
-      supabase.from("reminder_completions").select(COMPLETION_COLUMNS).gte("done_at", doneSince)
-        .order("done_at", { ascending: false }),
+      fetchAllPages((from, to) => supabase.from("reminders").select(REMINDER_COLUMNS, { count: "exact" })
+        .order("next_due_at", { nullsFirst: false }).order("created_at").order("id").range(from, to), LOAD_ERROR),
+      fetchAllPages((from, to) => supabase.from("reminder_completions").select(COMPLETION_COLUMNS, { count: "exact" })
+        .gte("done_at", doneSince).order("done_at", { ascending: false }).order("id").range(from, to), LOAD_ERROR),
     ]);
-    if (reminders.error) throw translateDatabaseError(reminders.error, LOAD_ERROR);
-    if (completions.error) throw translateDatabaseError(completions.error, LOAD_ERROR);
     return {
-      reminders: reminders.data.map(toReminder),
-      completions: completions.data.map(toCompletion),
+      reminders: reminders.map(toReminder),
+      completions: completions.map(toCompletion),
     };
   },
 
