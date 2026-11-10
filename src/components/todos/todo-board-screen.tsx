@@ -12,17 +12,18 @@ import { TodoDialog } from "@/components/todos/todo-dialog";
 import { TodoFilterChips } from "@/components/todos/todo-filters";
 import { useLinkedCard } from "@/components/todos/use-linked-card";
 import { useTodoBoard } from "@/components/todos/use-todo-board";
-import { DataError, DataLoading } from "@/components/ui/data-state";
+import { DataError } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconButton } from "@/components/ui/icon-button";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { TodosSkeleton } from "@/components/ui/skeletons";
 import { UndoToast, useDeleteWithUndo, type DeleteCopy } from "@/components/ui/undo-toast";
 import { useAccount } from "@/hooks/use-account";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { useMemberColors } from "@/hooks/use-member-colors";
-import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
+import { FAMILY_API_KEY, todosApiKey, type FamilyResponse } from "@/lib/api/keys";
 import {
   filterTodos,
   hasTodoFilters,
@@ -133,7 +134,7 @@ export function TodoBoardScreen() {
       </Stack>
     );
   }
-  if (!board.todos || !visible) return <DataLoading label="Loading the board…" />;
+  if (!board.todos || !visible) return <TodosSkeleton slowKey={todosApiKey()} />;
 
   return (
     <Stack gap={{ base: "4", md: "5" }}>

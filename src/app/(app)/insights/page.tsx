@@ -10,7 +10,7 @@ import { MonthlyDashboard } from "@/components/dashboard/monthly-dashboard";
 import { SummaryDashboard } from "@/components/dashboard/summary-dashboard";
 import { ViewingControls } from "@/components/family/viewing-picker";
 import { PermissionGate } from "@/components/layout/permission-gate";
-import { DataLoading } from "@/components/ui/data-state";
+import { InsightsBodySkeleton, InsightsSkeleton } from "@/components/ui/skeletons";
 import { PageHeader } from "@/components/ui/page-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -57,7 +57,7 @@ function InsightsContent() {
         }
       />
       <ViewingControls noun="expenses" family />
-      {!viewing.ready ? <DataLoading label="Loading insights…" slowKey={FAMILY_API_KEY} /> : null}
+      {!viewing.ready ? <InsightsBodySkeleton slowKey={FAMILY_API_KEY} /> : null}
       {viewing.ready && viewing.family && view !== "summary" ? (
         <Text textStyle="bodySm" color="fg.muted">
           Monthly and History show one person at a time. Choose a member above, or go back to Summary.
@@ -78,7 +78,7 @@ function InsightsContent() {
 export default function InsightsPage() {
   return (
     <PermissionGate module="expenses">
-      <Suspense fallback={<DataLoading label="Loading insights…" />}>
+      <Suspense fallback={<InsightsSkeleton />}>
         <InsightsContent />
       </Suspense>
     </PermissionGate>

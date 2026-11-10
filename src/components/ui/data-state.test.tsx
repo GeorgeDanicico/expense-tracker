@@ -5,7 +5,8 @@ import { SWRConfig } from "swr";
 import useSWR from "swr";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DataError, DataLoading, SLOW_MESSAGE } from "@/components/ui/data-state";
+import { DataError, DataLoading } from "@/components/ui/data-state";
+import { SLOW_MESSAGE } from "@/components/ui/slow-notice";
 import { clearSlow, markSlow } from "@/lib/api/slow-keys";
 import { Provider } from "@/components/ui/provider";
 

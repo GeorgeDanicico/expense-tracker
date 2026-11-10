@@ -17,8 +17,9 @@ import { useExpenseDelete, useExpenseWrites } from "@/components/expenses/use-ex
 import { ViewingBar, ViewingMenu } from "@/components/family/viewing-picker";
 import { PermissionGate } from "@/components/layout/permission-gate";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
+import { DataError, DataRefresh } from "@/components/ui/data-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { ExpensesSkeleton, LedgerSkeleton, RowsCardSkeleton } from "@/components/ui/skeletons";
 import { UndoToast } from "@/components/ui/undo-toast";
 import { useApiForm } from "@/hooks/use-api-form";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -125,9 +126,11 @@ function ExpensesContent() {
         <DataRefresh error={tabsError} updating={tabsUpdating} retry={() => void mutateTabs()} />
       ) : null}
 
-      {activeTabId || !viewing.ready ? controls : null}
+      {activeTabId ? controls : null}
       {!viewing.ready ? (
-        <DataLoading label="Loading expenses…" slowKey={FAMILY_API_KEY} />
+        activeTabId
+          ? <RowsCardSkeleton label="Loading expenses…" slowKey={FAMILY_API_KEY} />
+          : <LedgerSkeleton controls={controls} slowKey={FAMILY_API_KEY} />
       ) : !activeTabId ? (
         <LedgerPanel month={month} currency={viewing.currency} filtersOpen={filtersOpen} actions={actions} controls={controls} />
       ) : openTab ? (
@@ -135,7 +138,7 @@ function ExpensesContent() {
       ) : !tabsResult ? (
         tabsError ? (
           <DataError message="Saved expense tabs could not be loaded." retry={() => void mutateTabs()} />
-        ) : <DataLoading label="Loading saved tabs…" slowKey={expenseTabsApiKey(viewing.member)} />
+        ) : <RowsCardSkeleton label="Loading saved tabs…" slowKey={expenseTabsApiKey(viewing.member)} />
       ) : (
         <Box py="8" role="status">
           <Text textStyle="bodySm" color="fg.muted">This tab is no longer available. Returning to Expenses…</Text>
@@ -177,7 +180,7 @@ function ExpensesContent() {
 export default function ExpensesPage() {
   return (
     <PermissionGate module="expenses">
-      <Suspense fallback={<DataLoading label="Loading expenses…" />}>
+      <Suspense fallback={<ExpensesSkeleton />}>
         <ExpensesContent />
       </Suspense>
     </PermissionGate>

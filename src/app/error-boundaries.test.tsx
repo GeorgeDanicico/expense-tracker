@@ -43,12 +43,15 @@ describe("the error boundaries", () => {
     expect(html).toContain("Try again");
   });
 
-  it("error.tsx, for pages outside (app), reports as a boundary error and looks the same", () => {
+  it("error.tsx, for pages outside (app), reports as a boundary error, without the way home", () => {
     const html = render(<RootError error={serverError} retry={retry} />);
 
     expect(reportClientError).toHaveBeenCalledExactlyOnceWith(serverError, "boundary");
     expect(effects).toEqual([{ deps: [serverError] }]);
-    expect(html).toBe(render(<AppError error={serverError} retry={retry} />));
+    const appHtml = render(<AppError error={serverError} retry={retry} />);
+    expect(appHtml).toContain("Go to Home");
+    expect(html).not.toContain("Go to Home");
+    expect(html).toContain("We couldn’t load this page");
   });
 
   it("global-error.tsx reports as a global boundary error and renders its own document", () => {

@@ -15,3 +15,6 @@ export const PAGE_SPACING = {
   /** The phone's bottom bar and the home indicator below it: what a sticky bar or a toast sits on. */
   bottomBar: "calc(4.5rem + env(safe-area-inset-bottom))",
 } as const;
+
+/** Expenses' ledger: the list, and "By category" at 20rem beside it from `lg`. The panel and its skeleton share it. */
+export const LEDGER_COLUMNS = { base: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 20rem" } as const;

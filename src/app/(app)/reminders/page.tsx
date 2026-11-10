@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { RemindersScreen } from "@/components/reminders/reminders-screen";
-import { DataLoading } from "@/components/ui/data-state";
+import { RemindersSkeleton } from "@/components/ui/skeletons";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 /** The screen with `?focus=<id>` from the URL: a reminder notification opens the page on its reminder. */
@@ -17,7 +17,7 @@ export default function RemindersPage() {
   useDocumentTitle("Reminders");
   // `useSearchParams` needs a boundary above it.
   return (
-    <Suspense fallback={<DataLoading label="Loading your reminders…" />}>
+    <Suspense fallback={<RemindersSkeleton />}>
       <FocusedRemindersScreen />
     </Suspense>
   );

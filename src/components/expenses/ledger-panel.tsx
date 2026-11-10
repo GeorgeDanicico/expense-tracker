@@ -12,8 +12,9 @@ import type { ExpenseRowActions } from "@/components/expenses/expense-rows";
 import { MemberName } from "@/components/family/member-swatch";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
-import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
-import { PAGE_SPACING } from "@/components/ui/theme/layout";
+import { DataError, DataRefresh } from "@/components/ui/data-state";
+import { LedgerSkeleton } from "@/components/ui/skeletons";
+import { LEDGER_COLUMNS, PAGE_SPACING } from "@/components/ui/theme/layout";
 import { useViewing } from "@/hooks/use-viewing";
 import { mainExpensesApiKey } from "@/lib/api/keys";
 import { formatMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
@@ -79,12 +80,12 @@ export function LedgerPanel({
   const ledger = data?.month === month ? data : undefined;
 
   if (!ledger) {
-    return (
+    return error ? (
       <Stack gap="3">
         {controls}
-        {error ? <DataError retry={() => void mutate()} /> : <DataLoading label="Loading expenses…" slowKey={mainExpensesApiKey(month, viewing.member)} />}
+        <DataError retry={() => void mutate()} />
       </Stack>
-    );
+    ) : <LedgerSkeleton controls={controls} slowKey={mainExpensesApiKey(month, viewing.member)} />;
   }
 
   // Filtered once: the rows (deleted ones still there, to collapse), and what the totals count.
@@ -97,12 +98,16 @@ export function LedgerPanel({
     ? groupByCurrency(shown.map((expense) => ({ currency: expense.currency ?? currency, total: expense.amount, count: 1, largest: expense.amount })))
     : null;
   const { total } = summarizeExpenses(shown);
-  const change = !totals && !filtering && previous?.month === previousMonth
+  const comparable = !totals && !filtering;
+  const change = comparable && previous?.month === previousMonth
     ? monthChange(month, shown, previous.expenses, getBucharestToday())
     : null;
+  // The comparison arrives with the month before, a moment after the rows, and on a phone it wraps the
+  // line: keep room for it until it's here, so the list doesn't drop when it lands (PF3).
+  const waitingForChange = comparable && previous?.month !== previousMonth;
 
   return (
-    <Grid templateColumns={{ base: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 20rem" }} gap={PAGE_SPACING.columnGap} alignItems="start">
+    <Grid templateColumns={LEDGER_COLUMNS} gap={PAGE_SPACING.columnGap} alignItems="start">
       <Stack gap="3" minW="0">
         {controls}
         {filtersOpen ? (
@@ -116,7 +121,7 @@ export function LedgerPanel({
           />
         ) : null}
         <DataRefresh error={error} updating={isValidating} retry={() => void mutate()} />
-        <Text as="div" textStyle="bodySm" color="fg.muted" display="flex" flexWrap="wrap" columnGap="1.5" alignItems="baseline">
+        <Text as="div" textStyle="bodySm" color="fg.muted" display="flex" flexWrap="wrap" columnGap="1.5" alignItems="baseline" minH={waitingForChange ? { base: "2.25rem", md: "1.125rem" } : undefined}>
           <Text as="span" fontWeight="semibold" color="fg">
             {totals ? <CurrencyAmounts totals={totals} fallbackCurrency={currency} size="sm" /> : <Amount value={total} currency={currency} size="sm" />}
           </Text>

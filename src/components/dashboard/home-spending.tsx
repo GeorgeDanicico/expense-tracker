@@ -4,14 +4,17 @@ import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 import { Inbox } from "lucide-react";
 import useSWR from "swr";
 
+import { MonthBodySkeleton } from "@/components/dashboard/home-skeleton";
 import { CategoryTile } from "@/components/expenses/category-visual";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
-import { DataError, DataLoading } from "@/components/ui/data-state";
+import { DataError } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON } from "@/components/ui/icon";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
+import { SkeletonFrame } from "@/components/ui/skeleton-frame";
+import { ListSkeleton } from "@/components/ui/skeletons";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { transition } from "@/components/ui/theme/motion";
 import { useAccount } from "@/hooks/use-account";
@@ -39,7 +42,10 @@ export function MonthCard() {
   if (!data) {
     return (
       <Card size="sm">
-        {error ? <Card.Body><DataError message="This month's spending could not be loaded." retry={() => void mutate()} /></Card.Body> : <Card.Body><DataLoading layout="section" label="Loading this month…" /></Card.Body>}
+        <Card.Header title={`Spent in ${formatMonthName(getBucharestMonth())}`} actions={<SectionLink href={INSIGHTS_PATH}>Insights</SectionLink>} />
+        <Card.Body>
+          {error ? <DataError message="This month's spending could not be loaded." retry={() => void mutate()} /> : <SkeletonFrame label="Loading this month…"><MonthBodySkeleton /></SkeletonFrame>}
+        </Card.Body>
       </Card>
     );
   }
@@ -81,7 +87,7 @@ export function RecentExpenses({ now }: { now: Date }) {
       <Card size="sm">
         {header}
         <Card.Body>
-          {error ? <DataError message="Your expenses could not be loaded." retry={() => void mutate()} /> : <DataLoading layout="section" label="Loading your expenses…" />}
+          {error ? <DataError message="Your expenses could not be loaded." retry={() => void mutate()} /> : <SkeletonFrame label="Loading your expenses…"><ListSkeleton rows={5} gap="0" /></SkeletonFrame>}
         </Card.Body>
       </Card>
     );

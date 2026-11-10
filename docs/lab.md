@@ -37,6 +37,7 @@ Other commands:
 | `npm run lab -- jwt shared` / `jwt asymmetric` | Switch how Auth signs tokens; restarts Auth and the app |
 | `npm run lab -- delay 40` | Add 40 ms to every call from the app to Supabase (see below); `delay 0` removes it |
 | `npm run lab -- stop-app` | Stop the app and the delay proxy, leave the database up |
+| `node scripts/lab/skeletons.mjs /<page> <width> [--tap /<page>]` | Compare a page's loading state with its loaded state (heights, layout shifts, screenshots) or time how soon a tab tap shows its skeleton; PF3 |
 | `npm run lab:baseline` | The full signed-in baseline: four pages, both JWT modes, 0 and 40 ms, both passes below (about 80 minutes; `LAB_BASELINE_PASS=cpu` for the second pass only) |
 
 `up` is safe to run twice: if the lab is already up and seeded it only prints the status, and if a

@@ -5,7 +5,7 @@ import { SWRConfig } from "swr";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Provider } from "@/components/ui/provider";
-import { SLOW_MESSAGE } from "@/components/ui/data-state";
+import { SLOW_MESSAGE } from "@/components/ui/slow-notice";
 
 import { ScreenPreview, type FixtureMode } from "./[screen]/screen-preview";
 

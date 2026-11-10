@@ -6,7 +6,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { rowRecipe } from "@/components/ui/theme/recipes/misc";
 
 /** A list item with the theme's row recipe: 56px tall on phones, no line between rows. */
-const RowItem = chakra("li", rowRecipe);
+export const RowItem = chakra("li", rowRecipe);
 
 /**
  * Mobile list row: leading icon, title, meta line, trailing amount/actions. Other props go on the

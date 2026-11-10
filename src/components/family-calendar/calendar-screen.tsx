@@ -17,12 +17,13 @@ import { MonthView } from "@/components/family-calendar/month-view";
 import { SubscribeDialog } from "@/components/family-calendar/subscribe-dialog";
 import { useCalendarRange, useCalendarWrites, usePrefetchRanges } from "@/components/family-calendar/use-calendar-events";
 import { WeekView } from "@/components/family-calendar/week-view";
-import { DataError, DataLoading, DataRefresh } from "@/components/ui/data-state";
+import { DataError, DataRefresh } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { CalendarBodySkeleton } from "@/components/ui/skeletons";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useAccount } from "@/hooks/use-account";
 import { useIsPhone } from "@/hooks/use-is-phone";
@@ -191,7 +192,7 @@ export function CalendarScreen() {
     return (
       <Stack gap={{ base: "4", md: "5" }}>
         {header}
-        <DataLoading label="Loading the calendar…" />
+        <CalendarBodySkeleton />
       </Stack>
     );
   }
