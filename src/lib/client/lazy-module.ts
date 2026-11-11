@@ -1,4 +1,21 @@
 /**
+ * How many subscribers hear that the module arrived in one go. A list of a few hundred rows has a lazy menu and
+ * tooltips on each, and every one swaps its plain button for the real thing when told, so telling them all at once
+ * rebuilt about a thousand widgets in a single block, most of a second on a phone-speed CPU (PF11). In batches,
+ * with the browser free to handle a tap between them, the same swap takes no longer overall and never blocks.
+ */
+export const NOTIFY_BATCH = 24;
+
+function notifyInBatches(subscribers: ReadonlySet<() => void>) {
+  const waiting = [...subscribers];
+  const run = () => {
+    for (const listener of waiting.splice(0, NOTIFY_BATCH)) if (subscribers.has(listener)) listener();
+    if (waiting.length) setTimeout(run, 0);
+  };
+  run();
+}
+
+/**
  * A script fetched once, on demand, that components can wait for (PF9): `lazySheet` and `useLazyMenu` both
  * keep one. `load()` starts the fetch (and returns the same promise every time); `get()` is the result once
  * it is in; `subscribe` calls back when it arrives, for `useSyncExternalStore`. `subscribeBefore` callbacks
@@ -21,7 +38,7 @@ export function createLazyModule<T>(fetchModule: () => Promise<T>) {
         (module) => {
           value = module;
           beforeSubscribers.forEach((listener) => listener());
-          subscribers.forEach((listener) => listener());
+          notifyInBatches(subscribers);
         },
         () => {
           loading = null;

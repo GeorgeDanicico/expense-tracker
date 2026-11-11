@@ -19,7 +19,7 @@ import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
 import { ListSkeleton } from "@/components/ui/skeletons";
 import { UndoToast } from "@/components/ui/undo-toast";
-import { preloadOnIntent } from "@/lib/client/preload";
+import { preloadOnIntent, usePreloadWhenIdle } from "@/lib/client/preload";
 import { dueReminders, dueTimeLabel } from "@/lib/home/today";
 import { formatDay, overdueText } from "@/lib/reminders/format";
 import type { ListedReminder } from "@/lib/reminders/list";
@@ -49,6 +49,7 @@ export function DueRemindersPending(state: BlockPending) {
  * refuses it, with the reason above the rows (`useReminders`).
  */
 export function DueReminders() {
+  usePreloadWhenIdle(preloadReminderActionDialogs);
   const now = useNow(REMINDERS_TICK_MS);
   const reminders = useReminders(now);
   const [toast, setToast] = useState<string | null>(null);

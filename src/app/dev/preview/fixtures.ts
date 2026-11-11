@@ -48,19 +48,32 @@ const TEMPLATE: [string, number, ExpenseCategory, string | null][] = [
   ["Internet", 29.99, "utilities", null],
 ];
 
+/** `?expenses=300` makes each month's ledger that long (the same fourteen, over and over), to try a big list; the default is one of each. */
+function previewExpenseCount() {
+  if (typeof window === "undefined") return TEMPLATE.length;
+  const asked = Number(new URLSearchParams(window.location.search).get("expenses"));
+  return Number.isInteger(asked) && asked > 0 ? Math.min(asked, 2000) : TEMPLATE.length;
+}
+
 function expensesFor(month: string, scale = 1): Expense[] {
   const days = daysInMonth(month);
   const isCurrent = month === getBucharestMonth();
   const lastDay = isCurrent ? Number(getBucharestToday().slice(8)) : days;
-  return TEMPLATE.map(([description, amount, category, notes], index) => ({
-    id: `${month}-${index}`,
-    description,
-    amount: Math.round(amount * scale * 100) / 100,
-    category,
-    subtype: category === "car" ? (index === 2 ? "car_fuel" : "car_maintenance") : null,
-    expenseDate: dateInMonth(month, Math.max(1, lastDay - index * 2)),
-    notes,
-  }));
+  const count = previewExpenseCount();
+  return Array.from({ length: count }, (_, index) => {
+    const [description, amount, category, notes] = TEMPLATE[index % TEMPLATE.length];
+    // The default ledger spreads its fourteen two days apart; a long one fits `count` rows into the month, newest first.
+    const day = count === TEMPLATE.length ? lastDay - index * 2 : lastDay - Math.floor((index * lastDay) / count);
+    return {
+      id: `${month}-${index}`,
+      description,
+      amount: Math.round(amount * scale * 100) / 100,
+      category,
+      subtype: category === "car" ? (index % TEMPLATE.length === 2 ? "car_fuel" : "car_maintenance") : null,
+      expenseDate: dateInMonth(month, Math.max(1, day)),
+      notes,
+    };
+  });
 }
 
 function ledger(month: string, scale = 1): ExpensesData {

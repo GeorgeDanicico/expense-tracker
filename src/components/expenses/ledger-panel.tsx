@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Flex, Grid, Stack, Text } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import { useDeferredValue, useMemo, useState, type ReactNode } from "react";
 
 import { CategoryBreakdown } from "@/components/dashboard/category-breakdown";
 import { CurrencyAmounts } from "@/components/expenses/currency-totals";
@@ -73,11 +73,19 @@ export function LedgerPanel({
 }) {
   const viewing = useViewing();
   const [filter, setFilter] = useState(NO_LEDGER_FILTER);
+  // The search box shows each key at once; the rows and totals follow a moment later and give way to the next key [S12].
+  const applied = useDeferredValue(filter);
   const { data, error, isValidating, mutate } = useServerFirstSWR<Ledger>(mainExpensesApiKey(month, viewing.member), { keepPreviousData: false });
   // The month before, for the comparison; it also has ‹ ready. The family view mixes currencies, so it has none.
   const previousMonth = shiftMonth(month, -1);
   const { data: previous } = useServerFirstSWR<ExpensesData>(viewing.family ? null : mainExpensesApiKey(previousMonth, viewing.member));
   const ledger = data?.month === month ? data : undefined;
+  const filtering = filtersOpen && (applied.query.trim() !== "" || applied.category !== "all");
+  // The same array until the data or the search changes, so the rows below only draw again when they must.
+  const matching = useMemo<ListedExpense[] | undefined>(
+    () => (filtering && ledger ? filterExpenses(ledger.expenses, applied) : ledger?.expenses),
+    [filtering, ledger, applied],
+  );
 
   if (!ledger) {
     return error ? (
@@ -89,10 +97,9 @@ export function LedgerPanel({
   }
 
   // Filtered once: the rows (deleted ones still there, to collapse), and what the totals count.
-  const filtering = filtersOpen && (filter.query.trim() !== "" || filter.category !== "all");
-  const matching: ListedExpense[] = filtering ? filterExpenses(ledger.expenses, filter) : ledger.expenses;
+  const rows: ListedExpense[] = matching ?? ledger.expenses;
   const isShown = (expense: ListedExpense) => !actions?.hidden.has(expense.id);
-  const shown = matching.filter(isShown);
+  const shown = rows.filter(isShown);
   const visibleCount = ledger.expenses.filter(isShown).length;
   const totals = isFamilyLedger(ledger)
     ? groupByCurrency(shown.map((expense) => ({ currency: expense.currency ?? currency, total: expense.amount, count: 1, largest: expense.amount })))
@@ -131,7 +138,7 @@ export function LedgerPanel({
         <Card>
           <Card.Body>
             <ExpenseList
-              expenses={matching}
+              expenses={rows}
               currency={currency}
               actions={actions}
               filtered={filtering}

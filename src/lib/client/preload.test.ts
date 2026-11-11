@@ -1,7 +1,11 @@
 // @vitest-environment happy-dom
+import { act, createElement } from "react";
+import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { preloadOnIntent, preloadWhenIdle } from "@/lib/client/preload";
+import { preloadOnIntent, preloadWhenIdle, usePreloadWhenIdle } from "@/lib/client/preload";
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 afterEach(() => {
   vi.useRealTimers();
@@ -83,5 +87,36 @@ describe("preloadOnIntent", () => {
     handlers.onFocus();
     handlers.onTouchStart();
     expect(preload).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("usePreloadWhenIdle", () => {
+  function Page({ load }: { load: () => void }) {
+    usePreloadWhenIdle(load);
+    return null;
+  }
+
+  it("preloads once the page is idle, and not if the page goes first", async () => {
+    let idle: (() => void) | null = null;
+    const cancelled: number[] = [];
+    vi.stubGlobal("requestIdleCallback", (callback: () => void) => {
+      idle = callback;
+      return 3;
+    });
+    vi.stubGlobal("cancelIdleCallback", (id: number) => cancelled.push(id));
+    vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
+    const load = vi.fn();
+
+    const staying = createRoot(document.createElement("div"));
+    await act(async () => staying.render(createElement(Page, { load })));
+    expect(load).not.toHaveBeenCalled();
+    (idle as (() => void) | null)?.();
+    expect(load).toHaveBeenCalledTimes(1);
+    await act(async () => staying.unmount());
+
+    const leaving = createRoot(document.createElement("div"));
+    await act(async () => leaving.render(createElement(Page, { load })));
+    await act(async () => leaving.unmount());
+    expect(cancelled).toContain(3);
   });
 });

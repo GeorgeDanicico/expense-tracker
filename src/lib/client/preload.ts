@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 /**
  * Loading a lazy part of the app (`next/dynamic`, PF9) before it is asked for, so a tap never waits for
  * its script. Two moments: when the browser is idle after the page has settled, and on intent
@@ -33,6 +35,12 @@ export function preloadWhenIdle(load: () => unknown): () => void {
     window.removeEventListener("load", run);
     cancel();
   };
+}
+
+/** `preloadWhenIdle` for a component: starts `load` once the page has settled and the browser is idle, and cancels if the component goes first. */
+export function usePreloadWhenIdle(load: () => unknown) {
+  // `load` is a module-level function (the page's `preloadSheets`), so it doesn't change between renders.
+  useEffect(() => preloadWhenIdle(load), [load]);
 }
 
 /** Event handlers that call `preload` on hover, focus and touch: spread them on the button that opens a lazy part. */

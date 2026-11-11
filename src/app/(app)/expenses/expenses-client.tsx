@@ -26,7 +26,7 @@ import { useViewing } from "@/hooks/use-viewing";
 import { expenseTabsApiKey, FAMILY_API_KEY, mainExpensesExportUrl, type TabsResponse } from "@/lib/api/keys";
 import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { getBucharestMonth, resolveMainExpenseMonth } from "@/lib/calendar";
-import { preloadOnIntent } from "@/lib/client/preload";
+import { preloadOnIntent, usePreloadWhenIdle } from "@/lib/client/preload";
 import type { Expense } from "@/lib/expenses/types";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 
@@ -43,7 +43,7 @@ const EditExpenseSheet = editSheet.Sheet;
 const ExpenseTabDialog = tabDialogSheet.Sheet;
 const ConfirmDialog = confirmSheet.Sheet;
 
-/** Starts loading what a tap on this page can open, once the pointer, focus or a finger is on the page. */
+/** Starts loading what a tap on this page can open: when the browser is idle after the page loads, or at the first touch. */
 function preloadSheets() {
   editSheet.preload();
   tabDialogSheet.preload();
@@ -60,6 +60,7 @@ type TabDialog = { mode: "create" } | { mode: "edit"; tab: ExpenseTab };
  */
 function ExpensesContent() {
   useDocumentTitle("Expenses");
+  usePreloadWhenIdle(preloadSheets);
   const searchParams = useSearchParams();
   const month = resolveMainExpenseMonth(searchParams.get("month"));
   const viewing = useViewing();

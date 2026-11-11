@@ -22,14 +22,14 @@ import { RemindersSkeleton } from "@/components/ui/skeletons";
 import { UndoToast } from "@/components/ui/undo-toast";
 import { prefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { REMINDERS_API_KEY } from "@/lib/api/keys";
-import { preloadOnIntent } from "@/lib/client/preload";
+import { preloadOnIntent, usePreloadWhenIdle } from "@/lib/client/preload";
 import { doneEntries, groupOf, planReminders, type ListedReminder } from "@/lib/reminders/list";
 import { DONE_WINDOW_DAYS_LABEL } from "@/lib/reminders/format";
 
 const editDialog = lazySheet(() => import("@/components/reminders/reminder-dialog").then((module) => module.ReminderDialog));
 const ReminderDialog = editDialog.Sheet;
 
-/** Starts loading every dialog the list can open, once the pointer, focus or a finger is on it. */
+/** Starts loading every dialog the list can open: when the browser is idle after the page loads, or at the first touch. */
 function preloadDialogs() {
   editDialog.preload();
   preloadReminderActionDialogs();
@@ -56,6 +56,7 @@ const TOAST_MS = 3000;
  * once the list has loaded, opens Done when it is there, and highlights it for a moment.
  */
 export function RemindersScreen({ focusId = null }: { focusId?: string | null }) {
+  usePreloadWhenIdle(preloadDialogs);
   const now = useNow(REMINDERS_TICK_MS);
   const reminders = useReminders(now);
   const [toast, setToast] = useState<string | null>(null);

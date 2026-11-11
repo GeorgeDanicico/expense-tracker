@@ -1,4 +1,4 @@
-import type { Cache, ScopedMutator } from "swr";
+import type { ScopedMutator } from "swr";
 import { describe, expect, it, vi } from "vitest";
 
 import type { NetWorthApi } from "@/components/net-worth/net-worth-api";
@@ -16,19 +16,13 @@ const savings: NetWorthEntry = {
 const loan: NetWorthEntry = { ...savings, id: "manual:item-2", itemId: "item-2", kind: "liability", category: "debt", name: "Loan", currentValue: null, valuedOn: null, status: "missing_value" };
 const overview: NetWorthOverview = { entries: [savings, loan], totalsByCurrency: [], attention: [], calculationIssues: [] };
 
-/** An SWR cache with the global mutate's semantics for what these writes use: a key or a filter, data or no data. */
-function swrCache(initial: Record<string, unknown>) {
-  const store = new Map<string, { data?: unknown }>(Object.entries(initial).map(([key, data]) => [key, { data }]));
+/** A global `mutate` that records which cached keys a key or a filter reached, to see what a write refetches. */
+function swrCache(keys: string[]) {
   const revalidated: string[] = [];
-  const mutate = vi.fn(async (...args: [key: unknown, data?: unknown, options?: { revalidate?: boolean }]) => {
-    const [key, data, options] = args;
-    const keys = typeof key === "function" ? [...store.keys()].filter((cached) => (key as (value: string) => boolean)(cached)) : [key as string];
-    for (const cached of keys) {
-      if (args.length > 1) store.set(cached, { data });
-      if (args.length === 1 || options?.revalidate !== false) revalidated.push(cached);
-    }
+  const mutate = vi.fn(async (key: unknown) => {
+    revalidated.push(...(typeof key === "function" ? keys.filter((cached) => (key as (value: string) => boolean)(cached)) : [key as string]));
   });
-  return { mutate: mutate as unknown as ScopedMutator, cache: store as unknown as Cache, data: (key: string) => store.get(key)?.data, revalidated };
+  return { mutate: mutate as unknown as ScopedMutator, revalidated };
 }
 
 function deferred() {
@@ -63,57 +57,22 @@ describe("withValuation", () => {
   });
 });
 
-describe("an optimistic value", () => {
-  it("shows at once, before the server answers, then refetches every balance sheet", async () => {
-    const swr = swrCache({ [KEY]: overview, [`${KEY}?member=all`]: { members: [] }, "/api/expenses?month=2026-10": {} });
-    const server = deferred();
-    const writes = netWorthWrites(api({ addValuation: vi.fn(() => server.promise) }), swr);
-
-    const saving = writes.addValuation("item-1", { value: "4200.00", valuedOn: "2026-11-04" });
-    await vi.waitFor(() => expect((swr.data(KEY) as NetWorthOverview).entries[0].currentValue).toBe("4200.00"));
-    expect(swr.revalidated).toEqual([]);
-
-    server.answer();
-    await saving;
-    expect(swr.revalidated).toEqual([KEY, `${KEY}?member=all`]);
-  });
-
-  it("rolls the sheet back and throws when the server refuses", async () => {
-    const swr = swrCache({ [KEY]: overview });
-    const refusal = new Error("Couldn't save. Try again.");
-    const writes = netWorthWrites(api({ addValuation: vi.fn(async () => { throw refusal; }) }), swr);
-
-    await expect(writes.addValuation("item-1", { value: "4200.00", valuedOn: "2026-11-04" })).rejects.toBe(refusal);
-
-    expect(swr.data(KEY)).toBe(overview);
-    expect(swr.revalidated).toEqual([]);
-  });
-
-  it("sends the value for the item as typed", async () => {
-    const swr = swrCache({ [KEY]: overview });
-    const addValuation = vi.fn(async () => undefined);
-    await netWorthWrites(api({ addValuation }), swr).addValuation("item-1", { value: "4200", valuedOn: "2026-11-04" });
-    expect(addValuation).toHaveBeenCalledWith("item-1", { value: "4200", valuedOn: "2026-11-04" });
-  });
-});
-
 describe("item writes", () => {
   it("wait for the server before the sheet is refetched, and leave the cache alone on failure", async () => {
-    const swr = swrCache({ [KEY]: overview });
+    const swr = swrCache([KEY]);
     const server = deferred();
-    const writes = netWorthWrites(api({ updateItem: vi.fn(() => server.promise) }), swr);
+    const writes = netWorthWrites(api({ updateItem: vi.fn(() => server.promise) }), swr.mutate);
 
     const archiving = writes.updateItem("item-1", { archived: true });
     await Promise.resolve();
-    expect(swr.data(KEY)).toBe(overview);
     expect(swr.revalidated).toEqual([]);
     server.answer();
     await archiving;
     expect(swr.revalidated).toEqual([KEY]);
 
-    const failing = swrCache({ [KEY]: overview });
+    const failing = swrCache([KEY]);
     const refusal = new Error("nope");
-    await expect(netWorthWrites(api({ createItem: vi.fn(async () => { throw refusal; }) }), failing).createItem({
+    await expect(netWorthWrites(api({ createItem: vi.fn(async () => { throw refusal; }) }), failing.mutate).createItem({
       name: "Car", kind: "asset", category: "custom", currency: "EUR", purchaseAmount: null, value: "9000", valuedOn: "2026-11-04",
     })).rejects.toBe(refusal);
     expect(failing.revalidated).toEqual([]);

@@ -33,6 +33,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | 6 | Decide whether to rewrite the "read someone else's finance rows" policies (PF10 found it is the one slow database query, and no index fixes it) | Reading another family member's expenses costs 113 ms in the database for their dashboard (1,605 rows, one helper call per row); a rewritten policy costs 10 ms. It changes a policy on financial data and the existing pgTAP test that pins the policy's text, so it isn't in PF10. The route-level gain is small (about 75 ms on the family dashboard, none on your own pages) | PF10 sections 3 and 7 |
 | 7 | Optional: on the live project's SQL editor, run the one read-only `pg_stat_statements` query in PF10 section 5 and paste the output | It is the real query mix PF10 could only approximate in the lab. If a query there is slow, it gets its own index with a measured before and after | PF10 sections 5 and 7 |
 | 8 | Optional: say yes or no to five indexes on foreign keys the advisor flags (`todos.created_by`, `todos.completed_by`, `calendar_events.created_by`, `families.creator_id`, `app_flags.updated_by`) | They only matter when someone deletes an account. PF10 didn't add them because no slow query uses them; the SQL is in section 7 if you want them | PF10 sections 3 and 7 |
+| 9 | Optional: decide whether the React Compiler goes in after all | PF11 tried it and dropped it. It made one interaction, dropping a to-do card, about four times faster (188 to 44 ms), and cost 5 to 7% more JavaScript on every page, 20 to 25% more build CPU, and may have made a rare hydration error on To-dos more common. Turning it on is one line in `next.config.ts` and one pinned dev dependency | PF11 sections 3 and 7 |
 
 ## Progress
 
@@ -49,7 +50,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF8 | Prefetching, waterfalls and stable data | done | #234 |
 | PF9 | Smaller bundles | done, except Lighthouse's LCP on Home (still about 4.8 s, see PF9 section 4) and dnd-kit left in To-dos | #235 |
 | PF10 | SQL: indexes and RLS for the slow queries | done, with no migration: the lab and the advisor found no index a slow query needs (see PF10 section 3); waiting on rows 6 to 8 | #236 |
-| PF11 | Smooth interaction | not started | |
+| PF11 | Smooth interaction | done, except the first open of a lazy sheet (about 250 ms on the 4x CPU, see PF11 section 4); React Compiler tried and dropped | #237 |
 | PF12 | Lean runtime on the VPS | not started | |
 | PF13 | Measure and close | not started | |
 
@@ -139,6 +140,14 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   the live advisor flags no policy that calls `auth.uid()` per row. The one slow query is reading another
   family member's expenses (113 ms for their dashboard), which comes from a helper function that runs once per
   row, not from a missing index. A policy rewrite cuts it to 10 ms, but it is a decision for you (row 6).
+
+- **PF11, smooth interaction.** On an emulated phone (CPU 4x slower), tapping to the previous month on Expenses
+  with about 150 to 290 rows took **1,040 ms** and now takes **56 ms**; opening Filters went from **864 to 176 ms**;
+  typing in the search from **280 to 64 ms** a key. The cause was not the rows themselves: the first tap on the page
+  made every row's menu and tooltips swap in at once, and a month's rows all drew inside the tap. Adding a
+  net-worth value was already optimistic (the list shows it 52 ms after the tap, the server answers at 263 ms) and
+  now uses SWR's own rollback. The React Compiler was tried and **not kept**. Still above 200 ms on this slow CPU:
+  the first time a lazy sheet opens (quick add 256 ms, "Add value" 208 ms).
 
 ## Baseline and budgets
 
@@ -3658,3 +3667,167 @@ There is no code or schema change, so there is nothing to undo; reverting the PR
   changes it.
 - **Not measured:** the live database's own query times and plans, the VPS, and `get_family()` and `get_my_membership()` beyond their
   3.6 and 1.6 ms means (they are small and run on indexed tables; they are called many times per page, which is PF4's and PF7's subject, not an index).
+
+### PF11: Smooth interaction
+
+#### 1. The problem
+
+On a phone-speed CPU, three things on Expenses made a tap feel stuck. Tapping the previous or next month froze
+the screen for about a second. Tapping "Filters" froze it for 0.9 s, and each letter typed in the search took
+about 0.3 s to appear. The month with the most rows (the lab's family has about 290 expenses in a full month; you
+see about 150 of them as yourself) was the worst case. Other taps were fine: quick add, a reminder's Done,
+dropping a to-do card and typing an amount each took 0.05 to 0.4 s.
+
+INP, "Interaction to Next Paint", is the time from a tap or key press until the screen next changes. A page's INP
+is its slowest interaction, and "good" is under 200 ms for the 75th percentile of visits [S12].
+
+Adding a net-worth value was already optimistic when this task started (phase 17's U9 built it): the plan's
+description of it as "left" was out of date. What it lacked was SWR's own rollback and a test against real SWR.
+
+#### 2. What changed
+
+**Behaviour**
+- Expenses: a month's rows draw in two steps (the first 30, then the rest, while the browser can still answer a
+  tap). The old month stays, dimmed, until the new one is in. Rows no longer draw again when you open Filters, type in the
+  search or delete another row. Typing in the search is answered first and the list follows a moment later.
+- The pages' menus and tooltips: when their code arrives, the buttons swap in 24 at a time instead of all at once.
+- Expenses, Reminders and Home start loading their dialogs when the browser is idle after the page loads, not at
+  your first touch. To-dos keeps loading on touch (section 3).
+- Net worth: adding a value uses SWR's `optimisticData` and `rollbackOnError`. It looks the same as before: the row
+  shows the value at once, the sheet closes when the server answers, and a refused value puts the row back and shows the
+  error in the sheet.
+- No React Compiler (section 3).
+
+**Files**
+- `src/components/net-worth/use-net-worth-writes.ts`: `addValuationOptimistically` is one `mutate` call with `optimisticData`,
+  `rollbackOnError: true`, `populateCache: false`. Tests: `use-net-worth-writes.swr.test.tsx` (real SWR, 422 and 500 roll back,
+  starts from the cached copy) and `use-net-worth-writes.test.ts`.
+- `src/components/expenses/expense-rows.tsx`: memoized row items, `useDeferredValue(expenses, firstRows)`, stable handlers.
+  `ledger-panel.tsx`: the search is a deferred value and the filtered list is memoized. `expense-rows.test.tsx`: a test
+  that unchanged rows don't draw again.
+- `src/lib/client/lazy-module.ts` (`NOTIFY_BATCH`, `notifyInBatches`) with `lazy-module.test.ts`.
+- `src/lib/client/preload.ts` (`usePreloadWhenIdle`) and its three callers (`expenses-client.tsx`, `reminders-screen.tsx`,
+  `home-reminders.tsx`); `preload.test.ts`.
+- `src/app/dev/preview/fixtures.ts`: `/dev/preview/expenses?expenses=300` makes each month 300 rows long.
+- `scripts/lab/interactions.mjs` (the INP measurement, described in `docs/lab.md`).
+
+#### 3. Why this way
+
+**What the profiler showed.** I profiled the tap on "previous month" with Chrome's CPU profiler in the lab at 4x
+slow CPU. 863 of the first 1,000 ms was React drawing, inside the tap's own event, and most of it was Chakra working out
+styles for about 900 buttons and 290 rows. Two causes, both PF9's side effects:
+1. *The swap.* PF9 loads the menu and tooltip code after the page and every button then swaps itself for the real
+   menu. A row has a `⋯` menu and two hover buttons with tooltips, so a month of 290 rows swapped about 900 widgets in one
+   block, and the first tap on any button started that load. Telling them in batches of 24 (a timer between batches)
+   makes the same swap take the same total time without ever blocking for more than a few tens of ms.
+2. *The rows.* A month switch, Filters and each key in the search all drew every row again. A memoized row skips
+   unchanged work (Filters: 300 row draws before, 0 after; four keys typed in the search: 236 before, 0 after; counted in a dev
+   build of `/dev/preview/expenses?expenses=300`, with an effect in `ExpenseRow` that counts commits). A new list is drawn first-30-then-the-rest, which
+   matters most for a month switch.
+
+**Options turned down**
+- *Windowing.* The plan says only if a month can pass 1,000 rows. The seed's busiest month is about 290 and 300 rows
+  in a month is already a lot for a family; the deferral fixes the freeze without the cost of windowing (find in page, focus,
+  the delete animation). If a month ever passes about 1,000, revisit.
+- *Menus that only swap on touch.* More general (rows would never swap) but a swap on a phone's touchstart would replace the button
+  under the finger and lose the tap. Batching keeps PF9's behaviour.
+- *Closing the sheet before the server answers for a net-worth value.* A 422 shows field errors in the sheet, so it stays open
+  until the answer, as the expense form does.
+- *Idle preload on To-dos.* I added it first and took it out: with it, To-dos' cold load logged React error #418 (a hydration
+  mismatch) in 2 of 36 loads, and 0 of 36 without it (the lab's `first-render.mjs`). Samples are small, but the interaction
+  numbers don't need it.
+- *Deferring the quick-add form until after the sheet's frame.* Tried: the sheet's frame alone opens in about 150 ms, but React drew the
+  form in the same frame, so the first tap stayed at 248 ms. Reverted.
+
+**The React Compiler: tried, not kept.** The plan's rule: keep it only if interactions get measurably faster, all tests pass and
+the build stays under +30%. I tried `reactCompiler: true` with `babel-plugin-react-compiler@1.0.0` (the build used it: 43 chunks contain its cache
+code) on the unfixed code and on the fixed code [N12][S13].
+- *Faster?* On the **unfixed** code it fixed the search (280 to 72 ms a key) and the to-do drop (184 to 96 ms) but not the month switch
+  (1,040 to 1,120 ms) or Filters (864 to 952), which are the swap and the first draw. On the **fixed** code it changes nothing on the list.
+  The one gain left was dropping a to-do card: 188 ms median (p75 208) without it, 44 ms (p75 104) with it, 10 repetitions each. Annotating only the
+  board (`compilationMode: "annotation"`) gave 152 ms (p75 168), within noise.
+- *Cost.* First-load JavaScript, gzipped: Expenses 309.1 to 330.0 KiB, Home 288.9 to 305.5, To-dos 299.9 to 319.2, Reminders 280.0 to 294.9,
+  Net worth 301.9 to 325.1 (+5 to 8%). The size check still passed, but only through its 2% tolerance, using up the headroom PF9 left.
+  `npm run build` from a clean `.next`: 49.7, 47.0 and 67.2 s without (76.7, 75.5, 91.5 s of CPU) and 57.4 and 57.4 s with (92.4, 99.9 s of CPU):
+  about +18% on the median clock time (the 67 s run was a busy laptop) and +22 to +30% CPU.
+- *Risk.* To-dos' hydration error (the `id="todo-board"` fix from PF8) showed up in 4 of 18 cold loads of the compiled build with
+  `first-render.mjs` (and 1 of 80 with a quieter script), against 0 of 40 on `6dd1233`. The cause isn't known and the samples are small, but
+  the brief said the compiler must not disturb that.
+- So it is **dropped**: the manual fixes bring every list interaction under 200 ms, the compiler's one clear gain is
+  a to-do drop that is already about 176 ms, and it costs bytes on every page. Row 9 of "Waiting for George" has the switch if you want it. The dev
+  dependency isn't in `package.json`. The compiler's lint rules (`eslint-plugin-react-hooks` 7's `react-hooks/refs`, `purity`,
+  `set-state-in-effect` and the others) were already on through `eslint-config-next`, and `npm run lint` passes with them.
+
+**Lint rule: none added.** What I found (a swap that fans out to hundreds of subscribers, rows drawn inside a discrete event) can't be
+told from correct code by looking at the syntax.
+
+#### 4. Numbers
+
+Measured in the lab (`docs/lab.md`: 40 ms to Supabase, a production build) with `node scripts/lab/interactions.mjs --width W --scenario S --reps N`,
+CPU 4x slower, a new browser for every repetition. Each cell is median / p75 in ms (Event Timing rounds to 8 ms; under 16 ms reads as 0).
+Before is `6dd1233`, five repetitions; after is this branch, seven. Expenses scenarios use the last full month. All runs were on a busy laptop
+(load 2 to 5), so differences under about 40 ms are noise.
+
+| Interaction | Width | Before | After |
+| --- | --- | --- | --- |
+| Switch month (first tap) | 390 | 1,040 / 1,192 | **56 / 64** |
+| Switch month (first tap) | 1280 | 648 / 880 | **80 / 96** |
+| Open Filters | 390 | 864 / 1,368 | **176 / 184** |
+| Open Filters | 1280 | 1,928 (one repetition; the rest missed the tap) | **192 / 192** |
+| One key in the search | 390 | 280 / 328 | **64 / 72** |
+| One key in the search | 1280 | 264 / 280 | **64 / 72** |
+| Open quick add, first tap | 390 | 392 / 416 | 248 / 264 |
+| Open quick add, first tap | 1280 | 280 / 304 | 256 / 256 |
+| Open quick add, chunk already loaded | 390 | 80 / 96 | 56 / 64 |
+| One key typing an amount | 390 | 48 / 64 | 48 / 48 |
+| Mark a reminder done | 390 | 176 / 240 | 128 / 208 |
+| Drop a to-do card | 1280 | 184 / 192 | 160 / 176 |
+| Net worth: open the Add value sheet, first tap | 1280 | 304 / 312 | 200 / 208 |
+| Net worth: tap Save value (the tap itself) | 1280 | 152 / 160 | 88 / 104 |
+| Net worth: the list shows the new value, after the tap | 1280 | 93 / 95 | **52 / 54** |
+| Net worth: the server answers, after the tap | 1280 | 371 / 442 | 263 / 273 |
+
+- **Still over 200 ms at p75:** opening quick add the first time (248 to 264) and, just, the Add value sheet and Reminders' Done (208).
+  The first open of a lazy sheet builds Chakra's dialog and the form for the first time; the second open is 24 to 64 ms. I couldn't
+  split it (section 3). The plan's "under 200 ms on the target pages" is therefore met for the interactions that were slow, not for these.
+- Compiler arms (same commands, five repetitions; the to-do drop ten): unfixed code with the compiler: month 1,120 / 1,136, Filters 952 / 1,136, a search key
+  72 / 96, to-do drop 96 / 96. Fixed code with the compiler: month 64 / 64, Filters 176 / 176, search key 56 / 64, to-do drop 44 / 104 (ten
+  runs), reminder Done 208 / 272 (without: 180 / 272, eight runs each).
+- CPU profile of the tap on previous month before: 863 of 1,000 ms was React drawing in the tap's own event
+  (`node` script on the Chrome DevTools protocol; not committed).
+- Render counts in a dev build of `/dev/preview/expenses?expenses=300`: Filters 300 row draws to 0; four keys in the search 236 to 0.
+  Month switch can't be counted there: the preview's month links leave the preview.
+- First-load JavaScript with this branch and no compiler: Home 288.9 KiB, Expenses 309.1, To-dos 299.9, Reminders 280.0 (PF9: 288.9, 308.9, 299.8, 279.9), `npm run size:routes -- --check` passes.
+- **Lighthouse timespan mode: not measured.** The Event Timing script measures the same thing (the interaction's time to the next frame) for each
+  tap with a known cause, which timespan mode only totals. INP itself needs real visits (row 3).
+
+#### 5. How to check it yourself
+
+1. `npm run lab -- up`, then `npm run lab -- delay 40`.
+2. `node scripts/lab/interactions.mjs --width 390 --scenario month,search --reps 5`: the first prints the month switch, the second Filters and the keys.
+3. In the app as a parent, on Expenses, go to a full month and tap the previous month: the rows should arrive in two
+   steps (briefly dimmed) without the page freezing. Open Filters and type: each letter shows at once.
+4. Net worth, a row's `⋯` (or its Add value icon on desktop): enter a value, Save. The row shows it before the sheet closes. Stop the API
+   (`docker stop supabase_rest_expense-tracker-lab`) and save again: the row goes back and the sheet shows the error.
+5. `/dev/preview/expenses?expenses=300` shows a 300-row month.
+
+#### 6. Risks and how to undo it
+
+- The batching in `lazy-module.ts` also applies to the lazy sheets (one subscriber each: no change). A button can show as plain for a few
+  hundred ms longer on a very long list; a tap on it still works (`asked`).
+- `useDeferredValue` in `ExpenseRows` means a new list shows one pass late, and the old rows are dimmed meanwhile. The Expenses
+  server-rendered HTML now has the first 30 rows, not all of them.
+- Idle preload downloads the dialogs about a second after load on three pages (they are not part of the first-load budget).
+- Undo: revert the PR. Each part is separate: `ledger-panel.tsx` and `expense-rows.tsx` (rows), `lazy-module.ts` (batching), `preload.ts` and its callers (idle preload).
+
+#### 7. Left open
+
+- The first open of a lazy sheet (quick add about 250 ms, Add value about 200 ms at 4x slower CPU). Worth trying: render the form after
+  the sheet has painted (`requestAnimationFrame` twice) or keep a closed sheet mounted at idle.
+- **React #418 on To-dos.** The hydration error returned in about 1 of 6 to 18 cold loads in some builds of this branch (with idle preload on To-dos
+  and with the compiler); final build: 0 of 56. Cause not found. If it reappears in real use, `web_vital`/client-log lines will show it.
+- Net worth only has an optimistic *add*; there is no screen for editing a value, so there is nothing to make optimistic.
+- Not measured: INP from real visits (needs the VPS, row 3); a month over about 300 rows; the compiled build's page-load times (LCP) and
+  the compiled tests (vitest runs the uncompiled source).
+- The 1280 px Filters baseline has one usable repetition: at 1280 the harness's tap often missed because the page moved under it.
+- `babel-plugin-react-compiler` was installed locally while trying it; `npm ci` removes it from `node_modules`.
