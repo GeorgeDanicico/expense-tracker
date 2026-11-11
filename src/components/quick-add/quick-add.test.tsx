@@ -17,8 +17,8 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-import ExpensesPage from "@/app/(app)/expenses/page";
-import RemindersPage from "@/app/(app)/reminders/page";
+import { ExpensesClient } from "@/app/(app)/expenses/expenses-client";
+import { RemindersClient } from "@/app/(app)/reminders/reminders-client";
 import { HomeScreen } from "@/components/dashboard/home-screen";
 import { AppShell } from "@/components/layout/app-shell";
 
@@ -109,8 +109,8 @@ describe("the quick-add sheet", () => {
   it.each([
     // Home's page is a server component that starts its data on the server (PF6); its screen is the same.
     ["Home", <HomeScreen key="home" />],
-    ["Expenses", <ExpensesPage key="expenses" />],
-    ["Reminders", <RemindersPage key="reminders" />],
+    ["Expenses", <ExpensesClient key="expenses" />],
+    ["Reminders", <RemindersClient key="reminders" />],
   ])("is the same sheet from %s, opening on the fast expense form", (_screen, page) => {
     const html = renderShell(page);
     const sheet = sheetOf(html);
@@ -126,7 +126,7 @@ describe("the quick-add sheet", () => {
   });
 
   it("offers only Expense and Reminder to someone without a family", () => {
-    const sheet = sheetOf(renderShell(<RemindersPage />, null));
+    const sheet = sheetOf(renderShell(<RemindersClient />, null));
     expect(sheet).toContain(">Reminder<");
     expect(sheet).not.toContain(">To-do<");
     expect(sheet).not.toContain(">Event<");

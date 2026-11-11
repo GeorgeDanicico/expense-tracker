@@ -16,7 +16,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/expenses",
 }));
 
-import ExpensesPage from "./page";
+import { ExpensesClient } from "./expenses-client";
 
 function anAccount(membership: AccountMembership | null): AccountData {
   return { email: "user@example.com", signInName: "user@example.com", currency: "EUR", features: { family: true }, membership, mustChangePassword: false, avatarUrl: null };
@@ -31,7 +31,7 @@ function render(account: AccountData | null) {
   return renderToStaticMarkup(
     <ChakraProvider value={ledgerSystem}>
       <SWRConfig value={{ fallback: account ? { [ACCOUNT_API_KEY]: account } : {} }}>
-        <ExpensesPage />
+        <ExpensesClient />
       </SWRConfig>
     </ChakraProvider>,
   );

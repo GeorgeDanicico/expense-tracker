@@ -30,6 +30,8 @@ vi.mock("@/hooks/use-account", () => ({
   useAccount: () => ({ account: state.account, currency: state.account?.currency ?? "EUR" }),
 }));
 vi.mock("swr", () => ({
+  // `useServerFirstSWR` reads SWR's config; there is no server copy here.
+  useSWRConfig: () => ({ cache: new Map(), mutate: vi.fn(), fallback: {} }),
   default: (key: unknown) => {
     state.fetched.push(key);
     return { data: key ? state.family : undefined, error: key ? state.familyError : undefined };

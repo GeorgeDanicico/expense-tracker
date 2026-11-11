@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { act, cloneElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getAuthenticatedUser } from "@/lib/auth";
@@ -20,6 +21,7 @@ vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 const logged = vi.hoisted(() => [] as string[]);
 vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 
+import { useTodoBoard, type TodoBoardState } from "@/components/todos/use-todo-board";
 import { GET as familyRoute } from "@/app/api/family/route";
 import { GET as todosRoute } from "@/app/api/todos/route";
 import TodosPage from "@/app/(app)/todos/page";
@@ -78,6 +80,26 @@ describe("To-dos' first data on the server (PF7)", () => {
 
     const board = (cache.get(TODOS_API_KEY) as { data?: TodosResponse } | undefined)?.data;
     expect(board?.todos.map((todo) => todo.title)).toEqual(["Fix the gate"]);
+  });
+
+  it("moves a card right after a cold load: it shows at once, starting from the server's board", async () => {
+    seedParent();
+    const second = repositories.todos.seed({ title: "Paint the fence", status: "todo" });
+    let board: TodoBoardState | undefined;
+    function Probe() {
+      board = useTodoBoard();
+      return null;
+    }
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+    const rendered = await renderPage();
+    await mount({ ...rendered, page: cloneElement(rendered.page, {}, <Probe />) as ServerRender["page"] });
+    expect(board?.todos?.map((todo) => todo.title).sort()).toEqual(["Fix the gate", "Paint the fence"]);
+
+    await act(async () => { void board?.move(second.id, { status: "done", beforeId: null, afterId: null }); });
+
+    expect(board?.todos?.find((todo) => todo.id === second.id)?.status).toBe("done");
+    expect(board?.todos).toHaveLength(2);
+    vi.unstubAllGlobals();
   });
 
   it("answers each key exactly as its API route does", async () => {
