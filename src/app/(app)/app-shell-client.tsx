@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { SWRConfig } from "swr";
-
 import { AccountNoticeDialog } from "@/components/family/account-notice-dialog";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAccount } from "@/hooks/use-account";
@@ -10,16 +8,24 @@ import type { AccountData } from "@/lib/account/types";
 import { CHANGE_PASSWORD_PATH } from "@/lib/account/password-change";
 import { loadAfterSessionChange } from "@/lib/api/auth-redirect";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
+import { ServerFallback, type ServerFallbackData } from "@/lib/api/server-fallback";
 
 /**
- * The browser half of the `(app)` layout: the account the server loaded becomes SWR's fallback for
- * `/api/account`, so `useAccount()` has it on the first render, here and in every page.
+ * The browser half of the `(app)` layout: what the server loaded becomes SWR's fallback, so
+ * `useAccount()` has the account on the first render, here and in every page, and the Reminders
+ * badge gets its count as it streams in (`remindersSummary` is a promise the layout started and did
+ * not wait for; one that resolves to `undefined` failed, and its reader then asks itself).
  */
-export function AppShellClient({ account, children }: { account: AccountData; children: React.ReactNode }) {
+export function AppShellClient({ account, fallback, children }: {
+  account: AccountData;
+  /** The shell's other first answers by SWR key (the Reminders count, the notices), each a promise the layout didn't wait for. */
+  fallback: ServerFallbackData;
+  children: React.ReactNode;
+}) {
   return (
-    <SWRConfig value={{ fallback: { [ACCOUNT_API_KEY]: account } }}>
+    <ServerFallback fallback={{ [ACCOUNT_API_KEY]: account, ...fallback }}>
       <SignedInShell>{children}</SignedInShell>
-    </SWRConfig>
+    </ServerFallback>
   );
 }
 

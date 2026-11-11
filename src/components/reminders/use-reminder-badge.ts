@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import useSWR from "swr";
-
 import { REMINDERS_SUMMARY_API_KEY, type RemindersSummaryResponse } from "@/lib/api/keys";
+import { useServerFirstSWR } from "@/lib/api/server-fallback";
 
 /** How often the badge refetches while the tab is visible (SWR skips hidden tabs). */
 export const REMINDER_BADGE_REFRESH_MS = 5 * 60_000;
@@ -35,19 +34,20 @@ export function onServiceWorkerNotification(
 /**
  * What the Reminders nav badge shows: due + overdue from `GET /api/reminders/summary`, revalidated
  * on focus, every 5 minutes and when a push arrives. The reminders page mutates the same key after
- * every write. `enabled: false` neither fetches nor listens (nav rows without a badge).
+ * every write. The `(app)` layout starts the first answer on the server (PF8) and the shell's
+ * `ServerFallback` hands it over, so a cold load makes no request for it. Reads suspend until that
+ * answer arrives: render it inside a `StreamedSection` (`RemindersBadge`).
  */
-export function useReminderBadge(enabled = true) {
-  const { data, mutate } = useSWR<RemindersSummaryResponse>(enabled ? REMINDERS_SUMMARY_API_KEY : null, {
+export function useReminderBadge() {
+  const { data, mutate } = useServerFirstSWR<RemindersSummaryResponse>(REMINDERS_SUMMARY_API_KEY, {
     revalidateOnFocus: true,
     refreshInterval: REMINDER_BADGE_REFRESH_MS,
     shouldRetryOnError: false,
   });
 
   useEffect(() => {
-    if (!enabled || typeof navigator === "undefined") return;
     return onServiceWorkerNotification(navigator.serviceWorker, () => void mutate());
-  }, [enabled, mutate]);
+  }, [mutate]);
 
   const due = data?.due ?? 0;
   const overdue = data?.overdue ?? 0;

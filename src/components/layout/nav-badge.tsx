@@ -2,7 +2,8 @@
 
 import { Box } from "@chakra-ui/react";
 
-import { badgeText } from "@/components/reminders/use-reminder-badge";
+import { badgeText, useReminderBadge } from "@/components/reminders/use-reminder-badge";
+import { StreamedSection } from "@/components/ui/streamed-section";
 
 /**
  * The count on a nav row: hidden at 0, "9+" above 9. Red while anything is overdue, the brand
@@ -46,6 +47,23 @@ export function NavBadge({ count, overdue = 0, srLabel, dot = false }: {
       <span className="sr-only">{srLabel}</span>
     </>
   );
+}
+
+/**
+ * The Reminders count, in a boundary of its own: the layout starts the count on the server and it
+ * streams in, so the row it sits on is on screen without waiting for it (PF8).
+ */
+export function RemindersBadge({ dot = false }: { dot?: boolean }) {
+  return (
+    <StreamedSection fallback={null}>
+      <RemindersCount dot={dot} />
+    </StreamedSection>
+  );
+}
+
+function RemindersCount({ dot }: { dot: boolean }) {
+  const { count, overdue } = useReminderBadge();
+  return <NavBadge dot={dot} count={count} overdue={overdue} srLabel={remindersBadgeLabel(count)} />;
 }
 
 /** ", 3 due" — the badge's part of a row's accessible name, with the real count past 9. */

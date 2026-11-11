@@ -1,14 +1,14 @@
 "use client";
 
 import { Button, Text } from "@chakra-ui/react";
-import useSWR from "swr";
-
 import { useFamilyWrites } from "@/components/family/use-family-writes";
 import { AppDialog } from "@/components/ui/app-dialog";
+import { StreamedSection } from "@/components/ui/streamed-section";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useApiForm } from "@/hooks/use-api-form";
 import type { AccountNotice } from "@/lib/account/notice-repository";
 import { ACCOUNT_NOTICES_API_KEY, type NoticesResponse } from "@/lib/api/keys";
+import { useServerFirstSWR } from "@/lib/api/server-fallback";
 
 /** What a notice says. The family's own data is gone from the user's view, their personal data is not. */
 export function noticeMessage(notice: Pick<AccountNotice, "kind" | "familyName">): string {
@@ -57,12 +57,21 @@ export function NoticeDialog({
 }
 
 /**
- * Shows the oldest unseen notice. OK marks it as seen and moves on to the next one. Mount it only
- * while the family feature is on: the notices route answers 404 otherwise.
+ * Shows the oldest unseen notice, in a boundary of its own. OK marks it as seen and moves on to the next one. Mount it only
+ * while the family feature is on (the notices route answers 404 otherwise) and inside a boundary: the
+ * `(app)` layout starts the notices on the server and they stream in (PF8).
  */
 export function AccountNoticeDialog() {
+  return (
+    <StreamedSection fallback={null}>
+      <OldestNotice />
+    </StreamedSection>
+  );
+}
+
+function OldestNotice() {
   const writes = useFamilyWrites();
-  const { data } = useSWR<NoticesResponse>(ACCOUNT_NOTICES_API_KEY);
+  const { data } = useServerFirstSWR<NoticesResponse>(ACCOUNT_NOTICES_API_KEY);
   const form = useApiForm();
   const notice = data?.notices[0];
 

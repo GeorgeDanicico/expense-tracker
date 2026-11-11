@@ -8,8 +8,11 @@ import { DEDUPING_INTERVAL_MS } from "@/lib/api/client";
 // The browser half of "first data on the server" (PF6; the server half and the whole pattern are
 // described in src/lib/server-prefetch.ts).
 
-/** When this page's server data reached the browser (`performance.now()`); null outside a `ServerFallback`. */
-const ArrivedAt = createContext<number | null>(null);
+/** What the nearest `ServerFallback` sent: its data by SWR key, and when it reached the browser (`performance.now()`). */
+type Scope = { fallback: ServerFallbackData; arrivedAt: number };
+
+/** The nearest `ServerFallback`'s data and arrival time; null outside one. */
+const ServerScope = createContext<Scope | null>(null);
 
 /**
  * When each server answer `useServerFirstSWR` wrote into SWR's cache reached the browser, so a hook
@@ -32,49 +35,68 @@ export function ServerFallback({ fallback, children }: { fallback: ServerFallbac
   const [arrivedAt] = useState(() => performance.now());
   return (
     <SWRConfig value={{ fallback }}>
-      <ArrivedAt.Provider value={arrivedAt}>{children}</ArrivedAt.Provider>
+      <ServerScope.Provider value={{ fallback, arrivedAt }}>{children}</ServerScope.Provider>
     </SWRConfig>
   );
 }
 
 /**
- * `useSWR(key, config)` for a key a `ServerFallback` above may hold. Two things differ from plain
- * `useSWR`, and only while the copy SWR shows is the server's:
+ * `useSWR(key, config)` for a key a `ServerFallback` above may hold. What differs from plain `useSWR`:
  *
- * - **No request on mount** while that copy is younger than SWR's dedupe window (15 s, the time an
- *   answer SWR fetched itself counts as fresh), counted from when it reached the browser. Otherwise
- *   SWR treats fallback data as stale and asks again right after hydration, repeating what the
- *   server read a moment earlier. This holds for every hook on the key, including one that mounts
- *   after another has written the copy into the cache.
- * - **The copy goes into SWR's cache** once it is on screen. SWR never stores fallback data, so a
- *   write's `mutate(current => …)` would start from `undefined` and `mutate(filter)` would skip the
- *   key; written in, the server's answer is like one SWR fetched (focus, polling and later mounts
- *   revalidate it as usual).
+ * - **No request on mount** while the copy the server sent is fresh, and SWR would otherwise ask
+ *   again right after hydration (it treats fallback data as stale), repeating what the server read a
+ *   moment earlier. Fresh means: this `ServerFallback`'s own copy for the key (a page that has just
+ *   been rendered on the server, on a first load or on a move from another page), or an earlier copy
+ *   SWR holds that is younger than SWR's dedupe window (15 s, the time an answer SWR fetched itself
+ *   counts as fresh), counted from when it reached the browser. This holds for every hook on the key.
+ * - **The copy goes into SWR's cache** once it arrives, replacing an older answer SWR has for the key
+ *   (an earlier visit to the page shows at once, and the server's newer copy follows). SWR never
+ *   stores fallback data, so without this a write's `mutate(current => …)` would start from
+ *   `undefined` and `mutate(filter)` would skip the key; written in, the server's answer is like one
+ *   SWR fetched (focus, polling and later mounts revalidate it as usual). A copy that is `undefined`
+ *   (the loader failed) makes the browser ask instead.
  */
 export function useServerFirstSWR<Data>(key: string | null, config: SWRConfiguration<Data> = {}) {
-  const { cache, mutate, fallback } = useSWRConfig();
-  const arrivedAt = useContext(ArrivedAt);
+  const { cache, mutate } = useSWRConfig();
+  const scope = useContext(ServerScope);
   // SWR decides whether to revalidate when the hook mounts (and when its key changes), so the mount is what counts.
   const [mountedAt] = useState(() => performance.now());
   const cached: unknown = key === null ? undefined : cache.get(key)?.data;
-  const onlyServerCopy = key !== null && cached === undefined && fallback[key] !== undefined;
-  // When the copy SWR would show arrived: this page's server data, or the server's answer already written in.
-  const arrival = (onlyServerCopy ? arrivedAt : isObject(cached) ? arrivals.get(cached) : null) ?? null;
-  const fresh = arrival !== null && mountedAt - arrival < DEDUPING_INTERVAL_MS;
+  // What this `ServerFallback` sent for the key (a promise or a value).
+  const copy: unknown = key === null ? undefined : scope?.fallback[key];
+  const arrivedAt = scope?.arrivedAt ?? null;
+  // When the answer SWR would show arrived: this page's server copy, or an earlier one already written in.
+  const arrival = (cached === undefined ? (copy === undefined ? null : arrivedAt) : isObject(cached) ? arrivals.get(cached) : null) ?? null;
+  // The copy is on its way to replace an older answer SWR holds: asking again would repeat it.
+  const replacing = copy !== undefined && arrivedAt !== null && cached !== undefined && (arrival === null || arrival < arrivedAt);
+  const fresh = replacing || (arrival !== null && mountedAt - arrival < DEDUPING_INTERVAL_MS);
   const response = useSWR<Data>(key, fresh ? { ...config, revalidateIfStale: false } : config);
-  const { data } = response;
 
   useEffect(() => {
-    if (key === null || !onlyServerCopy || data === undefined || cache.get(key)?.data !== undefined) return;
-    if (isObject(data) && arrivedAt !== null) arrivals.set(data, arrivedAt);
-    // A hook that suspended on the server's promise and was replayed by React keeps an SWR callback
-    // bound to its first, unfinished render, which throws when told about the very first answer for
-    // its key (`returnedData` before initialization, SWR 2.4.1). The cache is written before the
-    // callbacks run and the data is the same one on screen, so the throw is dropped, not surfaced.
-    mutate(key, data, { revalidate: false }).catch(() => undefined);
-  }, [onlyServerCopy, data, cache, mutate, key, arrivedAt]);
+    if (key === null || copy === undefined || arrivedAt === null) return;
+    let current = true;
+    // With an older answer in the cache this mount was told not to ask; with none, SWR asks by itself.
+    const hadOlderAnswer = cache.get(key)?.data !== undefined;
+    void Promise.resolve(copy).then((data: unknown) => {
+      if (!current) return;
+      // A copy that failed (the loader resolved to nothing): the browser asks instead.
+      if (data === undefined) {
+        if (hadOlderAnswer) mutate(key).catch(ignore);
+        return;
+      }
+      if (cache.get(key)?.data === data) return;
+      if (isObject(data)) arrivals.set(data, arrivedAt);
+      // A hook that suspended on the server's promise and was replayed by React keeps an SWR callback
+      // bound to its first, unfinished render, which throws when told about the very first answer for
+      // its key (`returnedData` before initialization, SWR 2.4.1). The cache is written before the
+      // callbacks run and the data is the same one on screen, so the throw is dropped, not surfaced.
+      mutate(key, data, { revalidate: false }).catch(ignore);
+    });
+    return () => { current = false; };
+  }, [key, copy, arrivedAt, cache, mutate]);
 
   return response;
 }
 
+const ignore = () => undefined;
 const isObject = (value: unknown): value is object => typeof value === "object" && value !== null;

@@ -8,11 +8,16 @@ import { forgetLastActive } from "@/lib/family/last-active";
 import { kidAccountEmail } from "@/lib/family/kid-account";
 import { resetFakeRepositories, type FakeRepositories } from "@/test/fakes/repositories";
 import { renderOrRedirect } from "@/test/redirect";
+import { ACCOUNT_NOTICES_API_KEY, REMINDERS_SUMMARY_API_KEY } from "@/lib/api/keys";
+import { GET as GET_NOTICES } from "@/app/api/account/notices/route";
+import { loggedLines } from "@/test/log-lines";
 import { callRoute, signedInAs } from "@/test/route";
 
 const request = vi.hoisted(() => ({ headers: new Headers() }));
 
 vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: vi.fn(), asPageCaller: (fn: () => Promise<unknown>) => fn() }));
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 vi.mock("@/lib/repositories", () => import("@/test/fakes/repositories"));
 vi.mock("next/headers", () => ({ headers: async () => request.headers }));
 vi.mock("next/navigation", () => import("@/test/redirect"));
@@ -20,13 +25,14 @@ vi.mock("next/navigation", () => import("@/test/redirect"));
 import ProtectedLayout from "@/app/(app)/layout";
 import { AppShellClient } from "@/app/(app)/app-shell-client";
 import { GET } from "@/app/api/account/route";
+import { GET as GET_SUMMARY } from "@/app/api/reminders/summary/route";
 
 let repositories: FakeRepositories;
 
 /** Where the layout sent the browser, or the shell it rendered. */
 async function gate() {
   const { redirectedTo, rendered } = await renderOrRedirect(() => ProtectedLayout({ children: <p>The page</p> }));
-  return { redirectedTo, element: rendered as ReactElement<{ account: AccountData }> | null };
+  return { redirectedTo, element: rendered as ReactElement<{ account: AccountData; fallback: Record<string, Promise<unknown>> }> | null };
 }
 
 /** What `GET /api/account` answers for the same caller and data. */
@@ -35,6 +41,7 @@ const routeAnswer = () => callRoute(GET);
 beforeEach(() => {
   repositories = resetFakeRepositories();
   forgetLastActive();
+  logged.length = 0;
   request.headers = new Headers({ "x-page-path": "/expenses?month=2026-10" });
   vi.mocked(getAuthenticatedUser).mockResolvedValue(null);
   vi.stubEnv("FAMILY_ENABLED", "true");
@@ -114,6 +121,47 @@ describe("the (app) layout's session gate", () => {
     expect(redirectedTo).toBeNull();
     expect(element?.props.account.membership).toBeNull();
     expect(element?.props.account).toEqual((await routeAnswer()).body);
+  });
+
+  it("starts the Reminders badge's count for the shell, the same answer GET /api/reminders/summary gives", async () => {
+    signedInAs();
+    repositories.family.membership = aParent();
+    repositories.reminders.seed();
+
+    const { element } = await gate();
+
+    const summary = await element?.props.fallback[REMINDERS_SUMMARY_API_KEY];
+    expect(summary).toEqual((await callRoute(GET_SUMMARY)).body);
+    expect(summary).toMatchObject({ due: expect.any(Number), overdue: expect.any(Number) });
+  });
+
+  it("leaves the count to the browser when it can't be read, without failing the page", async () => {
+    signedInAs();
+    repositories.family.membership = aParent();
+    vi.spyOn(repositories.reminders, "summary").mockRejectedValue(new Error("private database failure"));
+
+    const { redirectedTo, element } = await gate();
+
+    expect(redirectedTo).toBeNull();
+    await expect(element?.props.fallback[REMINDERS_SUMMARY_API_KEY]).resolves.toBeUndefined();
+    expect(loggedLines(logged, "server_prefetch_failed")).toEqual([
+      expect.objectContaining({ route: "(app) layout", api: "/api/reminders/summary" }),
+    ]);
+  });
+
+  it("starts the unseen notices for the shell, the same answer GET /api/account/notices gives, only with the family feature on", async () => {
+    signedInAs();
+    repositories.family.membership = aParent();
+    repositories.notices.notices.push({ id: "n1", kind: "removed_from_family", familyName: "Smiths", createdAt: "2026-11-01T09:00:00Z" });
+
+    const { element } = await gate();
+
+    const notices = await element?.props.fallback[ACCOUNT_NOTICES_API_KEY];
+    expect(notices).toEqual((await callRoute(GET_NOTICES)).body);
+    expect(notices).toMatchObject({ notices: [expect.objectContaining({ familyName: "Smiths" })] });
+
+    vi.stubEnv("FAMILY_ENABLED", "false");
+    expect(Object.keys((await gate()).element?.props.fallback ?? {})).toEqual([REMINDERS_SUMMARY_API_KEY]);
   });
 
   it("throws (to the error boundary) instead of redirecting or rendering when the account can't be read", async () => {
