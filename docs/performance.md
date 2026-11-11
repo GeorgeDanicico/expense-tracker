@@ -44,7 +44,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF6 | First data on the server for Home | done, except Lighthouse's simulated LCP (4.6 s; the observed slow-4G LCP is 1.4 s, see PF6 section 4) | #232 |
 | PF7 | The same for Expenses, To-dos and Reminders | done | #233 |
 | PF8 | Prefetching, waterfalls and stable data | done | #234 |
-| PF9 | Smaller bundles | done, except Lighthouse's LCP on Home (still about 4.8 s, see PF9 section 4) and dnd-kit left in To-dos | #PR |
+| PF9 | Smaller bundles | done, except Lighthouse's LCP on Home (still about 4.8 s, see PF9 section 4) and dnd-kit left in To-dos | #235 |
 | PF10 | SQL: indexes and RLS for the slow queries | not started | |
 | PF11 | Smooth interaction | not started | |
 | PF12 | Lean runtime on the VPS | not started | |
