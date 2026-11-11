@@ -1,9 +1,9 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import useSWR from "swr";
 
 import { useAccount } from "@/hooks/use-account";
+import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 import type { FamilyMemberView } from "@/lib/family/views";
 import { ALL_MEMBERS, MEMBER_PARAM } from "@/lib/family/viewing";
@@ -43,7 +43,7 @@ export function useViewing(): ViewingState {
   const member = requested && requested.toLowerCase() !== ownId?.toLowerCase() ? requested : null;
 
   // The family view needs no member list: its response names every member.
-  const { data, error } = useSWR<FamilyResponse>(member && !family ? FAMILY_API_KEY : null);
+  const { data, error } = useServerFirstSWR<FamilyResponse>(member && !family ? FAMILY_API_KEY : null);
   const viewed = member && !family
     ? (data?.family?.members.find((entry) => entry.memberId.toLowerCase() === member.toLowerCase()) ?? null)
     : null;

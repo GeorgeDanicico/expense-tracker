@@ -1,17 +1,13 @@
-"use client";
+import { ServerFallback } from "@/lib/api/server-fallback";
+import { loadTodosFallback } from "@/lib/todos/load-todos-page";
 
-import { Suspense } from "react";
+import { TodosClient } from "./todos-client";
 
-import { TodoBoardScreen } from "@/components/todos/todo-board-screen";
-import { TodosSkeleton } from "@/components/ui/skeletons";
-import { useDocumentTitle } from "@/hooks/use-document-title";
-
-export default function TodosPage() {
-  useDocumentTitle("To-dos");
-  // The filters live in the URL, and `useSearchParams` needs a boundary above it.
+/** The family board. A server component since PF7: it starts the board's data here and the board streams in (`loadTodosFallback`). */
+export default async function TodosPage() {
   return (
-    <Suspense fallback={<TodosSkeleton />}>
-      <TodoBoardScreen />
-    </Suspense>
+    <ServerFallback fallback={await loadTodosFallback()}>
+      <TodosClient />
+    </ServerFallback>
   );
 }

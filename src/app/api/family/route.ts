@@ -1,4 +1,5 @@
 import { requireFamilyFeature } from "@/lib/family/feature";
+import { loadFamily } from "@/lib/family/load-family";
 import { familyView } from "@/lib/family/views";
 import { json, noContent, parseBody, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
@@ -6,10 +7,7 @@ import { createFamilySchema, deleteFamilySchema } from "@/lib/validation/family"
 
 const CREATE_FAILURE = "Unable to create the family.";
 
-export const GET = withUser(async () => {
-  requireFamilyFeature();
-  return json({ family: familyView(await getRepositories().family.getFamily()) });
-}, { failure: "Unable to load the family." });
+export const GET = withUser(async () => json(await loadFamily()), { failure: "Unable to load the family." });
 
 export const POST = withUser(async (request) => {
   requireFamilyFeature();
