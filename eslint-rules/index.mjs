@@ -3,6 +3,7 @@
  * (`local/<rule>`). Each rule is explained in docs/lint-rules.md, in a section named after it.
  */
 import clientOnlyChakraFactory from "./client-only-chakra-factory.mjs";
+import dndContextId from "./dnd-context-id.mjs";
 import motionTokens from "./motion-tokens.mjs";
 import noFetchInComponents from "./no-fetch-in-components.mjs";
 import noIsoDateSlice from "./no-iso-date-slice.mjs";
@@ -15,6 +16,7 @@ import noSubtleText from "./no-subtle-text.mjs";
 import noWindowConfirm from "./no-window-confirm.mjs";
 import noZodFlatten from "./no-zod-flatten.mjs";
 import postgrestFilterString from "./postgrest-filter-string.mjs";
+import stableDataOptions from "./stable-data-options.mjs";
 import streamedSection from "./streamed-section.mjs";
 import themeColors from "./theme-colors.mjs";
 import themeControlSize from "./theme-control-size.mjs";
@@ -24,6 +26,7 @@ const plugin = {
   meta: { name: "eslint-plugin-local" },
   rules: {
     "client-only-chakra-factory": clientOnlyChakraFactory,
+    "dnd-context-id": dndContextId,
     "motion-tokens": motionTokens,
     "no-fetch-in-components": noFetchInComponents,
     "no-iso-date-slice": noIsoDateSlice,
@@ -36,6 +39,7 @@ const plugin = {
     "no-window-confirm": noWindowConfirm,
     "no-zod-flatten": noZodFlatten,
     "postgrest-filter-string": postgrestFilterString,
+    "stable-data-options": stableDataOptions,
     "streamed-section": streamedSection,
     "theme-colors": themeColors,
     "theme-control-size": themeControlSize,

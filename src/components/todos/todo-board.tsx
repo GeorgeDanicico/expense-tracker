@@ -268,6 +268,10 @@ export function TodoBoard({ todos, onAdd, onMove, onOpen, onDelete, onDraggingCh
 
   return (
     <DndContext
+      // Without an id dnd-kit numbers its screen-reader text with a counter (`DndDescribedBy-3`) that
+      // counts renders, so the server's HTML and the browser's disagreed whenever a render was repeated
+      // (a suspended one): a hydration error (React #418) in about 1 load in 4 on To-dos after PF8.
+      id="todo-board"
       sensors={sensors}
       collisionDetection={collisionDetection}
       onDragStart={handleDragStart}

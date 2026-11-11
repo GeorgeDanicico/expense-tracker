@@ -28,6 +28,8 @@ Run them with `npm run lint`.
 | [`motion-tokens`](#motion-tokens) | error | 5 fixed in U4 (a `warn` until the tokens existed) | U1 |
 | [`no-reduced-motion-query`](#no-reduced-motion-query) | error | 1 fixed | U4 |
 | [`client-only-chakra-factory`](#client-only-chakra-factory) | error | none left (`list-row.tsx` was fixed by hand in #213) | U6 |
+| [`stable-data-options`](#stable-data-options) | error | 2 deliberate exceptions (the family settings pages) | PF8 |
+| [`dnd-context-id`](#dnd-context-id) | error | 1 fixed (the to-do board) | PF8 |
 | [`streamed-section`](#streamed-section) | error, in `src/components` and `src/app/**/*-client.tsx` | none; the `useSearchParams` boundaries of the pages still loaded in the browser (Calendar, Insights, Investments, Net worth, Import) are outside its files until they get server data too | PF6 |
 
 A rule that would need more than about 40 fixes outside the screen's own files lands as `warn`
@@ -190,6 +192,40 @@ panel ×2).
 
 **Disable:** `// eslint-disable-next-line local/no-redundant-swr-fetcher -- <reason>`: only if a
 provider other than the app's is in play.
+
+### `dnd-context-id`
+
+**Catches:** a `<DndContext>` (dnd-kit) with no `id` prop.
+
+**Why:** without an id, dnd-kit names the screen-reader text of every draggable (`aria-describedby`)
+from a counter of renders (`DndDescribedBy-3`). A render the server or the browser repeats (one that
+suspended and started again, which streaming data makes more likely) moves the counter, so the
+server's HTML and the browser's disagree and React reports a hydration error (#418) and redraws the
+board. PF8 found it on To-dos in about 1 load in 4.
+
+**Added by:** PF8. **Existing cases:** 1, fixed (`todo-board.tsx`, `id="todo-board"`).
+
+**Disable:** `// eslint-disable-next-line local/dnd-context-id -- <reason>`: only for a context that
+is never rendered on the server.
+
+### `stable-data-options`
+
+**Catches:** `useSWR`, `useSWRImmutable` or `useServerFirstSWR` on `ACCOUNT_API_KEY` or `FAMILY_API_KEY`
+without `STABLE_DATA` in the options.
+
+**Why:** the account and the family list rarely change. A hook reading them with SWR's defaults asks
+again every time a page opens (once SWR's 15 s dedupe window has passed): two requests per page for
+answers that were the same a minute ago. `STABLE_DATA` (`src/lib/api/stable-data.ts`) turns that off
+and reads them again on return to the app instead. Use `useAccount()` or `useFamily()`, which pass it.
+
+**Added by:** PF8. **Existing cases:** 7 reads fixed: the member-colours and viewing hooks, the
+viewing picker, the to-do board and form, the event form and the calendar now use `useFamily()`
+(the account hook passes `STABLE_DATA` itself). 2 left on purpose: the family settings pages
+(`settings/family/page.tsx`, `settings/family/manage/page.tsx`) read the list with plain `useSWR`
+so that opening them always shows the newest members; each has the disable comment below.
+
+**Disable:** `// eslint-disable-next-line local/stable-data-options -- <reason>`: for a screen whose
+job is to show the newest list.
 
 ### `no-fetch-in-components`
 

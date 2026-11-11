@@ -9,9 +9,8 @@ import { MemberSwatch } from "@/components/family/member-swatch";
 import { ChipMenu } from "@/components/ui/chip-menu";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { useAccount } from "@/hooks/use-account";
+import { useFamily } from "@/hooks/use-family";
 import { useViewing } from "@/hooks/use-viewing";
-import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
-import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { FILTER_KEYS } from "@/lib/expenses/filters";
 import { memberColorTokens } from "@/lib/family/member-colors";
 import type { FamilyMemberView } from "@/lib/family/views";
@@ -51,7 +50,7 @@ function useViewingChoices(allowFamily: boolean) {
   const { member, family } = useViewing();
   const membership = account?.membership ?? null;
   const allowed = membership !== null && can(membership, "family_finance", "view");
-  const { data } = useServerFirstSWR<FamilyResponse>(allowed ? FAMILY_API_KEY : null);
+  const { data } = useFamily(allowed);
 
   if (!allowed || !membership) return null;
   const others = (data?.family?.members ?? []).filter(

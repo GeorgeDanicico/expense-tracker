@@ -3,7 +3,6 @@
 import { chakra, Flex, Input, NativeSelect, Stack, Switch, Text, Textarea } from "@chakra-ui/react";
 import { Users } from "lucide-react";
 import { useId, useRef, useState, type RefObject } from "react";
-import useSWR from "swr";
 
 import type { ColorOf } from "@/components/family-calendar/event-appearance";
 import { useCalendarWrites } from "@/components/family-calendar/use-calendar-events";
@@ -15,9 +14,9 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { SheetForm, useSheetSave } from "@/components/ui/save-button";
 import { ToggleChip } from "@/components/ui/toggle-chip";
 import { useAccount } from "@/hooks/use-account";
+import { useFamily } from "@/hooks/use-family";
 import { useMemberColors } from "@/hooks/use-member-colors";
 import { ApiError } from "@/lib/api/client";
-import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 import { addDays, getBucharestToday } from "@/lib/calendar";
 import type { FamilyMemberView } from "@/lib/family/views";
 import {
@@ -360,7 +359,7 @@ export function EventFormFields({
 export function NewEventForm({ onSaved }: { onSaved: (events: CalendarEvent[], another: boolean) => void }) {
   const { account } = useAccount();
   const myMemberId = account?.membership?.memberId ?? null;
-  const { data: family } = useSWR<FamilyResponse>(account?.membership ? FAMILY_API_KEY : null);
+  const { data: family } = useFamily(Boolean(account?.membership));
   const members = family?.family?.members ?? [];
   const writes = useCalendarWrites(members);
   const colorOf = useMemberColors();

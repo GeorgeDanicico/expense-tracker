@@ -2,14 +2,15 @@
 
 import { Button, Flex, Input, NativeSelect, Stack, Text, Textarea } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import useSWR, { useSWRConfig } from "swr";
+import { useSWRConfig } from "swr";
 
 import { useTodoApi } from "@/components/todos/todo-api";
 import { ChipMenu } from "@/components/ui/chip-menu";
 import { FormField } from "@/components/ui/form-field";
 import { SheetForm, useSheetSave } from "@/components/ui/save-button";
 import { useAccount } from "@/hooks/use-account";
-import { FAMILY_API_KEY, isTodosKey, type FamilyResponse, type TodosResponse } from "@/lib/api/keys";
+import { useFamily } from "@/hooks/use-family";
+import { isTodosKey, type TodosResponse } from "@/lib/api/keys";
 import { addDays, formatShortDate, getBucharestToday } from "@/lib/calendar";
 import type { FamilyMemberView } from "@/lib/family/views";
 import { upsertTodo } from "@/lib/todos/board";
@@ -175,7 +176,7 @@ export function NewTodoForm({ onSaved }: { onSaved: (todo: Todo, another: boolea
   const { mutate } = useSWRConfig();
   const { account } = useAccount();
   const myMemberId = account?.membership?.memberId ?? null;
-  const { data: family } = useSWR<FamilyResponse>(account?.membership ? FAMILY_API_KEY : null);
+  const { data: family } = useFamily(Boolean(account?.membership));
   const { form, saved, save: run } = useSheetSave();
   const [status, setStatus] = useState<TodoStatus>("todo");
   const [draft, setDraft] = useState<TodoDraft>({ title: "", notes: "", assigneeMemberId: myMemberId ?? "", dueDate: "" });

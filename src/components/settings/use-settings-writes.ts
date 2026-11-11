@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import { useSWRConfig } from "swr";
 
 import { useSettingsApi } from "@/components/settings/settings-api";
-import { invalidateAfterAvatarChange } from "@/lib/api/invalidate";
+import type { AccountData } from "@/lib/account/types";
+import { afterCurrencyChanged, invalidateAfterAvatarChange } from "@/lib/api/invalidate";
 
 /** Settings' own writes, each followed by the refresh it needs. */
 export function useSettingsWrites() {
@@ -21,6 +22,8 @@ export function useSettingsWrites() {
         await api.removeAvatar();
         await invalidateAfterAvatarChange(mutate);
       },
+      /** After the currency card saved: `account` is the server's answer. */
+      currencyChanged: (account: AccountData) => afterCurrencyChanged(mutate, account),
     }),
     [api, mutate],
   );

@@ -1,11 +1,15 @@
 import type { ScopedMutator } from "swr";
 import { describe, expect, it, vi } from "vitest";
 
+import type { AccountData } from "@/lib/account/types";
 import {
+  afterCurrencyChanged,
+  afterFamilyChanged,
   afterFamilyDeleted,
   afterFamilyJoined,
   afterMemberRemoved,
   afterSignOut,
+  invalidateAfterAvatarChange,
 } from "@/lib/api/invalidate";
 
 const CACHED_KEYS = [
@@ -69,5 +73,33 @@ describe("cache invalidation after mutations", () => {
       { keys: ["/api/family"], data: { family: null }, options: NO_REVALIDATE },
       { keys: ["/api/account"], data: undefined, options: undefined },
     ]);
+  });
+
+  // The account and the family list are stable data (stable-data.ts): no page asks for them again, so
+  // each write that changes one has to update its key here.
+  describe("stable data", () => {
+    const FAMILY = { family: null };
+    const ACCOUNT = { currency: "USD" } as AccountData;
+
+    it("caches the family the server answered with after a change to it", async () => {
+      const changed = recorder();
+      await afterFamilyChanged(changed.mutate, FAMILY);
+      expect(changed.calls).toEqual([{ keys: ["/api/family"], data: FAMILY, options: NO_REVALIDATE }]);
+    });
+
+    it("reloads the account and the family list after the picture changes (the list shows pictures)", async () => {
+      const avatar = recorder();
+      await invalidateAfterAvatarChange(avatar.mutate);
+      expect(avatar.calls.map((call) => call.keys).flat().sort()).toEqual(["/api/account", "/api/family"]);
+    });
+
+    it("caches the new account and reloads the family list after the currency changes (the list shows each member's currency)", async () => {
+      const currency = recorder();
+      await afterCurrencyChanged(currency.mutate, ACCOUNT);
+      expect(currency.calls).toEqual([
+        { keys: ["/api/account"], data: ACCOUNT, options: NO_REVALIDATE },
+        { keys: ["/api/family"], data: undefined, options: undefined },
+      ]);
+    });
   });
 });
