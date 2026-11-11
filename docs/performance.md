@@ -43,7 +43,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF5 | Session gate and account on the server | done | #231 |
 | PF6 | First data on the server for Home | done, except Lighthouse's simulated LCP (4.6 s; the observed slow-4G LCP is 1.4 s, see PF6 section 4) | #232 |
 | PF7 | The same for Expenses, To-dos and Reminders | done | #233 |
-| PF8 | Prefetching, waterfalls and stable data | not started | |
+| PF8 | Prefetching, waterfalls and stable data | done | (PR) |
 | PF9 | Smaller bundles | not started | |
 | PF10 | SQL: indexes and RLS for the slow queries | not started | |
 | PF11 | Smooth interaction | not started | |
@@ -114,6 +114,14 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   permission off, or who may not view another member, gets none of that data in the page (checked in
   the lab). Insights, Investments and Net worth are as slow as Expenses was (data at about 7 s) and are
   next.
+
+- **PF8, moving between pages and stable data.** Moving between Home, Expenses, To-dos and Reminders now
+  makes **no request from the browser** (a seven-tap click-through: 20 data requests before, 0 after), with
+  **16 Auth calls instead of 56** and **69 Supabase calls instead of 177**, and the skeleton still shows
+  within about 100 ms. A cold load makes no request from the shell either (the Reminders count and the
+  notices come with the page): 2 fewer requests, 6 fewer Auth calls and 8 fewer Supabase calls, and
+  depth 3 → 0. Data on screen did not move beyond the noise (about 1.4 s on the emulated phone). Also
+  found and fixed: a hydration error on To-dos in about 1 load in 4 that this change exposed.
 
 ## Baseline and budgets
 
@@ -2889,3 +2897,299 @@ So **Insights, Investments and Net worth are as slow as Expenses was** (data at 
   code is untouched and unit-tested.
 - **Gzipped page size** for these pages is not measured.
 - **Not measured at all:** the VPS (see "Waiting for George").
+
+### PF8: Prefetching, waterfalls and stable data
+
+#### 1. The problem
+
+After PF7 a cold load of Home, Expenses, To-dos or Reminders arrives with its data, but **moving
+between them did not**. I scripted the click-through (Home, Expenses, Reminders, To-dos, Home, and
+round again, one tap every 16 s) and looked at what the browser asked for on each tap:
+
+- **Every tap asked for the account again** (`/api/account`), and the to-dos and expenses pages also
+  for the family list (`/api/family`), though nothing had changed. SWR, the library that keeps the
+  browser's copy of each answer, calls an answer "stale" 15 s after it fetched it and asks again
+  whenever a page that reads it opens. The account and the family list are read by nearly every page.
+- **Every tap asked for the page's own data too**, right after the server had sent the same data with
+  the page. Moving to Expenses made five requests (the account, the family list, this month, last
+  month, the saved tabs), Home four, To-dos three, Reminders two. On a revisit SWR already had an
+  older copy, preferred it to the fresh one the page had just brought, and refreshed the older one
+  from the network.
+- **Each tap cost 6 to 12 Auth calls** (the check that you are signed in, one per request) and 18 to 36
+  Supabase calls, half of them for answers that were already in the page.
+- **A cold load still made two requests of its own**, from the shell: the Reminders count in the nav
+  and the "you were removed from the family" notice check. They start only once the app's scripts
+  have run, so they are the "waits in a row" PF1 counted.
+- **Opening any page prefetched Settings, More and every settings page** along with the daily ones:
+  16 prefetch requests on a cold desktop load, 10 on a phone, each one a session check plus the page's
+  scripts, for pages nobody opens on most visits.
+
+#### 2. What changed
+
+**What a person notices**
+
+- **Moving between Home, Expenses, To-dos and Reminders makes no request at all** (account, family list,
+  colours or the pages' data): the page's skeleton shows within 40 to 125 ms of the tap (43 to 194 ms
+  before; see 4), and the fresh data comes in the same answer. Auth calls per tap fell from 6 to 12
+  to **2** (4 on the first visit, which also prefetches), Supabase calls from 18 to 36 to **8 to 13**.
+- **A cold load makes no request from the shell either**: the Reminders count and the notices come with
+  the page and stream in.
+- **Settings, More and the settings pages are prefetched when you point at them**, not when they
+  scroll into view. A cold load makes two prefetch requests fewer (one link).
+- **To-dos no longer gives a hydration error** that this task's change exposed (see "The hydration
+  error" in 3).
+- **A page you have been to before takes the server's fresh copy**, which comes with the page, instead
+  of asking again for its own older one. Nothing refetches it.
+- **The account and the family list are read again when you come back to the app** (the tab or the
+  installed app regains focus) and after your own writes, not when a page opens.
+
+**How it works**
+
+- **`STABLE_DATA`** (`src/lib/api/stable-data.ts`): `revalidateIfStale: false` and `revalidateOnFocus:
+  true`. `useAccount()` passes it; the new `useFamily(enabled)` (`src/hooks/use-family.ts`) passes it
+  for the family list and now serves `useMemberColors`, `useViewing`, the viewing picker, the to-do
+  board and form, the event form and the calendar, which used to call SWR on the key themselves. The
+  family settings pages read the list with plain `useSWR` on purpose: opening them shows the newest.
+  A new lint rule, `local/stable-data-options`, flags any other SWR read of these two keys without
+  it.
+- **Writes**: one was missing. Changing your currency updated the account but not the family list,
+  which shows each member's currency (`afterCurrencyChanged` in `src/lib/api/invalidate.ts`, called
+  from the settings page's `useSettingsWrites`). The others already updated their keys (checked in
+  the table in 3) and now have a test each.
+- **`useServerFirstSWR`** (`src/lib/api/server-fallback.tsx`) knows which data its own `ServerFallback`
+  (the page's) sent. When SWR holds an older answer for that key, it shows it at once, does not ask
+  the network, and writes the server's copy in when it arrives (if that copy is missing, because the
+  loader failed, it asks). A reader of a key the page did not send behaves as before.
+- **The shell's two requests** (`src/app/(app)/layout.tsx`): the layout starts `reminderSummary` and,
+  with the family feature on, `loadNotices` (new, `src/lib/account/load-notices.ts`; the route calls
+  it too) without waiting, and the shell's `ServerFallback` hands them to the nav badge and the notice
+  dialog, each in a `StreamedSection` of its own (`RemindersBadge` in `nav-badge.tsx`), so a slow
+  count never holds the shell.
+- **Prefetching** (`src/components/layout/intent-link.tsx`): `IntentLink`, a `Link` that prefetches on
+  hover, focus or touch (the pattern in the Next prefetching guide). The Settings row, the More tab and
+  every row of the settings list use it; every other navigation link keeps the default.
+- **The to-do board's drag-and-drop** (`todo-board.tsx`) got `id="todo-board"`, and a lint rule,
+  `local/dnd-context-id`, asks for one on every `DndContext`.
+- **Lab**: `scripts/lab/navigation.mjs`, the scripted click-through (see 4).
+
+#### 3. Why this way
+
+- **Stable data: the account.** The plan says `revalidateIfStale: false` for the account, and PF5
+  skipped it because the account would then never refresh on other pages. What PF5 did instead was a
+  15 s window after the page loaded, so after 15 s every page asked again. I took the plan's option and
+  gave the account what the window protected: a read on focus, and the writes' own updates. A change made
+  elsewhere (a parent changes a kid's permissions on another device) now shows when the kid returns
+  to the app, not when they open the next page. The server checks permissions on every request, so
+  a stale screen can show a button that is then refused, never the other way round. The same choice
+  for the family list.
+- **Categories**: there is no categories request to cache. The category list is in the code; I found
+  nothing in the app that fetches it.
+- **Why not `revalidateOnFocus` off**: then a long-open installed app would never see a change until
+  reload; before this task any page change refreshed it.
+- **Every write that changes stable data** (what each updates; `src/lib/api/invalidate.test.ts` and
+  `src/components/family/use-family-writes.test.ts` check each one):
+
+  | Write | Account | Family list |
+  | --- | --- | --- |
+  | Create a family, join one (an invite), delete it | reloaded | cached from the answer, or "no family" |
+  | Add a kid, delete a kid's account, set permissions, choose a colour | | cached from the answer |
+  | Remove a member | | reloaded |
+  | Profile picture set or removed | reloaded | reloaded |
+  | Currency | cached from the answer | reloaded (**was missing**) |
+  | Sign out | cleared | cleared |
+
+- **SWR's `preload()` instead of `useServerFirstSWR`'s own bookkeeping** (PF6's `/simplify` idea).
+  I tried it in a scratch test and turned it down:
+  - It works for the first mount: a preloaded answer is used by the first fetch, no request, and ends
+    up in the cache.
+  - But SWR keeps an unused preload until some fetch for the key uses it. A hook that doesn't fetch
+    (`revalidateIfStale: false`, the account's and the family list's option) never uses it, and the
+    next `mutate(key)` or focus revalidation then **returns that old server copy without asking the
+    network**. I reproduced it: after `preload(key)` and a mount with the option, `mutate(key)` made no
+    request and left the old copy. For a page that can be open for hours that is a stale-data bug waiting
+    for the first write.
+  - It is a no-op on the server and has to be called while the page renders in the browser, so it
+    would still need the arrival bookkeeping for the dedupe window and the same cache write.
+  So the hook stays, now with one rule fewer to explain (it no longer matters whether SWR's copy
+  or the server's is older: the page's own copy wins).
+- **Prefetch: where I ended up.** I measured what a cold load prefetches after PF5 (4). The sections'
+  skeletons (PF3) are what make a tab tap show a page in 43 to 86 ms, so the daily links keep
+  Next's default prefetch. The cost is the other links, each one a request through the session check
+  plus the page's scripts: Settings is the one that is on screen on every page (sidebar row, More tab)
+  and the one least used. I took it, the More tab and the settings list out of "prefetch when visible"
+  and into "prefetch on hover, focus or touch". I did not defer Investments, Net worth, Insights or
+  the Calendar (only on the desktop sidebar, where bandwidth is not the constraint, and the phone
+  doesn't link them), and I added no router.prefetch list (PF5 removed one).
+- **`staleTimes`**: left at its defaults. The plan's trigger was a tab tap's RSC request taking more
+  than 100 ms; in the lab it takes 234 to 347 ms (the page's server render with its data, 8 to 13
+  Supabase calls at 40 ms each). But the skeleton, from the prefetched shell, is on screen after 40 to
+  125 ms and the data arrives in that same answer, so what a person waits for is the server's reads,
+  not a missing cache. `staleTimes.dynamic` would show a page's payload from up to N seconds ago:
+  old data, to save a wait that ends with the data. Not the trade.
+- **The hydration error.** Once the shell stopped asking for its two requests, `/todos` logged React
+  error #418 ("the server's HTML didn't match") in about 1 load in 4 (5 of 20, 4 of 25: parent and kid) and
+  the page redrew itself. A dev-mode run named the attribute: `aria-describedby` on the board's cards.
+  dnd-kit numbers that text (`DndDescribedBy-3`) from a counter of renders, and a repeated render on
+  one side moves the counter; my change shifted when renders repeat. The same build on `main` showed
+  0 errors in 55 loads, so it is latent in the board and not new, but I exposed it. Fix: give
+  `DndContext` an id. After it: 0 errors in 120 loads (To-dos for both users, Reminders and Expenses
+  for the kid, 30 each). Two single errors earlier on kid Reminders (1 of 20) and kid Expenses at 1280
+  px (once) were never explained; none in the 60 loads of those two pages after the fix.
+- **Turned down:** a combined endpoint (no two requests always go together on a page any more, since
+  the pages bring their data), and the proxy `getClaims` shortcut (waits for George's signing-keys
+  decision, as told).
+
+#### 4. Numbers
+
+All from the lab on George's laptop, 11 November 2026, shared-secret JWT like production, 40 ms added to
+every Supabase call, parent user. "Before" is `main` at `a4cd4af` (PF1 to PF7), "after" this branch
+(the lab build of the final code). Medians of three cold loads. **Not production numbers.** The laptop
+was busy in places (load average 5 to 9 during two passes, which made one CPU-only pass 400 ms slower on
+Home; I repeated it with the load under 3 and use that one): read differences under about 100 ms as noise.
+
+**Requests when you move between the four pages** (`node scripts/lab/navigation.mjs --width 1280`, and
+`--width 390`; Home loaded cold, then taps on Expenses, Reminders, To-dos, Home, Expenses, Reminders,
+To-dos, one every 16 s, which is past SWR's 15 s window; the same seven taps at both widths).
+Totals over the seven taps, before → after:
+
+| | 1280 px | 390 px |
+| --- | ---: | ---: |
+| Data requests from the browser (account, family list, the pages' data) | 20 → **0** | 20 → **0** |
+| Auth calls | 56 → **16** | 56 → **16** |
+| Supabase calls | 177 → **69** | 177 → **69** |
+| Waterfall depth of a tap (RSC request, then a script, then a data request) | up to 3 → **1** | up to 3 → **1** |
+| URL changes / skeleton shows, ms after the tap | skeleton 43 to 87 → **53 to 102** | skeleton 7 to 194 → **48 to 126** |
+| Page loaded (data on screen), ms after the tap | 354 to 482 → **343 to 411** | 353 to 595 → **347 to 404** |
+
+The same at 1280 px, tap by tap (data requests; Auth calls; Supabase calls), before → after:
+
+| Tap | Data requests before | Auth | Supabase |
+| --- | --- | ---: | ---: |
+| Expenses (first) | `/api/account` | 6 → **4** | 18 → **12** |
+| Reminders | `/api/reminders`, `/api/account` | 6 → **2** | 19 → **8** |
+| To-dos | `/api/account`, `/api/family`, `/api/todos` | 8 → **2** | 25 → **9** |
+| Home | `/api/account`, `/api/dashboard`, `/api/reminders`, `/api/todos` | 10 → **2** | 36 → **13** |
+| Expenses (again) | `/api/account`, `/api/family`, two months of expenses, `/api/expense-tabs` | 12 → **2** | 35 → **10** |
+| Reminders (again) | `/api/reminders`, `/api/account` | 6 → **2** | 19 → **8** |
+| To-dos (again) | `/api/account`, `/api/family`, `/api/todos` | 8 → **2** | 25 → **9** |
+
+After, every tap's data requests are none. The first Expenses tap's 4 Auth calls include two prefetches it
+triggers. The skeleton is as fast as before (within the noise; the single 194 ms before and 126 ms
+after at 390 px are one-off taps), and the page's own data still comes in the tap's RSC answer, which
+takes 234 to 333 ms (244 to 347 before). I did not remove that wait: it is the server's reads.
+
+**A cold load** (`npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3
+--no-lighthouse --label …`, slow 4G on the emulated phone; the same with `--throttle cpu`; the server and
+request numbers are the same in both passes), before → after:
+
+| | Home | Expenses | To-dos | Reminders |
+| --- | ---: | ---: | ---: | ---: |
+| Data requests from the browser | 2 → **0** | 2 → **0** | 2 → **0** | 2 → **0** |
+| Waterfall depth (the lab's measure: page, scripts, data) | 3 → **0** | 3 → **0** | 3 → **0** | 3 → **0** |
+| Auth calls | 17 → **11** | 14 → **8** | 15 → **9** | 13 → **7** |
+| Supabase calls | 32 → **24** | 26 → **18** | 26 → **18** | 23 → **15** |
+| Prefetch (RSC) requests | 10 → **8** | 7 → **5** | 8 → **6** | 6 → **4** |
+| All requests | 70 → **66** | 67 → **63** | 68 → **64** | 63 → **59** |
+| JS transferred, KiB | 430.0 → **435.4** | 457.9 → **461.0** | 449.0 → **453.4** | 428.4 → **431.8** |
+| Data on screen, slow 4G, ms | 1,454 → **1,393** | 1,581 → **1,433** | 1,377 → **1,424** | 1,365 → **1,382** |
+| Data on screen, CPU-only, ms | 758 → **802** | 945 → **850** | 752 → **590** | 748 → **740** |
+| LCP, slow 4G, ms | 1,516 → **1,452** | 1,640 → **1,492** | 1,436 → **1,484** | 1,424 → **1,444** |
+| LCP, CPU-only, ms | 820 → **884** | 1,072 → **1,008** | 344 → **352** | 388 → **848** |
+| CLS | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 |
+
+What it says:
+
+- **Depth**: no cold load has a data request from the browser, so the lab's measure is 0 (it was 3:
+  the page, its scripts, then the badge and the notices). In a tap it is 1.
+- **Auth calls fell by 6 per cold load**: 4 from the two requests (two each) and 2 from the prefetches.
+  The Auth call per remaining prefetch is untouched; that is the proxy `getClaims` question, still
+  waiting on the signing-keys decision (row 1 above).
+- **Data on screen did not move beyond the noise.** The two requests were not on the way to the data
+  any more after PF7. The reminders LCP, CPU-only (388 → 848 ms) is not a slowdown: before, the biggest
+  element was the subtitle inside the loading screen (the run's `inBusy` flag was true), now it is the
+  real subtitle, drawn with the data; its data-on-screen time is 748 → 740 ms.
+- **The cost: JS grew by 3.4 to 5.4 KiB** (`jsBytes`, transferred) per cold load: the new hook, the intent
+  link and the badge's boundary. I did not look for where; PF9 is about bundles.
+
+**What prefetching costs now** (the lab's request lists): a cold desktop load makes 14 prefetch requests
+(16 before) and a phone 8 (10 before); Home's are the bottom bar's four tabs and the cards' links. The two
+removed are Settings and More. Tapping them with no pointer over them first (what a script's click is)
+commits the navigation after 106 to 160 ms; with a 120 ms hover before the tap, 39 to 146 ms (More at 390 px
+39 and 46 ms; Settings at 1280 px 146 and 70 ms):
+`node scripts/lab/navigation.mjs --moves More,Home,More [--hover 120]`. A real touch has its `touchstart`
+tens of ms before the click, so the hover case is the closer one. The four daily tabs are unchanged
+(40 to 126 ms in the table above).
+
+**Hydration** (`node <scratch stress script>`: a fresh Chromium, sign in, load the page, wait 2.5 s, count console
+errors; the script is not in the repo): `/todos` before the board fix, this branch: parent 5 of 20, kid 4 of 25
+loads logged React error #418; `main` (`a4cd4af`): 0 of 55. After the fix: 0 of 30 each for
+parent To-dos, kid To-dos, kid Reminders and kid Expenses at 1280 px. `first-render.mjs` (4 pages, 3 users,
+2 widths, before the fix): no data request on any first render except one in the run that hit the
+error; no other console message.
+
+**Screenshots** (after; the badge "4" on Planning came from the layout, no request):
+[Reminders, 390](performance/screenshots/pf8/after-reminders-parent-390.jpg) ·
+[Reminders, 1280](performance/screenshots/pf8/after-reminders-parent-1280.jpg). Nothing else on any page
+changed; I looked at the 390 px one.
+
+**Tests.** `src/hooks/stable-data.test.tsx` (new: with the option a page opening later asks for neither
+the account, the family list nor the colours; without it, the control, it asks for both; a key with no
+answer is fetched; focus reads them again; `useFamily(false)` asks for nothing),
+`src/lib/api/invalidate.test.ts` and `src/components/family/use-family-writes.test.ts` (each write
+that changes the account or the family list updates its key, one case per write),
+`src/lib/api/server-fallback.test.tsx` (the server's copy replaces an older answer without a request,
+the older one shows meanwhile, a failed copy asks, a key the page didn't send is left alone),
+`src/app/(app)/layout.test.tsx` and `app-shell-client.test.tsx` (the summary and the notices start
+in the layout, equal to their routes' answers, failure logged and left to the browser, shell drawn
+before they arrive), `src/components/layout/intent-link.test.tsx` (which links prefetch when visible),
+and the two lint rules' RuleTester files. Checks: `npm run lint`, `npx next typegen && npm run typecheck`,
+`npm test` (342 files, 6,984 tests passed, 1 skipped), `npm run build`: all pass.
+
+#### 5. How to check it yourself
+
+1. `npm run lab -- up && npm run lab -- delay 40`.
+2. `node scripts/lab/navigation.mjs --width 1280` (about 3 minutes): the table in 4 for your machine.
+   Every tap should list no `api` requests and `depth 1`.
+3. In the browser, signed in as the parent, with the network panel open, move Home → Expenses →
+   Reminders → To-dos: no `/api/…` request at all, on the first visit or later. Leave the tab, come
+   back: `/api/account` and `/api/family` are read again once.
+4. Settings → change the currency: `/api/account` is updated and `/api/family` is read again.
+5. Open To-dos about twenty times (reload): the console has no "hydration" error.
+6. `npm run lab -- down`.
+
+#### 6. Risks and how to undo it
+
+- **A change made elsewhere shows later.** The account and the family list are read again when you return
+  to the app and after your own writes, not when a page opens. A kid whose permissions a parent changes on
+  another device keeps the old buttons until they return to the app (the server refuses what they may
+  no longer do either way). Someone who joins the family shows in the member list at the next return.
+  Settings → Family reads the list on every visit.
+- **Focus revalidation is throttled by SWR** (a return within 5 s of the page mounting doesn't read again).
+- **The page's server copy replaces SWR's own.** If SWR's answer for a page's key were newer than the
+  copy (a refresh landing while the page's answer is still streaming), the older one wins until the
+  next read. I did not see it; the window is the page's few hundred ms.
+- **The layout starts two more reads on every cold load** (`reminderSummary`, `loadNotices`; Supabase
+  calls per cold load still fell by 8 because the browser's two requests each cost four). A failure of
+  either is logged as `server_prefetch_failed` (route `(app) layout`) and the browser asks instead.
+- **Settings and More are no longer prefetched by sight.** A tap with no earlier hover or touch commits in
+  100 to 160 ms (lab). One line each to undo (`prefetchOnIntent` in `nav-items.ts`, and `IntentLink` in
+  `settings-nav.tsx`).
+- **The hydration error was in the board before this task** and could surface again if a render is
+  repeated in a way the id doesn't cover; the lint rule keeps new boards from having none.
+- No migration, nothing stored. Revert the PR to undo everything; the routes' answers are unchanged.
+
+#### 7. Left open
+
+- **Calendar** (9 API requests, 62 Supabase calls per load) was not touched, as asked. Its waterfall
+  was not measured here beyond that count; moving it to the server is its own task.
+- **Auth calls per prefetch**: every link prefetch still costs one Auth call (the proxy's `getClaims`).
+  Cold loads now make 11, 8, 9 and 7. The workaround waits on the signing-keys decision (row 1).
+- **`useServerFirstSWR` bookkeeping** stays (see 3 for why `preload()` didn't replace it).
+- **Categories**: there is nothing to cache (the list is in the code).
+- **Not measured**: the VPS and a real phone; Lighthouse (not run, the observed numbers are the
+  evidence); the gzipped size of the JS added (+3.4 to 5.4 KiB, transferred); the hydration error
+  on Home, Insights, Investments and the Calendar beyond one 20-load run of kid Home (0).
+- **Two unexplained hydration errors** (see 3), on kid Reminders and kid Expenses once each, before the
+  board fix. 60 loads of those two pages after it showed none.
+- The lab sweep of Expenses' and To-dos' writes after the change (add, edit, delete) was not repeated by
+  hand; their code is untouched and their unit tests pass.

@@ -30,6 +30,8 @@ export type NavItemConfig = {
   requiresFamily?: boolean;
   /** A count shown next to the label (see `NavBadge`): `reminders` is what's due or overdue. */
   badge?: "reminders";
+  /** Prefetch the page only when someone points at the link, not whenever it is on screen (`IntentLink`). */
+  prefetchOnIntent?: boolean;
 };
 
 export type SectionKey = "home" | "money" | "planning" | "more";
@@ -38,7 +40,15 @@ export type SectionKey = "home" | "money" | "planning" | "more";
  * One of the five places in the bottom bar (the + sits between Money and Planning) and one group
  * in the sidebar. `href` is where its tab goes when it isn't its first item.
  */
-export type NavSection = { key: SectionKey; label: string; icon: LucideIcon; items: NavItemConfig[]; href?: string };
+export type NavSection = {
+  key: SectionKey;
+  label: string;
+  icon: LucideIcon;
+  items: NavItemConfig[];
+  href?: string;
+  /** Like `NavItemConfig.prefetchOnIntent`, for the section's bottom-bar tab. */
+  prefetchOnIntent?: boolean;
+};
 
 export const NAV_ITEMS = {
   home: { href: "/dashboard", label: "Home", icon: House },
@@ -49,7 +59,7 @@ export const NAV_ITEMS = {
   reminders: { href: "/reminders", label: "Reminders", icon: BellRing, badge: "reminders" },
   todos: { href: "/todos", label: "To-dos", icon: SquareKanban, requiresFamily: true },
   calendar: { href: "/calendar", label: "Calendar", icon: CalendarDays, requiresFamily: true },
-  settings: { href: "/settings", label: "Settings", icon: Settings2 },
+  settings: { href: "/settings", label: "Settings", icon: Settings2, prefetchOnIntent: true },
 } satisfies Record<string, NavItemConfig>;
 
 /**
@@ -64,7 +74,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { key: "home", label: "Home", icon: House, items: [NAV_ITEMS.home] },
   { key: "money", label: "Money", icon: WalletCards, items: [NAV_ITEMS.expenses, NAV_ITEMS.investments, NAV_ITEMS.netWorth, NAV_ITEMS.insights] },
   { key: "planning", label: "Planning", icon: LayoutGrid, items: [NAV_ITEMS.reminders, NAV_ITEMS.todos, NAV_ITEMS.calendar] },
-  { key: "more", label: "More", icon: MoreHorizontal, items: [NAV_ITEMS.settings], href: "/more" },
+  { key: "more", label: "More", icon: MoreHorizontal, items: [NAV_ITEMS.settings], href: "/more", prefetchOnIntent: true },
 ];
 
 /** A section as one user reaches it: its visible items, and the page its tab opens. */
