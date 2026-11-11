@@ -48,7 +48,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF7 | The same for Expenses, To-dos and Reminders | done | #233 |
 | PF8 | Prefetching, waterfalls and stable data | done | #234 |
 | PF9 | Smaller bundles | done, except Lighthouse's LCP on Home (still about 4.8 s, see PF9 section 4) and dnd-kit left in To-dos | #235 |
-| PF10 | SQL: indexes and RLS for the slow queries | done, with no migration: the lab and the advisor found no index a slow query needs (see PF10 section 3); waiting on rows 6 to 8 | PR_NUMBER |
+| PF10 | SQL: indexes and RLS for the slow queries | done, with no migration: the lab and the advisor found no index a slow query needs (see PF10 section 3); waiting on rows 6 to 8 | #236 |
 | PF11 | Smooth interaction | not started | |
 | PF12 | Lean runtime on the VPS | not started | |
 | PF13 | Measure and close | not started | |
