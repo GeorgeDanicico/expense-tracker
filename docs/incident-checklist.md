@@ -122,7 +122,8 @@ else.
   `docker inspect expense-tracker-web --format '{{.State.OOMKilled}}'`, or `Read-only file system`
   in `docker logs`), you don't need to revert the code. Set `WEB_MEMORY_LIMIT` or
   `WORKER_MEMORY_LIMIT` (for example `1g`) in `/etc/vps-apps/expense-tracker.sh` on the VPS and
-  force a deploy. Don't remove the hardening flags to "see if it helps" without noting it here.
+  force a deploy. (`FATAL ERROR: ... JavaScript heap out of memory` in `docker logs` is the heap limit,
+  not the container's: raise `WEB_HEAP_MB` or `WORKER_HEAP_MB` with it, see the README.) Don't remove the hardening flags to "see if it helps" without noting it here.
 - A database migration can't be rolled back by going back an image. If the bad deploy included a
   migration, deal with the data first (section 2 if needed), and write a new migration that undoes
   it. Deploys don't apply migrations; they are applied separately.

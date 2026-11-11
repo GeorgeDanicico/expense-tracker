@@ -41,6 +41,15 @@ WORKER_MEMORY_LIMIT="${WORKER_MEMORY_LIMIT:-256m}"
 TMP_TMPFS_SIZE="${TMP_TMPFS_SIZE:-64m}"
 NEXT_CACHE_TMPFS_SIZE="${NEXT_CACHE_TMPFS_SIZE:-128m}"
 NEXT_CACHE_DIR="${NEXT_CACHE_DIR:-/app/.next/cache}"
+# The V8 heap limit (docs/performance.md, PF12), in MB, passed as NODE_OPTIONS=--max-old-space-size. Node 24
+# sizes it from the container's limit: about half of it above 512 MB (432 MB of heap in the 768m web
+# container, measured), but never below about 256 MB, which is more than the 256m worker container
+# has. So the web container keeps Node's own limit unless WEB_HEAP_MB is set, and the worker gets 60%
+# of its memory limit unless WORKER_HEAP_MB is set. The heap is only part of a container's memory: Node
+# adds about 48 MB of young generation on top of this number, plus buffers, sharp and the code itself.
+WEB_HEAP_MB="${WEB_HEAP_MB:-}"
+WORKER_HEAP_MB="${WORKER_HEAP_MB:-}"
+WORKER_HEAP_PERCENT=60
 
 previous_container_renamed=false
 deployment_started=false
@@ -63,6 +72,32 @@ require_memory_size() {
   [[ "$value" =~ ^[1-9][0-9]*[bkmg]$ ]] || die "$name must be a number followed by b, k, m or g (for example 512m)"
 }
 
+# A memory limit (a number plus b, k, m or g) in whole MB, rounded down.
+memory_size_to_mb() {
+  local number="${1%?}"
+
+  case "${1: -1}" in
+    b) echo $(( number / 1048576 )) ;;
+    k) echo $(( number / 1024 )) ;;
+    m) echo "$number" ;;
+    g) echo $(( number * 1024 )) ;;
+  esac
+}
+
+# Checks a heap size in MB (empty means "not set"): a positive integer, below the container's limit.
+require_heap_mb() {
+  local name="$1"
+  local value="$2"
+  local limit_name="$3"
+  local limit="$4"
+
+  if [[ -z "$value" ]]; then
+    return 0
+  fi
+  require_positive_integer "$name" "$value"
+  (( value < $(memory_size_to_mb "$limit") )) || die "$name must be smaller than $limit_name ($limit)"
+}
+
 # The flags both containers share: a read-only root filesystem, no extra privileges, no Linux
 # capabilities (a non-root process binding port 3000 needs none) and no swap. The only writable
 # places are two tmpfs mounts: /tmp, and Next's cache (the optimized-image cache lives in RAM, so
@@ -77,6 +112,14 @@ set_hardening_flags() {
     --memory "$1"
     --memory-swap "$1"
   )
+}
+
+# The Node flags of a container, in RUNTIME_FLAGS: $1 is the V8 heap limit in MB (empty: Node's own).
+set_runtime_flags() {
+  RUNTIME_FLAGS=()
+  if [[ -n "${1:-}" ]]; then
+    RUNTIME_FLAGS=(--env "NODE_OPTIONS=--max-old-space-size=$1")
+  fi
 }
 
 # The logging flags both containers share, built once from LOG_DRIVER into LOG_FLAGS. journald tags
@@ -235,6 +278,7 @@ deploy_worker() {
 
   echo "Starting ${WORKER_CONTAINER_NAME}."
   set_hardening_flags "$WORKER_MEMORY_LIMIT"
+  set_runtime_flags "$WORKER_HEAP_MB"
   if docker run \
     --detach \
     --name "$WORKER_CONTAINER_NAME" \
@@ -242,6 +286,7 @@ deploy_worker() {
     --network expense-network \
     --env-file "$ENV_FILE" \
     "${HARDENING_FLAGS[@]}" \
+    ${RUNTIME_FLAGS[@]+"${RUNTIME_FLAGS[@]}"} \
     "${LOG_FLAGS[@]}" \
     "${IMAGE_NAME}:${IMAGE_TAG}" \
     node worker.js >/dev/null && worker_is_running; then
@@ -288,6 +333,12 @@ require_memory_size WEB_MEMORY_LIMIT "$WEB_MEMORY_LIMIT"
 require_memory_size WORKER_MEMORY_LIMIT "$WORKER_MEMORY_LIMIT"
 require_memory_size TMP_TMPFS_SIZE "$TMP_TMPFS_SIZE"
 require_memory_size NEXT_CACHE_TMPFS_SIZE "$NEXT_CACHE_TMPFS_SIZE"
+require_heap_mb WEB_HEAP_MB "$WEB_HEAP_MB" WEB_MEMORY_LIMIT "$WEB_MEMORY_LIMIT"
+require_heap_mb WORKER_HEAP_MB "$WORKER_HEAP_MB" WORKER_MEMORY_LIMIT "$WORKER_MEMORY_LIMIT"
+if [[ -z "$WORKER_HEAP_MB" ]]; then
+  WORKER_HEAP_MB=$(( $(memory_size_to_mb "$WORKER_MEMORY_LIMIT") * WORKER_HEAP_PERCENT / 100 ))
+  require_positive_integer WORKER_HEAP_MB "$WORKER_HEAP_MB"
+fi
 [[ "$LOG_DRIVER" == journald || "$LOG_DRIVER" == json-file ]] || die "LOG_DRIVER must be journald or json-file"
 set_log_flags
 [[ "$NEXT_CACHE_DIR" =~ ^/[A-Za-z0-9_./-]+$ ]] || die "NEXT_CACHE_DIR must be an absolute path"
@@ -335,6 +386,7 @@ fi
 echo "Starting ${CONTAINER_NAME}."
 deployment_started=true
 set_hardening_flags "$WEB_MEMORY_LIMIT"
+set_runtime_flags "$WEB_HEAP_MB"
 docker run \
   --detach \
   --name "$CONTAINER_NAME" \
@@ -343,6 +395,7 @@ docker run \
   --env-file "$ENV_FILE" \
   --publish "${BIND_ADDRESS}:${HOST_PORT}:${CONTAINER_PORT}" \
   "${HARDENING_FLAGS[@]}" \
+  ${RUNTIME_FLAGS[@]+"${RUNTIME_FLAGS[@]}"} \
   "${LOG_FLAGS[@]}" \
   "${IMAGE_NAME}:${IMAGE_TAG}"
 
