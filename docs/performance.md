@@ -26,7 +26,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | # | What | Why it matters | Where it's explained |
 | --- | --- | --- | --- |
 | 1 | Move the Supabase project to asymmetric JWT signing keys (dashboard → JWT Signing Keys) | Removes one or two calls to Supabase Auth from every signed-in request, with no code change. Measured in the lab (PF1b): a cold Home load goes from 30 Auth calls to 0. Measured again after PF4, which didn't change the Auth calls: with 40 ms to Supabase the data appears 150 to 254 ms sooner on all four daily pages (Home 1,056 → 906 ms) on the lab's CPU-only pass. PF4 left the code alternative (option 2) unbuilt until you decide | Plan, "Decisions for George"; PF4 below; "Signed-in lab baseline" |
-| 2 | Agree or change the budgets | They decide what "fast enough" means for PF13. I'm using them as working budgets until you change them | "Proposed budgets" under "Baseline and budgets", and PF1 below |
+| 2 | Agree or change the budgets | They decide what "fast enough" means for PF13. I'm using them as working budgets until you change them. The JS ones are now in `docs/performance-budget.json`, which CI checks: edit the numbers there | "Proposed budgets" under "Baseline and budgets", PF1 and PF9 below |
 | 3 | On the VPS, run `sudo scripts/perf-report.sh 5 expense-tracker-web` and the two delivery checks (streaming through the proxy, compression), and paste the output into the PR or send it to me | It is the real-use half of the baseline: Web Vitals per page, server time per route, Auth calls per request, whether the proxy streams. I have no access to production, so those cells say "not measured: needs the VPS" | "Real use" and "Delivery checks" under "Baseline and budgets" |
 | 4 | Check whether "Add a kid" works in production, and decide the fix | The lab found that creating a kid account fails on a database built from the migrations (`permission denied for function my_kid_ai_permitted`, from the AI gate migration's profile trigger). If production has the same grants, nobody can add a kid. It needs a migration, which only goes live with your go-ahead | PF1b, "Left open"; [lab.md](lab.md), "What the lab found while seeding" |
 | 5 | Optional: on the VPS, time its round trip to Supabase (one `curl`, read-only) | The lab's "realistic" delay, 40 ms, is from your laptop, not the VPS | [lab.md](lab.md), "The delay" |
@@ -44,7 +44,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF6 | First data on the server for Home | done, except Lighthouse's simulated LCP (4.6 s; the observed slow-4G LCP is 1.4 s, see PF6 section 4) | #232 |
 | PF7 | The same for Expenses, To-dos and Reminders | done | #233 |
 | PF8 | Prefetching, waterfalls and stable data | done | #234 |
-| PF9 | Smaller bundles | not started | |
+| PF9 | Smaller bundles | done, except Lighthouse's LCP on Home (still about 4.8 s, see PF9 section 4) and dnd-kit left in To-dos | #235 |
 | PF10 | SQL: indexes and RLS for the slow queries | not started | |
 | PF11 | Smooth interaction | not started | |
 | PF12 | Lean runtime on the VPS | not started | |
@@ -122,6 +122,13 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   notices come with the page): 2 fewer requests, 6 fewer Auth calls and 8 fewer Supabase calls, and
   depth 3 → 0. Data on screen did not move beyond the noise (about 1.4 s on the emulated phone). Also
   found and fixed: a hydration error on To-dos in about 1 load in 4 that this change exposed.
+
+- **PF9, smaller bundles.** The JavaScript a page needs before it works fell by 25 to 29% (Home 397.3 to 288.9 KiB
+  gzipped, Expenses 422.3 to 308.9, To-dos 413.3 to 299.8, Reminders 395.0 to 279.9), all inside PF1's
+  budgets, which CI now checks on every build, along with "no server-only package reaches the browser". Zod,
+  most of Chakra's unused styles, the sheets and dialogs and the menu code left the first load. Blocking time on the page
+  fell by 7 to 52%; LCP did not move on slow 4G, and the total bytes of a whole cold load stayed the same because the
+  code now arrives after the page.
 
 ## Baseline and budgets
 
@@ -3193,3 +3200,208 @@ and the two lint rules' RuleTester files. Checks: `npm run lint`, `npx next type
   board fix. 60 loads of those two pages after it showed none.
 - The lab sweep of Expenses' and To-dos' writes after the change (add, edit, delete) was not repeated by
   hand; their code is untouched and their unit tests pass.
+
+### PF9: Smaller bundles
+
+#### 1. The problem
+
+Every page started by downloading about 400 KiB of JavaScript (gzipped, Home 397.3, Expenses 422.3,
+To-dos 413.3, Reminders 395.0 at the start of this task), and none of it could be skipped: the
+browser needs the scripts before the page responds to a tap, and the phone spends time running
+them. The budgets PF1 proposed were 20% less (Home 308.4, Expenses 329.4, To-dos 322.2, Reminders
+307.4 KiB). A look inside the files showed three things that no page needed:
+
+- **Zod**, a validation library (about 23 KiB gzipped), was on every page, even the offline page.
+  The browser's error reporter used the server's Zod schema to check each report, and the shared
+  expense-filter code, which every page imports for the SWR keys, also imported Zod.
+- **Chakra's theme carried a style recipe for each of its 75 or so components**, including date
+  pickers, trees and sliders the app never shows: about 15 KiB gzipped.
+- **Things used by a tap or a hover were in the first load**: the quick-add sheet's four forms, every
+  dialog and sheet, and the code that places menus and tooltips next to their buttons (about 26 KiB).
+
+#### 2. What changed
+
+**What a person notices.** Nothing looks different (checked at 390 and 1280 px, see 5). Pages are
+smaller to download before they work (see 4); in the lab the main thread is busy for less time while
+the page loads (observed blocking time down 7 to 52% on the four pages). Menus and tooltips appear after the
+page does: the browser fetches that code when it is idle or when a finger, the pointer or the
+keyboard reaches a button. Until then the button is a plain button that looks the same; a tap before
+the code arrives opens the menu as soon as it does.
+
+**How it works.**
+
+- **No Zod in the shared code.** `src/lib/log/client-event.ts` (new) holds the report's types, limits
+  and a hand-written `isClientEvent`; `client-report.ts` keeps the Zod schema for the server and
+  re-exports it. `src/lib/expenses/tab-filters.ts` (new) holds the filter types, the URL parameters and a
+  hand-written reader; `filters.ts` keeps the schema. `instrumentation-client.ts` sets Zod's
+  `jitless` flag on `globalThis.__zod_globalConfig` instead of importing Zod. Tests run the hand-written
+  and the Zod versions on the same inputs and fail if they disagree, and the schema fails to compile
+  if its type drifts from the hand-written one.
+- **A trimmed Chakra theme** (`src/components/ui/theme/chakra-defaults.ts`): `defaultBaseConfig` plus
+  the default tokens and only the 12 recipes and 16 slot recipes of components the app imports. The
+  tests check the page CSS is identical to the full default theme's, every kept recipe equals the full
+  theme's, and no component imported anywhere in `src` has its recipe left out.
+- **Sheets and dialogs load when first wanted** (`lazySheet` and `useOpenedOnce`, `src/components/ui/lazy-sheet.tsx`):
+  the quick-add sheet, the edit-expense sheet, the tab dialog and the delete confirmation, the reminder,
+  snooze and log-expense dialogs, the to-do dialog, the sign-out confirmation and the account notice. The
+  saved expense tab's screen is loaded with `next/dynamic`.
+  Each is preloaded when a pointer, a focus or a touch reaches its page or button (`preloadOnIntent`); the quick-add
+  sheet is also preloaded when the browser is idle (`preloadWhenIdle`), so its `+` is as quick as before.
+  A tap before the script has come shows a dimmed screen with a spinner.
+- **Menus and tooltips load when idle** (`lazy-menu.tsx`, `menu-parts.tsx`): the six menus and the icon
+  button's tooltip render a plain button first and swap to the real one when the code is in, keeping focus.
+  A new lint rule, `local/lazy-popper`, stops anyone importing Chakra's `Menu`, `Tooltip` and the like directly.
+- **The budget and the checks.** `docs/performance-budget.json` holds the numbers; `npm run size:routes -- --check`
+  fails when a page is more than 2% over; `scripts/server-only-check.mjs` fails when `openai`, `unpdf`, `web-push`,
+  `sharp`, `fflate` or `@modelcontextprotocol/server` is in a browser chunk. Both run in the "Lint, types, tests and
+  build" job after the build, which now sets `BUNDLE_MODULES=1` so the build writes which modules are in each browser chunk
+  (`src/lib/build/client-modules-plugin.ts`, off otherwise).
+- **Avatars** have a width and height, decode asynchronously and load lazily (the sidebar's and the More page's are eager).
+- `import "server-only"` was added to `mcp/define-tool.ts`, `mcp/server.ts`, `imports/pdf-text.ts` and
+  `notifications/push.ts`, the four server files that import those packages without it.
+
+#### 3. Why this way
+
+- **Measured per step, not guessed.** Gzipped first-load JS of Home, Expenses, To-dos, Reminders
+  (`npm run build && npm run size:routes`):
+
+  | Step | Home | Expenses | To-dos | Reminders |
+  | --- | ---: | ---: | ---: | ---: |
+  | `main` at 0c4db9a | 397.3 | 422.3 | 413.3 | 395.0 |
+  | Zod out of the reporter, quick-add sheet lazy | 369.6 | 394.2 | 382.7 | 370.3 |
+  | Zod out of the filters (so out of every page) | 342.9 | 394.5 | 356.3 | 343.8 |
+  | Trimmed Chakra theme | 331.7 | 383.2 | 345.0 | 332.6 |
+  | Sheets and dialogs lazy | 317.9 | 335.0 | 332.2 | 308.9 |
+  | Menus and tooltips lazy | 289.8 | 308.6 | 300.7 | 280.9 |
+
+  Each lazy group saves at least 10 KiB on every page it was applied to: sheets and dialogs 13.8, 48.2, 12.8 and 23.4
+  KiB; menus and tooltips 28.1, 26.4, 31.5 and 28.0 KiB. The quick-add sheet was measured together with the reporter's
+  Zod, not on its own (the two changes were one step), so its own saving is **not measured**. A single dialog (the
+  reminder one, say) saves less than 10 KiB alone: they only leave the page together, because the dialog machinery (Chakra's
+  Dialog, a focus trap) is shared by all of them, so I kept them as one group.
+- **`instrumentation-client.ts` could not import Zod's `config`**: even `import { config } from "zod/v4/core"`
+  pulled the whole core (23 KiB) into every page, because Zod marks one module as having side effects.
+- **Why a deep import for the theme.** `@chakra-ui/react/theme` imports every recipe, and a recipe is plain data that no
+  bundler removes (I tried it: the pages got 3.9 KiB bigger). Importing the files directly through an alias
+  (`@chakra-theme`, `next.config.ts`, `tsconfig.json`, `vitest.config.ts`) is the only way to leave them out.
+  It depends on Chakra's file layout, which is pinned (3.36.1); an upgrade that moves the files fails the build.
+- **Why `lazySheet` is not `next/dynamic`.** `dynamic` suspends the first time it renders even when its script is
+  already loaded. My first version cost a quick-add tap 270 ms on a 4x slower CPU (175 ms to 449 ms); the
+  replacement renders the loaded component at once (195 ms, see 4). `next/dynamic` stays for the saved tab, which
+  is content, not a sheet.
+- **A pending state on the sheet, not on the button.** The brief asked for a pending button. A dimmed screen with a spinner
+  appears at once and works for every opener (row actions, shortcuts), without each button learning a loading state.
+  Plain Chakra, not `AppDialog`, so the dialog code stays out of the first load. I judged this equivalent; say if you want
+  the button version.
+- **dnd-kit stays.** The to-do board's cards call `useSortable` and the columns are drop targets inside one `DndContext`;
+  a read-only first render would be a second copy of both, swapped in after loading (remounting every card). That is the
+  case the plan says to leave. It is 16.8 KiB gzipped of To-dos' 299.8.
+- **Avatars, no `next/image`**, as the plan said: they are small WebP squares already, and the optimiser would run sharp
+  in the web container for every new size [N11]. The avatar route already answers `Cache-Control: private,
+  max-age=31536000, immutable` (checked in its test). `loading="lazy"` has little effect here: Chakra's avatar loads the
+  picture itself with a script `Image` before it shows the `<img>`.
+- **Dependencies**: I checked every dependency against `src`, `scripts` and the configs. Each is used; I removed none.
+- Sources: [N8] (analyzer), [N10] (lazy loading), [N11] (images), read in `node_modules/next/dist/docs/`.
+
+#### 4. Numbers
+
+Gzipped first-load JS per page, from `npm run build && npm run size:routes` (`main` at 0c4db9a, then this branch). Budgets from
+`docs/performance-budget.json`:
+
+| Page | Before (KiB) | After (KiB) | Budget (KiB) |
+| --- | ---: | ---: | ---: |
+| Home `/dashboard` | 397.3 | 288.9 | 308.4 |
+| Expenses | 422.3 | 308.9 | 329.4 |
+| To-dos | 413.3 | 299.8 | 322.2 |
+| Reminders | 395.0 | 279.9 | 307.4 |
+| `/login` (not a target) | 278.9 | 241.6 | 273.1 |
+| Shared by all pages | 247.9 | 210.6 | |
+
+All 24 pages are within their budget (`npm run size:routes -- --check`). Every target page is 19 to 27 KiB under it.
+
+**Server-only packages.** `BUNDLE_MODULES=1 npm run build && node scripts/server-only-check.mjs`: none of the six is in any
+of the 238 browser chunks. I also proved the check works: a test import of `fflate` in a client component failed it (exit 1),
+and I reverted that.
+
+**The lab** (`npm run lab:measure -- /dashboard /expenses /todos /reminders --json`, slow 4G mode with Lighthouse 13.6.0
+and 3 runs; then `--throttle cpu --no-lighthouse`; delay 40 ms; same machine, `main` built and measured first, then this branch;
+Lighthouse was run only in the slow-4G pass). "Data" is when the page's first data string is on screen. Observed values are medians of 3.
+
+| Page | JS transferred, whole cold load (KiB) before / after | LCP, observed, ms | TBT, observed, ms | TBT, Lighthouse, ms | LCP, Lighthouse, ms |
+| --- | --- | --- | --- | --- | --- |
+| Home | 435.4 / 439.7 | 1,412 / 1,416 | 276 / 170 | 491 / 368 | 4,515 / 4,822 |
+| Expenses | 461.0 / 455.0 | 1,472 / 1,452 | 559 / 521 | 1,907 / 1,064 | 5,020 / 5,131 |
+| To-dos | 453.4 / 452.0 | 1,428 / 1,428 | 260 / 130 | 306 / 253 | 2,804 / 909 |
+| Reminders | 431.8 / 428.9 | 1,420 / 1,408 | 202 / 97 | 311 / 216 | 913 / 909 |
+
+| Page | Data on screen, slow 4G, ms | LCP, CPU only, ms | Data on screen, CPU only, ms | TBT, CPU only, ms |
+| --- | --- | --- | --- | --- |
+| Home | 1,369 / 1,357 | 784 / 684 | 717 / 606 | 330 / 208 |
+| Expenses | 1,410 / 1,410 | 908 / 776 | 768 / 651 | 665 / 625 |
+| To-dos | 1,368 / 1,369 | 320 / 356 | 746 / 577 | 300 / 174 |
+| Reminders | 1,363 / 1,350 | 536 / 644 | 692 / 586 | 216 / 138 |
+
+What this says, and what it does not:
+
+- **The JS the browser downloads in a whole cold load did not fall** (435 to 440 KiB on Home). The first-load files are 108 KiB
+  smaller, but the lab's load runs on until the page is idle, and by then the browser has also fetched the menu code, the quick-add
+  sheet and the scripts of the pages Next prefetches (PF3). The code is the same size; it now arrives after the page is usable
+  instead of before. I did not set out to cut total bytes and did not.
+- **Blocking time fell** on every page (observed 38%, 7%, 50% and 52% on Home, Expenses, To-dos and Reminders; in the CPU-only pass 37%, 6%, 42% and 36%).
+  The page's own work no longer includes starting Zod or building the whole theme.
+- **LCP did not move on slow 4G** (observed, same 1.4 s): its cost is the network latency of the page and its data, not the scripts.
+  Lighthouse's simulated LCP is noisy and did not improve on Home (4.5 to 4.8 s; its three runs span 0.7 s) and moved by large amounts on To-dos
+  (2.8 s to 0.9 s) that I do not take as a result of this change (it is a simulation, and the page's data arrives at the same time in both builds). **PF6's hope that smaller bundles would
+  bring Home's Lighthouse LCP down was not met in this measurement.** With the CPU slowed only, observed LCP and data fell on Home and
+  Expenses (by 70 to 130 ms) and Reminders' LCP rose by 108 ms: the spread across runs is of that size, so I call that noise.
+- The laptop was busy (load average 3 to 9) and the runs are 3 each; treat differences under about 100 ms as noise.
+
+**First tap on a sheet** (CPU 4x slower, 390 px for quick-add, 1280 px for Edit, median of 5 fresh browsers; a scratch script,
+not committed):
+
+| Tap | Before (ms) | After (ms) |
+| --- | ---: | ---: |
+| Quick-add `+`, 6 s after load (preloaded) | 175 | 195 |
+| Quick-add `+`, 0.1 s after load (not preloaded) | 584 | 622 |
+| Edit on an expense row, 6 s after load | 481 | 542 |
+| Edit on an expense row, 0.1 s after load | 1,616 | 1,283 (4 of 5 runs failed to find the button, **not reliable**) |
+
+A tap after the preload costs 20 to 60 ms more than before: the sheet's first render now also builds the form's Zod schemas, which
+used to be built when the page loaded.
+
+#### 5. How to check it yourself
+
+1. `npm run build && npm run size:routes -- --check`: the table, every page "OK". Edit a number in `docs/performance-budget.json`
+   down by 30 and run it again: it fails and says which page.
+2. `BUNDLE_MODULES=1 npm run build && node scripts/server-only-check.mjs`.
+3. `npm run lab -- up`, sign in (`.lab/users.json`) at <http://localhost:3110>. At 390 px and 1280 px: open Home, Expenses, To-dos and
+   Reminders (they look as before), tap `+` (the amount field has focus), tap an expense's Edit, tap `⋯`, hover a row action (its tooltip).
+   `npm run lab -- down` when done.
+4. The numbers in 4: `npm run lab -- app --delay-ms 40`, then `npm run lab:measure -- /dashboard /expenses /todos /reminders` on `main`
+   (`git switch --detach origin/main` first) and on the branch.
+
+#### 6. Risks and how to undo it
+
+- **Menus and tooltips swap their buttons when the code arrives.** The swap keeps focus (tested) but remounts the button, so a hover in
+  progress loses its tooltip once. A tap before the code is in opens the menu on arrival. If the code never loads (offline), menus do not
+  open; they try again on the next touch. Revert PR to undo.
+- **The theme's deep import depends on Chakra's file layout.** An upgrade that moves the files breaks the build with a clear
+  error, and the theme test compares the CSS with the full theme's. A component whose recipe is left out renders unstyled with no error;
+  `theme.test.tsx` checks the imports in `src` against the kept list.
+- **The hand-written report and filter checks must follow their schemas.** Tests run both on the same inputs; a new field needs both.
+- **The sheet's first render is 20 to 60 ms slower after the preload** (see 4).
+- **The size check is as loose as its numbers.** Non-target pages are held to their PF1 baseline, which they are now 40 to 100 KiB
+  under: a regression of that size would pass. Tighten them in `docs/performance-budget.json` if you want.
+- Everything is one commit: reverting the PR restores all of it, including the budget file and the CI steps.
+
+#### 7. Left open
+
+- **George has not confirmed the budgets** (Waiting for George, row 2). They are in `docs/performance-budget.json`.
+- **dnd-kit (16.8 KiB) was left in To-dos' first load**, see 3. Chakra's runtime (about a third of every page) is the next lever, as PF1 said;
+  its own plan, not done here.
+- **`@next/bundle-analyzer` was not added.** `next analyze` works (Turbopack), but its chunks differ from the real build's and it counts
+  lazy chunks; I used a small webpack plugin (`BUNDLE_MODULES`) for the real build's modules instead. Chakra's share of the shared
+  files is not re-measured here.
+- **Not measured:** the VPS, a real phone; the quick-add sheet's saving alone; the "Edit, 0.1 s after load" tap; Lighthouse in the CPU-only pass.
+- **Lighthouse LCP on Home is still about 4.8 s** (see 4): the lever PF6 named did not move it here.
+- The decimal.js (12 KiB) in Expenses and the SWR/Next runtime stayed; they are the page's own content.

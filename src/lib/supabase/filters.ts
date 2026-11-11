@@ -1,5 +1,5 @@
 import { CATEGORY_LABELS, EXPENSE_CATEGORIES, EXPENSE_SUBTYPES, SUBTYPE_LABELS } from "@/lib/expenses/categories";
-import { NO_SUBTYPE_LABEL } from "@/lib/expenses/filters";
+import { NO_SUBTYPE_LABEL } from "@/lib/expenses/tab-filters";
 
 /**
  * Guards for the few PostgREST filters that are built from strings (security plan S8).

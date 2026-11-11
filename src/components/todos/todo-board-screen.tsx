@@ -7,13 +7,13 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 
 import { TodoBoard } from "@/components/todos/todo-board";
-import { TodoDialog } from "@/components/todos/todo-dialog";
 import { TodoFilterChips } from "@/components/todos/todo-filters";
 import { useLinkedCard } from "@/components/todos/use-linked-card";
 import { useTodoBoard } from "@/components/todos/use-todo-board";
 import { DataError } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconButton } from "@/components/ui/icon-button";
+import { lazySheet } from "@/components/ui/lazy-sheet";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
@@ -24,6 +24,7 @@ import { useFamily } from "@/hooks/use-family";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { useMemberColors } from "@/hooks/use-member-colors";
 import { todosApiKey } from "@/lib/api/keys";
+import { preloadOnIntent } from "@/lib/client/preload";
 import {
   filterTodos,
   hasTodoFilters,
@@ -73,6 +74,9 @@ function FilterSummary({ shown, total, onClear }: { shown: number; total: number
     </Flex>
   );
 }
+
+const todoDialog = lazySheet(() => import("@/components/todos/todo-dialog").then((module) => module.TodoDialog));
+const TodoDialog = todoDialog.Sheet;
 
 /**
  * The family to-do board page: header, the filter chips (kept in the URL as `?member=` and
@@ -137,7 +141,7 @@ export function TodoBoardScreen() {
   if (!board.todos || !visible) return <TodosSkeleton slowKey={todosApiKey()} />;
 
   return (
-    <Stack gap={{ base: "4", md: "5" }}>
+    <Stack gap={{ base: "4", md: "5" }} {...preloadOnIntent(todoDialog.preload)}>
       {header}
       {board.moveError ? (
         <InlineAlert

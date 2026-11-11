@@ -17,6 +17,10 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// The sheet is loaded on demand in the app (PF9). `lazySheet` renders the loaded component at once, also on the server, so
+// loading the module first gives the markup below the open sheet.
+await (await import("./quick-add-provider")).preloadQuickAddSheet();
+
 import { ExpensesClient } from "@/app/(app)/expenses/expenses-client";
 import { RemindersClient } from "@/app/(app)/reminders/reminders-client";
 import { HomeScreen } from "@/components/dashboard/home-screen";

@@ -8,7 +8,9 @@ import {
   CLIENT_PAGE_MAX,
   CLIENT_VITAL_MAX,
   clientEventLine,
+  clientEventSchema,
   clientLogBodySchema,
+  isClientEvent,
   MAX_STACK_FRAMES,
   sanitizePage,
   sanitizeStack,
@@ -137,6 +139,58 @@ describe("the client log schema", () => {
     for (const page of ["", "expenses", "//evil.example/x", "javascript:alert(1)", "data:text/html,x", "ftp://x/y"]) {
       expect(accepts([vitalEvent({ page })]), page).toBe(false);
     }
+  });
+});
+
+describe("isClientEvent, the browser's check", () => {
+  const OVER = (max: number) => "x".repeat(max + 1);
+  // Valid and invalid events side by side: the browser's hand-written check and the endpoint's schema must agree on each.
+  const cases: Record<string, unknown> = {
+    "an error": errorEvent(),
+    "an error with every optional field": errorEvent({ stack: "s", digest: "2817461234", requestId: "3fK9xQ2mBv0a", release: "4f0c2b1.v1-2_3" }),
+    "an error with undefined optional fields": errorEvent({ stack: undefined, digest: undefined, requestId: undefined, release: undefined }),
+    "a vital": vitalEvent(),
+    "a vital at its limits": vitalEvent({ value: 600_000, navigationType: "prerender" }),
+    "a vital of zero": vitalEvent({ value: 0 }),
+    "an unknown kind": { ...errorEvent(), kind: "other" },
+    "no kind": { name: "LCP", page: "/" },
+    "an unknown key": { ...errorEvent(), extra: 1 },
+    "an unknown key on a vital": { ...vitalEvent(), extra: 1 },
+    "an unknown source": errorEvent({ source: "worker" as ClientErrorEvent["source"] }),
+    "an empty name": errorEvent({ name: "" }),
+    "a name over its limit": errorEvent({ name: OVER(CLIENT_ERROR_NAME_MAX) }),
+    "a message over its limit": errorEvent({ message: OVER(CLIENT_ERROR_MESSAGE_MAX) }),
+    "an empty message": errorEvent({ message: "" }),
+    "a stack over its limit": errorEvent({ stack: OVER(CLIENT_ERROR_STACK_MAX) }),
+    "a digest that isn't one": errorEvent({ digest: "has space" }),
+    "a request id that isn't one": errorEvent({ requestId: "nope" }),
+    "a release that isn't one": errorEvent({ release: "has space" }),
+    "an empty page": errorEvent({ page: "" }),
+    "a page over its limit": errorEvent({ page: `/${OVER(CLIENT_PAGE_MAX)}` }),
+    "a protocol-relative page": errorEvent({ page: "//evil.example/x" }),
+    "an https page": errorEvent({ page: "https://ledger.example/expenses" }),
+    "a javascript: page": errorEvent({ page: "javascript:alert(1)" }),
+    "a relative page": errorEvent({ page: "expenses" }),
+    "an unknown vital": vitalEvent({ name: "FID" as ClientVitalEvent["name"] }),
+    "a negative vital": vitalEvent({ value: -1 }),
+    "a vital past its limit": vitalEvent({ value: CLIENT_VITAL_MAX + 1 }),
+    "a vital that isn't finite": vitalEvent({ value: Number.NaN }),
+    "an infinite vital": vitalEvent({ value: Number.POSITIVE_INFINITY }),
+    "a vital as text": { ...vitalEvent(), value: "12" },
+    "an unknown rating": vitalEvent({ rating: "ok" as ClientVitalEvent["rating"] }),
+    "an unknown navigation type": vitalEvent({ navigationType: "tab" as ClientVitalEvent["navigationType"] }),
+    "null": null,
+    "an array": [],
+    "a string": "error",
+  };
+
+  it.each(Object.entries(cases))("agrees with the schema on %s", (_name, value) => {
+    expect(isClientEvent(value)).toBe(clientEventSchema.safeParse(value).success);
+  });
+
+  it("is not trivially true or false", () => {
+    expect(Object.values(cases).filter(isClientEvent).length).toBeGreaterThan(3);
+    expect(Object.values(cases).filter((value) => !isClientEvent(value)).length).toBeGreaterThan(20);
   });
 });
 

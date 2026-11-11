@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Button, Field, Flex, Input, Menu, Portal, Text } from "@chakra-ui/react";
+import { Box, Button, Field, Flex, Input, Portal, Text } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,6 +8,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 
 import { ICON } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
+import { useLazyMenu } from "@/components/ui/lazy-menu";
 import { formatMonth, getBucharestMonth, isMonthAllowed, shiftMonth } from "@/lib/calendar";
 
 const ANOTHER_MONTH = "another";
@@ -38,6 +39,8 @@ export function MonthToolbar({
 }) {
   const router = useRouter();
   const [picking, setPicking] = useState(false);
+  const { parts, placeholder, holdPlain, takeFocus, asked } = useLazyMenu();
+  const Menu = parts?.Menu;
   const nextMonth = shiftMonth(month, 1);
   const canAdvance = isMonthAllowed(nextMonth, maxMonth);
 
@@ -58,15 +61,16 @@ export function MonthToolbar({
             <ChevronLeft size={ICON.nav} />
           </Link>
         </IconButton>
-        <Menu.Root
+        {Menu ? <Menu.Root
           positioning={{ placement: "bottom" }}
+          defaultOpen={asked}
           onSelect={({ value }) => {
             if (value === ANOTHER_MONTH) setPicking(true);
             else router.push(href(value));
           }}
         >
           <Menu.Trigger asChild>
-            <Button variant="ghost" size="sm" minW="8rem" px="1.5" aria-label={`Month: ${formatMonth(month)}`}>
+            <Button ref={takeFocus} variant="ghost" size="sm" minW="8rem" px="1.5" aria-label={`Month: ${formatMonth(month)}`}>
               <Text as="span" textStyle="sectionTitle" aria-live="polite">
                 {formatMonth(month)}
               </Text>
@@ -85,7 +89,13 @@ export function MonthToolbar({
               </Menu.Content>
             </Menu.Positioner>
           </Portal>
-        </Menu.Root>
+        </Menu.Root> : (
+          <Button ref={holdPlain} {...placeholder} variant="ghost" size="sm" minW="8rem" px="1.5" aria-label={`Month: ${formatMonth(month)}`}>
+            <Text as="span" textStyle="sectionTitle" aria-live="polite">
+              {formatMonth(month)}
+            </Text>
+          </Button>
+        )}
         {canAdvance ? (
           <IconButton asChild aria-label="Next month">
             <Link href={href(nextMonth)}>

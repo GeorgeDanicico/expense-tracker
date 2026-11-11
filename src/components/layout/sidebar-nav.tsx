@@ -10,11 +10,12 @@ import { SignOutIconButton } from "@/components/layout/sign-out-button";
 import { useNavigation } from "@/components/layout/use-navigation";
 import { Avatar } from "@/components/ui/avatar";
 import { ICON } from "@/components/ui/icon";
+import { preloadOnIntent } from "@/lib/client/preload";
 
 function AccountRow({ signInName, avatarUrl }: { signInName: string; avatarUrl: string | null }) {
   return (
     <Flex position="relative" align="center" gap="2" ps="2" pe="1" py="1.5">
-      <Avatar size="xs" name={signInName} src={avatarUrl} decorative />
+      <Avatar size="xs" name={signInName} src={avatarUrl} decorative priority />
       <Text flex="1" minW="0" textStyle="bodySm" color="fg.muted" truncate title={signInName}>
         {signInName}
       </Text>
@@ -50,7 +51,7 @@ export function SidebarNav({ signInName, avatarUrl = null }: { signInName: strin
       <Box px="2">
         <Brand />
       </Box>
-      <Button mt="5" size="md" bg="fg.accent" color="bg.surface" _hover={{ bg: "brand.fg" }} onClick={() => quickAdd.open()}>
+      <Button mt="5" size="md" bg="fg.accent" color="bg.surface" _hover={{ bg: "brand.fg" }} onClick={() => quickAdd.open()} {...preloadOnIntent(quickAdd.preload)}>
         <Plus size={ICON.sm} aria-hidden="true" /> Add
       </Button>
       <Stack as="nav" aria-label="Primary navigation" gap="3" mt="5" overflowY="auto">

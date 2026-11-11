@@ -79,11 +79,23 @@ jobs:
         run: npm test
 
       # Placeholders for the server-only secrets, so the scan below can tell if a build inlined one.
+      # BUNDLE_MODULES also writes which modules are in each browser chunk (.next/diagnostics), for the
+      # server-only check below; it changes nothing in the build itself.
       - name: Build
         run: npm run build
         env:
           VAPID_PRIVATE_KEY: ci-placeholder-vapid-private-key
           OPENAI_API_KEY: ci-placeholder-openai-api-key
+          BUNDLE_MODULES: "1"
+
+      # The JavaScript each page downloads, against the budgets in docs/performance-budget.json (gzipped, 2% over
+      # allowed). Fails and prints the table when a page is over; a new page needs a line in the file (PF9).
+      - name: Check the size of each page's JavaScript
+        run: npm run size:routes -- --check
+
+      # openai, unpdf, web-push, sharp, fflate and the MCP server must never be in a chunk the browser downloads.
+      - name: Check no server-only package is in the browser's JavaScript
+        run: node scripts/server-only-check.mjs
 
       # Everything in .next/static is downloadable from the browser: it must hold no secret.
       # The self-test proves the patterns still catch planted fakes before the real scan runs.

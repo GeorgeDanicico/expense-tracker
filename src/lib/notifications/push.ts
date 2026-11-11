@@ -1,3 +1,5 @@
+import "server-only";
+
 import webpush, { WebPushError } from "web-push";
 
 import { recordSpan } from "@/lib/log/span";

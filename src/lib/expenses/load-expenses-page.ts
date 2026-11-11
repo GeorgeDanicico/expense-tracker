@@ -5,7 +5,7 @@ import { expenseTabExpensesApiKey, expenseTabsApiKey, FAMILY_API_KEY, mainExpens
 import type { ServerFallbackData } from "@/lib/api/server-fallback";
 import { resolveMainExpenseMonth, shiftMonth } from "@/lib/calendar";
 import { loadExpenses, loadExpenseTabLedger, loadExpenseTabs } from "@/lib/expenses/load-expenses";
-import { readExpenseTabFilters } from "@/lib/expenses/filters";
+import { readExpenseTabFilters } from "@/lib/expenses/tab-filters";
 import { loadFamily } from "@/lib/family/load-family";
 import { ALL_MEMBERS, MEMBER_PARAM } from "@/lib/family/viewing";
 import { can } from "@/lib/permissions";

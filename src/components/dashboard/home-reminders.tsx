@@ -5,7 +5,7 @@ import { BellRing, CircleAlert, PartyPopper, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ReminderSwipe } from "@/components/reminders/reminder-row";
-import { useReminderActions } from "@/components/reminders/use-reminder-actions";
+import { preloadReminderActionDialogs, useReminderActions } from "@/components/reminders/use-reminder-actions";
 import { REMINDERS_TICK_MS, useReminders } from "@/components/reminders/use-reminders";
 import { useNow } from "@/hooks/use-now";
 import { HomeBlockPending, type BlockPending } from "@/components/dashboard/home-skeleton";
@@ -19,6 +19,7 @@ import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
 import { ListSkeleton } from "@/components/ui/skeletons";
 import { UndoToast } from "@/components/ui/undo-toast";
+import { preloadOnIntent } from "@/lib/client/preload";
 import { dueReminders, dueTimeLabel } from "@/lib/home/today";
 import { formatDay, overdueText } from "@/lib/reminders/format";
 import type { ListedReminder } from "@/lib/reminders/list";
@@ -62,7 +63,7 @@ export function DueReminders() {
 
   if (!reminders.reminders) return <DueRemindersPending error={reminders.error} retry={reminders.refresh} />;
   return (
-    <Card size="sm">
+    <Card size="sm" {...preloadOnIntent(preloadReminderActionDialogs)}>
       {header}
       <Card.Body>
         {reminders.actionError ? (

@@ -4,9 +4,8 @@ import { Box, Stack, Text } from "@chakra-ui/react";
 import { BellRing, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { ReminderDialog } from "@/components/reminders/reminder-dialog";
 import { DoneRow, ReminderRow } from "@/components/reminders/reminder-row";
-import { useReminderActions } from "@/components/reminders/use-reminder-actions";
+import { preloadReminderActionDialogs, useReminderActions } from "@/components/reminders/use-reminder-actions";
 import { REMINDERS_TICK_MS, useReminders } from "@/components/reminders/use-reminders";
 import { useNow } from "@/hooks/use-now";
 import { DataError } from "@/components/ui/data-state";
@@ -15,6 +14,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { EmptyState } from "@/components/ui/empty-state";
 import { GroupLabel } from "@/components/ui/group-label";
 import { IconButton } from "@/components/ui/icon-button";
+import { lazySheet } from "@/components/ui/lazy-sheet";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
@@ -22,8 +22,18 @@ import { RemindersSkeleton } from "@/components/ui/skeletons";
 import { UndoToast } from "@/components/ui/undo-toast";
 import { prefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { REMINDERS_API_KEY } from "@/lib/api/keys";
+import { preloadOnIntent } from "@/lib/client/preload";
 import { doneEntries, groupOf, planReminders, type ListedReminder } from "@/lib/reminders/list";
 import { DONE_WINDOW_DAYS_LABEL } from "@/lib/reminders/format";
+
+const editDialog = lazySheet(() => import("@/components/reminders/reminder-dialog").then((module) => module.ReminderDialog));
+const ReminderDialog = editDialog.Sheet;
+
+/** Starts loading every dialog the list can open, once the pointer, focus or a finger is on it. */
+function preloadDialogs() {
+  editDialog.preload();
+  preloadReminderActionDialogs();
+}
 
 /** How long a reminder opened from a notification stays highlighted. */
 export const FOCUS_HIGHLIGHT_MS = 2500;
@@ -135,7 +145,7 @@ export function RemindersScreen({ focusId = null }: { focusId?: string | null })
           {reminders.actionError}
         </InlineAlert>
       ) : null}
-      <Card>
+      <Card {...preloadOnIntent(preloadDialogs)}>
         <Card.Body>
           <Stack gap="1">
             {plan.today.length > 0 ? group("Today", openRows(plan.today)) : null}

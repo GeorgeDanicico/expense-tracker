@@ -1,7 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect } from "react";
-import { AccountNoticeDialog } from "@/components/family/account-notice-dialog";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAccount } from "@/hooks/use-account";
 import type { AccountData } from "@/lib/account/types";
@@ -9,6 +9,9 @@ import { CHANGE_PASSWORD_PATH } from "@/lib/account/password-change";
 import { loadAfterSessionChange } from "@/lib/api/auth-redirect";
 import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 import { ServerFallback, type ServerFallbackData } from "@/lib/api/server-fallback";
+
+// A notice is rare and its dialog is a sheet: the script is fetched after the page is up, not with it (PF9).
+const AccountNoticeDialog = dynamic(() => import("@/components/family/account-notice-dialog").then((module) => module.AccountNoticeDialog), { ssr: false });
 
 /**
  * The browser half of the `(app)` layout: what the server loaded becomes SWR's fallback, so

@@ -1,6 +1,6 @@
 import type { AnalyticsFilters } from "@/lib/expenses/types";
 import { getBucharestMonth, resolveMainExpenseMonth } from "@/lib/calendar";
-import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/filters";
+import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/tab-filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { AccountNotice } from "@/lib/account/notice-repository";
 import type { Expense } from "@/lib/expenses/types";

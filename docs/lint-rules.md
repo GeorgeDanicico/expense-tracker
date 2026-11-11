@@ -30,6 +30,7 @@ Run them with `npm run lint`.
 | [`client-only-chakra-factory`](#client-only-chakra-factory) | error | none left (`list-row.tsx` was fixed by hand in #213) | U6 |
 | [`stable-data-options`](#stable-data-options) | error | 2 deliberate exceptions (the family settings pages) | PF8 |
 | [`dnd-context-id`](#dnd-context-id) | error | 1 fixed (the to-do board) | PF8 |
+| [`lazy-popper`](#lazy-popper) | error | none left (6 menus and the icon button's tooltip moved to `useLazyMenu`) | PF9 |
 | [`streamed-section`](#streamed-section) | error, in `src/components` and `src/app/**/*-client.tsx` | none; the `useSearchParams` boundaries of the pages still loaded in the browser (Calendar, Insights, Investments, Net worth, Import) are outside its files until they get server data too | PF6 |
 
 A rule that would need more than about 40 fixes outside the screen's own files lands as `warn`
@@ -286,6 +287,24 @@ behaves, and from U4 it is a bottom sheet on a phone. A screen that builds its o
 **Added by:** U1 (U4 listed it). **Existing cases:** none; this keeps it that way.
 
 **Disable:** `// eslint-disable-next-line local/no-raw-dialog -- <reason>`.
+
+### `lazy-popper`
+
+**Catches:** importing `Menu`, `Tooltip`, `Popover`, `HoverCard`, `Combobox`, `Select`, `DatePicker` or
+`ColorPicker` from `@chakra-ui/react`. Types don't count. `src/components/ui/menu-parts.tsx` is the one
+file that may, and tests.
+
+**Why:** each of them floats a panel beside a button, which brings the positioning library (Floating UI)
+and a state machine. Menu and Tooltip together were about 26 KiB gzipped in the first load of every page
+(PF9), for something a minority of visits use. They now load when the page is idle, through
+`useLazyMenu()` / `useLazyTooltip()` (`src/components/ui/lazy-menu.tsx`): the button renders on its own first,
+and swaps for the real menu once the code is there. A new menu is written the same way (see the six in
+`src/components/` that use it). A second eager import would put the 26 KiB back, and the size check in CI
+would only say a page grew, not why.
+
+**Added by:** PF9. **Existing cases:** none left.
+
+**Disable:** `// eslint-disable-next-line local/lazy-popper -- <reason>`.
 
 ### `no-window-confirm`
 

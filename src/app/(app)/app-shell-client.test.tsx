@@ -121,7 +121,8 @@ describe("the (app) layout in the browser", () => {
 
     await mount(new Map(), { [ACCOUNT_NOTICES_API_KEY]: Promise.resolve(notices) }, { ...account, features: { family: true } });
 
-    expect(document.body.textContent).toContain("You were removed from the family Smiths.");
+    // The notice's dialog is loaded after the page (PF9), so it arrives a moment later.
+    await vi.waitFor(() => expect(document.body.textContent).toContain("You were removed from the family Smiths."));
     expect(asked).not.toContain(ACCOUNT_NOTICES_API_KEY);
   });
 

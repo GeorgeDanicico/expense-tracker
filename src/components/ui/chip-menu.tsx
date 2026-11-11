@@ -1,8 +1,9 @@
 "use client";
 
-import { Flex, Menu, Portal, Text } from "@chakra-ui/react";
+import { Flex, Portal, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
+import { useLazyMenu } from "@/components/ui/lazy-menu";
 import { ToggleChip } from "@/components/ui/toggle-chip";
 
 export type ChipMenuItem = { value: string; label: ReactNode };
@@ -26,14 +27,28 @@ export function ChipMenu({
   /** The chip's name when its label alone doesn't say what it chooses ("Category: Groceries"). */
   "aria-label"?: string;
 }) {
+  const { parts, placeholder, holdPlain, takeFocus, asked } = useLazyMenu();
+  const chipContents = (
+    <>
+      {label}
+      <Text as="span" aria-hidden="true" color="fg.muted">
+        ▾
+      </Text>
+    </>
+  );
+  const Menu = parts?.Menu;
+  if (!Menu) {
+    return (
+      <ToggleChip ref={holdPlain} {...placeholder} selected={selected} aria-label={ariaLabel}>
+        {chipContents}
+      </ToggleChip>
+    );
+  }
   return (
-    <Menu.Root positioning={{ placement: "bottom-start" }} onSelect={({ value }) => onSelect?.(value)}>
+    <Menu.Root positioning={{ placement: "bottom-start" }} defaultOpen={asked} onSelect={({ value }) => onSelect?.(value)}>
       <Menu.Trigger asChild>
-        <ToggleChip selected={selected} aria-label={ariaLabel}>
-          {label}
-          <Text as="span" aria-hidden="true" color="fg.muted">
-            ▾
-          </Text>
+        <ToggleChip ref={takeFocus} selected={selected} aria-label={ariaLabel}>
+          {chipContents}
         </ToggleChip>
       </Menu.Trigger>
       <Portal>
