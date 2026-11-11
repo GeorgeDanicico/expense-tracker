@@ -2,8 +2,6 @@
 
 import { Button, Center, Heading, Input, Stack, Text } from "@chakra-ui/react";
 import type { FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import { useSWRConfig } from "swr";
 
 import { Brand } from "@/components/layout/brand";
 import { SignOutButton } from "@/components/layout/sign-out-button";
@@ -15,7 +13,7 @@ import { useApiForm } from "@/hooks/use-api-form";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { changePassword } from "@/lib/api/account-requests";
 import { ApiError } from "@/lib/api/client";
-import { afterPasswordChange } from "@/lib/api/invalidate";
+import { loadAfterSessionChange } from "@/lib/api/auth-redirect";
 
 /**
  * Where the `(app)` layout sends an account that must choose a new password (a kid account a parent
@@ -28,8 +26,6 @@ import { afterPasswordChange } from "@/lib/api/invalidate";
  */
 export default function ChangePasswordPage() {
   useDocumentTitle("Choose a new password");
-  const router = useRouter();
-  const { mutate } = useSWRConfig();
   const { account } = useAccount();
   const form = useApiForm();
   const temporary = account?.mustChangePassword === true;
@@ -49,14 +45,13 @@ export default function ChangePasswordPage() {
         await changePassword(change);
       } catch (caught) {
         if (caught instanceof ApiError && caught.status === 401) {
-          router.replace("/login");
+          loadAfterSessionChange("/login");
           return;
         }
         throw caught;
       }
 
-      await afterPasswordChange(mutate);
-      router.replace("/dashboard");
+      loadAfterSessionChange("/dashboard");
     }, { fallback: "Unable to change your password. Please try again." });
   }
 

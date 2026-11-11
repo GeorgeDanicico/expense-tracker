@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getEnv } from "@/lib/env";
 import { contentSecurityPolicy, createNonce, CSP_HEADER, NONCE_HEADER, REPORTING_ENDPOINTS } from "@/lib/http/csp";
+import { PAGE_PATH_HEADER, pagePathOf } from "@/lib/http/page-path";
 import { strictTransportSecurity } from "@/lib/http/security-headers";
 import { createRequestId, REQUEST_ID_FROM_PROXY, REQUEST_ID_HEADER, REQUEST_ID_SOURCE_HEADER } from "@/lib/log/request-id";
 import { updateSession, withHeaders } from "@/lib/supabase/proxy";
@@ -21,6 +22,9 @@ const SESSIONLESS_PATHS: ReadonlySet<string> = new Set(["/offline"]);
  * It also gives the request its id (logging plan, L2): a new `x-request-id` on the forwarded request,
  * overwriting any the client sent, with `x-request-id-source: proxy` (also overwritten) so the route
  * wrappers know they may use it, and the same id on the response.
+ *
+ * And the page's path and query (`x-page-path`, also overwritten), which the `(app)` layout turns
+ * into the `next` of its sign-in redirect (PF5).
  */
 export async function proxy(request: NextRequest) {
   const nonce = createNonce();
@@ -31,6 +35,7 @@ export async function proxy(request: NextRequest) {
     [CSP_HEADER]: policy,
     [REQUEST_ID_HEADER]: requestId,
     [REQUEST_ID_SOURCE_HEADER]: REQUEST_ID_FROM_PROXY,
+    [PAGE_PATH_HEADER]: pagePathOf(request.nextUrl),
   };
 
   const response = SESSIONLESS_PATHS.has(request.nextUrl.pathname)

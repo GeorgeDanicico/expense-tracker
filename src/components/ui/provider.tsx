@@ -5,7 +5,7 @@ import { LucideProvider } from "lucide-react";
 import { ThemeProvider } from "next-themes";
 import { SWRConfig, type SWRConfiguration } from "swr";
 
-import { apiFetcher, retryDelay } from "@/lib/api/client";
+import { apiFetcher, DEDUPING_INTERVAL_MS, retryDelay } from "@/lib/api/client";
 import { redirectIfPasswordChangeRequired } from "@/lib/api/password-change";
 import { clearSlow, markSlow } from "@/lib/api/slow-keys";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
@@ -19,7 +19,7 @@ const swrConfig: SWRConfiguration = {
   fetcher: apiFetcher,
   keepPreviousData: false,
   revalidateOnFocus: false,
-  dedupingInterval: 15_000,
+  dedupingInterval: DEDUPING_INTERVAL_MS,
   errorRetryCount: 2,
   loadingTimeout: LOADING_SLOW_MS,
   onLoadingSlow: (key) => markSlow(key),

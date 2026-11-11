@@ -36,6 +36,8 @@ export const TIMEOUT_CODE = "timeout";
 /** The `code` of the error made up while the device has no connection. */
 export const OFFLINE_CODE = "offline";
 export const OFFLINE_MESSAGE = "You're offline. Reconnect to load your data.";
+/** SWR's `dedupingInterval` (`provider.tsx`): how long a fetched answer counts as fresh enough not to ask again on mount. */
+export const DEDUPING_INTERVAL_MS = 15_000;
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();

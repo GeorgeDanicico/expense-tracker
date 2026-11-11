@@ -2,55 +2,20 @@ import type { NextRequest } from "next/server";
 
 import { CURRENCY_RELABEL, currencyRelabelMessage } from "@/lib/account/currency-change";
 import { DELETE_INVALID, deleteOwnAccount } from "@/lib/account/deletion";
-import type { AccountData, AccountMembership } from "@/lib/account/types";
-import type { AuthenticatedUser } from "@/lib/auth";
-import { avatarUrl } from "@/lib/avatars/paths";
-import { isFamilyEnabled } from "@/lib/features";
-import { getCurrentMember } from "@/lib/family/current-member";
-import { signInName, visibleEmail } from "@/lib/family/kid-account";
+import { loadAccount } from "@/lib/account/load-account";
 import { accountDeletionAttempts, TOO_MANY_ACCOUNT_DELETIONS } from "@/lib/http/rate-limit";
 import { HttpError, json, noContent, parseBody, readJson, tooManyRequests, withUser } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { isSupportedCurrency } from "@/lib/utils/currency";
 import { deleteAccountSchema } from "@/lib/validation/account";
 
-/** The caller's membership with their own member id only (not the family's id); `null` with no family or while the flag is off. */
-async function accountMembership(): Promise<AccountMembership | null> {
-  const member = await getCurrentMember();
-  if (!member) return null;
-  const { memberId, role, isCreator, familyName, permissions } = member;
-  return { memberId, role, isCreator, familyName, permissions };
-}
-
-/**
- * The account response, reading the currency (unless given), the membership, the password flag and
- * the picture in parallel.
- */
-async function accountData(user: AuthenticatedUser, knownCurrency?: string): Promise<AccountData> {
-  const { account, avatars } = getRepositories();
-  const [currency, membership, mustChangePassword, avatarPath] = await Promise.all([
-    knownCurrency ?? account.getCurrency(user.id),
-    accountMembership(),
-    account.getMustChangePassword(user.id),
-    avatars.getPath(user.id),
-  ]);
-  return {
-    email: visibleEmail(user.email),
-    signInName: signInName(user.email),
-    currency,
-    features: { family: isFamilyEnabled() },
-    membership,
-    mustChangePassword,
-    avatarUrl: avatarUrl(avatarPath),
-  };
-}
-
 /**
  * Answers an account that must choose a new password too (`allowPasswordChangeRequired`): the browser
  * reads `mustChangePassword` here to send it to the change-password page. Every other account route
- * refuses such an account with 403 `password_change_required`.
+ * refuses such an account with 403 `password_change_required`. The `(app)` layout puts the same
+ * answer (`loadAccount`) in the page, so the browser only asks here outside it or to refresh it.
  */
-export const GET = withUser(async (_request, user) => json(await accountData(user)), {
+export const GET = withUser(async (_request, user) => json(await loadAccount(user)), {
   failure: "Unable to load account settings.",
   allowPasswordChangeRequired: true,
 });
@@ -75,7 +40,7 @@ export const PATCH = withUser(async (request: NextRequest, user) => {
 
   await account.updateCurrency(user, payload.currency);
 
-  return json(await accountData(user, payload.currency));
+  return json(await loadAccount(user, payload.currency));
 }, { failure: "The currency could not be saved. Please try again." });
 
 /**

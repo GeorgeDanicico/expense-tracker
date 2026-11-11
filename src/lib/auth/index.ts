@@ -7,6 +7,7 @@ import { MEMO_KEYS, oncePerRequest } from "@/lib/request-memo";
 import { supabaseAuth } from "@/lib/supabase/auth";
 import { createSupabaseAuthAdmin } from "@/lib/supabase/auth-admin";
 import { supabaseOAuthConsent, supabaseOAuthIssuer } from "@/lib/supabase/oauth-consent";
+import { createClient, runWithSupabaseClient } from "@/lib/supabase/server";
 
 export type * from "@/lib/auth/admin";
 export type * from "@/lib/auth/oauth-consent";
@@ -45,4 +46,14 @@ export function getOAuthIssuer(): string {
  */
 export function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
   return oncePerRequest(MEMO_KEYS.user, () => getAuth().getCurrentUser());
+}
+
+/**
+ * For a page or layout (a server component): runs `fn` as the request's cookie session, the way
+ * `withUser` reads it for an API route, with a memo of its own so the user and the membership are
+ * read once (`oncePerRequest`; outside `logRequest` there is none otherwise). It writes no request
+ * line: those are for API requests (PF5).
+ */
+export async function asPageCaller<T>(fn: () => Promise<T>): Promise<T> {
+  return runWithSupabaseClient(await createClient(), fn);
 }

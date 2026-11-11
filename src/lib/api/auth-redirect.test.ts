@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { loginUrlFor, redirectToLoginIfUnauthorized } from "@/lib/api/auth-redirect";
+import { loadAfterSessionChange, loginUrl, loginUrlFor, redirectToLoginIfUnauthorized } from "@/lib/api/auth-redirect";
 
 function locationAt(pathname: string, search = "") {
   return { pathname, search, replace: vi.fn() };
@@ -16,6 +16,24 @@ describe("loginUrlFor", () => {
     ["a backslash path", "/\\evil.test"],
   ])("sends the dashboard, not %s", (_, pathname) => {
     expect(loginUrlFor({ pathname, search: "" })).toBe("/login?next=%2Fdashboard");
+  });
+});
+
+describe("loginUrl", () => {
+  it("takes a path with its query, as the (app) layout reads it from the proxy's header", () => {
+    expect(loginUrl("/todos?view=board")).toBe("/login?next=%2Ftodos%3Fview%3Dboard");
+  });
+
+  it("sends the dashboard when there is no path", () => {
+    expect(loginUrl(null)).toBe("/login?next=%2Fdashboard");
+  });
+});
+
+describe("loadAfterSessionChange", () => {
+  it("goes with a full page load, so no page the router prefetched under the old session is reused", () => {
+    const location = { replace: vi.fn() };
+    loadAfterSessionChange("/dashboard", location);
+    expect(location.replace).toHaveBeenCalledWith("/dashboard");
   });
 });
 

@@ -2,8 +2,7 @@
 
 import { Button, Heading, HStack, Image, Input, Separator, Stack, Text } from "@chakra-ui/react";
 import { FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useSWRConfig } from "swr";
+import { useSearchParams } from "next/navigation";
 
 import { submitAuth } from "@/components/auth/auth-api";
 import { Brand } from "@/components/layout/brand";
@@ -12,13 +11,11 @@ import { FormField } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useApiForm } from "@/hooks/use-api-form";
-import { afterSignIn } from "@/lib/api/invalidate";
+import { loadAfterSessionChange } from "@/lib/api/auth-redirect";
 
 type AuthMode = "login" | "signup";
 
 function AuthModeForm({ mode, next }: { mode: AuthMode; next: string }) {
-  const router = useRouter();
-  const { mutate } = useSWRConfig();
   const form = useApiForm();
   const [notice, setNotice] = useState("");
 
@@ -32,8 +29,7 @@ function AuthModeForm({ mode, next }: { mode: AuthMode; next: string }) {
       const result = await submitAuth({ mode, email: formData.get("email"), password: formData.get("password"), next });
 
       if (result.authenticated) {
-        await afterSignIn(mutate);
-        router.replace(next);
+        loadAfterSessionChange(next);
         return;
       }
 
