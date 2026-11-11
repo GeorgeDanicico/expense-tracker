@@ -30,6 +30,9 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | 3 | On the VPS, run `sudo scripts/perf-report.sh 5 expense-tracker-web` and the two delivery checks (streaming through the proxy, compression), and paste the output into the PR or send it to me | It is the real-use half of the baseline: Web Vitals per page, server time per route, Auth calls per request, whether the proxy streams. I have no access to production, so those cells say "not measured: needs the VPS" | "Real use" and "Delivery checks" under "Baseline and budgets" |
 | 4 | Check whether "Add a kid" works in production, and decide the fix | The lab found that creating a kid account fails on a database built from the migrations (`permission denied for function my_kid_ai_permitted`, from the AI gate migration's profile trigger). If production has the same grants, nobody can add a kid. It needs a migration, which only goes live with your go-ahead | PF1b, "Left open"; [lab.md](lab.md), "What the lab found while seeding" |
 | 5 | Optional: on the VPS, time its round trip to Supabase (one `curl`, read-only) | The lab's "realistic" delay, 40 ms, is from your laptop, not the VPS | [lab.md](lab.md), "The delay" |
+| 6 | Decide whether to rewrite the "read someone else's finance rows" policies (PF10 found it is the one slow database query, and no index fixes it) | Reading another family member's expenses costs 113 ms in the database for their dashboard (1,605 rows, one helper call per row); a rewritten policy costs 10 ms. It changes a policy on financial data and the existing pgTAP test that pins the policy's text, so it isn't in PF10. The route-level gain is small (about 75 ms on the family dashboard, none on your own pages) | PF10 sections 3 and 7 |
+| 7 | Optional: on the live project's SQL editor, run the one read-only `pg_stat_statements` query in PF10 section 5 and paste the output | It is the real query mix PF10 could only approximate in the lab. If a query there is slow, it gets its own index with a measured before and after | PF10 sections 5 and 7 |
+| 8 | Optional: say yes or no to five indexes on foreign keys the advisor flags (`todos.created_by`, `todos.completed_by`, `calendar_events.created_by`, `families.creator_id`, `app_flags.updated_by`) | They only matter when someone deletes an account. PF10 didn't add them because no slow query uses them; the SQL is in section 7 if you want them | PF10 sections 3 and 7 |
 
 ## Progress
 
@@ -45,7 +48,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF7 | The same for Expenses, To-dos and Reminders | done | #233 |
 | PF8 | Prefetching, waterfalls and stable data | done | #234 |
 | PF9 | Smaller bundles | done, except Lighthouse's LCP on Home (still about 4.8 s, see PF9 section 4) and dnd-kit left in To-dos | #235 |
-| PF10 | SQL: indexes and RLS for the slow queries | not started | |
+| PF10 | SQL: indexes and RLS for the slow queries | done, with no migration: the lab and the advisor found no index a slow query needs (see PF10 section 3); waiting on rows 6 to 8 | #236 |
 | PF11 | Smooth interaction | not started | |
 | PF12 | Lean runtime on the VPS | not started | |
 | PF13 | Measure and close | not started | |
@@ -129,6 +132,13 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   most of Chakra's unused styles, the sheets and dialogs and the menu code left the first load. Blocking time on the page
   fell by 7 to 52%; LCP did not move on slow 4G, and the total bytes of a whole cold load stayed the same because the
   code now arrives after the page.
+
+- **PF10, SQL: indexes and RLS (nothing changes for users, and there is no migration to apply).** Every
+  expenses, calendar, investments and net-worth query already runs on an index and takes 0.1 to 3 ms in the lab on
+  three years of a family's data (6,665 expenses; tables scaled up to 1,500 events and 3,000 orders to check);
+  the live advisor flags no policy that calls `auth.uid()` per row. The one slow query is reading another
+  family member's expenses (113 ms for their dashboard), which comes from a helper function that runs once per
+  row, not from a missing index. A policy rewrite cuts it to 10 ms, but it is a decision for you (row 6).
 
 ## Baseline and budgets
 
@@ -3405,3 +3415,246 @@ used to be built when the page loaded.
 - **Not measured:** the VPS, a real phone; the quick-add sheet's saving alone; the "Edit, 0.1 s after load" tap; Lighthouse in the CPU-only pass.
 - **Lighthouse LCP on Home is still about 4.8 s** (see 4): the lever PF6 named did not move it here.
 - The decimal.js (12 KiB) in Expenses and the SWR/Next runtime stayed; they are the page's own content.
+
+### PF10: SQL: indexes and RLS for the slow queries
+
+#### 1. The problem
+
+The plan expected a migration of indexes for slow database queries. Nothing a person waits for
+suggested one. The slow pages (Insights, Investments and Net worth settle in about 1.3 s in the lab with a fast network and 40 ms to
+Supabase, and PF7 saw them at about 7 s on slow 4G) are slow from the number of requests one after
+another, not from the database: PF7 counted 9 API requests and 62 Supabase calls on one Calendar load, and
+each call pays the network round trip, not the query. The question for this task was whether the database
+itself was the slow part anywhere, and whether an index would fix it.
+
+#### 2. What changed
+
+**Nothing in the app or the database.** No migration, no function, no policy and no index is added.
+Only this document changed (and a line in `docs/lab.md` on turning on `pg_stat_statements`).
+
+The reason is the plan's own rule: "add only what a slow query uses". I looked for slow queries four ways
+(section 3) and none of them was slow because an index was missing. What I did find is one query that is
+slow for another reason, and a fix I measured but did not ship (section 3, "The one slow query").
+
+#### 3. Why this way
+
+**What I looked at**
+
+1. **The performance advisor on the live project** (`get_advisors`, type `performance`, read-only, 11 November 2026,
+   19:07 UTC). It reported three kinds of finding:
+   - `auth_rls_initplan` (a policy calls `auth.uid()` once per row instead of once per query): **none**.
+   - Five foreign keys without an index (`app_flags.updated_by`, `calendar_events.created_by`, `families.creator_id`,
+     `todos.completed_by`, `todos.created_by`), level INFO.
+   - Eight unused indexes (the list for you is in section 7).
+2. **The policies themselves, on the lab's database** (built from the migrations, the same schema as live). The plan
+   said 4 of 46 `auth.uid()` calls in policies were still bare. Searching the migrations for `auth.uid()` finds 46
+   lines, and every one is either wrapped as `(select auth.uid())`, a comment, or the body of
+   `app_private.current_user_id()`. Checking the result rather than the text: of the 69 policies in the `public` schema, none
+   has a call to `uid()` or `current_user_id()` outside a `( SELECT … )` (the query is in section 5). So the
+   "4 bare calls" were a miscount of comments and that function's body, and there is nothing to rewrite. This agrees with the advisor.
+3. **`pg_stat_statements` on the lab** (the extension was already on; I set `pg_stat_statements.track = 'all'` so queries inside
+   functions show up, then reset it). I ran PF4's route probe (28 routes, 5 runs each, 40 ms delay) and loaded Calendar, Insights,
+   Investments and Net worth once. The top entries by total time are in section 4.
+4. **`explain (analyze, buffers)` on the queries behind the top entries**, as the signed-in parent (role `authenticated` with the
+   user's JWT claims, so row level security applies), on the lab's data: 6,665 expenses over three years (Alex 3,729, Sam 2,656,
+   Robin 264, one solo user 16). Then again with the smaller tables scaled up inside a transaction that was rolled back (1,500 extra
+   calendar events with attendees, 3,000 investment orders, 40 net-worth items with 36 valuations each), to see whether
+   a plan changes when the tables are a lot bigger than the seed.
+
+**What I found**
+
+- Every expenses query uses one of the existing indexes (`expenses_user_date_created_idx`, `expenses_user_category_date_idx`).
+  Own-rows queries take 0.1 to 2.5 ms. Calendar's month query takes 0.74 ms with 1,514 events (it reads the whole table, 171 buffers, because
+  a month window is not selective enough for the planner to prefer the index; reading the last two years uses
+  `calendar_events_family_id_starts_at_idx` in 3.2 ms). Investments with 3,005 orders takes 1.2 ms and Net worth with 43 items and
+  about 1,450 valuations 1.6 ms. An index added to any of these would save well under a millisecond, and every index slows every write.
+- **The one slow query: reading another family member's rows.** The select policy on `expenses` (and on the other finance tables)
+  is `user_id = (select current_user_id()) or family_private.can_view_finance_of(user_id)`. Your own rows pass the first half
+  at once. Someone else's rows call the helper once **per row**, and each call does four small indexed lookups
+  (`family_members` by user, `my_family_id()`, `member_level()`, `member_permissions`). That is 2,812 calls and 639 ms of the lab's
+  total in the table below. Alex reading Sam's month page: 5.5 ms. Alex reading Sam's dashboard (a year of 1,605 rows): **113.6 ms and 7,182
+  buffers**. An index can't help: each lookup is already an index lookup, there are just a lot of them. A ledger search on Sam's rows
+  reads about 4,600 buffers for the same reason (the plan applies the policy to every row the index returns, before the search's `ilike`).
+- **A fix that works, which I did not ship.** Replace the helper call with a sub-select that Postgres runs once per query:
+  `user_id = (select app_private.current_user_id()) or ((select family_private.member_level('family_finance')) in ('view','edit') and user_id in (select m.user_id from public.family_members m where m.family_id = (select family_private.my_family_id())))`.
+  In a rolled-back transaction on the lab it took Sam's dashboard from 113.6 ms to 10.1 ms (656 buffers), and the parent still sees 6,649 rows
+  of the 6,665. With it applied to the lab's `expenses` policy I ran the route probe again: the family dashboard (`/api/dashboard?member=all`)
+  went from 303 to 229 ms of server time (median of 5, 40 ms delay) and the family expenses list from 255 to 232 ms; no other route moved by more than
+  noise (a few ms). I then ran `npm run test:db` with that policy as a temporary migration: 876 assertions pass, and one fails:
+  `family_finance_rls.sql` test 4 ("every select policy checks the owner first, then can_view_finance_of"), which pins the policy's text.
+  The plan says RLS tests must pass unchanged, the policy is on financial data, and the author of that migration chose the per-row helper on purpose
+  (its comment calls it "acceptable at family scale"), so I left it as a decision (Waiting for George, row 6). If you say yes, it needs the same
+  rewrite on the other five finance policies, that test updated to the new shape, and the existing RLS tests run unchanged against it.
+- **The five unindexed foreign keys** matter only when a row they point to is deleted (the database looks for rows that refer to it, and without an
+  index that is a scan of the table). Mainly account deletion does that. In the lab the scan costs nothing measurable (the largest of those tables has 22 rows), and no slow query uses them. They are not in a migration. If you want them anyway (cheap, and the
+  family tables will grow), this is the SQL, with the index name the advisor would expect:
+
+  ```sql
+  create index if not exists todos_created_by_idx on public.todos (created_by);
+  create index if not exists todos_completed_by_idx on public.todos (completed_by);
+  create index if not exists calendar_events_created_by_idx on public.calendar_events (created_by);
+  create index if not exists families_creator_id_idx on public.families (creator_id);
+  create index if not exists app_flags_updated_by_idx on public.app_flags (updated_by);
+  ```
+
+**Options turned down.** Adding the five foreign-key indexes anyway "because the advisor says so": the plan says only what a slow query
+uses, and the advisor itself rates them INFO. A covering index on `expenses (user_id, expense_date) include (amount, category)` for the
+dashboard, so it could skip the table: the own-rows dashboard scan already takes 0.58 ms. A trigram index for the ledger's `ilike`
+search: the index on user and category already cuts the rows to a few thousand, and the search then takes about 2 ms. A cache or a
+function to hold the member list: PF10 allows no functions. Sources: [S5] for wrapping `auth.uid()` and indexing policy columns (nothing left to do
+here), [S6] and [S7] for the advisor and `pg_stat_statements` used above.
+
+#### 4. Numbers
+
+The lab, 40 ms to Supabase, the parent signed in. Top statements by total time after the route probe and four page loads
+(`pg_stat_statements`, reset first, `track = 'all'`; the query that produced it is in section 5, run on the lab). Authentication
+queries and Postgres' own are left out.
+
+| Total ms | Calls | Mean ms | Buffers per call | Statement |
+| ---: | ---: | ---: | ---: | --- |
+| 639 | 2,812 | 0.23 | 6 | `family_private.can_view_finance_of(owner)`, the per-row policy helper |
+| 570 | 27 | 21.11 | 647 | `rpc get_expense_dashboard` (the function body alone: 525 ms, 19.4 mean); a few of the 27 calls are other members' |
+| 265 | 73 | 3.62 | 177 | `rpc get_family()` |
+| 190 | 25 | 7.61 | 165 | the tab ledger: expenses in some categories for one owner, newest first |
+| 185 | 10 | 18.46 | 138 | the same with a search on description, notes, category or subtype |
+| 181 | 20 | 9.05 | 161 | the Expenses page: one owner, one month, newest first, with a count |
+| 167 | 104 | 1.60 | 91 | `rpc get_my_membership()` |
+| 163 | 3,204 | 0.05 | 2 | `family_private.my_family_id()` (called by the policy helper and the family policies) |
+| 125 | 2,812 | 0.04 | 2 | the lookup inside `member_level()` (called by the policy helper) |
+
+The next entries are under 80 ms in total each. A route's `dbMs` is mostly the delay, not the queries: `/api/dashboard` makes 5
+database calls and reports 265 ms, about 40 ms each plus a few ms of query time.
+
+`explain (analyze, buffers)` as the parent, before (nothing changed, so there is no "after"):
+
+| Query | Plan | Execution | Buffers |
+| --- | --- | ---: | ---: |
+| Dashboard rows, own, 12 months (1,605 rows) | bitmap scan on `expenses_user_date_created_idx` | 0.58 ms | 99 |
+| `get_expense_dashboard`, own | the same, inside the function | 2.5 ms | 344 |
+| Expenses page, own, one month (57 rows) | the same index, sort 57 rows | 0.11 ms | 12 |
+| Tab ledger, own, 3 categories (2,032 rows, limit 1000) | bitmap scan on `expenses_user_category_date_idx` | 1.0 ms | 75 |
+| Tab ledger search, own | the same, then `ilike` on 2,032 rows | 2.2 ms | 75 |
+| Expenses page, Sam's month (40 rows), read by Alex | the same index, policy helper per row | 5.5 ms | 399 |
+| `get_expense_dashboard`, Sam's (1,605 rows), read by Alex | the same, helper per row | **113.6 ms** | **7,182** |
+| The same with the rewritten policy (rolled back, not shipped) | sub-select once | 10.1 ms | 656 |
+| Calendar, one month, 1,514 events (scaled) | seq scan 171 buffers, then attendees by key | 0.74 ms | 583 |
+| Calendar, two years (scaled) | `calendar_events_family_id_starts_at_idx` | 3.2 ms | 9,556 |
+| Investments, 3,005 orders (scaled) | seq scan, top-N sort | 1.2 ms | 40 |
+| Net worth, 43 items, about 1,450 valuations (scaled) | seq scan on items, valuations by `net_worth_valuations_item_valued_on_idx` | 1.6 ms | 657 |
+
+Page timings in the lab before this task (no migration, so none after): the CPU-only pass, 40 ms delay, parent, median of 2 loads.
+"Settled" is when the last loading placeholder left; Home, Expenses, To-dos and Reminders have data in the HTML so their "content"
+is the same moment.
+
+| Page | Content or settled (ms) | Supabase calls in the load | Auth calls |
+| --- | ---: | ---: | ---: |
+| `/dashboard` | 647 | 24 | 11 |
+| `/expenses` | 672 | 18 | 8 |
+| `/todos` | 637 | 18 | 9 |
+| `/reminders` | 531 | 15 | 7 |
+| `/calendar` | 1,560 | 54 | 23 |
+| `/insights` | 1,368 | 32 | 19 |
+| `/investments` | 1,257 | 25 | 13 |
+| `/net-worth` | 1,280 | 28 | 15 |
+
+Route server times with 40 ms to Supabase, before and with the prototype policy applied (lab only, median ms of 5; only the rows that moved):
+
+| Route | Before | Prototype policy |
+| --- | ---: | ---: |
+| `/api/dashboard?member=all` | 303 | 229 |
+| `/api/expenses?member=all` | 255 | 232 |
+
+The other 26 routes were within 10 ms of their "before" in the three probe runs I made (for example `/api/calendar` list 225, 225, 229).
+
+Commands (all against the lab, `npm run lab -- up`, then `npm run lab -- delay 40`):
+
+```bash
+node scripts/lab/search-compare.mjs > /dev/null                       # makes the tab the probe needs
+node scripts/lab/route-probe.mjs .lab parent 5 > routes.json          # the per-route table
+npm run lab:measure -- /dashboard /expenses /todos /reminders /calendar /insights /investments /net-worth \
+  --user parent --runs 2 --no-lighthouse --throttle cpu               # the page table
+# the statements table and the explain rows: the queries in section 5, run with psql inside the lab's database container
+```
+
+#### 5. How to check it yourself
+
+1. **The advisor, read-only.** In the Supabase dashboard open Advisors, Performance. You should see the five unindexed
+   foreign keys and the eight unused indexes, and no `auth_rls_initplan` item.
+2. **The policies, on any database built from the migrations.** This returns no rows when every policy wraps its caller lookups:
+
+   ```sql
+   select tablename, policyname
+   from pg_policies
+   where schemaname = 'public'
+     and (coalesce(qual, '') || coalesce(with_check, '')) ~* '(uid|current_user_id)'
+     and regexp_replace(coalesce(qual, '') || coalesce(with_check, ''), '\( *SELECT +[a-z_.]*(uid|current_user_id)\(\)', '', 'gi') ~* '(uid|current_user_id)\(\)';
+   ```
+
+   Run it on the live project in the SQL editor too: it only reads.
+3. **The real query mix (Waiting for George, row 7).** In the live project's SQL editor, which only reads here:
+
+   ```sql
+   select calls,
+          round(total_exec_time::numeric, 0) as total_ms,
+          round(mean_exec_time::numeric, 2) as mean_ms,
+          round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 1) as pct_of_all,
+          rows / greatest(calls, 1) as rows_per_call,
+          (shared_blks_hit + shared_blks_read) / greatest(calls, 1) as buffers_per_call,
+          left(regexp_replace(query, '\s+', ' ', 'g'), 220) as query
+   from pg_stat_statements
+   where query !~* '^(set|begin|commit|show|deallocate|rollback)'
+     and query !~* 'pg_stat_statements|pg_get_|pg_class|pg_attribute|pg_namespace|supabase_migrations|cron\.'
+   order by total_exec_time desc
+   limit 20;
+   ```
+
+   The default setting is `pg_stat_statements.track = 'top'` (the lab's was), so a function's inner queries show up as the one call,
+   not as separate lines; the lab's numbers above used `all`. Anything with a mean over about 20 ms and many calls is worth an
+   `explain (analyze, buffers)` in the lab before an index is proposed.
+4. **Reproduce the lab numbers.** `npm run lab -- up`, then in the database container
+   (`docker exec -it supabase_db_expense-tracker-lab psql -U supabase_admin -d postgres`) run
+   `alter system set pg_stat_statements.track = 'all'; select pg_reload_conf(); select pg_stat_statements_reset();`, run the commands
+   in section 4, and read `pg_stat_statements`. For an `explain` as a signed-in user, inside a transaction:
+   `set local role authenticated; select set_config('request.jwt.claims', '{"sub":"<user id from .lab/users.json>","role":"authenticated"}', true);`
+   and then `explain (analyze, buffers) …`; finish with `rollback`.
+5. **That nothing changed:** `git diff --stat origin/main -- supabase` is empty on this branch. `npm run test:db` passes as on `main`.
+
+#### 6. Risks and how to undo it
+
+There is no code or schema change, so there is nothing to undo; reverting the PR only removes this text.
+
+- **The conclusion rests on the lab's data.** It is three years of a four-person family, plus scaled-up copies of the small tables. Production's
+  stats may differ (more months, more tabs, other usage). That is why row 7 asks for the real `pg_stat_statements` before anyone says "no index is needed" for good.
+- **The advisor sees only what has run on live.** "Unused" means no scans since the stats were last reset; a young project reports
+  many indexes unused.
+- **The measured fix in section 3 is not tested against the whole suite.** I ran `npm run test:db` with it: one failure, the test that pins the policy's text.
+  The other 876 assertions pass, but I haven't written the matching update, and I only changed the `expenses` policy.
+
+#### 7. Left open
+
+- **No migration, so nothing to apply live.** The plan's checkpoint ("George approves applying PF10's migration live") has nothing to approve unless
+  you choose one of rows 6 or 8. The plan's "done when no route's server p95 is over 300 ms" couldn't be checked here: it needs the VPS's request
+  lines (row 3, `scripts/perf-report.sh`). In the lab three routes are over 300 ms: the family dashboard (303), the Everything tab (435, a 629 KB response from four
+  expenses reads) and a search on it (317). Only the first is slow in the database.
+- **Waiting for George:** row 6 (the policy rewrite), row 7 (`pg_stat_statements` on live) and row 8 (the five foreign-key indexes).
+- **The advisor's eight unused indexes, for you.** I dropped none. The migration comments say why each exists, and most of them are there to make a delete
+  or a cascade cheap, which is why they show no scans:
+
+  | Index | On | Why it exists (from its migration) |
+  | --- | --- | --- |
+  | `categories_user_id_idx` | `categories` | Legacy tracker table; not in the current migrations, so I can't say |
+  | `expenses_user_id_category_id_idx` | `expenses` | Legacy category foreign key, with `expenses_category_id_user_id_idx` (migration `20260823152318`) |
+  | `expenses_category_id_user_id_idx` | `expenses` | The same legacy foreign key |
+  | `ai_request_leases_expires_at_idx` | `private.ai_request_leases` | Clearing expired AI request leases |
+  | `profiles_managed_by_family_idx` | `profiles` | Deleting a family sets its kids' `managed_by_family` to null (partial index) |
+  | `reminder_completions_expense_id_idx` | `reminder_completions` | Deleting an expense (cascade) |
+  | `todos_assignee_member_id_idx` | `todos` | Removing a member (cascade) and the assignee filter |
+  | `ai_usage_user_id_created_at_idx` | `ai_usage` | The AI gate's spend sums and the owner's reads |
+
+  I would keep the ones that serve a cascade or a delete (the cost is a few kilobytes and one extra write per row). The two legacy `expenses`
+  indexes and `categories_user_id_idx` are the candidates for a drop, because their table (`categories`) is legacy; check that nothing in the
+  legacy tracker still reads it first. Not checked: whether anything outside this repository uses them.
+- **"Add a kid" (`permission denied for function my_kid_ai_permitted`, row 4)** changes a function's grants, so it is not in this task. Nothing here
+  changes it.
+- **Not measured:** the live database's own query times and plans, the VPS, and `get_family()` and `get_my_membership()` beyond their
+  3.6 and 1.6 ms means (they are small and run on indexed tables; they are called many times per page, which is PF4's and PF7's subject, not an index).

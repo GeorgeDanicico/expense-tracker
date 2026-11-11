@@ -227,6 +227,27 @@ how to read them. Each call saves its runs, the Lighthouse reports and the app's
 `scripts/perf-report.sh --input <folder>/requests-*.jsonl` reads the request lines like the
 production logs.
 
+## Finding slow queries (PF10)
+
+`pg_stat_statements` is already installed in the lab's database. By default it records only top-level statements, so a function's inner
+queries are hidden inside the one call; turn on all of them, reset, use the app, then read it
+(`docker exec -it supabase_db_expense-tracker-lab psql -U supabase_admin -d postgres`):
+
+```sql
+alter system set pg_stat_statements.track = 'all';
+select pg_reload_conf();
+select pg_stat_statements_reset();
+-- … run `node scripts/lab/route-probe.mjs` or `npm run lab:measure`, then:
+select calls, round(total_exec_time::numeric, 1) as total_ms, round(mean_exec_time::numeric, 2) as mean_ms,
+       left(regexp_replace(query, '\s+', ' ', 'g'), 200) as query
+from pg_stat_statements order by total_exec_time desc limit 20;
+```
+
+To `explain` a query the way the app runs it (row level security on), do it in a transaction as the signed-in user and roll back:
+`begin; set local role authenticated; select set_config('request.jwt.claims', '{"sub":"<userId from .lab/users.json>","role":"authenticated"}', true);`
+`explain (analyze, buffers) …; rollback;`. Scaling a small table up for a test goes in the same transaction, before the `set local role`.
+The results are in [performance.md](performance.md), PF10.
+
 ## Checking it never reached the live project
 
 - `npx vitest run scripts/lab` runs the guard's tests, including `lab.sh guard`, `app` and
