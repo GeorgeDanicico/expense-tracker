@@ -1,7 +1,8 @@
-// PF6's check of a page whose first data comes from the server (docs/lab.md, docs/performance.md "PF6").
+// PF6's check of a page whose first data comes from the server (docs/lab.md, docs/performance.md "PF6"),
+// for Home and, since PF7, Expenses, To-dos and Reminders.
 //
-//   node scripts/lab/first-render.mjs [/dashboard] [--users parent,kid,solo] [--widths 390,1280]
-//                                     [--shots <dir>] [--kid-without-expenses]
+//   node scripts/lab/first-render.mjs [/dashboard | /expenses | /todos | /reminders] [--users parent,kid,solo] [--widths 390,1280]
+//                                     [--shots <dir>] [--prefix after] [--kid-without-expenses]
 //
 // For each user and width: signs in through the app's own route, then
 //   1. fetches the page as a phone's browser would (its User-Agent: Next sends crawlers, Lighthouse
@@ -19,7 +20,7 @@ import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { guardProblems, parseEnvFile } from "./guard.mjs";
-import { MOBILE, connect, cookieHeader, findChrome, homeStrings, launchChrome, signIn as labSignIn } from "./measure.mjs";
+import { MOBILE, connect, cookieHeader, findChrome, homeStrings, launchChrome, probesFor, signIn as labSignIn } from "./measure.mjs";
 
 const REPO = new URL("../../", import.meta.url).pathname;
 const problems = guardProblems(parseEnvFile(readFileSync(`${REPO}/.lab/app.env`, "utf8")));
@@ -33,7 +34,7 @@ const widths = option("--widths", "390,1280").split(",").map(Number);
 const shots = option("--shots", null);
 const kidWithoutExpenses = args.includes("--kid-without-expenses");
 const appUrl = "http://localhost:3110";
-const DATA_APIS = ["/api/dashboard", "/api/reminders", "/api/todos", "/api/expenses"];
+const DATA_APIS = ["/api/dashboard", "/api/reminders", "/api/todos", "/api/expenses", "/api/expense-tabs", "/api/family"];
 const users = JSON.parse(readFileSync(`${REPO}/.lab/users.json`, "utf8")).users;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const proxyLog = `${REPO}/.lab/supabase-calls.jsonl`;
@@ -70,6 +71,8 @@ async function fetchPage(cookies, strings) {
     status: response.status,
     firstByteMs: Math.round(firstByte),
     lastByteMs: Math.round(lastByte),
+    // The page's own data strings (PF7: Expenses' descriptions, To-dos' and Reminders' titles).
+    pageStringsInMarkup: `${found(strings.page)}/${strings.page.length}`,
     inMarkup: { expenses: `${found(strings.expenses)}/${strings.expenses.length}`, monthTotal: strings.expenses[0] ? markup.includes(strings.expenses[0]) : null, reminders: `${found(strings.reminders)}/${strings.reminders.length}`, todos: `${found(strings.todos)}/${strings.todos.length}` },
     // Anywhere in the page, scripts and the RSC payload included: for a user who must get none of it.
     expensesAnywhere: strings.expenses.filter((text) => text && html.includes(text)).length,
@@ -83,7 +86,10 @@ const parent = await labSignIn(appUrl, users.parent);
 // Each user's data strings, read before the kid's permission changes, so the kid's own expenses are
 // known and can be looked for in a page that must not have them.
 const stringsFor = {};
-for (const key of userKeys) stringsFor[key] = await homeStrings(appUrl, await labSignIn(appUrl, users[key]));
+for (const key of userKeys) {
+  const cookies = await labSignIn(appUrl, users[key]);
+  stringsFor[key] = { ...(await homeStrings(appUrl, cookies)), page: (await probesFor(page.split("?")[0], appUrl, cookies)).strings };
+}
 let kidMember = null;
 if (kidWithoutExpenses) {
   const { body } = await call(parent, "GET", "/api/family");
@@ -132,7 +138,7 @@ try {
       if (shots) {
         mkdirSync(shots, { recursive: true });
         const { data } = await send("Page.captureScreenshot", { format: "jpeg", quality: 80 });
-        writeFileSync(join(shots, `after-${page.slice(1).replace(/\W+/g, "-")}-${key}${kidWithoutExpenses && key === "kid" ? "-no-expenses" : ""}-${width}.jpg`), Buffer.from(data, "base64"));
+        writeFileSync(join(shots, `${option("--prefix", "after")}-${page.slice(1).replace(/\W+/g, "-")}-${key}${kidWithoutExpenses && key === "kid" ? "-no-expenses" : ""}-${width}.jpg`), Buffer.from(data, "base64"));
       }
       const result = { ...load, dashboardStatus: (await call(cookies, "GET", "/api/dashboard")).status, html };
       load = null;
