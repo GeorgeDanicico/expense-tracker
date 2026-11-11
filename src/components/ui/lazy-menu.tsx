@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { createLazyModule } from "@/lib/client/lazy-module";
 import { preloadWhenIdle } from "@/lib/client/preload";
 
 /**
@@ -18,37 +19,17 @@ import { preloadWhenIdle } from "@/lib/client/preload";
  */
 type Parts = typeof import("./menu-parts");
 
-let loaded: Parts | null = null;
-let loading: Promise<void> | null = null;
+const menuParts = createLazyModule<Parts>(() => import("./menu-parts"));
 let idleStarted = false;
-const swapListeners = new Set<() => void>();
-const beforeSwap = new Set<() => void>();
 
 /** Fetches the menu parts (once), then tells every waiting button to swap itself. A failed fetch is tried again next time. */
-export function loadMenuParts(): Promise<void> {
-  loading ??= import("./menu-parts").then(
-    (parts) => {
-      loaded = parts;
-      beforeSwap.forEach((listener) => listener());
-      swapListeners.forEach((listener) => listener());
-    },
-    () => {
-      loading = null;
-    },
-  );
-  return loading;
-}
-
-const subscribe = (listener: () => void) => {
-  swapListeners.add(listener);
-  return () => void swapListeners.delete(listener);
-};
+export const loadMenuParts = menuParts.load;
 
 /** The loaded menu parts, or null until they are: render the plain button while it is null. */
 export function useMenuParts(): Parts | null {
-  const parts = useSyncExternalStore(subscribe, () => loaded, () => null);
+  const parts = useSyncExternalStore(menuParts.subscribe, menuParts.get, () => null);
   useEffect(() => {
-    if (loaded || idleStarted) return;
+    if (menuParts.get() || idleStarted) return;
     idleStarted = true;
     preloadWhenIdle(loadMenuParts);
   }, []);
@@ -57,7 +38,8 @@ export function useMenuParts(): Parts | null {
 
 /**
  * The state a menu's button needs for the swap: the parts, the props that make the plain button ask for them,
- * two ref callbacks (`holdPlain` for the plain button, `takeFocus` for the real one: the swap puts a new button on the page and this hands it the focus the old one had), and whether a tap came before the parts did. `open` is a menu opened from
+ * two ref callbacks (`holdPlain` for the plain button, `takeFocus` for the real one: the swap puts a new
+ * button on the page and this hands it the focus the old one had), and whether a tap came before the parts did. `open` is a menu opened from
  * somewhere else (a swipe or a long press, `RowActions`): it asks for the parts too.
  */
 export function useLazyMenu({ open = false }: { open?: boolean } = {}) {
@@ -76,8 +58,7 @@ export function useLazyMenu({ open = false }: { open?: boolean } = {}) {
     const remember = () => {
       if (plain.current && plain.current === document.activeElement) hadFocus.current = true;
     };
-    beforeSwap.add(remember);
-    return () => void beforeSwap.delete(remember);
+    return menuParts.subscribeBefore(remember);
   }, []);
 
   const takeFocus = useCallback((element: HTMLElement | null) => {

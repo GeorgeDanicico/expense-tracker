@@ -17,11 +17,9 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// The sheet is loaded on demand in the app (PF9); here `dynamic` hands back the loaded sheet at once, so the markup below has it.
-vi.mock("next/dynamic", async () => {
-  const { QuickAddSheet } = await import("./quick-add-sheet");
-  return { default: () => QuickAddSheet };
-});
+// The sheet is loaded on demand in the app (PF9). `lazySheet` renders the loaded component at once, also on the server, so
+// loading the module first gives the markup below the open sheet.
+await (await import("./quick-add-provider")).preloadQuickAddSheet();
 
 import { ExpensesClient } from "@/app/(app)/expenses/expenses-client";
 import { RemindersClient } from "@/app/(app)/reminders/reminders-client";

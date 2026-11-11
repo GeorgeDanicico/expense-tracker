@@ -1,6 +1,7 @@
 "use client";
 
 import { Box, Stack, Text } from "@chakra-ui/react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
@@ -34,18 +35,20 @@ import type { ExpenseTab } from "@/lib/expenses/tabs";
 const editSheet = lazySheet(() => import("@/components/expenses/edit-expense-sheet").then((module) => module.EditExpenseSheet));
 const tabDialogSheet = lazySheet(() => import("@/components/expenses/expense-tab-dialog").then((module) => module.ExpenseTabDialog));
 const confirmSheet = lazySheet(() => import("@/components/ui/confirm-dialog").then((module) => module.ConfirmDialog));
-const customTab = lazySheet(() => import("@/components/expenses/custom-expense-tab").then((module) => module.CustomExpenseTab));
+// The saved tab is the page's content, not a sheet: it is rendered on the server and shows a skeleton while its script loads.
+const CustomExpenseTab = dynamic(() => import("@/components/expenses/custom-expense-tab").then((module) => module.CustomExpenseTab), {
+  loading: () => <RowsCardSkeleton label="Loading expenses…" slowKey={FAMILY_API_KEY} />,
+});
 const EditExpenseSheet = editSheet.Sheet;
 const ExpenseTabDialog = tabDialogSheet.Sheet;
 const ConfirmDialog = confirmSheet.Sheet;
-const CustomExpenseTab = customTab.Sheet;
 
 /** Starts loading what a tap on this page can open, once the pointer, focus or a finger is on the page. */
 function preloadSheets() {
   editSheet.preload();
   tabDialogSheet.preload();
   confirmSheet.preload();
-  customTab.preload();
+  void import("@/components/expenses/custom-expense-tab");
 }
 
 type TabDialog = { mode: "create" } | { mode: "edit"; tab: ExpenseTab };

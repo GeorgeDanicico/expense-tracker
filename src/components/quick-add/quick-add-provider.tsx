@@ -1,11 +1,10 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useNavigation } from "@/components/layout/use-navigation";
-import { SheetLoading, useOpenedOnce } from "@/components/ui/lazy-sheet";
+import { lazySheet, useOpenedOnce } from "@/components/ui/lazy-sheet";
 import { UndoToast, UNDO_MS } from "@/components/ui/undo-toast";
 import { preloadWhenIdle } from "@/lib/client/preload";
 
@@ -17,13 +16,13 @@ export type QuickAddOptions = {
   kind?: QuickAddKind;
 };
 
-/** The sheet's script: the four forms and what they pull in. Loaded ahead of the first tap, see `QuickAddProvider`. */
-const loadSheet = () => import("./quick-add-sheet");
+/** The sheet: the four forms and what they pull in. Loaded ahead of the first tap, see `QuickAddProvider`. */
+const quickAddSheet = lazySheet(() => import("./quick-add-sheet").then((module) => module.QuickAddSheet));
+const QuickAddSheet = quickAddSheet.Sheet;
+const loadSheet = quickAddSheet.preload;
 
-const QuickAddSheet = dynamic(() => import("./quick-add-sheet").then((module) => module.QuickAddSheet), {
-  // A tap before the script has arrived (a slow link, a fast thumb): a spinner at once, then the sheet.
-  loading: () => <SheetLoading />,
-});
+/** Starts loading the sheet's script; the promise settles when it is in (tests wait on it). */
+export const preloadQuickAddSheet = loadSheet;
 
 const QuickAddContext = createContext<{
   open: (options?: QuickAddOptions) => void;
@@ -73,7 +72,7 @@ export function QuickAddProvider({ initial = null, children }: { initial?: Quick
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const value = useMemo(() => ({ open, preload: () => void loadSheet() }), [open]);
+  const value = useMemo(() => ({ open, preload: loadSheet }), [open]);
   return (
     <QuickAddContext.Provider value={value}>
       {children}

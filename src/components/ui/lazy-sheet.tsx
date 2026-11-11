@@ -1,8 +1,9 @@
 "use client";
 
 import { Box, Spinner } from "@chakra-ui/react";
-import dynamic from "next/dynamic";
-import { useState, type ComponentType } from "react";
+import { createElement, useEffect, useState, useSyncExternalStore, type ComponentType } from "react";
+
+import { createLazyModule } from "@/lib/client/lazy-module";
 
 /**
  * What a sheet or dialog that is loaded on demand (`next/dynamic`, PF9) shows while its script is on the
@@ -30,15 +31,23 @@ export function useOpenedOnce(active: boolean): boolean {
 }
 
 /**
- * A sheet or dialog loaded when it is first wanted (`next/dynamic`, PF9). `Sheet` is used like the
- * component it stands for, rendered only once it is wanted (see {@link useOpenedOnce}); it shows
- * {@link SheetLoading} until its script arrives. `preload` starts the download ahead of time: call it on
- * hover, focus or touch near the control that opens the sheet (`preloadOnIntent`).
- * Call it once, at module level.
+ * A sheet or dialog loaded when it is first wanted (PF9). `Sheet` is used like the component it stands for,
+ * rendered only once it is wanted (see {@link useOpenedOnce}); it shows {@link SheetLoading} until its script
+ * arrives. `preload` starts the download ahead of time: call it on hover, focus or touch near the control that
+ * opens the sheet (`preloadOnIntent`), or when the browser is idle. Call `lazySheet` once, at module level.
+ *
+ * This is not `next/dynamic`: that suspends the first time it renders even when its script is already there,
+ * which put a loading frame and an extra render between a tap and a sheet whose code had been preloaded
+ * (the lab measured +270 ms on a 4x slower CPU). Once the script is in, `Sheet` renders the component at once.
  */
 export function lazySheet<P extends object>(load: () => Promise<ComponentType<P>>) {
-  return {
-    Sheet: dynamic(load, { loading: () => <SheetLoading /> }),
-    preload: () => void load(),
-  };
+  const script = createLazyModule(load);
+  function Sheet(props: P) {
+    const loaded = useSyncExternalStore(script.subscribe, script.get, script.get);
+    useEffect(() => {
+      void script.load();
+    }, []);
+    return loaded ? createElement(loaded, props) : <SheetLoading />;
+  }
+  return { Sheet, preload: script.load };
 }
