@@ -52,7 +52,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF9 | Smaller bundles | done, except Lighthouse's LCP on Home (still about 4.8 s, see PF9 section 4) and dnd-kit left in To-dos | #235 |
 | PF10 | SQL: indexes and RLS for the slow queries | done, with no migration: the lab and the advisor found no index a slow query needs (see PF10 section 3); waiting on rows 6 to 8 | #236 |
 | PF11 | Smooth interaction | done, except the first open of a lazy sheet (about 250 ms on the 4x CPU, see PF11 section 4); React Compiler tried and dropped | #237 |
-| PF12 | Lean runtime on the VPS | done, except the VPS numbers (the worker's heap limit is now 153 MB, the web container's stays on Node's own 432 MB, `preloadEntriesOnStart` stays on: it would save 23 MB, the bar is 50) | #PR |
+| PF12 | Lean runtime on the VPS | done, except the VPS numbers (the worker's heap limit is now 153 MB, the web container's stays on Node's own 432 MB, `preloadEntriesOnStart` stays on: it would save 23 MB, the bar is 50) | #238 |
 | PF13 | Measure and close | not started | |
 
 ## The short version
