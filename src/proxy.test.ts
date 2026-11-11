@@ -113,6 +113,19 @@ describe("the proxy's security headers", () => {
     expect(response.headers.get("content-security-policy-report-only")).toContain("'unsafe-eval'");
   });
 
+  it("forwards the page's path and query for the (app) layout's sign-in redirect, without `_rsc` (PF5)", async () => {
+    const page = await proxy(new NextRequest("http://localhost/expenses?month=2026-10"));
+    expect(forwardedRequestHeaders(page)["x-page-path"]).toBe("/expenses?month=2026-10");
+
+    const navigation = await proxy(new NextRequest("http://localhost/todos?_rsc=1x2y3"));
+    expect(forwardedRequestHeaders(navigation)["x-page-path"]).toBe("/todos");
+  });
+
+  it("overwrites a page path the client sent", async () => {
+    const response = await proxy(new NextRequest("http://localhost/dashboard", { headers: { "x-page-path": "//evil.test" } }));
+    expect(forwardedRequestHeaders(response)["x-page-path"]).toBe("/dashboard");
+  });
+
   it("overwrites a nonce the client sent", async () => {
     const response = await proxy(new NextRequest("http://localhost/login", { headers: { "x-nonce": "chosen-by-attacker" } }));
     expect(forwardedRequestHeaders(response)["x-nonce"]).not.toBe("chosen-by-attacker");

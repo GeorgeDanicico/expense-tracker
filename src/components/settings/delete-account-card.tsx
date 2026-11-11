@@ -2,7 +2,6 @@
 
 import { Button, Input, List, Stack, Text } from "@chakra-ui/react";
 import { Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useSWRConfig } from "swr";
 
@@ -17,6 +16,7 @@ import { forgetThisDeviceBeforeSignOut } from "@/hooks/use-notification-settings
 import { DELETE_ACCOUNT_PHRASE } from "@/lib/account/data-repository";
 import type { AccountMembership } from "@/lib/account/types";
 import { deleteAccount } from "@/lib/api/account-requests";
+import { loadAfterSessionChange } from "@/lib/api/auth-redirect";
 import { afterSignOut } from "@/lib/api/invalidate";
 import { currentSubscription } from "@/lib/notifications/browser";
 
@@ -42,7 +42,6 @@ export function deletionBlockedReason(membership: AccountMembership | null): str
  * account in a family sees why it can't be deleted yet instead of the button.
  */
 export function DeleteAccountCard({ membership }: { membership: AccountMembership | null }) {
-  const router = useRouter();
   const { mutate } = useSWRConfig();
   const form = useApiForm();
   const [open, setOpen] = useState(false);
@@ -61,7 +60,7 @@ export function DeleteAccountCard({ membership }: { membership: AccountMembershi
       // The server already deleted this browser's push subscription with the account; stop it here too.
       await forgetThisDeviceBeforeSignOut({ current: currentSubscription, deleteOnServer: async () => undefined });
       await afterSignOut(mutate);
-      router.replace("/login");
+      loadAfterSessionChange("/login");
     }, { fallback: "Unable to delete your account. Please try again." });
   }
 

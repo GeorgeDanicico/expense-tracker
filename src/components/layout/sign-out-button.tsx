@@ -2,7 +2,6 @@
 
 import { Button } from "@chakra-ui/react";
 import { LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 
@@ -12,6 +11,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useApiForm } from "@/hooks/use-api-form";
 import { forgetThisDeviceBeforeSignOut } from "@/hooks/use-notification-settings";
 import { signOut as requestSignOut } from "@/lib/api/account-requests";
+import { loadAfterSessionChange } from "@/lib/api/auth-redirect";
 import { afterSignOut } from "@/lib/api/invalidate";
 
 /**
@@ -19,7 +19,6 @@ import { afterSignOut } from "@/lib/api/invalidate";
  * turns off this device's notifications (best effort, never blocking the sign-out).
  */
 function useSignOut() {
-  const router = useRouter();
   const { mutate } = useSWRConfig();
   const form = useApiForm();
   const [confirming, setConfirming] = useState(false);
@@ -29,7 +28,7 @@ function useSignOut() {
       await forgetThisDeviceBeforeSignOut();
       await requestSignOut();
       await afterSignOut(mutate);
-      router.replace("/login");
+      loadAfterSessionChange("/login");
     }, { fallback: "Unable to sign out. Try again." });
   }
 

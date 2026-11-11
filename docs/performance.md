@@ -40,7 +40,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF2 | No endless loading | done | #228 |
 | PF3 | Skeletons and a boundary per section | done, except the cold-load cost found (see PF3 section 7) | #229 |
 | PF4 | Fewer round trips in the app | done, except one getClaims per request: waiting on row 1 | #230 |
-| PF5 | Session gate and account on the server | not started | |
+| PF5 | Session gate and account on the server | done | #PRNUM |
 | PF6 | First data on the server for Home | not started | |
 | PF7 | The same for Expenses, To-dos and Reminders | not started | |
 | PF8 | Prefetching, waterfalls and stable data | not started | |
@@ -89,6 +89,14 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   investment account showed only its **oldest 1,000 orders**; now all of them, up to 5,000. Pages
   don't show their data measurably sooner (within the 150 ms noise); asymmetric keys still would,
   by 150 to 254 ms (row 1).
+
+- **PF5, the session gate on the server.** A signed-out visit to any page is a redirect to sign in
+  straight from the server: **32 requests and 425 KiB instead of 82 and 610**, and none of the app's
+  code. Signed in, the shell and skeleton come with the page: on the emulated phone the first text
+  appears at **1.4 s instead of 7.2 s**, the data **0.4 to 0.8 s sooner**, with no `/api/account`
+  request and 7 fewer Auth calls per cold load (Home 30 → 23). The cost: the first byte waits
+  ~110 ms for the account, and on a fast network with a slow phone CPU the data comes 0.1 to 0.3 s
+  later, until PF6 and PF7 start it on the server.
 
 ## Baseline and budgets
 
@@ -1857,3 +1865,352 @@ lab, and `.lab/` holds only `results/`.
   layer instead of per write (Supabase's RPC reads are POSTs too, so a write can't be told from a
   read there); showing a 409's message in every `DataError` (no other read answers 409); one helper
   for "read cap + 1 and refuse" (two places, different messages).
+
+### PF5: The session gate and the account on the server
+
+#### 1. The problem
+
+- **A signed-out visitor downloaded the app only to be told to sign in** (audit P12). Opening
+  `/dashboard` without a session answered 200 with a grey loading screen, then 64 script files
+  (432 KiB), then the app asked `/api/account` ("who am I?"), got a 401, and only then went to the
+  sign-in page: 82 requests and 610 KiB to reach a form.
+- **Every signed-in cold load started blank and waited for "who am I?".** The layout above every
+  page was a browser component. On the server it could only draw that text-free grey screen; in
+  the browser it asked `/api/account` after all the scripts had run, and drew the shell and the page
+  only when the answer came. On the emulated phone the first text (FCP, the moment any text first
+  appears) came at about **7.2 s**, after 48 requests had finished. PF3's skeletons couldn't help,
+  because this screen came before them.
+
+#### 2. What changed
+
+**What a person notices**
+
+- **Signed out:** any signed-in page (and `/`) answers with a redirect to
+  `/login?next=<that page and its query>` straight from the server: no app code, no "Checking…"
+  screen first. The browser downloads only the sign-in page.
+- **Signed in, cold load:** the shell (sidebar or bottom bar, your name and picture) and the page's
+  skeleton come in the first answer from the server. On the emulated phone the first text appears at
+  **1.4 s instead of 7.2 s**, and the data lands 0.4 to 0.8 s sooner than before. On a fast network
+  with a slow phone CPU the data lands 0.1 to 0.3 s *later* (4 explains why).
+- **No `/api/account` request on a cold load.** The account comes with the page.
+- **A password that must be changed** (a kid's first sign-in, or after a parent reset it) sends you
+  to `/change-password` from the server, before the page shows.
+- **Signing in, signing out, deleting your account and choosing a new password now end with a full
+  page load** instead of a move inside the app. Without it, signing out and back in on the same tab
+  could get stuck bouncing between the sign-in page and Home (found in the lab, 3 below).
+- Loaded screens look the same as before; the first screen is now the shell with PF3's skeleton
+  instead of the grey loading screen (screenshots in 4).
+
+**How it works**
+
+- `src/app/(app)/layout.tsx` is now a **server component**. It reads the session the same way
+  `withUser` does (`getAuthenticatedUser`), then the account. No session → `redirect` to
+  `/login?next=…`; `mustChangePassword` → `redirect("/change-password")`; otherwise it renders
+  `AppShellClient` with the account.
+- `src/lib/account/load-account.ts` (new): `loadAccount(user)` is the account response, moved out of
+  `src/app/api/account/route.ts`, which now calls it (its tests are unchanged and pass).
+  `loadPageAccount()` is the same for a server component: signed-in user's account, or `null`.
+- `asPageCaller(fn)` (new, `src/lib/auth/index.ts`): runs a server component's reads as the
+  request's cookie session inside `runWithSupabaseClient`, which gives it PF4's once-per-request memo.
+- `src/app/(app)/app-shell-client.tsx` (new, browser): puts the account in SWR's `fallback` under
+  `/api/account`, so `useAccount()` has it on the first render everywhere under the layout, and
+  draws `AppShell` and the account-notice dialog from it. It keeps the old layout's client-side
+  redirect to `/change-password` for an account that is loaded again while the app is open.
+- `src/hooks/use-account.ts`: a hook that mounts while SWR's only copy of the account is the
+  server's, less than 15 s after the page loaded (SWR's own dedupe window, now one constant,
+  `DEDUPING_INTERVAL_MS` in `src/lib/api/client.ts`), doesn't ask `/api/account` again. Later
+  mounts revalidate as before.
+- `src/proxy.ts` puts the page's path and query on the request as `x-page-path` (overwriting any the
+  client sent), because a layout isn't given the URL. `src/lib/http/page-path.ts` drops Next's
+  `_rsc` parameter. The layout builds `next` with `loginUrl` (`src/lib/api/auth-redirect.ts`), which
+  runs PF2's `safeNextPath`: anything that isn't a same-site path becomes `/dashboard`.
+- `src/app/page.tsx` (`/`) is a server component that redirects to `/dashboard`; the layout there
+  decides between the app and sign-in.
+- `loadAfterSessionChange(path)` (new, `src/lib/api/auth-redirect.ts`) moves with a full page load.
+  The sign-in form and the sign-in page (for a visitor who is already signed in), sign-out, "Sign out
+  everywhere", account deletion, the change-password page and the shell's own password redirect use
+  it instead of `router.replace`. `afterSignIn` and `afterPasswordChange` (`src/lib/api/invalidate.ts`)
+  are gone: they only patched SWR's cache for a move inside the app, and a full load starts with an
+  empty cache.
+- **The hand-written `router.prefetch` list is gone** (`/dashboard`, `/expenses`, `/investments`,
+  `/net-worth`, `/settings`). The links prefetch the sections they show, since PF3 gave every
+  section a `loading.tsx`.
+- Tests: `layout.test.tsx` (every redirect case, and that the layout's account equals what
+  `GET /api/account` answers for the same data), `app-shell-client.test.tsx` (the shell and a page
+  render with a fetcher that fails if `/api/account` is asked for; it asks again once the server's
+  copy is older than 15 s; an account SWR already has wins over the server's; a reloaded account
+  that must change its password redirects), `load-account.test.ts`, `page.test.ts`,
+  `page-path.test.ts`, and additions to `proxy.test.ts`, `auth-redirect.test.ts` and
+  `src/lib/auth/index.test.ts`. `src/test/redirect.ts` mocks `next/navigation`'s `redirect`.
+- `scripts/lab/session-gate.mjs` (new): the lab probe behind the checks in 4. `measure.mjs` now
+  exports its Chrome, DevTools and sign-in helpers for it.
+
+#### 3. Why this way
+
+- **The plan's design, checked against the installed docs.** The layout awaits the account because
+  the redirects depend on it. A layout's own data holds up the first byte and isn't covered by
+  `loading.js` (`layout.md`, "Interaction with loading.js"; `authentication.md`, "Auth and
+  streaming"), but a layout doesn't render again on client navigation (`authentication.md`,
+  "Layouts and auth checks"), so only a cold load pays. In the lab that is about 110 ms of server
+  time (one Auth call, then the four account reads side by side, at 40 ms each).
+- **The gate isn't the only check, by design.** The same doc warns that a layout check doesn't run
+  on every navigation and doesn't stop the pages under it from rendering. Here every page's data
+  comes from API routes that check the session themselves; a 401 sends the browser to sign in
+  (PF2) and a 403 `password_change_required` to `/change-password`. The pages under the layout are
+  browser components with no data of their own on the server, and Investments and Net worth only
+  wrap browser panels, so a page that renders while the layout redirects has nothing private in it.
+- **One loader for the route and the layout** (plan, Design 2; `swr.md`, "Provide initial data from
+  a Server Component"): the layout's account is exactly what `/api/account` would have answered, so
+  the same rules apply to a kid, a removed member, a deleted account and an expired session. The
+  layout test compares the two for each case.
+- **The account as a value in `fallback`, not a promise.** The SWR guide passes unawaited promises;
+  here the layout has already awaited the account to decide the redirects, so there is nothing left
+  to stream.
+- **Skipping the first revalidation.** The SWR guide's default is to treat fallback data as stale
+  and fetch again after hydration. That would be one `/api/account` request (2 Auth calls, 4 reads)
+  per cold load to re-read what the server read a moment earlier. `revalidateIfStale: false`
+  everywhere (an option the guide names) would also stop the account from refreshing when you open
+  another page later, which is how a removed member or changed permissions show up today. So the
+  skip is limited to "SWR has only the server's copy and the page is less than 15 s old": the same
+  freshness SWR gives any answer it fetched itself.
+- **A full page load across every change of session.** Running the lab's sign-out-and-in check four
+  times, two runs got stuck: `/dashboard` → `/login?next=%2Fdashboard` → `/dashboard`… about 16
+  times a second, with an empty page. The trace showed why. In the moment between the sign-out
+  request and leaving the page, the router prefetched `/dashboard` and `/more` from the links on
+  screen; the server, seeing no session, answered both with the layout's redirect to sign in, and
+  the router kept that answer. After signing in, `router.replace("/dashboard")` followed the kept
+  redirect without asking the server, the sign-in page saw an account and sent the browser back,
+  and so on. Before PF5 the layout never redirected on the server, so a page prefetched while signed
+  out was harmless. Next's own guide signs out with a Server Action, which clears the router's cache
+  by itself; this app signs in and out through route handlers, which don't. A full page load is the
+  one way that drops the router's memory whatever is in it, and it also keeps the last person's
+  account (now part of the page the router keeps) from coming back on Back. Turned down:
+  `router.refresh()` (its docs say it clears the current route only, not the prefetched ones).
+- **The path in a header.** Layouts don't get the URL (`layout.md`). The alternative, deciding the
+  redirect in the proxy, would need the proxy to know which paths are signed-in pages (route groups
+  aren't in the URL) and would split the gate in two places.
+- **`/` always goes to `/dashboard`.** Checking the session there too would cost one more Auth call;
+  a signed-out visitor now goes `/` → `/dashboard` → `/login?next=%2Fdashboard`, which ends in the
+  same place.
+- **Dropping `router.prefetch`** (plan): the links already prefetch the sections they show, and
+  PF3 found the hand list was where the extra 58 KB came from (`/investments`, `/net-worth` and
+  `/settings` aren't linked from the phone's bottom bar, so their panel code came only from it).
+- **Turned down:** reading only the user and the password flag before deciding, and streaming the
+  rest (the shell needs the name, the picture and the membership to draw anything, so nothing would
+  paint sooner); checking the session in the proxy instead of a second `getClaims` (waits on row 1,
+  as the brief says).
+
+#### 4. Numbers
+
+All from the lab on George's laptop, 10–11 November 2026, with the shared-secret JWT like
+production and 40 ms added to every call to Supabase (`npm run lab -- delay 40`). "Before" is `main`
+at `618fee4`, "after" this branch. Medians of three cold loads; ± is half the spread. **Not
+production numbers.** "Slow 4G" is the lab's emulated phone (`docs/lab.md`); "CPU only" keeps the
+phone's 4× slower CPU but not the slow network, which is where server time shows.
+
+```bash
+npm run lab -- up && npm run lab -- delay 40
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3 --no-lighthouse
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user kid --runs 3 --no-lighthouse
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3 --throttle cpu --no-lighthouse
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user kid --runs 3 --throttle cpu --no-lighthouse
+```
+
+The tables below are read from the runs' JSON (`.lab/results/<time>-pf5-<before|after>-…/runs-*.json`):
+`observed.fcp`, `observed.lcp`, `observed.settled` and `observed.content`, and `server.routes`.
+
+**Slow 4G, parent, ms** (before → after):
+
+| | Home | Expenses | To-dos | Reminders |
+| --- | ---: | ---: | ---: | ---: |
+| FCP, the first text | 7,212 → **1,412** | 7,588 → **1,428** | 7,364 → **1,400** | 7,244 → **1,412** |
+| LCP, the biggest thing on screen | 7,848 → **7,148** | 8,652 → **8,276** | 7,364 → **1,400** | 7,244 → **1,412** |
+| Data on screen (every placeholder gone) | 7,906 → **7,546** | 8,545 → **8,167** | 8,057 → **7,643** | 7,866 → **7,049** |
+| Requests finished before the first text | 48 → **3** | 52 → **3** | 49 → **3** | 48 → **3** |
+
+**Slow 4G, kid, ms:**
+
+| | Home | Expenses | To-dos | Reminders |
+| --- | ---: | ---: | ---: | ---: |
+| FCP | 7,236 → **1,420** | 7,656 → **1,400** | 7,388 → **1,408** | 7,264 → **1,412** |
+| LCP | 7,872 → **7,120** | 8,364 → **7,852** | 7,388 → **1,408** | 7,264 → **1,412** |
+| Data on screen | 7,860 → **7,495** | 8,280 → **7,468** | 8,065 → **7,624** | 7,804 → **6,971** |
+
+**CPU only, ms** (parent; kid in brackets):
+
+| | Home | Expenses | To-dos | Reminders |
+| --- | ---: | ---: | ---: | ---: |
+| FCP | 1,060 → **340** (1,052 → 344) | 1,136 → **328** (1,120 → 324) | 1,052 → **324** (1,056 → 324) | 1,048 → **340** (1,040 → 324) |
+| LCP | 1,228 → 1,440 (1,244 → 1,376) | 1,356 → 1,628 (1,424 → 1,720) | 1,052 → **324** (1,056 → 324) | 1,048 → **340** (1,040 → 324) |
+| Data on screen | 1,286 → 1,416 (1,254 → 1,383) | 1,727 → 1,963 (1,357 → 1,646) | 1,325 → 1,428 (1,309 → 1,419) | 1,253 → 1,383 (1,215 → 1,336) |
+| Total blocking time | 4 → 215 | 730 → 1,231 | 98 → 308 | 41 → 244 |
+
+**Per cold load, both users and both passes** (the counts didn't vary):
+
+| | Home | Expenses | To-dos | Reminders |
+| --- | ---: | ---: | ---: | ---: |
+| `/api/account` requests | 1 → **0** | 1 → **0** | 1 → **0** | 1 → **0** |
+| Calls to Supabase Auth | 30 → **23** | 29 → **22** | 26 → **19** | 22 → **15** |
+| All calls to Supabase | 49 → **42** | 48 → **41** | 40 → **33** | 33 → **26** |
+| Link prefetches (`?_rsc=`) | 16 → **10** | 13 → **7** | 14 → **8** | 12 → **6** |
+| JS on the wire, KiB | 491.5 → **433.1** | 494.4 → **454.1** | 505.6 → **445.1** | 484.5 → **425.0** |
+| The page itself (gzipped / unzipped), KiB | 15.8 / 80 → 23.2 / 143 | 16.0 / 80 → 26.7 / 182 | 15.9 / 80 → 23.3 / 142 | 15.9 / 80 → 23.4 / 143 |
+| Time to the page's first byte (TTFB), ms | 61 → 168 | 59 → 174 | 56 → 164 | 59 → 168 |
+
+What it says:
+
+- **The first text comes 5.8 s sooner on the slow phone** on every page, for both users: it is in
+  the first answer now, and only the stylesheet and a font have to arrive before it paints. On
+  To-dos and Reminders the biggest thing on screen is the subtitle in the skeleton, so LCP moves the
+  same 5.8 s.
+- **The data comes 0.36 to 0.83 s sooner on the slow phone** (Reminders most), mostly because
+  `/api/account` no longer has to come and go first.
+- **On a fast network with a slow CPU the data comes 0.10 to 0.29 s later, and LCP on Home and
+  Expenses with it.** I looked at the request timings: the shell's own requests start about 60 ms
+  *sooner* than before, but the page's data requests start 70 to 290 ms later (Expenses: 1,019 →
+  1,276 ms). The page now arrives drawn by the server and has to be hydrated (React attaching itself
+  to it) before its effects send the requests; before, React drew it from nothing right after
+  `/api/account` answered, which on this pass happened earlier. The blocking time grew for the
+  same reason (hydrating a full page is one long task). PF6 and PF7 start the data on the server,
+  which takes these requests out of the browser's hands altogether.
+- **7 fewer Auth calls per cold load**: −2 for `/api/account`, +1 for the layout's own check (the
+  proxy has already checked once; asymmetric keys, row 1, would make both free), and −6 from the
+  prefetches: the hand-written list's three sections that no link on the phone's screen points to
+  (Investments, Net worth, Settings), each fetched twice. A prefetch doesn't render the layout again: the
+  Supabase calls add up to exactly the page, the API requests, the prefetches' proxy checks and one
+  browser report.
+- **58 to 60 KiB less JavaScript per cold load**, the same size PF3 found the section prefetches
+  added (57.9 KiB). This is the `router.prefetch` list: nothing else here changes what scripts load.
+- **The page itself is about 7 to 11 KiB bigger on the wire** (the shell and the skeleton are in
+  it), and its first byte comes about 110 ms later (the layout's Auth call and account reads).
+- CLS (how much the page jumps) is unchanged except Expenses for the parent, 0.014 → 0.023: PF3
+  measured 0.023 too, so the "before" here was the low one.
+- **Home's "content" marker isn't a data string any more**: since PF3 the month card's title
+  "Spent in November" is drawn before its amount, and now it is in the first HTML. So for Home I
+  give "every placeholder gone" above; the marker says 7,106 → 1,354 ms, which is the title.
+
+**Signed out, `/dashboard`** (Lighthouse 13.6.0, mobile preset, three runs, all three identical
+except FCP ±3 ms):
+
+```bash
+npx lighthouse@13.6.0 http://localhost:3110/dashboard --only-categories=performance --output=json \
+  --output-path=dashboard-1.json --chrome-flags="--headless=new --no-sandbox" --quiet
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' http://localhost:3110/dashboard
+```
+
+| | Before | After |
+| --- | ---: | ---: |
+| First answer | 200, the app's loading screen | **307 to `/login?next=%2Fdashboard`** |
+| Requests | 82 | **32** |
+| Scripts | 64 files, 432.4 KiB | **22 files, 296.4 KiB** (the sign-in page's own) |
+| Everything transferred | 610 KiB | **425 KiB** |
+| App code from the signed-in pages (`app/(app)/…` chunks) | yes | **none** (`session-gate.mjs`) |
+| Lighthouse FCP / time to interactive | 1,520 / 6,104 ms | 1,063 / 3,974 ms |
+
+Every signed-in page answers the same way signed out: `curl` gave a 307 to `/login?next=<path>`
+for all ten sections (`/` answers 307 to `/dashboard`, which then does the same; the query is kept: `/expenses?month=2026-10` →
+`/login?next=%2Fexpenses%3Fmonth%3D2026-10`). The redirect's body is Next's own error shell, which a
+browser doesn't read on a 307.
+
+**Every case of the gate, checked for real** (`node scripts/lab/session-gate.mjs --width 1280`, then
+`--width 390 --writes`; cold loads in headless Chromium, lab server in UTC as production's container
+is, after midnight Bucharest time, so server and browser were on different dates; run on the first
+build and again on the final one):
+
+| Case | Where it ended | Unit test |
+| --- | --- | --- |
+| Signed out, each of the ten sections and `/` | 307 → `/login?next=<page>` (`/` goes through `/dashboard`), 21 to 22 scripts, all the sign-in page's, no `(app)` code | `layout.test.tsx`, `page.test.ts` |
+| A damaged session cookie (what an expired session whose refresh failed looks like) | 307 → `/login?next=%2Fexpenses%3Fmonth%3D2026-10` | `layout.test.tsx` (no user) |
+| A session ended from another device ("sign out everywhere" from a second sign-in) | 307 → `/login?next=%2Ftodos` | same |
+| A kid whose password a parent just set (a kid's first sign-in), on `/dashboard` and `/reminders` | 307 → `/change-password` | `layout.test.tsx`, two cases |
+| The same kid after choosing a password | `/dashboard`, the shell | `layout.test.tsx` |
+| A member removed from the family (Sam) | `/dashboard`, the shell, and the "You were removed from the family The Example Family" dialog | `layout.test.tsx` (no membership, same as the route) |
+| A deleted account (Casey), visiting with the cookies it had | 307 → `/login?next=%2Fdashboard` | `layout.test.tsx` (no user) |
+| The parent and the kid on each of the ten sections, 390 and 1280 px | the section, no `/api/account` request | `app-shell-client.test.tsx` |
+| Signing out and in as the kid in the same tab, through the buttons | before the full loads: 2 of 4 runs stuck in a `/login` ↔ `/dashboard` loop (3); after: 7 of 7 runs ended on the kid's More page naming `robin.lab` (2 with the probe, 5 with a trace script that isn't in the repo; a sixth trace run printed nothing, because that script didn't guard against the page reloading under it) | `auth-redirect.test.ts` (full load); `app-shell-client.test.tsx` (SWR's answer wins over the server's copy) |
+| A database failure while reading the account | not checked in the lab | `layout.test.tsx`: it throws to the error boundary, neither redirects nor renders |
+
+**The browser console on every one of those loads:** no errors and no warnings, so no React
+hydration errors and no CSP report-only violations (the nonce still reaches next-themes' and Next's
+scripts; S14 hasn't switched to enforcing yet). The only line is on the sign-in page: its own
+"Checking your session…" asks `/api/account` and gets the 401 it expects, as before.
+
+**Screenshots** (after; 390 and 1280 px, the server's first screen with every data request held,
+and the loaded page), in `docs/performance/screenshots/pf5/`, named
+`after-<page>-<width>-<loading|loaded>.jpg`: [Home, 390, first screen](performance/screenshots/pf5/after-dashboard-390-loading.jpg) ·
+[Home, 1280, loaded](performance/screenshots/pf5/after-dashboard-1280-loaded.jpg) ·
+[Expenses, 1280, loaded](performance/screenshots/pf5/after-expenses-1280-loaded.jpg).
+They match PF3's `after-…` screenshots apart from the data (the seed moved a day). There is no
+"before" picture of the old grey screen: it is the one PF1 describes ("Opening your ledger…", grey
+boxes, no visible text).
+
+Checks: `npm run lint`, `npx next typegen && npm run typecheck`, `npm test` (6,873 passed),
+`npm run build`: all pass.
+
+#### 5. How to check it yourself
+
+1. `npm run lab -- up`.
+2. Signed out: `curl -sI http://localhost:3110/expenses?month=2026-10` shows
+   `307` and `location: /login?next=%2Fexpenses%3Fmonth%3D2026-10`. In a private window, open
+   `/dashboard` with the network panel open: only the sign-in page's files load.
+3. Sign in (`.lab/users.json`), then reload Home with the network panel open: no `/api/account`
+   request, and the shell and skeleton are in the page's own HTML.
+4. `node scripts/lab/session-gate.mjs` prints every case above, one JSON line each; `--writes` adds
+   the kid's first sign-in, a removed member and a deleted account (it changes the lab's data, so
+   run it last).
+5. `npm run lab -- down`.
+
+#### 6. Risks and how to undo it
+
+- **This layout decides who sees the app.** A mistake here locks people out or lets a page render
+  for the wrong person. The cases are in 4, each checked in the lab and in a unit test. Even if the
+  gate failed open, every request for data still checks the session itself.
+- **A cold load's first byte now waits for the account** (about 110 ms in the lab: one Auth call
+  and the reads). If Supabase is slow, the whole first screen waits; before, the grey screen came
+  at once and the wait came later. If the account can't be read at all, the page shows the root
+  error screen ("We couldn't load this page", Try again) instead of the layout's own error. That
+  should be what happens: the unit test shows the layout throws, but I didn't break the database in
+  the lab to watch it.
+- **Hydration is now a long task** on every cold load (blocking time +100 to +500 ms on the 4×
+  CPU), and on a fast network with a slow CPU the data comes 0.1 to 0.3 s later (4). A component that
+  draws something different on the server and in the browser (the clock, local time zones) would now
+  show a hydration error; none did in the lab, with the server in UTC.
+- **Signing in and out are full page loads now.** Each costs a page load where it was a move inside
+  the app (on the phone, sign-in now lands on a cold load of Home: 1.4 s to the first text in the
+  lab, 4). If a place that changes the session is added later and moves with `router.replace`, the
+  loop in 3 can come back; `loadAfterSessionChange` says why in its comment.
+- **The 15 s skip of the account's first refresh depends on `performance.now()`** being the time
+  since the page loaded, which it is in every browser. If it weren't, the account would be
+  refreshed on mount as before, which is safe.
+- **Sections no link on screen points to aren't prefetched any more.** On a phone, Investments, Net
+  worth and Settings are reached through More or the Money tabs, whose links prefetch them once they
+  are on screen. A tap that beats that prefetch should wait for the server before the skeleton
+  shows; I didn't measure it.
+- No migration, nothing stored. To undo: revert the PR.
+
+#### 7. Left open
+
+- **The layout's Auth call is the proxy's twice over.** The proxy checks the session, then the
+  layout checks it again: with the shared-secret JWT that is two Auth round trips before the first
+  byte. Asymmetric keys (row 1) make both free; passing the proxy's answer on is the workaround the
+  brief said not to build.
+- **The CPU-only slowdown in 4** is for PF6 and PF7, which start each page's data on the server.
+- **Whether production's proxy streams** (row 3) still isn't known. PF5's gain doesn't depend on
+  it: the layout sends the page in one piece once the account is read. PF6 and PF7's will.
+- **No request line for a page render.** The layout's Supabase calls (one Auth call, four reads)
+  show in the delay proxy's log in the lab, but in production they appear in no `request` line:
+  those are written only for API requests. `/api/account` used to log them. A line per page render
+  would need a request context for server components; I didn't add one.
+- **`/api/account` still reads your `profiles` row three times** (PF4's note); it is now on the
+  first-byte path of every cold load, side by side, so it costs Supabase calls but no wait.
+- **The sign-in page still asks `/api/account` on every visit**, to send an already signed-in
+  visitor on. A server check there would remove the 401 on every signed-out visit; it wasn't in
+  this task.
+- **Not done from the `/simplify` review:** `revalidateIfStale: false` for the account (it would
+  stop the refresh on page changes, see 3); moving the session check to React's `cache()` instead of
+  `asPageCaller` (PF4 chose `AsyncLocalStorage` for one memo across route handlers, MCP and pages);
+  writing the server's account into SWR's cache on every server render (it would refetch at once).
+- **No lint rule.** Nothing the review found is a pattern a syntax rule can check: the duplicated
+  constant is now one, and the lab scripts' copied helpers are now imports. The sign-in loop isn't
+  either: `router.replace("/login")` is right for a visitor who was never signed in (the invite and
+  consent pages do it) and wrong after signing out, and only the code around it says which.

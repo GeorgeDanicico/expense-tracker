@@ -1,26 +1,11 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-import { DataError, DataLoading } from "@/components/ui/data-state";
-import { useAccount } from "@/hooks/use-account";
-import { ApiError } from "@/lib/api/client";
-import { ACCOUNT_API_KEY } from "@/lib/api/keys";
-import { BRAND } from "@/lib/brand";
-
-export default function HomePage() {
-  const router = useRouter();
-  const { account: data, error, mutate } = useAccount();
-
-  useEffect(() => {
-    if (data) router.replace("/dashboard");
-    if (error instanceof ApiError && error.status === 401) router.replace("/login");
-  }, [data, error, router]);
-
-  if (error && !(error instanceof ApiError && error.status === 401)) {
-    return <DataError message={error.message} retry={() => void mutate()} />;
-  }
-
-  return <DataLoading layout="screen" label={`Opening ${BRAND.name}…`} slowKey={ACCOUNT_API_KEY} />;
+/**
+ * `/` has nothing of its own: it sends everyone to Home, on the server and before any of the app's
+ * JavaScript (PF5). Home's layout then decides the rest: no session → sign in, a password that must
+ * be changed → `/change-password`. Reading the session here too would only cost one more call to
+ * Supabase Auth.
+ */
+export default function RootPage() {
+  redirect("/dashboard");
 }

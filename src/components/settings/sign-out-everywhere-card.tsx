@@ -2,7 +2,6 @@
 
 import { Button } from "@chakra-ui/react";
 import { LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 
@@ -12,6 +11,7 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { useApiForm } from "@/hooks/use-api-form";
 import { forgetThisDeviceBeforeSignOut } from "@/hooks/use-notification-settings";
 import { signOutEverywhere } from "@/lib/api/account-requests";
+import { loadAfterSessionChange } from "@/lib/api/auth-redirect";
 import { afterSignOut } from "@/lib/api/invalidate";
 
 /**
@@ -21,7 +21,6 @@ import { afterSignOut } from "@/lib/api/invalidate";
  * notifications (best effort).
  */
 export function SignOutEverywhereCard() {
-  const router = useRouter();
   const { mutate } = useSWRConfig();
   const form = useApiForm();
   const [confirming, setConfirming] = useState(false);
@@ -31,7 +30,7 @@ export function SignOutEverywhereCard() {
       await forgetThisDeviceBeforeSignOut();
       await signOutEverywhere();
       await afterSignOut(mutate);
-      router.replace("/login");
+      loadAfterSessionChange("/login");
     }, { fallback: "Unable to sign out everywhere. Please try again." });
   }
 

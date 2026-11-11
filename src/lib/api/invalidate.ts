@@ -8,34 +8,18 @@ import {
   type FamilyResponse,
   type NoticesResponse,
 } from "@/lib/api/keys";
-import type { AccountData } from "@/lib/account/types";
 
 // What to refresh after each mutation of the modules not yet on an API object and hooks. Every helper
 // takes the global `mutate` from `useSWRConfig()`. Retry buttons keep calling their own bound
 // `mutate()`. Expenses, saved tabs and imports moved out in U8 (`expense-cache.ts`, `useExpenseWrites`),
 // investments and net worth in U9 (`useInvestmentWrites`, `useNetWorthWrites`).
 
-export function afterSignIn(mutate: ScopedMutator) {
-  return mutate(ACCOUNT_API_KEY);
-}
-
-/**
- * Clears `mustChangePassword` in the cached account, so the `(app)` layout stops sending the app to
- * `/change-password`. A plain `mutate(key)` isn't enough: it only refetches through mounted hooks, and
- * `/change-password` sits outside the `(app)` layout, so nothing there reads the account. The cache
- * would keep the stale `true`, and `/dashboard` would bounce straight back. The layout refetches the
- * account when it mounts.
- */
-export function afterPasswordChange(mutate: ScopedMutator) {
-  return mutate<AccountData>(ACCOUNT_API_KEY, (current) => current && { ...current, mustChangePassword: false });
-}
-
 /** After the caller's picture changes: their account (sidebar, settings) and the family list. */
 export function invalidateAfterAvatarChange(mutate: ScopedMutator) {
   return Promise.all([mutate(ACCOUNT_API_KEY), mutate(FAMILY_API_KEY)]);
 }
 
-/** Clears every cached response without refetching. */
+/** Clears every cached response without refetching: signing out, before the full page load to `/login`. */
 export function afterSignOut(mutate: ScopedMutator) {
   return mutate(() => true, undefined, { revalidate: false });
 }

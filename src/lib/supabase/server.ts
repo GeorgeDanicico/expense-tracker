@@ -63,8 +63,9 @@ export function createAppTokenClient(token: string): SupabaseClient<Database> {
 
 /**
  * The app token behind the scoped client, when the scoped client came from `createAppTokenClient`;
- * otherwise null (no scope, or a password session's client). Only an MCP call scopes a client, so a
- * REST request never gets one.
+ * otherwise null (no scope, or a password session's client). An MCP call scopes a client, and a
+ * server-rendered page scopes the request's own cookie client (`asPageCaller`); a REST request never
+ * gets one.
  */
 export function getScopedAppToken(): string | null {
   const scoped = scopedClient.getStore();

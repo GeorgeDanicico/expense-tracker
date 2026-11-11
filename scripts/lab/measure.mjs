@@ -275,7 +275,7 @@ export async function fetchOnceMore(url, init, { fetcher = fetch, log = (line) =
 }
 
 /** Signs in through POST /api/auth, as the sign-in form does; returns the cookies it set. */
-async function signIn(appUrl, account) {
+export async function signIn(appUrl, account) {
   const response = await fetchOnceMore(`${appUrl}/api/auth`, {
     method: "POST",
     headers: { "content-type": "application/json", origin: appUrl },
@@ -287,7 +287,7 @@ async function signIn(appUrl, account) {
   return cookies;
 }
 
-const cookieHeader = (cookies) => cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+export const cookieHeader = (cookies) => cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
 
 // ---- what the page's data looks like (the marker and the first-HTML check) ------------------------
 
@@ -388,7 +388,7 @@ const CHROME_FLAGS = [
   "--mute-audio", "--password-store=basic", "--use-mock-keychain", "--disable-features=Translate,OptimizationHints,MediaRouter",
 ];
 
-async function launchChrome(chromePath) {
+export async function launchChrome(chromePath) {
   const profile = mkdtempSync(join(tmpdir(), "lab-chrome-"));
   const child = spawn(chromePath, [...CHROME_FLAGS, `--user-data-dir=${profile}`, "--remote-debugging-port=0", "about:blank"], { stdio: "ignore" });
   const exited = new Promise((resolve) => child.once("exit", resolve));
@@ -410,7 +410,7 @@ async function launchChrome(chromePath) {
   }
 }
 
-async function connect(url) {
+export async function connect(url) {
   const socket = new WebSocket(url);
   await new Promise((resolve, reject) => {
     socket.addEventListener("open", resolve, { once: true });

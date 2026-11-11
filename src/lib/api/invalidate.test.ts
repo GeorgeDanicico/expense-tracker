@@ -1,15 +1,12 @@
-import { mutate as globalMutate, type ScopedMutator } from "swr";
+import type { ScopedMutator } from "swr";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   afterFamilyDeleted,
   afterFamilyJoined,
   afterMemberRemoved,
-  afterPasswordChange,
-  afterSignIn,
   afterSignOut,
 } from "@/lib/api/invalidate";
-import type { AccountData } from "@/lib/account/types";
 
 const CACHED_KEYS = [
   "/api/account",
@@ -43,48 +40,10 @@ function recorder() {
 const NO_REVALIDATE = { revalidate: false };
 
 describe("cache invalidation after mutations", () => {
-  it("single-key helpers revalidate their key; sign-out clears everything without refetching", async () => {
-    const signIn = recorder();
-    await afterSignIn(signIn.mutate);
-    expect(signIn.calls.map((call) => call.keys)).toEqual([["/api/account"]]);
-
-    const passwordChange = recorder();
-    await afterPasswordChange(passwordChange.mutate);
-    expect(passwordChange.calls.map((call) => call.keys)).toEqual([["/api/account"]]);
-    const clearFlag = passwordChange.calls[0].data as (current?: AccountData) => AccountData | undefined;
-    const account: AccountData = {
-      email: "kid@example.test",
-      signInName: "kid@example.test",
-      currency: "RON",
-      features: { family: true },
-      membership: null,
-      mustChangePassword: true,
-      avatarUrl: null,
-    };
-    expect(clearFlag(account)).toEqual({ ...account, mustChangePassword: false });
-    expect(clearFlag(undefined)).toBeUndefined();
-
+  it("sign-out clears everything without refetching", async () => {
     const signOut = recorder();
     await afterSignOut(signOut.mutate);
     expect(signOut.calls).toEqual([{ keys: CACHED_KEYS, data: undefined, options: NO_REVALIDATE }]);
-  });
-
-  it("clears the password flag in SWR's cache even when no hook reads the account", async () => {
-    // `/change-password` mounts no account hook, so a plain revalidation would leave the stale flag behind.
-    const account: AccountData = {
-      email: "kid@example.test",
-      signInName: "kid@example.test",
-      currency: "RON",
-      features: { family: true },
-      membership: null,
-      mustChangePassword: true,
-      avatarUrl: null,
-    };
-    await globalMutate("/api/account", account, { revalidate: false });
-
-    await afterPasswordChange(globalMutate);
-
-    expect(await globalMutate("/api/account")).toEqual({ ...account, mustChangePassword: false });
   });
 
   it("caches the joined family and reloads the account", async () => {
