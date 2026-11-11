@@ -2,7 +2,7 @@
 
 import { Box, Stack } from "@chakra-ui/react";
 import { Pencil, Trash2 } from "lucide-react";
-import type { KeyboardEvent } from "react";
+import { memo, useDeferredValue, useMemo, type KeyboardEvent } from "react";
 
 import { CategoryTile } from "@/components/expenses/category-visual";
 import { Amount } from "@/components/ui/amount";
@@ -37,7 +37,13 @@ export function groupByDay<T extends Pick<Expense, "expenseDate">>(expenses: rea
   return groups;
 }
 
-function ExpenseRow({ expense, currency, accent, actions }: { expense: ListedExpense; currency: string; accent?: string; actions?: ExpenseRowActions }) {
+/** How many rows a long list draws before the rest (about two screens on a phone). */
+const FIRST_ROWS = 30;
+
+/** What a row calls: the part of `ExpenseRowActions` that doesn't change when a delete hides a row. */
+type RowHandlers = Pick<ExpenseRowActions, "edit" | "remove">;
+
+function ExpenseRow({ expense, currency, accent, actions }: { expense: ListedExpense; currency: string; accent?: string; actions?: RowHandlers }) {
   const { rowProps, menu } = useRowActions();
   const remove = actions ? () => actions.remove(expense) : undefined;
   const rowActions: RowAction[] | null = actions && remove
@@ -83,6 +89,24 @@ function ExpenseRow({ expense, currency, accent, actions }: { expense: ListedExp
 }
 
 /**
+ * One row in its collapsing item. Memoized (PF11): the ledger re-renders on every key typed in its search and
+ * every tap on Filters, and without this each of a month's few hundred rows rendered again each time.
+ */
+const ExpenseListItem = memo(function ExpenseListItem({ expense, currency, accent, actions, open }: {
+  expense: ListedExpense;
+  currency: string;
+  accent?: string;
+  actions?: RowHandlers;
+  open: boolean;
+}) {
+  return (
+    <Collapse as="li" open={open}>
+      <ExpenseRow expense={expense} currency={currency} accent={accent} actions={actions} />
+    </Collapse>
+  );
+});
+
+/**
  * Expenses grouped by day under "Today", "Yesterday", "Mon 2 Nov" (the one day formatter, audit D9),
  * one list at every width. In the family view each row has its member's colour down its edge and
  * their name in its caption. A row deleted with Undo collapses, and opens again on Undo.
@@ -99,19 +123,27 @@ export function ExpenseRows({
   now?: Date;
 }) {
   const memberColor = useMemberColors();
+  // A long list (a month's few hundred rows) draws its first rows at once and the rest right after, in pieces the
+  // browser can interrupt, and a different list (another month, a search) is drawn the same way while the old rows stay,
+  // dimmed, until the new ones are in. Drawing them all in the tap that asked for them took most of a second [S12].
+  const rows = useDeferredValue(expenses, expenses.slice(0, FIRST_ROWS));
+  const stale = rows !== expenses;
+  const groups = useMemo(() => groupByDay(rows), [rows]);
   const hidden = actions?.hidden;
+  // Only the two callbacks go to the rows, so a row that is deleted (the `hidden` set changes) doesn't render the others again.
+  const edit = actions?.edit;
+  const remove = actions?.remove;
+  const handlers = useMemo<RowHandlers | undefined>(() => (edit && remove ? { edit, remove } : undefined), [edit, remove]);
   return (
-    <Stack gap="1">
-      {groupByDay(expenses).map((group) => (
+    <Stack gap="1" opacity={stale ? 0.6 : undefined} aria-busy={stale || undefined}>
+      {groups.map((group) => (
         <Box key={group.date}>
           <Collapse open={!group.expenses.every((expense) => hidden?.has(expense.id))}>
             <GroupLabel px="2">{relativeDay(group.date, now)}</GroupLabel>
           </Collapse>
           <Stack as="ul" gap="0.5" m="0" p="0">
             {group.expenses.map((expense) => (
-              <Collapse as="li" key={expense.id} open={!hidden?.has(expense.id)}>
-                <ExpenseRow expense={expense} currency={currency} accent={memberColor(expense.memberId)} actions={actions} />
-              </Collapse>
+              <ExpenseListItem key={expense.id} expense={expense} currency={currency} accent={memberColor(expense.memberId)} actions={handlers} open={!hidden?.has(expense.id)} />
             ))}
           </Stack>
         </Box>
