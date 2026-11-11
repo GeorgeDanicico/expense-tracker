@@ -20,9 +20,10 @@
 // One unmeasured warm-up load per page comes first, so the server is warm (as production's is).
 //
 // The content marker: the first animation frame in which one of the page's own data strings (an
-// expense's description, a reminder's or a to-do's title, Home's "Spent in <month>") is in the
-// page, has a size, and isn't inside a loading placeholder. It's read from the same API the page
-// calls, so it is the page's data and not its frame. "Settled" is when the last loading
+// expense's description, a reminder's or a to-do's title, Home's month total as the card formats it)
+// is in the page, has a size, and isn't inside a loading placeholder. It's read from the same API the
+// page calls, so it is the page's data and not its frame. (Until PF6 Home's marker was the month
+// card's title, "Spent in <month>", which is drawn before its data: since PF3 it measured the frame.) "Settled" is when the last loading
 // placeholder (`aria-busy="true"`) left the page.
 //
 // It reads .lab/app.env, .lab/users.json, the app's log (.lab/app.log) and the delay proxy's call
@@ -292,41 +293,65 @@ export const cookieHeader = (cookies) => cookies.map((cookie) => `${cookie.name}
 // ---- what the page's data looks like (the marker and the first-HTML check) ------------------------
 
 
+/** Home's month total as its card writes it (`formatCurrency` in src/lib/utils/currency.ts). */
+const formatTotal = (amount, currency) => new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
+
+/** GET `path` from the app as the signed-in `cookies`; the JSON, or null when it isn't a 2xx. */
+async function getJson(appUrl, cookies, path) {
+  const response = await fetchOnceMore(`${appUrl}${path}`, { headers: { cookie: cookieHeader(cookies) } });
+  return response.ok ? response.json() : null;
+}
+
+/**
+ * Home's data strings for this user, read from the APIs Home's blocks call: `expenses` is the month's
+ * total as the card writes it and the five newest expenses (empty for a kid without the expenses
+ * permission, who gets a 403), then the reminders' and the open to-dos' titles.
+ */
+export async function homeStrings(appUrl, cookies) {
+  const get = (path) => getJson(appUrl, cookies, path);
+  const [account, dashboard, reminders, todos] = await Promise.all([
+    get("/api/account"),
+    get(`/api/dashboard?period=3m&granularity=month&date=${bucharestToday().slice(0, 7)}`),
+    get("/api/reminders"),
+    get("/api/todos"),
+  ]);
+  return {
+    expenses: dashboard && account ? [formatTotal(dashboard.currentTotal, account.currency), ...dashboard.currentExpenses.slice(0, 5).map((expense) => expense.description)] : [],
+    reminders: (reminders?.reminders ?? []).map((reminder) => reminder.title),
+    todos: (todos?.todos ?? []).filter((todo) => todo.status !== "done").map((todo) => todo.title),
+  };
+}
+
 /**
  * The page's own data strings, read from the API the page calls with the same session: the content
- * marker waits for one of them, and the first-HTML check looks for them. `prefix` marks Home's month
- * card ("Spent in …", only drawn once its data has arrived).
+ * marker waits for one of them, and the first-HTML check looks for them. For Home, `homeStrings`.
  */
 async function probesFor(page, appUrl, cookies) {
-  const get = async (path) => {
-    const response = await fetchOnceMore(`${appUrl}${path}`, { headers: { cookie: cookieHeader(cookies) } });
-    return response.ok ? response.json() : null;
-  };
+  const get = (path) => getJson(appUrl, cookies, path);
   const month = bucharestToday().slice(0, 7);
   if (page.startsWith("/dashboard")) {
-    const reminders = await get("/api/reminders");
-    return { prefix: "Spent in ", strings: (reminders?.reminders ?? []).map((reminder) => reminder.title).slice(0, 10) };
+    const { expenses, reminders, todos } = await homeStrings(appUrl, cookies);
+    return { strings: [...new Set([...expenses, ...reminders, ...todos])] };
   }
   if (page.startsWith("/expenses")) {
     const data = await get(`/api/expenses?month=${month}`);
     const list = data?.expenses ?? data?.items ?? [];
-    return { prefix: null, strings: [...new Set(list.map((expense) => expense.description))].slice(0, 15) };
+    return { strings: [...new Set(list.map((expense) => expense.description))].slice(0, 15) };
   }
   if (page.startsWith("/todos")) {
     const data = await get("/api/todos");
-    return { prefix: null, strings: (data?.todos ?? []).filter((todo) => todo.status !== "done").map((todo) => todo.title).slice(0, 15) };
+    return { strings: (data?.todos ?? []).filter((todo) => todo.status !== "done").map((todo) => todo.title).slice(0, 15) };
   }
   if (page.startsWith("/reminders")) {
     const data = await get("/api/reminders");
-    return { prefix: null, strings: (data?.reminders ?? []).map((reminder) => reminder.title).slice(0, 15) };
+    return { strings: (data?.reminders ?? []).map((reminder) => reminder.title).slice(0, 15) };
   }
-  return { prefix: null, strings: [] };
+  return { strings: [] };
 }
 
 /** The script put in the page before any of its own: observers for paint, LCP, shifts, long tasks and the marker. */
-export function observerScript({ prefix, strings }) {
+export function observerScript({ strings }) {
   return `(() => {
-  const PREFIX = ${JSON.stringify(prefix)};
   const STRINGS = ${JSON.stringify(strings)};
   const lab = (window.__lab = { lcp: [], shifts: [], longTasks: [], content: null, sawBusy: false, settled: null });
   const inBusy = (el) => Boolean(el && el.closest && el.closest('[aria-busy="true"]'));
@@ -335,16 +360,15 @@ export function observerScript({ prefix, strings }) {
   observe("largest-contentful-paint", (e) => lab.lcp.push({ t: e.startTime, size: e.size, element: describe(e.element) }));
   observe("layout-shift", (e) => { if (!e.hadRecentInput) lab.shifts.push({ t: e.startTime, value: e.value }); });
   observe("longtask", (e) => lab.longTasks.push({ start: e.startTime, duration: e.duration }));
-  const matches = (text) => (PREFIX !== null && text.startsWith(PREFIX)) || STRINGS.includes(text);
   function findContent() {
     const body = document.body;
     if (!body) return null;
     const all = body.textContent || "";
-    if (!(PREFIX !== null && all.includes(PREFIX)) && !STRINGS.some((s) => all.includes(s))) return null;
+    if (!STRINGS.some((s) => all.includes(s))) return null;
     const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const text = node.data.trim();
-      if (!text || !matches(text)) continue;
+      if (!text || !STRINGS.includes(text)) continue;
       const el = node.parentElement;
       if (!el || inBusy(el) || el.closest("[aria-hidden='true'], script, template")) continue;
       const box = el.getBoundingClientRect();
@@ -818,7 +842,7 @@ async function main() {
       const cookies = await signIn(appUrl, account);
       const probes = await probesFor(page, appUrl, cookies);
       const html = await (await fetchOnceMore(url, { headers: { cookie: cookieHeader(cookies) } })).text();
-      const dataInHtml = probes.strings.some((text) => html.includes(text)) || (probes.prefix !== null && html.includes(probes.prefix));
+      const dataInHtml = probes.strings.some((text) => html.includes(text));
       await new Promise((resolve) => setTimeout(resolve, 1500));
       // Read only what the logs gain from here on: they hold every earlier load too.
       const offsets = { app: sizeOf(join(LAB, "app.log")), proxy: sizeOf(join(LAB, "supabase-calls.jsonl")) };

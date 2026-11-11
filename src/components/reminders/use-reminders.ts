@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import useSWR, { useSWRConfig } from "swr";
+import { useSWRConfig } from "swr";
 
 import { useReminderApi, type LogExpenseOptions, type ReminderFields } from "@/components/reminders/reminder-api";
 import { ApiError } from "@/lib/api/client";
+import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { afterExpenseLogged } from "@/components/expenses/expense-cache";
 import { REMINDERS_API_KEY, REMINDERS_SUMMARY_API_KEY, type RemindersResponse } from "@/lib/api/keys";
 import {
@@ -32,7 +33,7 @@ export function useReminders(now: Date) {
   const api = useReminderApi();
   const { mutate: mutateKey } = useSWRConfig();
   const [actionError, setActionError] = useState("");
-  const { data, error, isLoading, mutate } = useSWR<RemindersResponse>(REMINDERS_API_KEY, {
+  const { data, error, isLoading, mutate } = useServerFirstSWR<RemindersResponse>(REMINDERS_API_KEY, {
     revalidateOnFocus: true,
     refreshInterval: (latest) => (latest ? REMINDERS_REFRESH_MS : 0),
     keepPreviousData: true,

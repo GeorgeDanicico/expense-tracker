@@ -101,6 +101,18 @@ const clientOnlyFactories = {
   rules: { "local/client-only-chakra-factory": "error" },
 };
 
+/**
+ * A section that streams in on the server (PF6) is a StreamedSection, not a bare <Suspense> with a
+ * fallback: content streamed into a bare one lost the styles its fallback wrote first until the page
+ * hydrated. The page files' own boundaries (around `useSearchParams`) never show their fallback on
+ * the server and are left out until PF7 makes those pages stream; see docs/lint-rules.md.
+ */
+const streamedSection = {
+  files: ["src/components/**/*.tsx", "src/app/**/*-client.tsx"],
+  ignores: ["src/**/*.test.tsx", "src/components/ui/streamed-section.tsx"],
+  rules: { "local/streamed-section": "error" },
+};
+
 const reducedMotion = {
   files: ["src/**/*.{ts,tsx}"],
   ignores: ["src/hooks/use-reduced-motion.ts"],
@@ -196,6 +208,7 @@ const eslintConfig = defineConfig([
   uiGuardrails,
   motion,
   reducedMotion,
+  streamedSection,
   clientOnlyFactories,
   supabaseBoundary,
   workerBoundary,

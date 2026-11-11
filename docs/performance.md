@@ -41,7 +41,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF3 | Skeletons and a boundary per section | done, except the cold-load cost found (see PF3 section 7) | #229 |
 | PF4 | Fewer round trips in the app | done, except one getClaims per request: waiting on row 1 | #230 |
 | PF5 | Session gate and account on the server | done | #231 |
-| PF6 | First data on the server for Home | not started | |
+| PF6 | First data on the server for Home | done, except Lighthouse's simulated LCP (4.6 s; the observed slow-4G LCP is 1.4 s, see PF6 section 4) | #PR6 |
 | PF7 | The same for Expenses, To-dos and Reminders | not started | |
 | PF8 | Prefetching, waterfalls and stable data | not started | |
 | PF9 | Smaller bundles | not started | |
@@ -97,6 +97,14 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   request and 7 fewer Auth calls per cold load (Home 30 → 23). The cost: the first byte waits
   ~110 ms for the account, and on a fast network with a slow phone CPU the data comes 0.1 to 0.3 s
   later, until PF6 and PF7 start it on the server.
+
+- **PF6, Home's data from the server.** Home arrives with its numbers: on the emulated phone the
+  month's total is on screen at **1.4 s instead of 6.8 s** (LCP 6.8 → 1.4 s), and with a fast
+  network and a slow phone at **0.3 to 0.7 s instead of 1.4 s**, undoing PF5's slowdown there. No request
+  for Home's data on a cold load (3 → 0), 10 fewer Supabase calls per cold load (42 → 32), and the
+  page no longer jumps (CLS 0.012/0.085 → 0.000). A kid without the expenses permission gets none of
+  it in the page. Lighthouse's simulated LCP is still 4.6 s (was 5.8): it counts every script the
+  page started, which PF9 has to cut.
 
 ## Baseline and budgets
 
@@ -579,7 +587,8 @@ The terms:
 - **Content visible**: the first frame in which one of the page's own data strings is on the page
   with a size and outside any loading placeholder. The strings are read from the same API the page
   calls: Home, the "Spent in November" card (it's only drawn once its data arrives) or a reminder's
-  title; Expenses, the description of one of this month's expenses; To-dos, an open card's title;
+  title (since PF6: the month's total, one of the five newest expenses, a reminder's or an open
+  to-do's title, because PF3 made the card's title part of the skeleton); Expenses, the description of one of this month's expenses; To-dos, an open card's title;
   Reminders, a reminder's title. This is the number that says "you can see your data".
 - **First paint**: the first frame with anything drawn, here the grey skeleton boxes of the
   loading screen.
@@ -2214,3 +2223,342 @@ Checks: `npm run lint`, `npx next typegen && npm run typecheck`, `npm test` (6,8
   constant is now one, and the lab scripts' copied helpers are now imports. The sign-in loop isn't
   either: `router.replace("/login")` is right for a visitor who was never signed in (the invite and
   consent pages do it) and wrong after signing out, and only the code around it says which.
+
+### PF6: First data on the server for Home
+
+#### 1. The problem
+
+After PF5, opening Home showed the shell and four grey cards at once, but the numbers came much
+later: the browser first had to download and run the app's scripts, and only then asked
+`/api/dashboard`, `/api/reminders` and `/api/todos`. On the emulated phone the month's total
+appeared at **6.8 s**, five and a half seconds after the first text. On a fast network with a slow
+phone, PF5 had even made the data **0.1 to 0.3 s later**, because the requests now waited for React
+to attach itself to the server's page (hydration) before they could start.
+
+#### 2. What changed
+
+**What a person notices**
+
+- **Home arrives with its numbers.** The month's total, the five newest expenses, what's due and the
+  to-dos are in the page the server sends. On the emulated phone they are on screen at **1.36 s
+  instead of 6.77 s** (the same moment as the first text); with a fast network and a slow phone, at
+  **0.3 to 0.7 s instead of 1.37 s**.
+- **No request for Home's data on a cold load.** The browser no longer asks `/api/dashboard`,
+  `/api/reminders` or `/api/todos` when Home opens (the nav badge's `/api/reminders/summary` and
+  the account notices still go, as before).
+- **Nothing jumps.** The page's layout shift on the emulated phone is now 0.000 (was 0.012 for the
+  parent and 0.085 for the kid), because the grey cards are gone before anything paints.
+- **A kid without the expenses permission gets no expense data in the page at all**, not even
+  hidden: the server never loads it.
+- Home looks the same as U7's signed-off screens (screenshots in 4). Moving to Home from another tab
+  also gets the data from the server, in the same answer as the page.
+
+**How it works**
+
+- `src/app/(app)/dashboard/page.tsx` is now a **server component**. It reads which blocks this person
+  has (`homeBlocks`, the rule the browser uses: spending needs the expenses permission, to-dos a
+  family), **starts** one load per block without waiting for it, and hands the unfinished loads to
+  the page as SWR's `fallback` (`loadHomeFallback`, `src/lib/home/load-home.ts`).
+- **Loaders** (`src/lib/expenses/load-dashboard.ts`, `src/lib/reminders/load-reminders.ts`,
+  `src/lib/todos/load-todos.ts`) return exactly what `GET /api/dashboard`, `/api/reminders` and
+  `/api/todos` answer for a query. The three routes now call them; their tests are unchanged and pass.
+- `prefetch(page, key, loader)` (`src/lib/server-prefetch.ts`) runs a loader as the signed-in user
+  with the key's own query. If it fails, it logs `server_prefetch_failed` (the page and the API path,
+  never the data) and leaves that key to the browser, which fetches it as before.
+- **Keys**: the page builds them with the same functions the blocks use. Home's month key is now one
+  function, `homeDashboardApiKey()` in `src/lib/api/keys.ts`, read on the application's calendar.
+- **In the browser** (`src/lib/api/server-fallback.tsx`): `ServerFallback` puts the server's loads in
+  SWR's `fallback`. The blocks' hooks (`useHomeDashboard`, `useReminders`, `useTodoBoard`) now use
+  `useServerFirstSWR`, which is `useSWR` plus two things while the copy on screen is the server's:
+  it doesn't ask again on mount while that copy is under 15 s old, and it writes the copy into SWR's
+  cache, so Done, Snooze and a new expense change it like any answer SWR fetched. Later visits,
+  focus and polling revalidate as before. The To-dos and Reminders pages use the same hooks; with no
+  server copy there, they behave exactly as `useSWR`.
+- **Each block streams on its own**: `HomeScreen` wraps each one in a `StreamedSection`
+  (`src/components/ui/streamed-section.tsx`), a `<Suspense>` whose fallback is the block's loading
+  card (`MonthCardPending`, `DueRemindersPending`, `RecentExpensesPending`, `FamilyTodosPending`,
+  each a `HomeBlockPending` in `home-skeleton.tsx`, and each also the block's own "no data yet"
+  branch). The greeting and the date are outside every boundary.
+- **The layout and the page share one request's reads**: `asPageCaller` now keeps one cookie client
+  and one memo per server render (React's `cache`), and `loadPageAccount` is cached the same way, so
+  the page reuses the layout's user, membership and account instead of reading them again.
+- `/dev/preview` and the quick-add test render Home's screen (`HomeScreen`) instead of the page,
+  which now needs a server.
+- New lint rule `local/streamed-section` (3) and a lab probe, `scripts/lab/first-render.mjs` (5).
+  `scripts/lab/measure.mjs`'s Home marker now waits for real data (4).
+
+#### 3. Why this way
+
+- **The plan's pattern, from the installed Next docs** [N1]: a server component passes unawaited
+  promises as SWR's `fallback`, and the client components keep their `useSWR` keys. Every optimistic
+  update and undo from phase 17 still works on the same cache entries.
+- **The SWR spike** (done first, recorded at the top of `load-home.ts`): with SWR 2.4.1, a
+  component calling plain `useSWR(key)`, without `suspense: true`, waits for a promise in
+  `fallback` (SWR calls React's `use()` on it whatever `suspense` says). In a production build in
+  the lab, the server sent the boundary's fallback, then streamed the component with the data when the
+  promise resolved. So the blocks didn't change, only got boundaries. The spike also showed the two
+  things that needed code: right after hydration SWR asked for the key again, and a promise that
+  resolved to nothing left the key to the browser (which is how a failed load falls back).
+- **Skipping the first revalidation, like PF5's account, but not the same code.** Fallback data is
+  stale to SWR, so without the skip every cold load would still send the three requests, just
+  later. PF5's rule ("only the server's copy, page under 15 s old") wasn't enough here, for two
+  reasons found in the lab and the tests: the copy's age has to count from when it reached the
+  browser (a move to Home from another tab brings a new copy long after the page loaded), and once
+  one block wrote the copy into SWR's cache, the block that hydrated after it saw "cached data" and
+  asked again (the kid's and the solo user's Home sent `/api/dashboard` that way before the fix). So
+  `useServerFirstSWR` remembers when each server copy arrived. Writing the copy into the cache is
+  needed because SWR never stores fallback data: a write's `mutate(current => …)` would start from
+  nothing, so marking a reminder done would have shown an empty list for a moment. I left
+  `useAccount` as PF5 made it: its writes only refetch, so it doesn't have that problem, and changing
+  it would change PF5's tested behaviour.
+- **`StreamedSection` instead of a bare `<Suspense>`** (found in the lab, not in the plan). The first
+  build had a layout shift of **0.34** on the emulated phone, 6.2 s after load. A probe showed every
+  card's padding change at hydration. The cause: Chakra's styles are Emotion's, written as `<style>`
+  tags next to the elements, and Emotion writes each rule once per cache. The loading card wrote the
+  card's rules first; the streamed content, under the same cache, didn't write them again; when the
+  content replaced the card, the card's `<style>` tags were removed with it, and the content had no
+  padding until the page hydrated. In the HTML, each streamed block used 9 to 14 classes it didn't
+  define. `StreamedSection` gives the content its own Emotion cache on the server (Emotion makes one
+  when the context holds `null`; the browser keeps its single cache), so each block carries every rule
+  it uses: CLS went to 0.000 and no console warnings. Emotion's own source comment says this "could
+  change in the future because of suspense". Turned down: waiting for all the data before sending
+  the page (no boundaries, so nothing to lose, but the slowest load would hold the whole page,
+  against the plan [N4]); putting Emotion's styles in `<head>` with a style registry
+  (`useServerInsertedHTML`), the cleaner fix, but it needs `@emotion/cache` as a new direct
+  dependency, which this phase doesn't add, and it changes how every page gets its styles. Worth a
+  look in PF9.
+- **The lint rule**: a bare `<Suspense>` with a fallback is exactly what a machine can spot, and PF7
+  will add more boundaries. It covers `src/components` and the `*-client.tsx` page bodies PF7 will
+  create. The 8 `useSearchParams` boundaries in today's page files never show their fallback on the
+  server, so they are outside its files for now (docs/lint-rules.md).
+- **Permissions on the server are the browser's rule plus the route's check.** The page decides the
+  blocks with `homeBlocks(account)`, the same function `useHomeBlocks` now uses, so the server loads
+  exactly what will be drawn; the dashboard loader also runs `requirePermission("expenses", "edit")`
+  itself, the route's own check (free in the route: the membership is already in the request's memo).
+- **The memo through React's `cache`.** PF4's memo is an `AsyncLocalStorage` store that a route
+  request enters once; a page render has no single entry point (the layout and the page are rendered
+  separately), so each `asPageCaller` call used to start a new memo. React's `cache` lasts one server
+  render, so it finds the render's memo. Without it the page would have asked Supabase Auth for the
+  user a second time.
+- **Logging**: `server_prefetch_failed` at `error`, as the plan says. I didn't add a request line for
+  page renders (as PF5 didn't): it needs a request context for server components, and the loaders'
+  calls are the same queries the API routes log when the browser asks.
+
+#### 4. Numbers
+
+All from the lab on George's laptop, 11 November 2026, shared-secret JWT like production and 40 ms
+added to every Supabase call. "Before" is `main` at `f004404` (PF1–PF5), "after" this branch's final
+build (after `/simplify`; a build before it measured the same within the spread); both builds
+measured with this branch's `measure.mjs` (its Home marker fixed, below). Medians of three cold
+loads, ± half the spread. **Not production numbers.**
+
+```bash
+npm run lab -- up && npm run lab -- delay 40
+npm run lab:measure -- /dashboard --user parent --runs 3                                  # slow 4G + Lighthouse
+npm run lab:measure -- /dashboard --user kid --runs 3
+npm run lab:measure -- /dashboard --user parent --runs 3 --throttle cpu --no-lighthouse    # fast network, 4x slower CPU
+npm run lab:measure -- /dashboard --user kid --runs 3 --throttle cpu --no-lighthouse
+```
+
+Read from each run's `summary.json` (`.lab/results/<time>-pf6-<before|after>-…`).
+
+**Home, slow 4G (the emulated phone), ms**, parent (kid in brackets):
+
+| | Before | After |
+| --- | ---: | ---: |
+| Real data on screen (the marker: the month's total, an expense, a reminder or a to-do) | 6,774 (6,732) | **1,357 (1,343)** |
+| Every placeholder gone | 7,247 (7,194) | **1,357 (1,343)** |
+| FCP, the first text | 1,416 (1,408) | 1,412 (1,388) |
+| **LCP**, the biggest thing on screen (the month's total, both times) | 6,832 (6,792) | **1,412 (1,388)** |
+| CLS, how much the page jumps | 0.012 (0.085) | **0.000 (0.000)** |
+| TTFB, the page's first byte | 173 (169) | 171 (167) |
+| TBT, time the page's code blocks taps | 199 (194) | 287 (264) |
+| Lighthouse (simulated) LCP | 5,784 ±238 (5,491 ±219) | 4,582 ±2,021 (4,579 ±1,836) |
+| Lighthouse FCP / CLS / TBT | 914 / 0.012 / 375 (915 / 0.085 / 298) | 910 / 0.012 / 373 (912 / 0.000 / 412) |
+
+**Home, fast network and slow CPU (`--throttle cpu`), ms**, the pass where PF5 got slower:
+
+| | Before | After |
+| --- | ---: | ---: |
+| Real data on screen | 1,369 ±77 (1,308 ±23) | **691 ±200 (689 ±15)** |
+| Every placeholder gone | 1,369 (1,375) | 691 (689) |
+| FCP | 344 (336) | 316 (328) |
+| LCP | 1,444 (1,384) | **752 ±214 (748 ±14)** |
+| CLS | 0.012 (0.085) | 0.000 (0.000) |
+| TTFB | 180 (167) | 166 (171) |
+| TBT | 207 (205) | 339 (304) |
+
+**Per cold load of Home** (same for both users and both passes):
+
+| | Before | After |
+| --- | ---: | ---: |
+| Requests to Home's APIs (`/api/dashboard`, `/api/reminders`, `/api/todos`) on first render | 3 | **0** |
+| All API requests | 5 | 2 |
+| Calls to Supabase | 42 | **32** |
+| Calls to Supabase Auth | 23 | **17** |
+| Real data in the first HTML | no | **yes** (every run) |
+| The page itself, unzipped, KiB | 146.0 (145.1) | 214.1 (204.8) |
+
+**One page render** (`node scripts/lab/first-render.mjs /dashboard --users parent,kid,solo`, which
+counts the delay proxy's lines for one `fetch` of the page with a phone's User-Agent):
+
+| | Parent | Kid (with expenses) | Kid without expenses | No family (solo) |
+| --- | ---: | ---: | ---: | ---: |
+| Supabase calls for the render | 13 (2 Auth, 8 REST, 3 RPC) | 13 | 11 | 10 |
+| First byte / last byte, ms | 174–201 / 219–236 | 200–203 / 230–246 | 199–200 / 228–235 | 199 / 223–224 |
+| Home's API requests in Chromium's first render | 0 | 0 | 0 | 0 |
+| Console errors or warnings | none | none | none | none |
+
+Before, a render made 6 calls (PF5: the proxy's and the layout's Auth calls, four account reads);
+now the data's 5 to 7 reads are added, and still only 2 Auth calls: the dashboard loader's user check
+reuses the layout's. A run sometimes counted 14 with a third Auth call, from a background request
+overlapping the window. The gzipped page is 30.6 to 33.1 KiB after (`curl` with
+`accept-encoding: gzip`, three each); PF5 measured 23.2 KiB before. The first byte didn't move: the
+shell is sent before the data, and the data follows 25 to 45 ms later in the same answer.
+
+What it says:
+
+- **LCP is under 2.5 s in the lab's observed passes: 1.41 s on the slow-4G phone, 0.75 s on the
+  CPU-only pass.** It is **not** under 2.5 s in Lighthouse's simulated pass: 4.6 s for both users
+  (was 5.8 and 5.5), and it swings by ±2 s between runs. Lighthouse doesn't throttle a real load; it loads the page
+  unthrottled and then estimates. In those unthrottled loads LCP happened at 320 to 600 ms, but every
+  script the page started before that moment (about 40 files) is counted as something LCP waited for,
+  though they are `async` and the total is drawn by the server's HTML. In two of three runs a second
+  LCP entry came after hydration (600 ms), which makes it worse, and the runs swing by ±2 s for the
+  same reason. The observed pass, which really throttles, shows the total painting
+  with the first text. Fewer scripts (PF9) is what moves Lighthouse's number. Lighthouse also gets
+  the page unstreamed: Next treats its User-Agent as a crawler and renders the page whole.
+- **PF5's slowdown on the CPU-only pass is gone and reversed**: data 1.37 → 0.69 s for the parent
+  (1.31 → 0.69 s for the kid). It comes at one of two moments, about 0.3 s or about 0.7 s (5 of 12
+  runs over both builds at 0.28 to 0.31 s, 7 at 0.69 to 0.72 s). React 19.2 holds back a streamed
+  block's reveal until 300 ms after the last paint, to batch reveals (`$RC` in the page's inline
+  script: `$RT+300`): when the blocks arrive with the shell, they paint with it; when they arrive just
+  after the first paint, they wait for that window. On the slow-4G phone the shell itself takes
+  longer than that, so the blocks paint with the first text. Waiting for all the data before sending
+  the page would avoid it, at the cost described in 3.
+- **The price is hydration**: TBT is 70 to 130 ms higher (the page hydrates four filled blocks
+  instead of four skeletons), and the page is 7 to 10 KiB bigger gzipped (the data, twice: as HTML
+  and in React's payload; and the blocks' style tags, now repeated per block).
+- **10 fewer Supabase calls and 6 fewer Auth calls per cold load**: three API requests (each with its
+  own Auth call, password check and membership read) became reads inside the page's one render.
+
+**The marker** (`scripts/lab/measure.mjs`): until now Home's "content" was the month card's title,
+"Spent in November", which PF3 made part of the loading card, so it measured the frame (PF5 had to
+quote "every placeholder gone" instead). It now waits for one of the month's total as the card writes
+it, the five newest expenses, a reminder's or an open to-do's title, read from the same APIs. Both
+builds above were measured with it.
+
+**Kid without the expenses permission, for real.** `node scripts/lab/first-render.mjs /dashboard
+--users kid,parent --kid-without-expenses` turns the seeded kid's expenses off through the parent's
+API, loads Home as the kid, and turns it back on. With it off: `/api/dashboard` answers the kid 403,
+none of the kid's 6 expense strings (the month's total and five descriptions, read before turning it
+off) is anywhere in the page, scripts and React's payload included, the dashboard's key isn't in the
+page, and the first render asks for nothing. Unit tests check the same (`load-home.test.tsx`).
+
+**Screenshots** (after, loaded; `--shots docs/performance/screenshots/pf6`), compared with U7's
+signed-off ones in `docs/ui-styling/screenshots/` (`u7-home-*`): same layout, cards, type and spacing;
+only the data differs (the lab's family, not the fixtures).
+[Parent, 390](performance/screenshots/pf6/after-dashboard-parent-390.jpg) ·
+[Parent, 1280](performance/screenshots/pf6/after-dashboard-parent-1280.jpg) ·
+[Kid, 390](performance/screenshots/pf6/after-dashboard-kid-390.jpg) ·
+[Kid without expenses, 390](performance/screenshots/pf6/after-dashboard-kid-no-expenses-390.jpg) ·
+[Kid without expenses, 1280](performance/screenshots/pf6/after-dashboard-kid-no-expenses-1280.jpg) ·
+[No family, 390](performance/screenshots/pf6/after-dashboard-solo-390.jpg) ·
+[No family, 1280](performance/screenshots/pf6/after-dashboard-solo-1280.jpg).
+
+**Moving to Home from To-dos** (a scratch probe, 1280 px, no throttling): Home's data was on screen
+423 ms after the tap, from the RSC answer for `/dashboard`; no request to Home's APIs, no console
+warnings.
+
+Tests: `src/lib/home/load-home.test.tsx` (the page's keys for a parent, a kid with and without the
+permission, a user without a family and no session; each answer equals its route's; the page
+rendered in the browser asks for nothing; a failing load is logged and fetched by the browser),
+`src/lib/api/server-fallback.test.tsx` (no request on mount, the copy in SWR's cache, a second block
+mounting later, the 15 s window, a failed load, an answer SWR already has),
+`src/components/ui/streamed-section.test.tsx` (streamed content defines every class it uses), the
+rule's tests, and `src/lib/auth/index.test.ts` (one memo for the layout and the page of a render).
+Checks: `npm run lint`, `npx next typegen && npm run typecheck`, `npm test`, `npm run build`: all pass.
+
+#### 5. How to check it yourself
+
+1. `npm run lab -- up && npm run lab -- delay 40`.
+2. Sign in as the parent (`.lab/users.json`), open Home with the network panel open and reload: no
+   `/api/dashboard`, `/api/reminders` or `/api/todos` request, and the numbers are there at once.
+3. "View source" (or `curl -N -b <the session cookie> http://localhost:3110/dashboard`): the month's
+   total and the expenses' names are in the HTML.
+4. `node scripts/lab/first-render.mjs /dashboard --users parent,kid,solo` prints, per user and
+   width, what's in the HTML, the Supabase calls of one render, the data requests on the first
+   render and any console warnings. Add `--kid-without-expenses` for the permission check (it
+   changes the kid's permission while it runs and puts it back).
+5. `npm run lab -- down`.
+
+#### 6. Risks and how to undo it
+
+- **Home's first byte now depends on nothing new, but its last byte does.** If one load is slow,
+  that block keeps its loading card while the rest show; if a load fails, the browser fetches that
+  block as before (logged as `server_prefetch_failed`). A load that hangs keeps the page's answer open
+  until Supabase's own timeout; the blocks already sent stay usable. I didn't hang Supabase in the
+  lab for this.
+- **Each move to Home now reads Home's data on the server**, even when the browser already has it
+  (the server can't know). That is 5 to 7 Supabase reads per visit; the browser then shows its own
+  copy and revalidates as before.
+- **`StreamedSection` relies on how Emotion behaves on the server** (a `null` cache in the context
+  makes a fresh one). An Emotion or Chakra upgrade could change it; the test in
+  `streamed-section.test.tsx` fails if streamed content stops carrying its styles.
+- **Server and browser can disagree on time-relative text** ("12 minutes late"): the overdue label
+  is marked `suppressHydrationWarning`, and the clock redraws it. Other labels are per day; a render
+  just before midnight could show yesterday's greeting until the clock ticks (the same as since PF5).
+- **The skip of the first revalidation** means data up to 15 s old is shown without a check, the
+  same freshness SWR gives any answer it fetched.
+- No migration, nothing stored. To undo: revert the PR. The routes keep their answers either way.
+
+#### 7. Left open
+
+- **Lighthouse's simulated LCP (4.6 to 4.9 s)** stays over 2.5 s; see 4. The observed passes meet it.
+  PF9's smaller bundles are the lever.
+- **React's 300 ms reveal window** (4): on a fast network the blocks sometimes paint 0.4 s after the
+  first text. Not changed; it is React's own batching, and the slow-4G phone doesn't see it.
+- **Styles in `<head>` instead of per element** (an Emotion registry) would remove the duplicated
+  style tags and the need for `StreamedSection`. It needs `@emotion/cache` as a direct dependency,
+  so it's a decision, not done here.
+- **Whether production's proxy streams** (row 3) matters more now: if it buffers, the page arrives
+  in one piece about 30 to 45 ms later (the data's time), which is still a win over the browser
+  fetching it.
+- **No request line for page renders**, as in PF5: only failures are logged.
+- **`useAccount` keeps PF5's own skip.** Moving it to `useServerFirstSWR` would make one mechanism
+  (PF8 touches the account hook).
+- **Not done from the `/simplify` review:** SWR's own `preload()` in place of `useServerFirstSWR`'s
+  freshness bookkeeping (it would let the hooks go back to plain `useSWR`, but it only works with
+  SWR's default cache, which the tests replace, and a re-mounted page could hand SWR an old promise
+  as a fresh answer; worth a try in PF8); starting the reminders load before the account is read (it
+  would stream about two round trips sooner, but a signed-out visit would then log a failed load);
+  starting the browser's clock at the server's time instead of `suppressHydrationWarning` (the other
+  date labels change per day, not per minute); moving the lab scripts' console listeners into one
+  helper (`session-gate.mjs` and `first-render.mjs` want different answers from `call`); the Emotion
+  registry (above). Done from it: one `HomeBlockPending` for the four loading cards, the dashboard's
+  permission check inside its loader, and `first-render.mjs` reading Home's strings from
+  `measure.mjs` (`homeStrings`) instead of a copy.
+- **Not done from the plan:** a separate test file per loader; the three loaders are tested together
+  against their routes in `load-home.test.tsx`, and the routes' own tests pass unchanged.
+
+#### The pattern for PF7
+
+Written out at the top of `src/lib/server-prefetch.ts`. In short, for Expenses, To-dos and Reminders:
+
+1. A loader per resource in `src/lib/<feature>/load-*.ts` that returns what the route answers for a
+   query; the route calls it.
+2. The page becomes a server component: it awaits only what decides which blocks there are (the
+   account, `loadPageAccount()`, already read by the layout in this render), then builds
+   `{ [key]: prefetch(page, key, loader) }` without awaiting and renders
+   `<ServerFallback fallback={…}>` around the client body (moved to a `*-client.tsx`). A block the
+   person can't see gets no entry.
+3. Keys come from `src/lib/api/keys.ts`; give the page's key a builder both sides call, and read
+   "today" and "this month" from the application calendar. For Expenses, read the month and the
+   viewed member from the URL the way `url-state.ts` and `resolveViewedUser` do, inside the loader.
+4. The client hooks swap `useSWR` for `useServerFirstSWR` (same arguments).
+5. Every block that waits gets a `StreamedSection` with its loading card as the fallback (the lint
+   rule enforces it in `*-client.tsx` and `src/components`); the heading stays outside.
+6. Tests like `load-home.test.tsx`: the keys per kind of user, each answer equal to its route's, the
+   page rendered with a fetcher that records requests (it must record none), a failing loader.
+7. In the lab: `first-render.mjs <page>` for the HTML, the first render's requests and the console;
+   its data strings are Home's, so give it the page's own (like `measure.mjs`'s `probesFor`).

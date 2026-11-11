@@ -5,14 +5,11 @@ import type { ReactNode } from "react";
 
 import { PAGE_SPACING } from "@/components/ui/theme/layout";
 import { useAccount } from "@/hooks/use-account";
-import { useCan } from "@/hooks/use-can";
+import { homeBlocks } from "@/lib/home/blocks";
 
-/** Which blocks Home has for this person: spending needs the expenses permission, to-dos a family. Home and its skeleton share it. */
+/** Which blocks Home has for this person (`homeBlocks`): spending needs the expenses permission, to-dos a family. Home and its skeleton share it. */
 export function useHomeBlocks() {
-  const { account } = useAccount();
-  const spending = useCan("expenses", "edit");
-  const memberId = account?.membership?.memberId ?? null;
-  return { spending, todos: memberId !== null, memberId };
+  return homeBlocks(useAccount().account);
 }
 
 /**

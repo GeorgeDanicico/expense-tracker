@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import type { AccountData, AccountMembership } from "@/lib/account/types";
 import { asPageCaller, getAuthenticatedUser, type AuthenticatedUser } from "@/lib/auth";
 import { avatarUrl } from "@/lib/avatars/paths";
@@ -40,10 +42,14 @@ export async function loadAccount(user: AuthenticatedUser, knownCurrency?: strin
   };
 }
 
-/** The signed-in user's account for a server component, or `null` with no session (signed out, expired, deleted). */
-export function loadPageAccount(): Promise<AccountData | null> {
-  return asPageCaller(async () => {
+/**
+ * The signed-in user's account for a server component, or `null` with no session (signed out,
+ * expired, deleted). Read once per render (React's `cache`): the `(app)` layout decides the redirects
+ * with it, and a page that needs it too (Home, to know which blocks to load) gets the same answer.
+ */
+export const loadPageAccount = cache((): Promise<AccountData | null> =>
+  asPageCaller(async () => {
     const user = await getAuthenticatedUser();
     return user ? loadAccount(user) : null;
-  });
-}
+  }),
+);

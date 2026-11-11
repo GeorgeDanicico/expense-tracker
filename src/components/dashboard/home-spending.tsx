@@ -2,23 +2,21 @@
 
 import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 import { Inbox } from "lucide-react";
-import useSWR from "swr";
 
-import { MonthBodySkeleton } from "@/components/dashboard/home-skeleton";
+import { HomeBlockPending, MonthBodySkeleton, type BlockPending } from "@/components/dashboard/home-skeleton";
 import { CategoryTile } from "@/components/expenses/category-visual";
 import { Amount } from "@/components/ui/amount";
 import { Card } from "@/components/ui/card";
-import { DataError } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON } from "@/components/ui/icon";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
-import { SkeletonFrame } from "@/components/ui/skeleton-frame";
 import { ListSkeleton } from "@/components/ui/skeletons";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { transition } from "@/components/ui/theme/motion";
 import { useAccount } from "@/hooks/use-account";
-import { dashboardApiKey } from "@/lib/api/keys";
+import { homeDashboardApiKey } from "@/lib/api/keys";
+import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { formatMonthName, getBucharestMonth } from "@/lib/calendar";
 import { expenseClassificationLabel } from "@/lib/expenses/categories";
 import type { DashboardData } from "@/lib/expenses/types";
@@ -31,24 +29,27 @@ import { formatCurrency } from "@/lib/utils/currency";
  * with it already loaded and a new expense shows in both at once: `useExpenseWrites`).
  */
 function useHomeDashboard() {
-  const month = getBucharestMonth();
-  return useSWR<DashboardData>(dashboardApiKey({ period: "3m", granularity: "month", customDate: month }, null));
+  return useServerFirstSWR<DashboardData>(homeDashboardApiKey());
+}
+
+/** The month card before its data: its title and link, then the skeleton or the error (PF6). */
+export function MonthCardPending(state: BlockPending) {
+  return (
+    <HomeBlockPending
+      {...state}
+      header={<Card.Header title={`Spent in ${formatMonthName(getBucharestMonth())}`} actions={<SectionLink href={INSIGHTS_PATH}>Insights</SectionLink>} />}
+      label="Loading this month…"
+      skeleton={<MonthBodySkeleton />}
+      errorMessage="This month's spending could not be loaded."
+    />
+  );
 }
 
 /** This month's total against last month's, with a meter of how much of last month's it is. */
 export function MonthCard() {
   const { currency } = useAccount();
   const { data, error, mutate } = useHomeDashboard();
-  if (!data) {
-    return (
-      <Card size="sm">
-        <Card.Header title={`Spent in ${formatMonthName(getBucharestMonth())}`} actions={<SectionLink href={INSIGHTS_PATH}>Insights</SectionLink>} />
-        <Card.Body>
-          {error ? <DataError message="This month's spending could not be loaded." retry={() => void mutate()} /> : <SkeletonFrame label="Loading this month…"><MonthBodySkeleton /></SkeletonFrame>}
-        </Card.Body>
-      </Card>
-    );
-  }
+  if (!data) return <MonthCardPending error={error} retry={() => void mutate()} />;
   const { previousMonth, previousTotal, share, over } = monthSoFar(data);
   const previous = formatMonthName(previousMonth);
   return (
@@ -77,25 +78,22 @@ export function MonthCard() {
   );
 }
 
+const recentHeader = <Card.Header title="Recent expenses" actions={<SectionLink href="/expenses">Expenses</SectionLink>} />;
+
+/** The recent expenses before their data: the skeleton or the error (PF6). */
+export function RecentExpensesPending(state: BlockPending) {
+  return <HomeBlockPending {...state} header={recentHeader} label="Loading your expenses…" skeleton={<ListSkeleton rows={5} gap="0" />} errorMessage="Your expenses could not be loaded." />;
+}
+
 /** The last five expenses of the month, newest first. */
 export function RecentExpenses({ now }: { now: Date }) {
   const { currency } = useAccount();
   const { data, error, mutate } = useHomeDashboard();
-  const header = <Card.Header title="Recent expenses" actions={<SectionLink href="/expenses">Expenses</SectionLink>} />;
-  if (!data) {
-    return (
-      <Card size="sm">
-        {header}
-        <Card.Body>
-          {error ? <DataError message="Your expenses could not be loaded." retry={() => void mutate()} /> : <SkeletonFrame label="Loading your expenses…"><ListSkeleton rows={5} gap="0" /></SkeletonFrame>}
-        </Card.Body>
-      </Card>
-    );
-  }
+  if (!data) return <RecentExpensesPending error={error} retry={() => void mutate()} />;
   const expenses = data.currentExpenses.slice(0, 5);
   return (
     <Card size="sm">
-      {header}
+      {recentHeader}
       <Card.Body>
         {expenses.length === 0 ? (
           <EmptyState size="sm" titleAs="p" icon={<Inbox size={ICON.nav} aria-hidden="true" />} title="No expenses yet this month" description="Tap + to add one." />

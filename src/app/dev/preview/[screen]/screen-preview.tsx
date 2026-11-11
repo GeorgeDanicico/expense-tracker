@@ -5,7 +5,6 @@ import { Suspense } from "react";
 import { SWRConfig, type Middleware } from "swr";
 
 import CalendarPage from "@/app/(app)/calendar/page";
-import DashboardPage from "@/app/(app)/dashboard/page";
 import InsightsPage from "@/app/(app)/insights/page";
 import ExpensesPage from "@/app/(app)/expenses/page";
 import ImportPage from "@/app/(app)/expenses/import/page";
@@ -22,6 +21,7 @@ import NotificationsSettingsPage from "@/app/(app)/settings/notifications/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import TodosPage from "@/app/(app)/todos/page";
 import ChangePasswordPage from "@/app/change-password/page";
+import { HomeScreen } from "@/components/dashboard/home-screen";
 import { ExpenseApiProvider } from "@/components/expenses/expense-api";
 import { FamilyApiProvider } from "@/components/family/family-api";
 import { ImportApiProvider } from "@/components/expenses/import/import-api";
@@ -47,7 +47,8 @@ import { previewTodoApi } from "../todo-fixtures";
 import type { PreviewScreen } from "./screens";
 
 const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
-  dashboard: DashboardPage,
+  // Home's page is a server component that starts its data on the server (PF6); the preview draws its screen from fixtures.
+  dashboard: HomeScreen,
   insights: InsightsPage,
   more: MorePage,
   expenses: ExpensesPage,

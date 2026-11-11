@@ -1,5 +1,5 @@
 import type { AnalyticsFilters } from "@/lib/expenses/types";
-import { resolveMainExpenseMonth } from "@/lib/calendar";
+import { getBucharestMonth, resolveMainExpenseMonth } from "@/lib/calendar";
 import { expenseTabFilterParams, type ExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 import type { AccountNotice } from "@/lib/account/notice-repository";
@@ -129,6 +129,15 @@ export function dashboardApiKey(filters: AnalyticsFilters, member?: string | nul
     date: filters.customDate,
   });
   return withMember(`/api/dashboard?${params}`, member);
+}
+
+/**
+ * Home's month card and recent expenses: {@link dashboardApiKey} for the caller's own current month
+ * (the application's calendar, not the browser's zone). Home's server render builds the same key for
+ * its SWR fallback (PF6), so the two must come from here.
+ */
+export function homeDashboardApiKey() {
+  return dashboardApiKey({ period: "3m", granularity: "month", customDate: getBucharestMonth() }, null);
 }
 
 /** GET → `ExpensesData` (`@/lib/expenses/types`). */
