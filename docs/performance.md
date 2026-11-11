@@ -41,7 +41,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF3 | Skeletons and a boundary per section | done, except the cold-load cost found (see PF3 section 7) | #229 |
 | PF4 | Fewer round trips in the app | done, except one getClaims per request: waiting on row 1 | #230 |
 | PF5 | Session gate and account on the server | done | #231 |
-| PF6 | First data on the server for Home | done, except Lighthouse's simulated LCP (4.6 s; the observed slow-4G LCP is 1.4 s, see PF6 section 4) | #PR6 |
+| PF6 | First data on the server for Home | done, except Lighthouse's simulated LCP (4.6 s; the observed slow-4G LCP is 1.4 s, see PF6 section 4) | #232 |
 | PF7 | The same for Expenses, To-dos and Reminders | not started | |
 | PF8 | Prefetching, waterfalls and stable data | not started | |
 | PF9 | Smaller bundles | not started | |
