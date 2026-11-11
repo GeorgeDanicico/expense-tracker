@@ -13,7 +13,7 @@ import { RowsCardSkeleton } from "@/components/ui/skeletons";
 import { useViewing } from "@/hooks/use-viewing";
 import { expenseTabExpensesApiKey } from "@/lib/api/keys";
 import { useServerFirstSWR } from "@/lib/api/server-fallback";
-import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/expenses/filters";
+import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/expenses/tab-filters";
 import type { ExpenseTab, ExpenseTabLedgerData } from "@/lib/expenses/tabs";
 
 /**

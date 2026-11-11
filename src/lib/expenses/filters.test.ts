@@ -12,6 +12,23 @@ import {
 
 const params = (query: string) => new URLSearchParams(query);
 
+describe("the browser's filter reader", () => {
+  // Zod-free (`tab-filters.ts`); it must read the same filters from the same query as the schema the server uses.
+  const queries = [
+    "", "month=2026-10", "scope=all", "scope=all&subtype=none&category=car&search=++garage++", "scope=all&subtype=car_fuel",
+    "scope=year&year=2026", "scope=year&year=0099", "scope=year&year=1000", "scope=year&year=99999", "scope=year&year=2e03", "scope=year", "scope=year&year=2026&category=housing",
+    "scope=range&startDate=2024-02-29&endDate=2024-12-31", "scope=range&startDate=2026-03-02&endDate=2026-03-01", "scope=range&startDate=2025-02-29&endDate=2025-03-01",
+    "scope=range&startDate=2026-03-01&endDate=2026-03-01", "scope=range&startDate=2026-03-01", "scope=range",
+    "scope=all&year=2026", "scope=all&startDate=2026-01-01", "scope=invalid", "scope=", "subtype=invalid", "subtype=", "category=invalid", "category=",
+    `search=${"x".repeat(200)}`, `search=${"x".repeat(201)}`, `search=${encodeURIComponent(`  ${"x".repeat(200)}  `)}`, "search=",
+  ];
+  it.each(queries)("agrees with the schema on %j", (query) => {
+    const schema = parseExpenseTabFilters(params(query));
+    const reader = readExpenseTabFilters(params(query));
+    expect(reader).toEqual(schema.success ? schema.data : DEFAULT_EXPENSE_TAB_FILTERS);
+  });
+});
+
 describe("custom expense filter state", () => {
   it("defaults to all time without inheriting the retained main month", () => {
     expect(readExpenseTabFilters(params("month=2026-10"))).toEqual(DEFAULT_EXPENSE_TAB_FILTERS);

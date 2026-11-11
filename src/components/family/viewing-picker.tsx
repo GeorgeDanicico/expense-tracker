@@ -11,7 +11,7 @@ import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { useAccount } from "@/hooks/use-account";
 import { useFamily } from "@/hooks/use-family";
 import { useViewing } from "@/hooks/use-viewing";
-import { FILTER_KEYS } from "@/lib/expenses/filters";
+import { FILTER_KEYS } from "@/lib/expenses/tab-filters";
 import { memberColorTokens } from "@/lib/family/member-colors";
 import type { FamilyMemberView } from "@/lib/family/views";
 import { ALL_MEMBERS, MEMBER_PARAM } from "@/lib/family/viewing";

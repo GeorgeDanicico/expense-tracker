@@ -1,15 +1,12 @@
 import { z } from "zod";
 
-import {
-  CATEGORY_LABELS,
-  EXPENSE_CATEGORIES,
-  EXPENSE_SUBTYPES,
-  SUBTYPE_LABELS,
-  type ExpenseCategory,
-} from "@/lib/expenses/categories";
-import type { Expense } from "@/lib/expenses/types";
-import { addDays, toIsoDate } from "@/lib/calendar";
+import { EXPENSE_CATEGORIES, EXPENSE_SUBTYPES } from "@/lib/expenses/categories";
+import { rawFilters, type ExpenseTabFilters, type SearchParams } from "@/lib/expenses/tab-filters";
 import { calendarDate } from "@/lib/validation/primitives";
+
+// The Zod schema for the filters, for the server and the custom-tab filter form. What the browser reads them with, and
+// everything else about them, is in `tab-filters.ts` (no Zod, PF9); it is all exported from here too.
+export * from "@/lib/expenses/tab-filters";
 
 const common = {
   subtype: z.enum(["all", "none", ...EXPENSE_SUBTYPES]).default("all"),
@@ -25,82 +22,13 @@ export const expenseTabFiltersSchema = z.discriminatedUnion("scope", [
   message: "The end date must be on or after the start date.", path: ["endDate"],
 });
 
-export type ExpenseTabFilters = z.infer<typeof expenseTabFiltersSchema>;
-export const DEFAULT_EXPENSE_TAB_FILTERS: ExpenseTabFilters = {
-  scope: "all", subtype: "all", category: null, search: "",
-};
-
-/** Expense dates are calendar dates; midnight and timezone offsets never enter the query. */
-export function expenseTabDateBounds(filters: ExpenseTabFilters) {
-  if (filters.scope === "all") return {};
-  if (filters.scope === "year") {
-    return { start: toIsoDate(filters.year, 1, 1),
-      endExclusive: `${filters.year + 1}-01-01` };
-  }
-  return { start: filters.startDate, endExclusive: addDays(filters.endDate, 1) };
-}
-
-/** What the search calls an expense without a subtype. The server's search (`expenseSearchFilter`) uses it too. */
-export const NO_SUBTYPE_LABEL = "No subtype";
-
-/** Whether the expense's text, category or subtype contains `term`, which is already lower-cased. */
-export function matchesExpenseSearch(expense: Expense, term: string) {
-  return [expense.description, expense.notes ?? "", CATEGORY_LABELS[expense.category],
-    expense.subtype ? SUBTYPE_LABELS[expense.subtype] : NO_SUBTYPE_LABEL]
-    .some((value) => value.toLowerCase().includes(term));
-}
-
-/** The month ledger's search and category filter (behind the Expenses screen's Filters chip). */
-export type LedgerFilter = { query: string; category: ExpenseCategory | "all" };
-
-export const NO_LEDGER_FILTER: LedgerFilter = { query: "", category: "all" };
-
-/** The expenses `filter` keeps: the search in the description, notes, category or subtype, and the category. */
-export function filterExpenses<T extends Expense>(expenses: readonly T[], { query, category }: LedgerFilter) {
-  const term = query.trim().toLocaleLowerCase();
-  return expenses.filter((expense) => (category === "all" || expense.category === category) && (!term || matchesExpenseSearch(expense, term)));
-}
-
-type SearchParams = { get(name: string): string | null };
-export const FILTER_KEYS = ["scope", "year", "startDate", "endDate", "subtype", "category", "search"] as const;
+// `tab-filters.ts` writes the same type out by hand; this fails to compile when the two drift.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+const _typesMatch: Same<z.infer<typeof expenseTabFiltersSchema>, ExpenseTabFilters> = true;
+void _typesMatch;
 
 /** Ignore the separately retained main month, but reject incompatible custom date modes. */
 export function parseExpenseTabFilters(params: SearchParams) {
-  const raw: Record<string, unknown> = { scope: params.get("scope") ?? "all" };
-  for (const key of FILTER_KEYS) {
-    const value = params.get(key);
-    if (value !== null) raw[key] = key === "year" ? (/^\d{4}$/.test(value) ? Number(value) : NaN) : value;
-  }
-  return expenseTabFiltersSchema.safeParse(raw);
+  return expenseTabFiltersSchema.safeParse(rawFilters(params));
 }
 
-export function readExpenseTabFilters(params: SearchParams): ExpenseTabFilters {
-  const parsed = parseExpenseTabFilters(params);
-  return parsed.success ? parsed.data : { ...DEFAULT_EXPENSE_TAB_FILTERS };
-}
-
-export function expenseTabFilterParams(filters: ExpenseTabFilters) {
-  const params = new URLSearchParams({ scope: filters.scope });
-  if (filters.scope === "year") params.set("year", String(filters.year));
-  if (filters.scope === "range") {
-    params.set("startDate", filters.startDate);
-    params.set("endDate", filters.endDate);
-  }
-  if (filters.subtype !== "all") params.set("subtype", filters.subtype);
-  if (filters.category) params.set("category", filters.category);
-  if (filters.search) params.set("search", filters.search.trim());
-  return params;
-}
-
-/** Passing no filters on a tab click deliberately opens its all-time scope. */
-export function expenseTabHref(params: SearchParams & { toString(): string }, tabId: string | null,
-  filters: ExpenseTabFilters = DEFAULT_EXPENSE_TAB_FILTERS) {
-  const next = new URLSearchParams(params.toString());
-  for (const key of FILTER_KEYS) next.delete(key);
-  next.delete("tab");
-  if (tabId) {
-    next.set("tab", tabId);
-    for (const [key, value] of expenseTabFilterParams(filters)) next.set(key, value);
-  }
-  return `/expenses${next.size ? `?${next}` : ""}`;
-}

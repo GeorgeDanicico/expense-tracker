@@ -6,12 +6,16 @@ import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 
 import {
+  BUDGET_FILE,
   buildReport,
+  checkBudget,
   chunksFromClientManifest,
   collectRoutes,
   createSizer,
+  formatCheck,
   formatTable,
   loadsModule,
+  parseBudget,
   routeFromAppPath,
   sharedFiles,
 } from "./route-js-size.mjs";
@@ -161,5 +165,65 @@ describe("buildReport and formatTable", () => {
   it("has the fields PF9 will check against", () => {
     expect(Object.keys(report.routes[0]).sort()).toEqual(["files", "gzipBytes", "ownFiles", "ownGzipBytes", "rawBytes", "route"]);
     expect(Object.keys(report.shared).sort()).toEqual(["files", "gzip", "raw"]);
+  });
+});
+
+describe("the budget check (PF9)", () => {
+  const sizeOf = createSizer(FIXTURE, (path) => Buffer.from("a".repeat(relative(FIXTURE, path).length * 10)));
+  const report = buildReport(routes, sizeOf);
+  const kib = (route) => report.routes.find((entry) => entry.route === route).gzipBytes / 1024;
+  const budgetFor = (overrides = {}, tolerancePercent = 2) => ({
+    tolerancePercent,
+    firstLoadGzipKiB: { ...Object.fromEntries(report.routes.map((entry) => [entry.route, kib(entry.route) + 10])), ...overrides },
+  });
+
+  it("passes when every route is within its budget", () => {
+    const result = checkBudget(report, budgetFor());
+    expect(result.failed).toBe(false);
+    expect(result.rows.every((row) => row.status === "ok")).toBe(true);
+    expect(formatCheck(result, 2)).toMatch(/Size check passed\.$/);
+  });
+
+  it("allows the tolerance above a budget and not a byte more", () => {
+    // A budget whose limit is the route's size passes, one 0.01 KiB under it fails.
+    expect(checkBudget(report, budgetFor({ "/dashboard": kib("/dashboard") / 1.02 })).rows.find((row) => row.route === "/dashboard").status).toBe("ok");
+    const below = checkBudget(report, budgetFor({ "/dashboard": kib("/dashboard") / 1.02 - 0.01 }));
+    expect(below.rows.find((row) => row.route === "/dashboard").status).toBe("over");
+    expect(below.failed).toBe(true);
+    expect(formatCheck(below, 2)).toMatch(/\/dashboard is [\d.]+ KiB over its budget of [\d.]+ KiB.*\nSize check FAILED\.$/s);
+  });
+
+  it("fails for a route with no budget, and for a budget with no route in the build", () => {
+    const withoutTodos = Object.fromEntries(Object.entries(budgetFor().firstLoadGzipKiB).filter(([route]) => route !== "/todos"));
+    const missing = checkBudget(report, { tolerancePercent: 2, firstLoadGzipKiB: withoutTodos });
+    expect(missing.failed).toBe(true);
+    expect(missing.rows.find((row) => row.route === "/todos").status).toBe("no budget");
+    expect(formatCheck(missing, 2)).toContain(`/todos has no budget. Add it to ${BUDGET_FILE}.`);
+
+    const stale = checkBudget(report, budgetFor({ "/gone": 100 }));
+    expect(stale.failed).toBe(true);
+    expect(stale.stale).toEqual(["/gone"]);
+    expect(formatCheck(stale, 2)).toContain("has a budget for /gone, which is not in the build");
+  });
+
+  it("does not call a budget stale in a run limited to some routes", () => {
+    const only = { ...report, routes: report.routes.filter((entry) => entry.route === "/dashboard") };
+    expect(checkBudget(only, budgetFor(), { partial: true }).failed).toBe(false);
+    expect(checkBudget(only, budgetFor()).failed).toBe(true);
+  });
+
+  it("reads a budget file and refuses a malformed one", () => {
+    expect(parseBudget('{"tolerancePercent":2,"firstLoadGzipKiB":{"/dashboard":308.4}}')).toEqual({ tolerancePercent: 2, firstLoadGzipKiB: { "/dashboard": 308.4 } });
+    expect(() => parseBudget('{"firstLoadGzipKiB":{}}')).toThrow(/tolerancePercent/);
+    expect(() => parseBudget('{"tolerancePercent":2}')).toThrow(/firstLoadGzipKiB/);
+    expect(() => parseBudget('{"tolerancePercent":2,"firstLoadGzipKiB":{"dashboard":1}}')).toThrow(/"dashboard"/);
+    expect(() => parseBudget('{"tolerancePercent":2,"firstLoadGzipKiB":{"/dashboard":"big"}}')).toThrow(/"\/dashboard"/);
+    expect(() => parseBudget('{"tolerancePercent":-1,"firstLoadGzipKiB":{}}')).toThrow(/tolerancePercent/);
+  });
+
+  it("has the budget file CI reads, with the four target pages at 20% under their baselines", () => {
+    const budget = parseBudget(readFileSync(BUDGET_FILE, "utf8"));
+    expect(budget.firstLoadGzipKiB).toMatchObject({ "/dashboard": 308.4, "/expenses": 329.4, "/todos": 322.2, "/reminders": 307.4 });
+    expect(Object.keys(budget.firstLoadGzipKiB)).toHaveLength(24);
   });
 });

@@ -2,12 +2,22 @@
 
 import { useCallback, useState, type ReactNode } from "react";
 
-import { LogExpenseDialog } from "@/components/reminders/log-expense-dialog";
 import type { SnoozeChoice } from "@/components/reminders/reminder-row";
-import { SnoozeDialog } from "@/components/reminders/snooze-dialog";
 import type { RemindersState } from "@/components/reminders/use-reminders";
+import { lazySheet } from "@/components/ui/lazy-sheet";
 import { useAccount } from "@/hooks/use-account";
 import type { ListedReminder } from "@/lib/reminders/list";
+
+const logExpense = lazySheet(() => import("@/components/reminders/log-expense-dialog").then((module) => module.LogExpenseDialog));
+const snoozeUntil = lazySheet(() => import("@/components/reminders/snooze-dialog").then((module) => module.SnoozeDialog));
+const LogExpenseDialog = logExpense.Sheet;
+const SnoozeDialog = snoozeUntil.Sheet;
+
+/** Starts loading the two dialogs a reminder's actions can open; call it on hover, focus or touch near the rows. */
+export function preloadReminderActionDialogs() {
+  logExpense.preload();
+  snoozeUntil.preload();
+}
 
 /**
  * What tapping Mark done and Snooze does on a reminder row, shared by the Reminders page and Home:

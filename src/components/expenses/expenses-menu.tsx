@@ -1,11 +1,12 @@
 "use client";
 
-import { Menu, Portal } from "@chakra-ui/react";
+import { Portal } from "@chakra-ui/react";
 import { Download, FileUp, MoreHorizontal, Pencil, Trash2, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { ICON } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
+import { useLazyMenu } from "@/components/ui/lazy-menu";
 
 /** Where the statement import lives (`src/app/(app)/expenses/import`). */
 const IMPORT_PAGE_HREF = "/expenses/import";
@@ -48,16 +49,26 @@ export function expensesMenuItems({
 
 /** The `⋯` beside the page title; nothing when there is nothing in it. */
 export function ExpensesMenu({ items, onSelect }: { items: readonly ExpensesMenuItem[]; onSelect: (value: "edit-tab" | "delete-tab") => void }) {
+  const { parts, placeholder, holdPlain, takeFocus, asked } = useLazyMenu();
   if (!items.length) return null;
+  const Menu = parts?.Menu;
+  if (!Menu) {
+    return (
+      <IconButton ref={holdPlain} {...placeholder} aria-label="More expense actions" variant="outline">
+        <MoreHorizontal size={ICON.sm} />
+      </IconButton>
+    );
+  }
   return (
     <Menu.Root
       positioning={{ placement: "bottom-end" }}
+      defaultOpen={asked}
       onSelect={({ value }) => {
         if (value === "edit-tab" || value === "delete-tab") onSelect(value);
       }}
     >
       <Menu.Trigger asChild>
-        <IconButton aria-label="More expense actions" variant="outline">
+        <IconButton ref={takeFocus} aria-label="More expense actions" variant="outline">
           <MoreHorizontal size={ICON.sm} />
         </IconButton>
       </Menu.Trigger>

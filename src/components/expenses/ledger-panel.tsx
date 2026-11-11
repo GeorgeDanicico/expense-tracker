@@ -20,7 +20,7 @@ import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { formatMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
 import { monthAnalytics } from "@/lib/expenses/analytics";
 import { groupByCurrency } from "@/lib/expenses/family";
-import { filterExpenses, NO_LEDGER_FILTER } from "@/lib/expenses/filters";
+import { filterExpenses, NO_LEDGER_FILTER } from "@/lib/expenses/tab-filters";
 import { monthChange } from "@/lib/expenses/month-change";
 import { summarizeExpenses } from "@/lib/expenses/summary";
 import type { ExpensesData, FamilyExpensesData, ListedExpense } from "@/lib/expenses/types";

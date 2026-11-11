@@ -1,11 +1,12 @@
 "use client";
 
-import { Box, Flex, Menu, Portal, Text, type BoxProps } from "@chakra-ui/react";
+import { Box, Flex, Portal, Text, type BoxProps } from "@chakra-ui/react";
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
 import { useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
+import { useLazyMenu } from "@/components/ui/lazy-menu";
 import { transition } from "@/components/ui/theme/motion";
 import { SWIPE, useSwipe, type SwipeSide } from "@/components/ui/use-swipe";
 
@@ -108,6 +109,8 @@ export function RowActions({
   /** Where a long press opened the menu; the menu opens under the `⋯` otherwise. */
   anchor?: Point | null;
 }) {
+  const { parts, placeholder, holdPlain, takeFocus, asked } = useLazyMenu({ open });
+  const Menu = parts?.Menu;
   return (
     <>
       <Flex data-row-actions display={{ base: "none", md: "flex" }} gap="1">
@@ -118,9 +121,10 @@ export function RowActions({
         ))}
       </Flex>
       <Box display={{ base: phoneMenu ? "block" : "none", md: "none" }}>
-        <Menu.Root
+        {Menu ? <Menu.Root
           lazyMount
           unmountOnExit
+          defaultOpen={asked}
           open={open}
           onOpenChange={onOpenChange ? (details) => onOpenChange(details.open) : undefined}
           positioning={{
@@ -130,7 +134,7 @@ export function RowActions({
           onSelect={({ value }) => actions.find((action) => action.label === value)?.onSelect()}
         >
           <Menu.Trigger asChild>
-            <IconButton aria-label={`More actions: ${label}`} size="sm">
+            <IconButton ref={takeFocus} aria-label={`More actions: ${label}`} size="sm">
               <MoreHorizontal size={ICON.sm} />
             </IconButton>
           </Menu.Trigger>
@@ -146,7 +150,11 @@ export function RowActions({
               </Menu.Content>
             </Menu.Positioner>
           </Portal>
-        </Menu.Root>
+        </Menu.Root> : (
+          <IconButton ref={holdPlain} {...placeholder} aria-label={`More actions: ${label}`} size="sm">
+            <MoreHorizontal size={ICON.sm} />
+          </IconButton>
+        )}
       </Box>
     </>
   );

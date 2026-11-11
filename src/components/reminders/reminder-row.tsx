@@ -1,11 +1,12 @@
 "use client";
 
-import { Box, chakra, Flex, Menu, Portal, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, Portal, Text } from "@chakra-ui/react";
 import { AlarmClock, BellOff, BellRing, Check, CircleAlert, CircleCheck, Receipt } from "lucide-react";
 import NextLink from "next/link";
 import { useState, type ReactNode } from "react";
 
 import { IconButton } from "@/components/ui/icon-button";
+import { useLazyMenu } from "@/components/ui/lazy-menu";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconTile } from "@/components/ui/icon-tile";
 import { ListRow } from "@/components/ui/list-row";
@@ -102,16 +103,27 @@ export function SnoozeMenu({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
+  const { parts, placeholder, holdPlain, takeFocus, asked } = useLazyMenu({ open });
+  const Menu = parts?.Menu;
+  const icon = <AlarmClock size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />;
+  if (!Menu) {
+    return (
+      <IconButton ref={holdPlain} {...placeholder} aria-label={`Snooze ${title}`} disabled={disabled}>
+        {icon}
+      </IconButton>
+    );
+  }
   return (
     <Menu.Root
       positioning={{ placement: "bottom-end" }}
+      defaultOpen={asked}
       open={open}
       onOpenChange={onOpenChange ? (details) => onOpenChange(details.open) : undefined}
       onSelect={({ value }) => onChoose(value as SnoozeChoice)}
     >
       <Menu.Trigger asChild>
-        <IconButton aria-label={`Snooze ${title}`} disabled={disabled}>
-          <AlarmClock size={ICON.sm} strokeWidth={ICON_STROKE} aria-hidden="true" />
+        <IconButton ref={takeFocus} aria-label={`Snooze ${title}`} disabled={disabled}>
+          {icon}
         </IconButton>
       </Menu.Trigger>
       <Portal>

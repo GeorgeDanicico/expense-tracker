@@ -29,13 +29,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Badge, Box, Flex, Heading, Menu, Portal, SimpleGrid, Stack, Text } from "@chakra-ui/react";
+import { Badge, Box, Flex, Heading, Portal, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import { ArrowRightLeft, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoQuickAdd } from "@/components/todos/todo-quick-add";
 import { IconButton } from "@/components/ui/icon-button";
+import { useLazyMenu } from "@/components/ui/lazy-menu";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { DELETE_KEYS, focusNeighbour, isDeleteKey, SwipeRow } from "@/components/ui/row-actions";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -427,15 +428,28 @@ function SortableTodoCard({
 /** "Move to…" on a phone card: the other columns, each putting the card at its top. */
 function MoveToMenu({ todo, onMoveTo }: { todo: Todo; onMoveTo: (todo: Todo, status: TodoStatus) => void }) {
   const targets = TODO_STATUSES.filter((status) => status !== todo.status);
+  const { parts, placeholder, holdPlain, takeFocus, asked } = useLazyMenu();
+  const Menu = parts?.Menu;
+  const icon = <ArrowRightLeft size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />;
+  if (!Menu) {
+    return (
+      <Box position="absolute" top="1.5" insetEnd="1.5">
+        <IconButton ref={holdPlain} {...placeholder} aria-label={`Move ${todo.title} to…`} size="xs">
+          {icon}
+        </IconButton>
+      </Box>
+    );
+  }
   return (
     <Box position="absolute" top="1.5" insetEnd="1.5">
       <Menu.Root
         positioning={{ placement: "bottom-end" }}
+        defaultOpen={asked}
         onSelect={({ value }) => onMoveTo(todo, value as TodoStatus)}
       >
         <Menu.Trigger asChild>
-          <IconButton aria-label={`Move ${todo.title} to…`} size="xs">
-            <ArrowRightLeft size={ICON.xs} strokeWidth={ICON_STROKE} aria-hidden="true" />
+          <IconButton ref={takeFocus} aria-label={`Move ${todo.title} to…`} size="xs">
+            {icon}
           </IconButton>
         </Menu.Trigger>
         <Portal>

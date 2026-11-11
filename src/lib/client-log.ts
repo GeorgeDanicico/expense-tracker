@@ -7,20 +7,22 @@ import {
   CLIENT_LOG_MAX_EVENTS,
   CLIENT_LOG_PATH,
   CLIENT_PAGE_MAX,
-  clientEventSchema,
+  isClientEvent,
+  DIGEST,
+  RELEASE,
   type ClientErrorEvent,
   type ClientEvent,
   type ClientVitalEvent,
   WEB_VITAL_NAMES,
   WEB_VITAL_NAVIGATION_TYPES,
   WEB_VITAL_RATINGS,
-} from "@/lib/log/client-report";
+} from "@/lib/log/client-event";
 import { isRequestId } from "@/lib/log/request-id";
 
 /**
  * The browser's side of the client log (logging plan, L7): collects errors and Web Vitals and posts
  * them to `POST /api/client-log` (`src/app/api/client-log/route.ts`, whose contract is in
- * `src/lib/log/client-report.ts`).
+ * `src/lib/log/client-event.ts` and `client-report.ts`).
  *
  * Reports are queued and sent in batches: at most {@link CLIENT_LOG_MAX_EVENTS} events and
  * {@link CLIENT_LOG_MAX_BYTES} bytes a request, at most every {@link FLUSH_INTERVAL_MS}, and at once
@@ -80,9 +82,6 @@ function clip(text: string, max: number): string {
   const end = text.charCodeAt(max - 1);
   return text.slice(0, end >= 0xd800 && end <= 0xdbff ? max - 1 : max);
 }
-
-const RELEASE = /^[A-Za-z0-9._-]{1,64}$/;
-const DIGEST = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
  * The build this page came from: the commit hash `NEXT_PUBLIC_RELEASE` was set to when the app was
@@ -216,9 +215,8 @@ export function reportClientEvent(report: ClientReport): void {
   try {
     if (isPaused()) return;
 
-    const parsed = clientEventSchema.safeParse(normalise(report));
-    if (!parsed.success) return;
-    const event = parsed.data;
+    const event = normalise(report);
+    if (!isClientEvent(event)) return;
 
     if (state.accepted >= MAX_EVENTS_PER_PAGE) return;
     if (event.kind === "vital" && state.acceptedVitals >= MAX_VITALS_PER_PAGE) return;

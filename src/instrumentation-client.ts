@@ -1,4 +1,5 @@
-import { z } from "zod";
+// A module, though it exports nothing: Next runs it for its side effects.
+export {};
 
 /**
  * Runs in the browser before any of the app's own modules (Next's `instrumentation-client`).
@@ -9,8 +10,14 @@ import { z } from "zod";
  * a schema, even though Zod catches the error and falls back to the code this setting picks. It must
  * run before the first schema is created, which is why it is here and not in a component. The server
  * keeps the fast path: no CSP applies there.
+ *
+ * It sets the flag on the object Zod keeps its settings in (`globalThis.__zod_globalConfig`, what
+ * `z.config()` writes to) instead of importing Zod: importing anything from Zod here put its whole core,
+ * about 23 KiB gzipped, in the first load of every page, for one line (PF9). `instrumentation-client.test.ts`
+ * checks that Zod still reads the flag from there, so an upgrade that moves it fails a test.
  */
-z.config({ jitless: true });
+const zod = globalThis as typeof globalThis & { __zod_globalConfig?: { jitless?: boolean } };
+(zod.__zod_globalConfig ??= {}).jitless = true;
 
 /**
  * Errors nothing caught, sent to the server's logs through `src/lib/client-log.ts` (logging plan,

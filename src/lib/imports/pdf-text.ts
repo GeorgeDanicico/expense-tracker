@@ -1,3 +1,5 @@
+import "server-only";
+
 import { extractTextItems, getDocumentProxy, type StructuredTextItem } from "unpdf";
 
 import { IMPORT_MAX_PDF_PAGES, ImportError } from "@/lib/imports/types";

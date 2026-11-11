@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { CallToolResult, McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 import { z } from "zod";
 

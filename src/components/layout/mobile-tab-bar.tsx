@@ -12,6 +12,7 @@ import { useAppPathname } from "@/components/layout/use-app-pathname";
 import { useNavigation } from "@/components/layout/use-navigation";
 import { ICON_STROKE } from "@/components/ui/icon";
 import { PRESS_SCALE, pressFeedback, transition } from "@/components/ui/theme/motion";
+import { preloadOnIntent } from "@/lib/client/preload";
 
 /**
  * Fixed bottom navigation on phones: Home, Money, +, Planning, More, with the + in the middle
@@ -47,6 +48,7 @@ export function MobileTabBar() {
       aria-label="Quick add"
       aria-haspopup="dialog"
       onClick={() => quickAdd.open()}
+      {...preloadOnIntent(quickAdd.preload)}
     >
       <Plus size={26} strokeWidth={2.4} aria-hidden="true" />
     </chakra.button>

@@ -43,6 +43,14 @@ describe("Avatar", () => {
     expect(render(<Avatar name="Ana Pop" />)).not.toContain("aria-hidden");
   });
 
+  it("gives the picture its size, decodes it asynchronously and loads it lazily unless it is a header's", () => {
+    const img = (node: React.ReactNode) => render(node).match(/<img[^>]*>/)?.[0] ?? "";
+    const medium = img(<Avatar name="Ana Pop" src="/apple-icon.png" size="md" />);
+    for (const attribute of ['width="40"', 'height="40"', 'loading="lazy"', 'decoding="async"']) expect(medium).toContain(attribute);
+    expect(img(<Avatar name="Ana Pop" src="/apple-icon.png" size="lg" />)).toContain('width="64"');
+    expect(img(<Avatar name="Ana Pop" src="/apple-icon.png" size="xs" priority />)).toContain('loading="eager"');
+  });
+
   it("treats a null picture as none", () => {
     expect(render(<Avatar name="Ana Pop" src={null} />)).not.toContain("<img");
   });

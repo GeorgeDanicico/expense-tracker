@@ -4,10 +4,7 @@ import { Box, Stack, Text } from "@chakra-ui/react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { CustomExpenseTab } from "@/components/expenses/custom-expense-tab";
-import { EditExpenseSheet } from "@/components/expenses/edit-expense-sheet";
 import type { ExpenseRowActions } from "@/components/expenses/expense-rows";
-import { ExpenseTabDialog } from "@/components/expenses/expense-tab-dialog";
 import { ExpenseTabChips } from "@/components/expenses/expense-tabs";
 import { ExpensesMenu, expensesMenuItems } from "@/components/expenses/expenses-menu";
 import { LedgerPanel } from "@/components/expenses/ledger-panel";
@@ -16,8 +13,8 @@ import { useExpenseDelete, useExpenseWrites } from "@/components/expenses/use-ex
 import { ViewingBar, ViewingMenu } from "@/components/family/viewing-picker";
 import { PermissionGate } from "@/components/layout/permission-gate";
 import { StreamedSection } from "@/components/ui/streamed-section";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DataError, DataRefresh } from "@/components/ui/data-state";
+import { lazySheet, useOpenedOnce } from "@/components/ui/lazy-sheet";
 import { PageHeader } from "@/components/ui/page-header";
 import { ExpensesSkeleton, LedgerSkeleton, RowsCardSkeleton } from "@/components/ui/skeletons";
 import { UndoToast } from "@/components/ui/undo-toast";
@@ -28,8 +25,28 @@ import { useViewing } from "@/hooks/use-viewing";
 import { expenseTabsApiKey, FAMILY_API_KEY, mainExpensesExportUrl, type TabsResponse } from "@/lib/api/keys";
 import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { getBucharestMonth, resolveMainExpenseMonth } from "@/lib/calendar";
+import { preloadOnIntent } from "@/lib/client/preload";
 import type { Expense } from "@/lib/expenses/types";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
+
+// What opens on a tap, or only on a saved tab, is loaded when it is first wanted (PF9): the expense form (and the
+// validation library it brings), the tab dialog, the delete confirmation and the saved tab's own screen.
+const editSheet = lazySheet(() => import("@/components/expenses/edit-expense-sheet").then((module) => module.EditExpenseSheet));
+const tabDialogSheet = lazySheet(() => import("@/components/expenses/expense-tab-dialog").then((module) => module.ExpenseTabDialog));
+const confirmSheet = lazySheet(() => import("@/components/ui/confirm-dialog").then((module) => module.ConfirmDialog));
+const customTab = lazySheet(() => import("@/components/expenses/custom-expense-tab").then((module) => module.CustomExpenseTab));
+const EditExpenseSheet = editSheet.Sheet;
+const ExpenseTabDialog = tabDialogSheet.Sheet;
+const ConfirmDialog = confirmSheet.Sheet;
+const CustomExpenseTab = customTab.Sheet;
+
+/** Starts loading what a tap on this page can open, once the pointer, focus or a finger is on the page. */
+function preloadSheets() {
+  editSheet.preload();
+  tabDialogSheet.preload();
+  confirmSheet.preload();
+  customTab.preload();
+}
 
 type TabDialog = { mode: "create" } | { mode: "edit"; tab: ExpenseTab };
 
@@ -58,8 +75,10 @@ function ExpensesContent() {
   const [tabDialog, setTabDialog] = useState<TabDialog | null>(null);
   const [deletingTab, setDeletingTab] = useState<ExpenseTab | null>(null);
   const [editing, setEditing] = useState<Expense | null>(null);
+  const editOpened = useOpenedOnce(editing !== null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const tabDelete = useApiForm();
+  const deleteOpened = useOpenedOnce(deletingTab !== null);
   const { activeTabId, activeTab, changeTab, saveTab, returnToMain } = useExpenseTabRouting(tabsResult);
   const openTab = activeTabId ? (tabs.find((tab) => tab.id === activeTabId) ?? null) : null;
 
@@ -102,7 +121,7 @@ function ExpensesContent() {
   }
 
   return (
-    <Stack gap="3">
+    <Stack gap="3" {...preloadOnIntent(preloadSheets)}>
       <PageHeader
         title="Expenses"
         inline
@@ -146,7 +165,7 @@ function ExpensesContent() {
         </Box>
       )}
 
-      <EditExpenseSheet expense={editing} currency={viewing.currency} onClose={() => setEditing(null)} />
+      {editOpened ? <EditExpenseSheet expense={editing} currency={viewing.currency} onClose={() => setEditing(null)} /> : null}
       <UndoToast {...deletes.toast} />
 
       {tabDialog ? (
@@ -163,7 +182,7 @@ function ExpensesContent() {
         />
       ) : null}
 
-      <ConfirmDialog
+      {deleteOpened ? <ConfirmDialog
         open={deletingTab !== null}
         onOpenChange={(open) => { if (!open) setDeletingTab(null); }}
         title="Delete this tab?"
@@ -173,7 +192,7 @@ function ExpensesContent() {
         pending={tabDelete.pending}
         error={tabDelete.error}
         onConfirm={() => { if (deletingTab) deleteTab(deletingTab); }}
-      />
+      /> : null}
     </Stack>
   );
 }

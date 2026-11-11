@@ -1,0 +1,30 @@
+{
+  "about": "First-load JavaScript budgets, gzipped, in KiB, checked by `npm run size:routes -- --check` (CI, after the build). Four target pages (Home, Expenses, To-dos, Reminders) are 20% under the PF1 baseline; every other page is held to its PF1 baseline. These are PF1's proposed budgets, in use until George agrees or changes them (docs/performance.md, Waiting for George, row 2). To change one, edit its number here; the check allows tolerancePercent over it. A new page needs a line here, a removed page's line has to go.",
+  "tolerancePercent": 2,
+  "firstLoadGzipKiB": {
+    "/": 253.7,
+    "/_not-found": 243.8,
+    "/calendar": 387.5,
+    "/change-password": 299.6,
+    "/dashboard": 308.4,
+    "/expenses": 329.4,
+    "/expenses/import": 390.2,
+    "/insights": 399.7,
+    "/investments": 395.3,
+    "/join/[code]": 303.9,
+    "/login": 273.1,
+    "/more": 375.8,
+    "/net-worth": 382.6,
+    "/oauth/consent": 259.7,
+    "/offline": 246.9,
+    "/reminders": 307.4,
+    "/settings": 383.6,
+    "/settings/ai": 376.3,
+    "/settings/family": 378.9,
+    "/settings/family/manage": 382.4,
+    "/settings/mcp": 381.5,
+    "/settings/notifications": 378.7,
+    "/settings/permissions": 378.2,
+    "/todos": 322.2
+  }
+}

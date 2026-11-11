@@ -17,6 +17,12 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// The sheet is loaded on demand in the app (PF9); here `dynamic` hands back the loaded sheet at once, so the markup below has it.
+vi.mock("next/dynamic", async () => {
+  const { QuickAddSheet } = await import("./quick-add-sheet");
+  return { default: () => QuickAddSheet };
+});
+
 import { ExpensesClient } from "@/app/(app)/expenses/expenses-client";
 import { RemindersClient } from "@/app/(app)/reminders/reminders-client";
 import { HomeScreen } from "@/components/dashboard/home-screen";

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { McpServer } from "@modelcontextprotocol/server";
 
 import { isFamilyEnabled } from "@/lib/features";

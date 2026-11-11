@@ -1,5 +1,6 @@
 "use client";
 
+// eslint-disable-next-line local/lazy-popper -- a dev-only mockup page, not part of any shipped page's first load
 import { Box, Button, Flex, Grid, Menu, Portal, Stack, Text } from "@chakra-ui/react";
 import { AlarmClock, Check, SquareKanban } from "lucide-react";
 import { useState } from "react";

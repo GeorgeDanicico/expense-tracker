@@ -7,6 +7,9 @@ export type AvatarSize = "xs" | "sm" | "md" | "lg";
 /** Our sizes on Chakra's avatar recipe: xs 24px, sm 32px, md 40px, lg 64px (the recipe scales the initials). */
 const RECIPE_SIZE = { xs: "2xs", sm: "xs", md: "md", lg: "2xl" } as const satisfies Record<AvatarSize, string>;
 
+/** The pixel size of each, written on the picture so the browser reserves its space before it arrives (the recipe sizes the box the same). */
+const PIXELS = { xs: 24, sm: 32, md: 40, lg: 64 } as const satisfies Record<AvatarSize, number>;
+
 /**
  * A person's picture, or their initials on their member colour when they have none (or it fails to
  * load). `name` is required even with a picture: it's the image's alt text and the fallback.
@@ -15,6 +18,8 @@ const RECIPE_SIZE = { xs: "2xs", sm: "xs", md: "md", lg: "2xl" } as const satisf
  * the eighth share `fg.subtle`, which has no paired text colour), the fallback is neutral.
  * `decorative` hides it from screen readers, for places where the name is already written beside it
  * (the sidebar's account row), so the name isn't read twice.
+ * The picture has its width and height, decodes off the main thread and loads lazily; `priority` is for the one
+ * in the page's header (the sidebar's account row), which is on screen at once. The picture is a few KiB of WebP, already resized when it was uploaded, so it is served as it is, not through `next/image`.
  */
 export function Avatar({
   name,
@@ -22,12 +27,14 @@ export function Avatar({
   color,
   size = "sm",
   decorative = false,
+  priority = false,
 }: {
   name: string;
   src?: string | null;
   color?: string;
   size?: AvatarSize;
   decorative?: boolean;
+  priority?: boolean;
 }) {
   const slot = color && /^member\.[1-8]$/.test(color) ? color : null;
   return (
@@ -43,7 +50,7 @@ export function Avatar({
       ) : (
         <ChakraAvatar.Fallback name={name} role="img" aria-label={name} />
       )}
-      {src ? <ChakraAvatar.Image src={src} alt={decorative ? "" : name} /> : null}
+      {src ? <ChakraAvatar.Image src={src} alt={decorative ? "" : name} htmlWidth={PIXELS[size]} htmlHeight={PIXELS[size]} loading={priority ? "eager" : "lazy"} decoding="async" /> : null}
     </ChakraAvatar.Root>
   );
 }

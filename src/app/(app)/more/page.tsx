@@ -40,7 +40,7 @@ export default function MorePage() {
       <Card>
         <Card.Body>
           <Flex align="center" gap="3">
-            <Avatar name={signInName} src={avatarUrl} size="md" decorative />
+            <Avatar name={signInName} src={avatarUrl} size="md" decorative priority />
             <Box minW="0">
               <Text textStyle="sectionTitle" overflowWrap="anywhere">
                 {signInName}

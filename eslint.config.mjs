@@ -115,6 +115,17 @@ const streamedSection = {
   rules: { "local/streamed-section": "error" },
 };
 
+/**
+ * Chakra's Menu, Tooltip and the other floating panels bring a positioning library and a state machine
+ * with them, about 26 KiB gzipped, so they load after the page (PF9): through `useLazyMenu`, with
+ * `menu-parts.tsx` the one file that imports them.
+ */
+const lazyPopper = {
+  files: ["src/**/*.{ts,tsx}"],
+  ignores: ["src/components/ui/menu-parts.tsx", "src/**/*.test.{ts,tsx}"],
+  rules: { "local/lazy-popper": "error" },
+};
+
 const reducedMotion = {
   files: ["src/**/*.{ts,tsx}"],
   ignores: ["src/hooks/use-reduced-motion.ts"],
@@ -210,6 +221,7 @@ const eslintConfig = defineConfig([
   uiGuardrails,
   motion,
   reducedMotion,
+  lazyPopper,
   streamedSection,
   clientOnlyFactories,
   supabaseBoundary,

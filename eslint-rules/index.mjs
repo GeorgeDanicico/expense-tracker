@@ -4,6 +4,7 @@
  */
 import clientOnlyChakraFactory from "./client-only-chakra-factory.mjs";
 import dndContextId from "./dnd-context-id.mjs";
+import lazyPopper from "./lazy-popper.mjs";
 import motionTokens from "./motion-tokens.mjs";
 import noFetchInComponents from "./no-fetch-in-components.mjs";
 import noIsoDateSlice from "./no-iso-date-slice.mjs";
@@ -27,6 +28,7 @@ const plugin = {
   rules: {
     "client-only-chakra-factory": clientOnlyChakraFactory,
     "dnd-context-id": dndContextId,
+    "lazy-popper": lazyPopper,
     "motion-tokens": motionTokens,
     "no-fetch-in-components": noFetchInComponents,
     "no-iso-date-slice": noIsoDateSlice,

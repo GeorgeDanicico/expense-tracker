@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 import { MAIN_EXPENSE_TAB } from "@/components/expenses/expense-tabs";
 import type { TabsResponse } from "@/lib/api/keys";
-import { expenseTabHref, readExpenseTabFilters } from "@/lib/expenses/filters";
+import { expenseTabHref, readExpenseTabFilters } from "@/lib/expenses/tab-filters";
 import type { ExpenseTab } from "@/lib/expenses/tabs";
 
 /**

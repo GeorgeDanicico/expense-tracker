@@ -5,14 +5,19 @@ import { LogOut } from "lucide-react";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
+import { lazySheet, useOpenedOnce } from "@/components/ui/lazy-sheet";
 import { useApiForm } from "@/hooks/use-api-form";
 import { forgetThisDeviceBeforeSignOut } from "@/hooks/use-notification-settings";
 import { signOut as requestSignOut } from "@/lib/api/account-requests";
 import { loadAfterSessionChange } from "@/lib/api/auth-redirect";
 import { afterSignOut } from "@/lib/api/invalidate";
+import { preloadOnIntent } from "@/lib/client/preload";
+
+const confirmation = lazySheet(() => import("@/components/ui/confirm-dialog").then((module) => module.ConfirmDialog));
+const ConfirmDialog = confirmation.Sheet;
+const preloadSignOutDialog = preloadOnIntent(confirmation.preload);
 
 /**
  * The sign-out flow: the button opens a confirmation, and only "Yes, log me out" signs out. It first
@@ -22,6 +27,8 @@ function useSignOut() {
   const { mutate } = useSWRConfig();
   const form = useApiForm();
   const [confirming, setConfirming] = useState(false);
+  // Every page has this button; the dialog's script is fetched when someone reaches for it (PF9).
+  const opened = useOpenedOnce(confirming);
 
   function signOut() {
     void form.submit(async () => {
@@ -32,7 +39,7 @@ function useSignOut() {
     }, { fallback: "Unable to sign out. Try again." });
   }
 
-  const dialog = (
+  const dialog = opened ? (
     <ConfirmDialog
       open={confirming}
       onOpenChange={(open) => {
@@ -50,7 +57,7 @@ function useSignOut() {
       error={form.error}
       onConfirm={signOut}
     />
-  );
+  ) : null;
   return { open: () => setConfirming(true), dialog };
 }
 
@@ -61,6 +68,7 @@ export function SignOutButton() {
     <>
       <Button
         onClick={open}
+        {...preloadSignOutDialog}
         variant="ghost"
         size="md"
         h="11"
@@ -81,7 +89,7 @@ export function SignOutIconButton() {
   const { open, dialog } = useSignOut();
   return (
     <>
-      <IconButton aria-label="Sign out" size="xs" tooltip onClick={open}>
+      <IconButton aria-label="Sign out" size="xs" tooltip onClick={open} {...preloadSignOutDialog}>
         <LogOut size={ICON.xs} strokeWidth={ICON_STROKE} />
       </IconButton>
       {dialog}

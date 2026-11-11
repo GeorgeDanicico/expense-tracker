@@ -3,15 +3,38 @@ import { z } from "zod";
 import type { LogFields } from "@/lib/log";
 import { loggablePagePath, loggableResourcePath } from "@/lib/log/loggable-path";
 import { redactString } from "@/lib/log/redact";
+import {
+  CLIENT_ERROR_MESSAGE_MAX,
+  CLIENT_ERROR_NAME_MAX,
+  CLIENT_ERROR_SOURCES,
+  CLIENT_ERROR_STACK_MAX,
+  CLIENT_LOG_MAX_EVENTS,
+  CLIENT_LOG_MIN_EVENTS,
+  CLIENT_PAGE_MAX,
+  CLIENT_VITAL_MAX,
+  DIGEST,
+  isPage,
+  RELEASE,
+  WEB_VITAL_NAMES,
+  WEB_VITAL_NAVIGATION_TYPES,
+  WEB_VITAL_RATINGS,
+  type ClientErrorEvent,
+  type ClientEvent,
+  type ClientVitalEvent,
+} from "@/lib/log/client-event";
 import { isRequestId } from "@/lib/log/request-id";
+
+// The names and limits the browser also uses live in `client-event.ts`; everything is importable from here.
+export * from "@/lib/log/client-event";
 
 /**
  * The browser's error and Web Vitals reports (logging plan, L6): the request `POST /api/client-log`
  * takes, and how each event is made safe to log. The browser reporter (L7) builds its requests from
  * the schema and limits here.
  *
- * It imports nothing server-only (no `next/*`, no `server-only`, no environment), so client code can
- * import the contract from it; the app's origin, which only the server knows, is passed in.
+ * It imports nothing server-only (no `next/*`, no `server-only`, no environment); the app's origin,
+ * which only the server knows, is passed in. It is Zod, the redactor and the path sanitiser, so the
+ * browser doesn't import it: it uses `client-event.ts` (PF9).
  *
  * SECURITY: everything in a report is written by whoever sends it, signed out included, and lands in
  * the logs. The schema is strict (unknown keys are refused) and bounds every field; then
@@ -21,23 +44,6 @@ import { isRequestId } from "@/lib/log/request-id";
  * redacted like any logged string. The logger redacts every field again when it writes the line.
  */
 
-/** Where the browser sends its reports. */
-export const CLIENT_LOG_PATH = "/api/client-log";
-/** The largest request body read (413 past it). */
-export const CLIENT_LOG_MAX_BYTES = 16 * 1024;
-/** The fewest and most events in one request. */
-export const CLIENT_LOG_MIN_EVENTS = 1;
-export const CLIENT_LOG_MAX_EVENTS = 10;
-
-/** Field limits, in characters, which the reporter clips to before sending: one field past its limit refuses the whole request. */
-export const CLIENT_ERROR_NAME_MAX = 80;
-export const CLIENT_ERROR_MESSAGE_MAX = 500;
-export const CLIENT_ERROR_STACK_MAX = 4000;
-/** A page is `location.pathname` (or `location.href`): a path starting with `/`, or an `http(s)` URL. */
-export const CLIENT_PAGE_MAX = 2048;
-/** The largest Web Vitals value accepted (milliseconds for all but CLS). */
-export const CLIENT_VITAL_MAX = 600_000;
-
 /** The most stack frames logged per error. */
 export const MAX_STACK_FRAMES = 15;
 /** The most characters kept of a frame's function name. */
@@ -45,33 +51,11 @@ const MAX_FUNCTION_LENGTH = 80;
 /** The largest line or column number kept. */
 const MAX_POSITION = 10_000_000;
 
-const RELEASE = /^[A-Za-z0-9._-]{1,64}$/;
-/** Next's error digest: a hash or number, never free text. */
-const DIGEST = /^[A-Za-z0-9_-]{1,64}$/;
-
 /** What the endpoint answers, with status 400, to any body that isn't a valid report. */
 export const NOT_A_CLIENT_REPORT = "That isn't a client report.";
 
-/** Whether `page` is a path (`/…`, not `//…`) or an absolute `http(s)` URL. */
-function isPage(page: string): boolean {
-  if (page.startsWith("/")) return !page.startsWith("//");
-  try {
-    const url = new URL(page);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 const pageSchema = z.string().min(1).max(CLIENT_PAGE_MAX).refine(isPage);
 const releaseSchema = z.string().regex(RELEASE);
-
-/** Where a browser error was caught: `window.onerror`, an unhandled rejection, or an error boundary. */
-export const CLIENT_ERROR_SOURCES = ["window", "unhandledrejection", "boundary", "global_boundary"] as const;
-export const WEB_VITAL_NAMES = ["LCP", "INP", "CLS", "TTFB", "FCP"] as const;
-export const WEB_VITAL_RATINGS = ["good", "needs-improvement", "poor"] as const;
-/** The `navigationType` values the `web-vitals` library reports. */
-export const WEB_VITAL_NAVIGATION_TYPES = ["navigate", "reload", "back-forward", "back-forward-cache", "prerender", "restore"] as const;
 
 /** A browser error. `requestId` is the `x-request-id` of the API response that caused it, if any. */
 export const clientErrorEventSchema = z.strictObject({
@@ -104,9 +88,11 @@ export const clientLogBodySchema = z.strictObject({
   events: z.array(clientEventSchema).min(CLIENT_LOG_MIN_EVENTS).max(CLIENT_LOG_MAX_EVENTS),
 });
 
-export type ClientErrorEvent = z.infer<typeof clientErrorEventSchema>;
-export type ClientVitalEvent = z.infer<typeof clientVitalEventSchema>;
-export type ClientEvent = z.infer<typeof clientEventSchema>;
+// The browser's hand-written types (`client-event.ts`) and these schemas must describe the same events.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+const _typesMatch: Same<z.infer<typeof clientEventSchema>, ClientEvent> = true;
+void _typesMatch;
+
 export type ClientLogBody = z.infer<typeof clientLogBodySchema>;
 
 /** Whose scripts a stack frame may name by path: the app's own origin (the server decides, see `isAppOrigin`). */

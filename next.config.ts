@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import { networkInterfaces } from "node:os";
+import { join } from "node:path";
 
+import { ClientModulesPlugin } from "./src/lib/build/client-modules-plugin";
 import { legacyRedirects } from "./src/lib/http/legacy-redirects";
 import { COOP_EXEMPTIONS, STATIC_SECURITY_HEADERS } from "./src/lib/http/security-headers";
 
@@ -23,6 +25,17 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
   outputFileTracingRoot: process.cwd(),
+  // `@chakra-theme` reaches into Chakra's theme files so the app's theme can leave out the recipes of components it
+  // doesn't use (src/components/ui/theme/chakra-defaults.ts, PF9). The same alias is in tsconfig.json and vitest.config.ts.
+  webpack(config, { dir, isServer }) {
+    // `BUNDLE_MODULES=1 npm run build` also records which modules are in each browser chunk (scripts/client-modules.mjs).
+    if (process.env.BUNDLE_MODULES && !isServer) config.plugins.push(new ClientModulesPlugin(join(dir, ".next", "diagnostics")));
+    config.resolve.alias["@chakra-theme"] = join(process.cwd(), "node_modules/@chakra-ui/react/dist/esm/theme");
+    return config;
+  },
+  turbopack: {
+    resolveAlias: { "@chakra-theme": "./node_modules/@chakra-ui/react/dist/esm/theme" },
+  },
   experimental: {
     optimizePackageImports: ["@chakra-ui/react", "lucide-react"],
   },

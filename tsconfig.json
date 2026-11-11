@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@chakra-theme/*": ["./node_modules/@chakra-ui/react/dist/types/theme/*"]
     }
   },
   "include": [
