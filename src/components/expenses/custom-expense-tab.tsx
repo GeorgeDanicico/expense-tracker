@@ -2,7 +2,6 @@
 
 import { Stack } from "@chakra-ui/react";
 import { useSearchParams } from "next/navigation";
-import useSWR from "swr";
 
 import { ExpenseTabDashboard } from "@/components/dashboard/expense-tab-dashboard";
 import { ExpenseList } from "@/components/expenses/expense-list";
@@ -13,6 +12,7 @@ import { DataError, DataRefresh } from "@/components/ui/data-state";
 import { RowsCardSkeleton } from "@/components/ui/skeletons";
 import { useViewing } from "@/hooks/use-viewing";
 import { expenseTabExpensesApiKey } from "@/lib/api/keys";
+import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { expenseTabFilterParams, readExpenseTabFilters } from "@/lib/expenses/filters";
 import type { ExpenseTab, ExpenseTabLedgerData } from "@/lib/expenses/tabs";
 
@@ -36,7 +36,7 @@ export function CustomExpenseTab({
   const filters = readExpenseTabFilters(searchParams);
   const viewing = useViewing();
   const key = expenseTabExpensesApiKey(tab.id, filters, tab.updatedAt, viewing.member);
-  const { data, error, isValidating, mutate } = useSWR<ExpenseTabLedgerData>(viewing.ready ? key : null, { keepPreviousData: false });
+  const { data, error, isValidating, mutate } = useServerFirstSWR<ExpenseTabLedgerData>(viewing.ready ? key : null, { keepPreviousData: false });
   const filtersMatch = data && expenseTabFilterParams(data.filters).toString() === expenseTabFilterParams(filters).toString();
   const ledger = data?.tab.id === tab.id && data.tab.updatedAt === tab.updatedAt && filtersMatch ? data : undefined;
 

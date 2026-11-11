@@ -6,12 +6,12 @@ import { SWRConfig, type Middleware } from "swr";
 
 import CalendarPage from "@/app/(app)/calendar/page";
 import InsightsPage from "@/app/(app)/insights/page";
-import ExpensesPage from "@/app/(app)/expenses/page";
+import { ExpensesClient } from "@/app/(app)/expenses/expenses-client";
 import ImportPage from "@/app/(app)/expenses/import/page";
 import InvestmentsPage from "@/app/(app)/investments/page";
 import MorePage from "@/app/(app)/more/page";
 import NetWorthPage from "@/app/(app)/net-worth/page";
-import RemindersPage from "@/app/(app)/reminders/page";
+import { RemindersClient } from "@/app/(app)/reminders/reminders-client";
 import FamilySettingsPage from "@/app/(app)/settings/family/page";
 import ManageFamilyPage from "@/app/(app)/settings/family/manage/page";
 import MyPermissionsPage from "@/app/(app)/settings/permissions/page";
@@ -19,7 +19,7 @@ import AiFeaturesSettingsPage from "@/app/(app)/settings/ai/page";
 import SettingsLayout from "@/app/(app)/settings/layout";
 import NotificationsSettingsPage from "@/app/(app)/settings/notifications/page";
 import SettingsPage from "@/app/(app)/settings/page";
-import TodosPage from "@/app/(app)/todos/page";
+import { TodosClient } from "@/app/(app)/todos/todos-client";
 import ChangePasswordPage from "@/app/change-password/page";
 import { HomeScreen } from "@/components/dashboard/home-screen";
 import { ExpenseApiProvider } from "@/components/expenses/expense-api";
@@ -51,12 +51,13 @@ const SCREENS: Record<PreviewScreen, () => React.ReactNode> = {
   dashboard: HomeScreen,
   insights: InsightsPage,
   more: MorePage,
-  expenses: ExpensesPage,
+  // Expenses, To-dos and Reminders are server components too since PF7: the preview draws their client bodies.
+  expenses: ExpensesClient,
   investments: InvestmentsPage,
   "net-worth": NetWorthPage,
   settings: SettingsPreview,
-  todos: TodosPage,
-  reminders: RemindersPage,
+  todos: TodosClient,
+  reminders: RemindersClient,
   calendar: CalendarPage,
   notifications: NotificationsPreview,
   "ai-settings": AiSettingsPreview,

@@ -5,7 +5,6 @@ import { History, SquareKanban, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
-import useSWR from "swr";
 
 import { TodoBoard } from "@/components/todos/todo-board";
 import { TodoDialog } from "@/components/todos/todo-dialog";
@@ -23,6 +22,7 @@ import { UndoToast, useDeleteWithUndo, type DeleteCopy } from "@/components/ui/u
 import { useAccount } from "@/hooks/use-account";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { useMemberColors } from "@/hooks/use-member-colors";
+import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { FAMILY_API_KEY, todosApiKey, type FamilyResponse } from "@/lib/api/keys";
 import {
   filterTodos,
@@ -94,7 +94,7 @@ export function TodoBoardScreen() {
   const board = useTodoBoard({ enabled: hasFamily });
   const { remove: removeCard } = board;
   const deletes = useDeleteWithUndo(useCallback((todo: Todo) => removeCard(todo.id), [removeCard]), CARD_DELETE);
-  const { data: family } = useSWR<FamilyResponse>(hasFamily ? FAMILY_API_KEY : null);
+  const { data: family } = useServerFirstSWR<FamilyResponse>(hasFamily ? FAMILY_API_KEY : null);
   const members = family?.family?.members;
   const card = useLinkedCard(board.todos, searchParams.get(TODO_CARD_PARAM), pathname);
   const opened = card.openId ? board.todos?.find((todo) => todo.id === card.openId) : undefined;

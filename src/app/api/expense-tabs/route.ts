@@ -1,13 +1,12 @@
-import { resolveViewedUserFor } from "@/lib/family/viewed-user";
+import { loadExpenseTabs } from "@/lib/expenses/load-expenses";
 import { withPermission } from "@/lib/http/permission";
 import { json, parseBody } from "@/lib/http/route";
 import { getRepositories } from "@/lib/repositories";
 import { expenseTabSchema } from "@/lib/validation/expense-tab";
 
-export const GET = withPermission("expenses", "edit", async (request, user, _context, member) => {
-  const { userId, viewing } = await resolveViewedUserFor(request, user, member);
-  return json({ tabs: await getRepositories().expenseTabs.list(userId), viewing });
-}, { failure: "Unable to load expense tabs." });
+export const GET = withPermission("expenses", "edit", async (request) => json(await loadExpenseTabs(new URL(request.url).searchParams)), {
+  failure: "Unable to load expense tabs.",
+});
 
 // Writes never read `?member=`: they always act on the caller.
 

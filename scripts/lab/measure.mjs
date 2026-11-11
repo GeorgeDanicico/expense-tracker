@@ -326,7 +326,7 @@ export async function homeStrings(appUrl, cookies) {
  * The page's own data strings, read from the API the page calls with the same session: the content
  * marker waits for one of them, and the first-HTML check looks for them. For Home, `homeStrings`.
  */
-async function probesFor(page, appUrl, cookies) {
+export async function probesFor(page, appUrl, cookies) {
   const get = (path) => getJson(appUrl, cookies, path);
   const month = bucharestToday().slice(0, 7);
   if (page.startsWith("/dashboard")) {

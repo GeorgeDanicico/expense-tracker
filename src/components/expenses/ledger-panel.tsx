@@ -2,7 +2,6 @@
 
 import { Box, Flex, Grid, Stack, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import useSWR from "swr";
 
 import { CategoryBreakdown } from "@/components/dashboard/category-breakdown";
 import { CurrencyAmounts } from "@/components/expenses/currency-totals";
@@ -17,6 +16,7 @@ import { LedgerSkeleton } from "@/components/ui/skeletons";
 import { LEDGER_COLUMNS, PAGE_SPACING } from "@/components/ui/theme/layout";
 import { useViewing } from "@/hooks/use-viewing";
 import { mainExpensesApiKey } from "@/lib/api/keys";
+import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { formatMonth, getBucharestToday, shiftMonth } from "@/lib/calendar";
 import { monthAnalytics } from "@/lib/expenses/analytics";
 import { groupByCurrency } from "@/lib/expenses/family";
@@ -73,10 +73,10 @@ export function LedgerPanel({
 }) {
   const viewing = useViewing();
   const [filter, setFilter] = useState(NO_LEDGER_FILTER);
-  const { data, error, isValidating, mutate } = useSWR<Ledger>(mainExpensesApiKey(month, viewing.member), { keepPreviousData: false });
+  const { data, error, isValidating, mutate } = useServerFirstSWR<Ledger>(mainExpensesApiKey(month, viewing.member), { keepPreviousData: false });
   // The month before, for the comparison; it also has ‹ ready. The family view mixes currencies, so it has none.
   const previousMonth = shiftMonth(month, -1);
-  const { data: previous } = useSWR<ExpensesData>(viewing.family ? null : mainExpensesApiKey(previousMonth, viewing.member));
+  const { data: previous } = useServerFirstSWR<ExpensesData>(viewing.family ? null : mainExpensesApiKey(previousMonth, viewing.member));
   const ledger = data?.month === month ? data : undefined;
 
   if (!ledger) {

@@ -1,21 +1,8 @@
 import type { NextRequest } from "next/server";
 
-import type { ExpenseTabLedgerData } from "@/lib/expenses/tabs";
-import { parseExpenseTabFilters } from "@/lib/expenses/filters";
-import { getExpenseTabLedger } from "@/lib/expenses/service";
-import { resolveViewedUserFor } from "@/lib/family/viewed-user";
+import { loadExpenseTabLedger } from "@/lib/expenses/load-expenses";
 import { withPermission } from "@/lib/http/permission";
-import { HttpError, json, notFound, parseId } from "@/lib/http/route";
-import { fieldErrorsOf } from "@/lib/validation/field-errors";
+import { json } from "@/lib/http/route";
 
-export const GET = withPermission("expenses", "edit", async (request: NextRequest, user, context: RouteContext<"/api/expense-tabs/[id]/expenses">, member) => {
-  const { userId, viewing } = await resolveViewedUserFor(request, user, member);
-  const id = parseId((await context.params).id, "Invalid tab identifier.");
-  const parsed = parseExpenseTabFilters(request.nextUrl.searchParams);
-  if (!parsed.success) {
-    throw new HttpError(422, "Check the expense filters and try again.", fieldErrorsOf(parsed.error));
-  }
-  const ledger: ExpenseTabLedgerData =
-    await getExpenseTabLedger(userId, id, parsed.data) ?? notFound("Expense tab not found.");
-  return json({ ...ledger, viewing });
-}, { failure: "Unable to load expense tab." });
+export const GET = withPermission("expenses", "edit", async (request: NextRequest, _user, context: RouteContext<"/api/expense-tabs/[id]/expenses">) =>
+  json(await loadExpenseTabLedger((await context.params).id, request.nextUrl.searchParams)), { failure: "Unable to load expense tab." });

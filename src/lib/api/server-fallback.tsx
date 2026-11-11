@@ -67,7 +67,11 @@ export function useServerFirstSWR<Data>(key: string | null, config: SWRConfigura
   useEffect(() => {
     if (key === null || !onlyServerCopy || data === undefined || cache.get(key)?.data !== undefined) return;
     if (isObject(data) && arrivedAt !== null) arrivals.set(data, arrivedAt);
-    void mutate(key, data, { revalidate: false });
+    // A hook that suspended on the server's promise and was replayed by React keeps an SWR callback
+    // bound to its first, unfinished render, which throws when told about the very first answer for
+    // its key (`returnedData` before initialization, SWR 2.4.1). The cache is written before the
+    // callbacks run and the data is the same one on screen, so the throw is dropped, not surfaced.
+    mutate(key, data, { revalidate: false }).catch(() => undefined);
   }, [onlyServerCopy, data, cache, mutate, key, arrivedAt]);
 
   return response;
