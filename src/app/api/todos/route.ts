@@ -1,14 +1,10 @@
 import { requireFamilyFeature } from "@/lib/family/feature";
-import { json, parseBody, parseInput, withUser } from "@/lib/http/route";
-import { createTodo, listTodos } from "@/lib/todos/service";
-import { todoListQuerySchema, todoSchema } from "@/lib/validation/todo";
+import { json, parseBody, withUser } from "@/lib/http/route";
+import { loadTodos } from "@/lib/todos/load-todos";
+import { createTodo } from "@/lib/todos/service";
+import { todoSchema } from "@/lib/validation/todo";
 
-export const GET = withUser(async (request) => {
-  requireFamilyFeature();
-  const query = Object.fromEntries(new URL(request.url).searchParams);
-  const { doneSince } = parseInput(query, todoListQuerySchema, "Check the board's filters and try again.");
-  return json({ todos: await listTodos(doneSince) });
-}, { failure: "Unable to load the to-do board." });
+export const GET = withUser(async (request) => json(await loadTodos(new URL(request.url).searchParams)), { failure: "Unable to load the to-do board." });
 
 export const POST = withUser(async (request, user) => {
   requireFamilyFeature();

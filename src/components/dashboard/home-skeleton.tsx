@@ -1,11 +1,33 @@
 "use client";
 
 import { Flex, Skeleton, Stack } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 
 import { HomeArea, HomeGrid } from "@/components/dashboard/home-layout";
+import { Card } from "@/components/ui/card";
+import { DataError } from "@/components/ui/data-state";
 import { SkeletonFrame } from "@/components/ui/skeleton-frame";
 import { HeadedCard, Line, ListSkeleton } from "@/components/ui/skeletons";
 import { PAGE_SPACING } from "@/components/ui/theme/layout";
+
+/** The state of a block before its data, for its `Pending` card. */
+export type BlockPending = { error?: unknown; retry?: () => void };
+
+/**
+ * A Home block before its data: its header, then the skeleton, or `errorMessage` with a retry once
+ * loading failed. Each block's `Pending` card is one, used by the block itself and as its
+ * `StreamedSection` fallback while the server's data streams in (PF6).
+ */
+export function HomeBlockPending({ header, label, skeleton, errorMessage, error, retry }: BlockPending & { header: ReactNode; label: string; skeleton: ReactNode; errorMessage: string }) {
+  return (
+    <Card size="sm">
+      {header}
+      <Card.Body>
+        {error && retry ? <DataError message={errorMessage} retry={retry} /> : <SkeletonFrame label={label}>{skeleton}</SkeletonFrame>}
+      </Card.Body>
+    </Card>
+  );
+}
 
 /** The inside of Home's month card while it loads: the total with its badge, and the meter. */
 export function MonthBodySkeleton() {

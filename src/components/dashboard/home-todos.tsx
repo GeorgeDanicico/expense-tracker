@@ -5,34 +5,30 @@ import { SquareKanban } from "lucide-react";
 import { useMemo } from "react";
 
 import { useTodoBoard } from "@/components/todos/use-todo-board";
+import { HomeBlockPending, type BlockPending } from "@/components/dashboard/home-skeleton";
 import { Card } from "@/components/ui/card";
-import { DataError } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON } from "@/components/ui/icon";
 import { IconTile } from "@/components/ui/icon-tile";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
-import { SkeletonFrame } from "@/components/ui/skeleton-frame";
 import { ListSkeleton } from "@/components/ui/skeletons";
 import { relativeDay, openTodosFor } from "@/lib/home/today";
 import { isOverdue } from "@/lib/todos/filters";
 import { TODO_STATUS_LABELS } from "@/lib/todos/types";
 
+const header = <Card.Header title="To-dos for you" actions={<SectionLink href="/todos">Board</SectionLink>} />;
+
+/** The to-dos before their data: the skeleton or the error (PF6). */
+export function FamilyTodosPending(state: BlockPending) {
+  return <HomeBlockPending {...state} header={header} label="Loading your to-dos…" skeleton={<ListSkeleton rows={3} gap="0" />} errorMessage="The board could not be loaded." />;
+}
+
 /** The family's open to-dos assigned to the signed-in member. Only rendered for a user with a family. */
 export function FamilyTodos({ memberId, now }: { memberId: string; now: Date }) {
   const board = useTodoBoard();
   const { shown, more } = useMemo(() => openTodosFor(board.todos ?? [], memberId), [board.todos, memberId]);
-  const header = <Card.Header title="To-dos for you" actions={<SectionLink href="/todos">Board</SectionLink>} />;
-  if (!board.todos) {
-    return (
-      <Card size="sm">
-        {header}
-        <Card.Body>
-          {board.error ? <DataError message="The board could not be loaded." retry={board.refresh} /> : <SkeletonFrame label="Loading your to-dos…"><ListSkeleton rows={3} gap="0" /></SkeletonFrame>}
-        </Card.Body>
-      </Card>
-    );
-  }
+  if (!board.todos) return <FamilyTodosPending error={board.error} retry={board.refresh} />;
   return (
     <Card size="sm">
       {header}

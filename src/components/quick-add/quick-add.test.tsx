@@ -17,9 +17,9 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-import DashboardPage from "@/app/(app)/dashboard/page";
 import ExpensesPage from "@/app/(app)/expenses/page";
 import RemindersPage from "@/app/(app)/reminders/page";
+import { HomeScreen } from "@/components/dashboard/home-screen";
 import { AppShell } from "@/components/layout/app-shell";
 
 import { initialKind, isQuickAddShortcut, quickAddKindsFor, type QuickAddKind } from "./kinds";
@@ -107,7 +107,8 @@ const sheetOf = (html: string) => html.slice(html.indexOf('role="dialog"'));
 
 describe("the quick-add sheet", () => {
   it.each([
-    ["Home", <DashboardPage key="home" />],
+    // Home's page is a server component that starts its data on the server (PF6); its screen is the same.
+    ["Home", <HomeScreen key="home" />],
     ["Expenses", <ExpensesPage key="expenses" />],
     ["Reminders", <RemindersPage key="reminders" />],
   ])("is the same sheet from %s, opening on the fast expense form", (_screen, page) => {

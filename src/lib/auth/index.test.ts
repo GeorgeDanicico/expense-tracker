@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ getCurrentUser: vi.fn(), createClient: vi.fn() }));
+// React's server `cache` keeps one answer per function for the render in progress; outside a server
+// render (as in tests) it keeps nothing. This stands in for it: `render.answers` is one render.
+const render = vi.hoisted(() => ({ answers: new Map<unknown, unknown>() }));
+vi.mock("react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react")>()),
+  cache: (fn: () => unknown) => () => {
+    if (!render.answers.has(fn)) render.answers.set(fn, fn());
+    return render.answers.get(fn);
+  },
+}));
 vi.mock("@/lib/supabase/auth", () => ({ supabaseAuth: { getCurrentUser: mocks.getCurrentUser } }));
 vi.mock("@/lib/supabase/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/supabase/server")>()),
@@ -14,6 +24,7 @@ const user = { id: "10000000-0000-4000-8000-000000000001", email: "alex@example.
 
 beforeEach(() => {
   vi.resetAllMocks();
+  render.answers = new Map();
   mocks.getCurrentUser.mockResolvedValue(user);
 });
 
@@ -44,10 +55,21 @@ describe("asPageCaller", () => {
     expect(mocks.getCurrentUser).toHaveBeenCalledTimes(1);
   });
 
+  it("shares one client and one memo between the layout and the page of one render (PF6)", async () => {
+    mocks.createClient.mockResolvedValue({});
+
+    const [layout, page] = await Promise.all([asPageCaller(() => getAuthenticatedUser()), asPageCaller(() => getAuthenticatedUser())]);
+
+    expect([layout, page]).toEqual([user, user]);
+    expect(mocks.createClient).toHaveBeenCalledTimes(1);
+    expect(mocks.getCurrentUser).toHaveBeenCalledTimes(1);
+  });
+
   it("gives each page render a memo of its own", async () => {
     mocks.createClient.mockResolvedValue({});
 
     await asPageCaller(() => getAuthenticatedUser());
+    render.answers = new Map();
     await asPageCaller(() => getAuthenticatedUser());
 
     expect(mocks.getCurrentUser).toHaveBeenCalledTimes(2);

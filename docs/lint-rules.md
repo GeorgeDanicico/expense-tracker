@@ -28,6 +28,7 @@ Run them with `npm run lint`.
 | [`motion-tokens`](#motion-tokens) | error | 5 fixed in U4 (a `warn` until the tokens existed) | U1 |
 | [`no-reduced-motion-query`](#no-reduced-motion-query) | error | 1 fixed | U4 |
 | [`client-only-chakra-factory`](#client-only-chakra-factory) | error | none left (`list-row.tsx` was fixed by hand in #213) | U6 |
+| [`streamed-section`](#streamed-section) | error, in `src/components` and `src/app/**/*-client.tsx` | none; the 8 page files' `useSearchParams` boundaries are outside its files until PF7 | PF6 |
 
 A rule that would need more than about 40 fixes outside the screen's own files lands as `warn`
 with its count here, and turns to `error` once the count reaches zero.
@@ -336,6 +337,28 @@ imported it. Put `"use client"` at the top of the file.
 directive in #213. Recipes (`defineRecipe`) are plain configuration and pass.
 
 **Disable:** `// eslint-disable-next-line local/client-only-chakra-factory -- <why it never reaches a server module>`.
+
+### `streamed-section`
+
+**Catches:** a `<Suspense>` from React (also renamed, or `React.Suspense`) that has a `fallback`, in
+`src/components` and in the `*-client.tsx` bodies of server pages. Tests and
+`src/components/ui/streamed-section.tsx` itself are exempt.
+
+**Why:** a section whose data starts on the server streams in after its fallback (PF6). Chakra's styles
+are Emotion's, written as `<style>` tags next to the elements, once per rule per cache. Under the page's
+one cache, a rule the fallback card wrote first isn't written again for the content; when the content
+swaps the card out, the card's `<style>` tags go with it, and the content stays unstyled until the page
+hydrates. On Home in the lab that was a layout shift of 0.34 on the emulated phone, 5 s after the data
+was on screen. `StreamedSection` gives the content its own cache on the server, so it carries every
+rule it uses.
+
+**Added by:** PF6. **Existing cases:** none in its files. The page files (`src/app/(app)/*/page.tsx`)
+have 8 boundaries with a fallback around `useSearchParams`, which never suspends during the server
+render of these dynamic pages, so nothing streams and nothing is lost. They are outside the rule's
+files; PF7, which makes those pages stream, moves their bodies to `*-client.tsx` files the rule covers.
+A boundary without a fallback (the sign-in form's) draws nothing first and passes.
+
+**Disable:** `// eslint-disable-next-line local/streamed-section -- <why nothing streams into it on the server>`.
 
 ## Conventions
 

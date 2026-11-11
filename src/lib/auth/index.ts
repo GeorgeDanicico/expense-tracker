@@ -1,9 +1,11 @@
 import "server-only";
 
+import { cache } from "react";
+
 import type { AuthAdmin } from "@/lib/auth/admin";
 import type { OAuthConsent } from "@/lib/auth/oauth-consent";
 import type { AuthenticatedUser, AuthService } from "@/lib/auth/service";
-import { MEMO_KEYS, oncePerRequest } from "@/lib/request-memo";
+import { MEMO_KEYS, oncePerRequest, type RequestMemo } from "@/lib/request-memo";
 import { supabaseAuth } from "@/lib/supabase/auth";
 import { createSupabaseAuthAdmin } from "@/lib/supabase/auth-admin";
 import { supabaseOAuthConsent, supabaseOAuthIssuer } from "@/lib/supabase/oauth-consent";
@@ -49,11 +51,22 @@ export function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
 }
 
 /**
+ * The cookie client and the memo of one page render. React's `cache` keeps one per server request
+ * while it renders, so the `(app)` layout and the page under it share them (PF6).
+ */
+const pageScope = cache(async (): Promise<{ client: Awaited<ReturnType<typeof createClient>>; memo: RequestMemo }> => ({
+  client: await createClient(),
+  memo: new Map(),
+}));
+
+/**
  * For a page or layout (a server component): runs `fn` as the request's cookie session, the way
- * `withUser` reads it for an API route, with a memo of its own so the user and the membership are
- * read once (`oncePerRequest`; outside `logRequest` there is none otherwise). It writes no request
- * line: those are for API requests (PF5).
+ * `withUser` reads it for an API route. Every call in one render shares one memo, so the user, the
+ * membership and the family are read once for the layout and the page together (`oncePerRequest`;
+ * outside `logRequest` there is none otherwise). It writes no request line: those are for API
+ * requests (PF5).
  */
 export async function asPageCaller<T>(fn: () => Promise<T>): Promise<T> {
-  return runWithSupabaseClient(await createClient(), fn);
+  const { client, memo } = await pageScope();
+  return runWithSupabaseClient(client, fn, memo);
 }

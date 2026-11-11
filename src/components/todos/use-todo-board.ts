@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import useSWR from "swr";
 
 import { useTodoApi, type TodoChanges } from "@/components/todos/todo-api";
 import { ApiError } from "@/lib/api/client";
+import { useServerFirstSWR } from "@/lib/api/server-fallback";
 import { todosApiKey, type TodosResponse } from "@/lib/api/keys";
 import { applyMove, upsertTodo } from "@/lib/todos/board";
 import type { QuickAddFields } from "@/lib/todos/filters";
@@ -41,7 +41,7 @@ export function useTodoBoard({ enabled = true }: { enabled?: boolean } = {}) {
   const paused = useRef(false);
 
   const key = enabled ? todosApiKey(doneSince) : null;
-  const { data, error, isLoading, mutate } = useSWR<TodosResponse>(key, {
+  const { data, error, isLoading, mutate } = useServerFirstSWR<TodosResponse>(key, {
     revalidateOnFocus: true,
     refreshInterval: (latest) => (latest ? BOARD_REFRESH_MS : 0),
     keepPreviousData: true,

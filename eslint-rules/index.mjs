@@ -15,6 +15,7 @@ import noSubtleText from "./no-subtle-text.mjs";
 import noWindowConfirm from "./no-window-confirm.mjs";
 import noZodFlatten from "./no-zod-flatten.mjs";
 import postgrestFilterString from "./postgrest-filter-string.mjs";
+import streamedSection from "./streamed-section.mjs";
 import themeColors from "./theme-colors.mjs";
 import themeControlSize from "./theme-control-size.mjs";
 import themeRadius from "./theme-radius.mjs";
@@ -35,6 +36,7 @@ const plugin = {
     "no-window-confirm": noWindowConfirm,
     "no-zod-flatten": noZodFlatten,
     "postgrest-filter-string": postgrestFilterString,
+    "streamed-section": streamedSection,
     "theme-colors": themeColors,
     "theme-control-size": themeControlSize,
     "theme-radius": themeRadius,

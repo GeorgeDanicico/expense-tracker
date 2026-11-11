@@ -8,8 +8,8 @@ import { ReminderSwipe } from "@/components/reminders/reminder-row";
 import { useReminderActions } from "@/components/reminders/use-reminder-actions";
 import { REMINDERS_TICK_MS, useReminders } from "@/components/reminders/use-reminders";
 import { useNow } from "@/hooks/use-now";
+import { HomeBlockPending, type BlockPending } from "@/components/dashboard/home-skeleton";
 import { Card } from "@/components/ui/card";
-import { DataError } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICON } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
@@ -17,7 +17,6 @@ import { IconTile } from "@/components/ui/icon-tile";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionLink } from "@/components/ui/section-link";
-import { SkeletonFrame } from "@/components/ui/skeleton-frame";
 import { ListSkeleton } from "@/components/ui/skeletons";
 import { UndoToast } from "@/components/ui/undo-toast";
 import { dueReminders, dueTimeLabel } from "@/lib/home/today";
@@ -29,9 +28,18 @@ const TOAST_MS = 3000;
 
 function Meta({ reminder, now }: { reminder: ListedReminder; now: Date }) {
   if (reminder.state === "overdue" && reminder.nextDueAt) {
-    return <Text as="span" color="fg.error" fontWeight="medium">Overdue · {overdueText(reminder.nextDueAt, now)}</Text>;
+    // Drawn on the server and again in the browser a few seconds later (PF6): "12 minutes late" can
+    // have become "13 minutes late" by then, which isn't worth a hydration error. The clock fixes it.
+    return <Text as="span" color="fg.error" fontWeight="medium" suppressHydrationWarning>{`Overdue · ${overdueText(reminder.nextDueAt, now)}`}</Text>;
   }
   return <>Today · {dueTimeLabel(reminder)}</>;
+}
+
+const header = <Card.Header title="Due today" actions={<SectionLink href="/reminders">All reminders</SectionLink>} />;
+
+/** What's due before its data: the skeleton or the error (PF6). */
+export function DueRemindersPending(state: BlockPending) {
+  return <HomeBlockPending {...state} header={header} label="Loading your reminders…" skeleton={<ListSkeleton rows={3} actions gap="0" />} errorMessage="Your reminders could not be loaded." />;
 }
 
 /**
@@ -52,17 +60,7 @@ export function DueReminders() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const header = <Card.Header title="Due today" actions={<SectionLink href="/reminders">All reminders</SectionLink>} />;
-  if (!reminders.reminders) {
-    return (
-      <Card size="sm">
-        {header}
-        <Card.Body>
-          {reminders.error ? <DataError message="Your reminders could not be loaded." retry={reminders.refresh} /> : <SkeletonFrame label="Loading your reminders…"><ListSkeleton rows={3} actions gap="0" /></SkeletonFrame>}
-        </Card.Body>
-      </Card>
-    );
-  }
+  if (!reminders.reminders) return <DueRemindersPending error={reminders.error} retry={reminders.refresh} />;
   return (
     <Card size="sm">
       {header}
