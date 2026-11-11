@@ -42,7 +42,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF4 | Fewer round trips in the app | done, except one getClaims per request: waiting on row 1 | #230 |
 | PF5 | Session gate and account on the server | done | #231 |
 | PF6 | First data on the server for Home | done, except Lighthouse's simulated LCP (4.6 s; the observed slow-4G LCP is 1.4 s, see PF6 section 4) | #232 |
-| PF7 | The same for Expenses, To-dos and Reminders | not started | |
+| PF7 | The same for Expenses, To-dos and Reminders | done | #PRNUM |
 | PF8 | Prefetching, waterfalls and stable data | not started | |
 | PF9 | Smaller bundles | not started | |
 | PF10 | SQL: indexes and RLS for the slow queries | not started | |
@@ -105,6 +105,15 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   page no longer jumps (CLS 0.012/0.085 → 0.000). A kid without the expenses permission gets none of
   it in the page. Lighthouse's simulated LCP is still 4.6 s (was 5.8): it counts every script the
   page started, which PF9 has to cut.
+
+- **PF7, the same for Expenses, To-dos and Reminders.** All three arrive with their data: on the
+  emulated phone the first expense, card or reminder is on screen at **1.4 s instead of 6.8 to 8.1 s**
+  (with a fast network and a slow phone, 0.6 to 1.1 s instead of 1.5 to 2.2 s). No data request on a
+  cold load (Expenses 4, To-dos 2, Reminders 1 before), 3 to 15 fewer Supabase calls and 2 to 8 fewer
+  Auth calls per load, and Expenses no longer jumps (CLS 0.023 to 0.000). A kid with the expenses
+  permission off, or who may not view another member, gets none of that data in the page (checked in
+  the lab). Insights, Investments and Net worth are as slow as Expenses was (data at about 7 s) and are
+  next.
 
 ## Baseline and budgets
 
@@ -2562,3 +2571,321 @@ Written out at the top of `src/lib/server-prefetch.ts`. In short, for Expenses, 
    page rendered with a fetcher that records requests (it must record none), a failing loader.
 7. In the lab: `first-render.mjs <page>` for the HTML, the first render's requests and the console;
    its data strings are Home's, so give it the page's own (like `measure.mjs`'s `probesFor`).
+
+### PF7: The same for Expenses, To-dos and Reminders
+
+#### 1. The problem
+
+After PF6, Home arrived with its numbers, but the three pages next to it still did what Home used to
+do: the shell and grey placeholders came at once, and the data only after the browser had downloaded
+and run the app's scripts and then asked the APIs. On the emulated phone the first expense, card or
+reminder appeared at **6.8 to 8.1 s**, five to six seconds after the first text. Expenses made **four
+data requests** (this month, last month, the saved tabs, the family list), To-dos two, Reminders one.
+Expenses also jumped a little while its data arrived (layout shift 0.023 for the parent, 0.014 for the
+kid).
+
+#### 2. What changed
+
+**What a person notices**
+
+- **All three pages arrive with their data.** On the emulated phone the first expense, card or
+  reminder is on screen at **1.36 to 1.42 s instead of 6.8 to 8.1 s**, with the first text. With a
+  fast network and a slow phone it is **0.6 to 1.1 s instead of 1.5 to 2.2 s**.
+- **No data request on a cold load.** Expenses no longer asks for the month, the month before, the
+  saved tabs or the family list; To-dos not for the board or the family list; Reminders not for the
+  list. Only the nav badge's `/api/reminders/summary` and the account notices go, as on Home.
+- **Expenses stops jumping** (CLS 0.023 and 0.014 became 0.000), so the saved-tab chips PF3 saw
+  moving "+ Tab" and "Filters" needed no fix of their own: the chips and the ledger now arrive together.
+- **Fewer calls to the server's database** per cold load: Supabase calls 41 → 26 (Expenses), 33 → 26
+  (To-dos), 26 → 23 (Reminders); Auth calls 22 → 14, 19 → 15, 15 → 13.
+- **Permissions are the same, and nothing extra reaches the page.** A kid with the expenses
+  permission off gets the "turned off" message and none of the expense data (checked in the lab, see 4).
+  Another member's expenses are in the page only for someone allowed to view them.
+- The pages look the same as before (screenshots in 4).
+
+**How it works** (PF6's pattern, unchanged; it's described at the top of `src/lib/server-prefetch.ts`)
+
+- Each page is now a **server component** that reads what it needs to decide what to load, starts the
+  loads without waiting, and puts them in SWR's `fallback` through `ServerFallback`. The page's old body
+  moved to a `*-client.tsx` file and sits in a `StreamedSection` with its loading screen as the fallback.
+- **Reminders** (`src/lib/reminders/load-reminders-page.ts`): the list, one key, for anyone signed in.
+- **To-dos** (`src/lib/todos/load-todos-page.ts`): the open board and the family list (the filter
+  chips' members and colours), only for someone in a family.
+- **Expenses** (`src/lib/expenses/load-expenses-page.ts`), for the URL the browser will draw, read the
+  way the page reads it: `?month=` (a future month goes back to this one), `?member=` (a member's id,
+  your own id meaning yourself, or `all`) and `?tab=`.
+  - The main ledger: this month and the month before (for "27% more than October so far"), and the
+    saved tabs, unless it is the family view, which has no tabs.
+  - The family list, for anyone in a family: the member picker and the colours read it.
+  - A saved tab: the tabs, then that tab's ledger for the filters in the URL. Its key carries the tab's
+    `updatedAt`, so the page waits for the tabs before it renders (one more round trip, only for a
+    `?tab=` URL).
+  - Another member's data only if the person may view it (`family_finance` at "view", or a parent).
+    A kid who may not gets nothing started, not even a refused load. A kid with the expenses
+    permission off gets nothing at all.
+- **Loaders return what the routes return.** New: `loadExpenses`, `loadExpenseTabs`,
+  `loadExpenseTabLedger` (`src/lib/expenses/load-expenses.ts`) and `loadFamily`
+  (`src/lib/family/load-family.ts`); `GET /api/expenses`, `/api/expense-tabs`,
+  `/api/expense-tabs/[id]/expenses` and `/api/family` now call them. Each runs the route's own checks
+  (the `expenses` permission, `resolveViewedUser` / `resolveFamilyViewers`). Route tests are unchanged
+  and pass. `loadTodos` and `loadReminders` already existed from PF6.
+- **Keys** are built with `src/lib/api/keys.ts` (`mainExpensesApiKey`, `expenseTabsApiKey`,
+  `expenseTabExpensesApiKey`, `FAMILY_API_KEY`, `TODOS_API_KEY`, `REMINDERS_API_KEY`); the month is on
+  `APPLICATION_TIMEZONE`'s calendar.
+- **In the browser**, the hooks on seeded keys became `useServerFirstSWR`: the tabs, the month and the
+  month before (`ledger-panel.tsx`), a saved tab's ledger (`custom-expense-tab.tsx`), the family list
+  (`use-viewing.ts`, `use-member-colors.ts`, `viewing-picker.tsx`, `todo-board-screen.tsx`). The
+  To-dos and Reminders hooks already were.
+- `/dev/preview` and the quick-add test draw the three pages' client bodies, since the pages need a server.
+- `useServerFirstSWR` got one fix (see 3): it no longer lets an error from SWR's own callbacks
+  surface as an unhandled rejection.
+- The lab's `first-render.mjs` now takes `/expenses`, `/todos` and `/reminders` (any query), with a
+  `--prefix` for the screenshots' names; `measure.mjs` exports `probesFor` for it.
+
+#### 3. Why this way
+
+- **PF6's pattern, as the plan says.** One commit per page; each can be reverted alone (the shared
+  parts, `loadFamily` and the `useServerFirstSWR` fix, are in the To-dos commit, which the Expenses
+  commit builds on).
+- **The family list is seeded on To-dos and Expenses, though the plan doesn't list it.** The first
+  test run, which records every key the browser asks for, showed `/api/family` going out on first
+  render on both pages (the filter chips, the member picker, the member colours). Without it the page
+  would still make a data request, and the chips would appear after the board and shift it.
+- **Another member's data is gated twice**: the page's own check (`family_finance`) keeps a refused
+  load from being started and logged for something a kid typed into the URL, and each loader runs
+  `resolveViewedUser`, so an id outside the family or a malformed one is refused as the route refuses
+  it (a failed load is logged as `server_prefetch_failed` and left to the browser, which gets the 404).
+- **A bug in `useServerFirstSWR` that PF6 missed.** When React replays a component that suspended on
+  the server's promise, SWR 2.4.1 keeps a callback from the first, unfinished render. The first write
+  of a key's value into SWR's cache calls it and it throws "Cannot access 'returnedData' before
+  initialization". The cache is written before the callback runs and the value is the one on screen, so
+  nothing is lost, but the throw was an unhandled promise rejection (vitest caught it in the To-dos
+  test). I now drop it (`.catch(() => undefined)` on that one call, with a comment). It happens only when the
+  server's copy resolves before the first render, which is every case here.
+- **One boundary around each whole page**, not one per block: these pages' blocks (the ledger's total,
+  the rows, the tabs) read the same few keys, and the lab shows the data arriving with the shell.
+  Per-block boundaries, as on Home, would add streaming steps for no gain. The heading is inside the
+  boundary, so it appears with the data (on To-dos and Reminders the LCP element is the heading's
+  subtitle, as PF1b found; its time moved from the loading screen's to the real page's).
+- **The nav badge stays the shell's request.** The plan says "the list and the badge count" for
+  Reminders. The badge is drawn by the shell, outside the page's `ServerFallback`, so a page can't
+  seed it; seeding it would mean the layout loading it on every page, which is not this task. The
+  request is the same as on Home and on every other page.
+- **Turned down:** reading `?tab=`'s ledger without the tabs (its key needs the tab's `updatedAt`);
+  seeding Insights' or the Import page's keys that share these hooks (not in scope).
+
+#### 4. Numbers
+
+All from the lab on George's laptop, 11 November 2026, shared-secret JWT like production, 40 ms added to
+every Supabase call. "Before" is `main` at `94aea98` (PF1 to PF6), "after" this branch's code (the lab
+build of `8ff195a`; only the docs came after it); both measured with this
+branch's `measure.mjs`. Medians of three cold loads. **Not production numbers**, and the laptop was
+busy with other work while they ran (load average 17 to 37), so the CPU-only pass in particular is
+noisier than PF6's: read differences under about 100 ms as noise.
+
+```bash
+npm run lab -- up && npm run lab -- delay 40       # before: at 94aea98; after: npm run lab -- app --delay-ms 40
+for page in /expenses /todos /reminders; do
+  for user in parent kid; do
+    npm run lab:measure -- $page --user $user --runs 3 --label pf7-<before|after>-mobile-$user-<page>
+    npm run lab:measure -- $page --user $user --runs 3 --throttle cpu --no-lighthouse --label pf7-<before|after>-cpu-$user-<page>
+  done
+  node scripts/lab/first-render.mjs $page --users parent,kid,solo
+done
+```
+
+Read from each run's `summary.json` (`.lab/results/<time>-pf7-<before|after>-…`). "Data on screen" is
+the measure marker: one of the page's own data strings drawn outside a placeholder.
+
+**slow 4G, the emulated phone, ms**, parent (kid in brackets), before → after:
+
+| Page | Data on screen | LCP | FCP | CLS | TTFB | TBT | Lighthouse LCP |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Expenses | 8,094 → **1,421** (7,282 → **1,361**) | 8,252 → **1,488** (7,664 → **1,424**) | 1,436 → **1,488** (1,412 → **1,424**) | 0.023 → **0.000** (0.014 → **0.000**) | 231 → **178** (197 → **183**) | 1,415 → **663** (439 → **281**) | 5,980 → 1,061 (5,988 → 913) |
+| To-dos | 7,459 → **1,393** (7,441 → **1,398**) | 1,408 → **1,452** (1,416 → **1,460**) | 1,408 → **1,452** (1,416 → **1,460**) | 0.000 → **0.000** (0.000 → **0.000**) | 178 → **182** (169 → **181**) | 355 → **332** (358 → **399**) | 915 → 946 (915 → 911) |
+| Reminders | 6,903 → **1,378** (6,815 → **1,362**) | 1,428 → **1,440** (1,404 → **1,404**) | 1,428 → **1,440** (1,404 → **1,404**) | 0.000 → **0.000** (0.000 → **0.000**) | 184 → **166** (173 → **211**) | 270 → **231** (262 → **229**) | 3,962 → 909 (913 → 913) |
+
+**fast network, 4x slower CPU, ms**, parent (kid in brackets), before → after:
+
+| Page | Data on screen | LCP | FCP | CLS | TTFB | TBT |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Expenses | 2,196 → **1,069** (1,776 → **1,008**) | 2,268 → **1,280** (1,904 → **992**) | 340 → **380** (352 → **500**) | 0.014 → **0.000** (0.000 → **0.000**) | 192 → **206** (178 → **220**) | 1,417 → **830** (421 → **452**) |
+| To-dos | 2,132 → **726** (1,488 → **739**) | 752 → **368** (356 → **352**) | 556 → **360** (328 → **340**) | 0.000 → **0.000** (0.000 → **0.000**) | 220 → **188** (169 → **173**) | 511 → **373** (364 → **376**) |
+| Reminders | 1,984 → **631** (1,472 → **738**) | 568 → **364** (348 → **796**) | 396 → **348** (348 → **424**) | 0.000 → **0.000** (0.000 → **0.000**) | 210 → **172** (172 → **174**) | 503 → **313** (223 → **256**) |
+
+**Per cold load** (same in both passes), parent (kid), before → after:
+
+| Page | Data requests on first render | All API requests | Supabase calls | Auth calls | Data in the first HTML |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Expenses | 4 (solo: 3) → **0** | 6 → **2** (6 → **2**) | 41 → **26** (41 → **26**) | 22 → **14** (22 → **14**) | no → **yes** |
+| To-dos | 2 (solo: 0) → **0** | 4 → **2** (4 → **2**) | 33 → **26** (33 → **26**) | 19 → **15** (19 → **15**) | no → **yes** |
+| Reminders | 1 → **0** | 3 → **2** (3 → **2**) | 26 → **23** (26 → **23**) | 15 → **13** (15 → **13**) | no → **yes** |
+
+What it says:
+
+- **The data is on screen with the first text on all three pages, for both users**: 1.36 to 1.42 s on
+  the emulated phone (was 6.8 to 8.1 s), 0.63 to 1.07 s on the CPU-only pass (was 1.5 to 2.2 s).
+  The first byte did not move (166 to 211 ms, within the noise).
+- **LCP, the moment the biggest thing on screen appears.** On Expenses it was the "27% more than
+  October" line, at 8.3 s, and is now at 1.49 s, with the data. On To-dos and Reminders the observed LCP
+  was already ~1.4 s *before*: the element was the subtitle inside the loading screen (the `inBusy`
+  flag in `summary.json`'s `lcpElements`), so it measured the frame, not the data (PF1b's finding).
+  It is still ~1.4 s after, now the real subtitle with the data. Judge those two by "data on screen".
+  The slow-4G LCP is under 2.5 s on all three. On the CPU-only pass it is under 1.3 s except one run
+  of three on the kid's Reminders (1.03 s, 0.42 s, 0.80 s; React's 300 ms reveal window and the busy
+  laptop, see PF6's 4).
+- **Lighthouse's simulated LCP** (separate column; it simulates, it doesn't throttle a real load, see
+  PF6's 4): Expenses 6.0 → 1.1 s (parent) and 6.0 → 0.9 s (kid); Reminders 4.0 → 0.9 s; To-dos 0.9 s both
+  times (its LCP was the loading screen's subtitle). Single runs of three still land on 3 to 5.3 s
+  (after: Expenses 5.3 and 4.9 s, To-dos 3.2 s, Reminders 3.4 s), as PF6 found; the medians are under 2.5 s.
+- **TBT** (how long the page's code blocks taps) fell on Expenses (1,415 → 663 ms, parent) and stayed
+  the same elsewhere, unlike Home's rise in PF6: these pages' filled blocks hydrate at the same cost as
+  their skeletons did, and the old way also ran every request's response through React.
+- **No jump anywhere**: CLS 0.000 on all six page and user pairs.
+- **The cost:** the page's HTML is bigger (Expenses' is 442 KB unzipped in the median run, with the data
+  twice: as HTML and in React's payload; PF6 saw the same on Home). I did not measure the before size or the gzipped size.
+
+**One page render** (`node scripts/lab/first-render.mjs <page> --users parent,kid,solo`, one `fetch` of
+the page with a phone's User-Agent; the proxy's lines for it):
+
+| | Parent | Kid | No family (solo) |
+| --- | ---: | ---: | ---: |
+| Expenses: Supabase calls (before → after) | 6–7 → 10–11 | 7 → 11 | 6–7 → 9–10 |
+| To-dos | 6–7 → 9 | 7 → 9–10 | 6–7 → 6 |
+| Reminders | 6 → 8 | 6 → 8 | 6–7 → 8 |
+| Data strings in the HTML, outside scripts (Expenses / To-dos / Reminders) | 15/15 · 14/14 · 10/10 | 8/8 · 14/14 · 2/2 | 0/0 · 0/0 · 1/1 |
+| Same, before | 0 on all three | 0 | 0 |
+| Data requests in Chromium's first render, besides the badge | 0 · 0 · 0 | 0 · 0 · 0 | 0 · 0 · 0 |
+| Console errors or warnings | none | none | none |
+
+The render makes 3 to 5 more Supabase calls (the page's own reads); the browser's requests used to make
+more (each with its own Auth call, password check and membership read), hence the lower totals above. Kid with the expenses permission: the kid's page
+has the same 8 strings as their own month; a solo user has no family, so no member or family reads.
+
+**Permissions, for real in the lab** (`node scripts/lab/first-render.mjs /expenses --users kid,parent --widths 390 --kid-without-expenses`
+and a scratch probe that fetched `/expenses?member=…` with each user's cookie and searched the whole
+page, scripts and React's payload included, for 8 of the other person's expense descriptions):
+
+| Who asks for | Result |
+| --- | --- |
+| Kid, expenses turned off | the "turned off" message; **0 of 8** of the kid's own descriptions in the page; `/api/dashboard` is not in it; the first render asks for nothing (turned on again afterwards: the kid's permissions read `expenses: "edit"` again) |
+| Kid (family finance off) viewing the parent, `?member=<parent>` | **0 of 8** of the parent's descriptions |
+| The same kid, `?member=all`, and `?member=<parent>&tab=x` | **0 of 8** of the parent's, 0 of 8 of the kid's own |
+| Parent viewing the kid, `?member=<kid>` | **8 of 8** of the kid's descriptions (allowed) |
+| Parent, `?member=all` | **8 of 8** of the kid's descriptions (allowed) |
+| Parent, `?member=<an id outside the family>` | 0 of 8 of the parent's own; the load is refused and logged, the browser gets the 404 as before |
+
+**A write right after a cold load** (a scratch probe in Chromium, lab, parent, 1280 px, no throttling):
+
+- **To-dos:** opened `/todos`, "Add a card" in To do, typed a title, Enter, the moment the board was
+  there: one `POST /api/todos`, the new card on screen, and the other cards still there (the page's
+  text grew from 161 to 164 lines). A write that started from an empty cache would have left only the new card; I did not
+  run that case, the unit test covers it. No data request.
+- **Reminders:** opened `/reminders`, tapped "Mark Book the dentist done" at once: the row left Today
+  within 60 ms, the other reminders stayed (no empty list at any point), then `POST …/complete`,
+  `GET /api/reminders/summary` (the badge went to "1, 1 due") and `GET /api/reminders` (the refetch the
+  write asks for). 
+- Unit tests do the same from the server's copy (below). Expenses' writes (add, edit, delete with
+  Undo) go through the same cache entries as before (`use-expense-writes.ts`, unchanged);
+  I did not repeat them by hand in the lab.
+
+**Screenshots** (after, loaded; `--shots docs/performance/screenshots/pf7`), to compare with the signed-off
+screens in `docs/ui-styling/screenshots/` and PF3's: same layout, cards, type and spacing; only the lab's
+data differs. Expenses: [parent, 390](performance/screenshots/pf7/after-expenses-parent-390.jpg) ·
+[parent, 1280](performance/screenshots/pf7/after-expenses-parent-1280.jpg) ·
+[kid, 390](performance/screenshots/pf7/after-expenses-kid-390.jpg) ·
+[kid, 1280](performance/screenshots/pf7/after-expenses-kid-1280.jpg) ·
+[kid without the permission, 390](performance/screenshots/pf7/after-expenses-kid-no-expenses-390.jpg) ·
+[1280](performance/screenshots/pf7/after-expenses-kid-no-expenses-1280.jpg) ·
+[family view, 390](performance/screenshots/pf7/after-family-expenses-member-all-parent-390.jpg) ·
+[1280](performance/screenshots/pf7/after-family-expenses-member-all-parent-1280.jpg). To-dos:
+[parent, 390](performance/screenshots/pf7/after-todos-parent-390.jpg) ·
+[parent, 1280](performance/screenshots/pf7/after-todos-parent-1280.jpg) ·
+[kid, 390](performance/screenshots/pf7/after-todos-kid-390.jpg) ·
+[kid, 1280](performance/screenshots/pf7/after-todos-kid-1280.jpg). Reminders:
+[parent, 390](performance/screenshots/pf7/after-reminders-parent-390.jpg) ·
+[parent, 1280](performance/screenshots/pf7/after-reminders-parent-1280.jpg) ·
+[kid, 390](performance/screenshots/pf7/after-reminders-kid-390.jpg) ·
+[kid, 1280](performance/screenshots/pf7/after-reminders-kid-1280.jpg). (The To-dos screenshots show a card,
+"Probe card after cold load", that the write check above added to the lab's board.) I looked at one
+Expenses screen at each width and the To-dos 390 and the no-permission screens; the others were taken
+by the same run and I did not open each one.
+
+**Tests.** `src/lib/expenses/load-expenses-page.test.tsx` (14: the keys for a parent, a month from the
+URL and a future one, a saved tab and an unknown tab, the family view, another member, the person's own
+id, a kid without the permission and a kid who may not view others, no session, an id outside the family,
+a failing month; each answer equal to its route's; the page mounted in the browser asks for nothing),
+`src/lib/todos/load-todos-page.test.tsx` (7, including a move from the server's board and a user without
+a family), `src/lib/reminders/load-reminders-page.test.tsx` (5, including marking done right after a
+cold load), `src/test/mount-server-page.tsx` (the shared helper), the Expenses page's old tests (moved to
+`expenses-client.test.tsx`) and `viewing.test.tsx` (its SWR mock gained `useSWRConfig`). Checks:
+`npm run lint`, `npx next typegen && npm run typecheck`, `npm test`, `npm run build`: all pass (6,926 tests passed, 1 skipped; run on this branch before the last commit).
+
+**Calendar, Insights, Investments, Net worth and Settings.** The plan says to list them "next" if PF1's
+numbers say they are slow too. PF1 and PF1b measured only Home, Expenses, To-dos and Reminders signed in;
+for these five I ran one quick pass now (slow 4G, parent, three runs, no Lighthouse) on this branch's build:
+
+Slow 4G on the emulated phone, parent, median of three cold loads (`npm run lab:measure -- /calendar /insights /investments /net-worth --user parent --runs 3 --no-lighthouse`; Settings alone in a second call; this laptop was busy). These pages have no content marker, so "LCP" is the biggest thing on screen, which is the data on the first three and the page's frame on the other two:
+
+| Page | LCP | CLS | TBT | API requests | Supabase calls | Auth calls | Verdict |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Insights | 7,424 ms | 0.073 | 255 ms | 4 | 39 | 25 | **next**: data at the end of the chain, and it jumps |
+| Investments | 6,856 ms | 0.107 | 364 ms | 4 | 33 | 19 | **next**, same, and the worst jump |
+| Net worth | 6,980 ms | 0.105 | 400 ms | 4 | 36 | 21 | **next**, same |
+| Calendar | 1,420 ms (the page's frame) | 0.002 | 326 ms | 9 | 62 | 29 | **next**: its LCP is the frame, but 9 API requests and 62 Supabase calls per load are the most of any page; when its events appear was not measured |
+| Settings | 1,404 ms (the page's frame) | 0.000 | 262 ms | 5 | 41 | 28 | later: forms and switches, no big data; its requests are the account's and the notices |
+
+So **Insights, Investments and Net worth are as slow as Expenses was** (data at about 7 s, a visible jump of 0.07 to 0.11 CLS, over the 0.1 limit on two of them) and should be the next pages to get PF6's pattern; Calendar next after them. This task leaves all five loaded in the browser, as the plan says.
+
+#### 5. How to check it yourself
+
+1. `npm run lab -- up && npm run lab -- delay 40`.
+2. Sign in as the parent (`.lab/users.json`), open Expenses, To-dos and Reminders one after the other
+   with the network panel open, reloading each: no request for the ledger, the board, the tabs, the
+   family list or the reminders (only `/api/reminders/summary` and `/api/account/notices`), and the data is there
+   at once. "View source" or `curl -N -b <the session cookie> http://localhost:3110/expenses` has the
+   expenses' descriptions in it.
+3. `node scripts/lab/first-render.mjs /expenses --users parent,kid,solo` (and `/todos`, `/reminders`):
+   per user and width, the strings in the HTML, the Supabase calls of one render, the data requests of
+   the first render and any console warnings. Add `--kid-without-expenses` for the permission check on
+   Expenses (it changes the kid's permission while it runs and puts it back). A query works:
+   `/expenses?member=all`.
+4. In the browser, as the kid, open `/expenses?member=<the parent's member id>`: the page has no
+   expense in it ("view source" and search for one of the parent's descriptions).
+5. On To-dos, add a card the moment the page opens: the other cards stay. On Reminders, tap the tick
+   on a reminder at once: it leaves Today and the others stay.
+6. `npm run lab -- down`.
+
+#### 6. Risks and how to undo it
+
+- **A page's first byte doesn't change, but its last byte now depends on its loads** (the data follows
+  the shell by 25 to 100 ms in the same answer). A slow load keeps the page's one boundary on its
+  loading screen; a failed one is logged as `server_prefetch_failed` and the browser fetches as before.
+  I didn't hang Supabase in the lab to see a slow load. Because there is one boundary per page here, the
+  slowest of Expenses' reads (the month, the month before, the tabs, the family list) decides when
+  the page shows; they run at once, so it's the slowest one, not the sum.
+- **Each visit to one of these pages now reads its data on the server**, even when the browser has it
+  (the server can't know): 3 to 5 more Supabase reads per render, then the browser shows its own copy
+  and revalidates as before.
+- **Expenses' `?tab=` URLs wait for the tab list before the page renders** (one extra round trip).
+- **The `useServerFirstSWR` throw is dropped, not understood.** I traced it to SWR's callback of a
+  replayed hook (3). If SWR fixes it, the `.catch` is harmless; if it hid a different error from the
+  same call, nothing would show. The test run that found it now has no unhandled errors.
+- **Time-relative text and the clock**: the same as Home (a render just before midnight could show
+  yesterday's day groups until the clock ticks).
+- **A garbage `?member=` logs one to three `server_prefetch_failed` lines** per page view when the
+  person may view other members (the loaders refuse it). The data isn't in the log.
+- No migration, nothing stored. To undo one page: revert its commit (To-dos' commit also holds
+  `loadFamily` and the `useServerFirstSWR` fix, which the Expenses commit uses, so revert Expenses
+  first). To undo all: revert the PR. The routes keep their answers either way.
+
+#### 7. Left open
+
+- **Checks:** `npm run lint`, `npx next typegen && npm run typecheck`, `npm test` (338 files, 6,926 tests passed, 1 skipped) and `npm run build` pass. A first full test run on the busy laptop had timeouts (5 s) in unrelated preview and dialog tests and, genuinely, in `viewing.test.tsx`, whose SWR mock lacked `useSWRConfig`; fixed, and the second full run was clean. `npm run test:db` not run: no SQL touched.
+- **The nav badge** (`/api/reminders/summary`) is still the browser's request on every page (3).
+- **Lighthouse's simulated LCP** has single runs of 3 to 5 s on Expenses, To-dos and Reminders; its
+  medians are under 2.5 s but the spread is PF9's (fewer scripts).
+- **Expenses' writes in the lab** (add, edit, delete) were not repeated by hand after the change; their
+  code is untouched and unit-tested.
+- **Gzipped page size** for these pages is not measured.
+- **Not measured at all:** the VPS (see "Waiting for George").

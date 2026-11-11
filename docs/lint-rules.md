@@ -28,7 +28,7 @@ Run them with `npm run lint`.
 | [`motion-tokens`](#motion-tokens) | error | 5 fixed in U4 (a `warn` until the tokens existed) | U1 |
 | [`no-reduced-motion-query`](#no-reduced-motion-query) | error | 1 fixed | U4 |
 | [`client-only-chakra-factory`](#client-only-chakra-factory) | error | none left (`list-row.tsx` was fixed by hand in #213) | U6 |
-| [`streamed-section`](#streamed-section) | error, in `src/components` and `src/app/**/*-client.tsx` | none; the 8 page files' `useSearchParams` boundaries are outside its files until PF7 | PF6 |
+| [`streamed-section`](#streamed-section) | error, in `src/components` and `src/app/**/*-client.tsx` | none; the `useSearchParams` boundaries of the pages still loaded in the browser (Calendar, Insights, Investments, Net worth, Import) are outside its files until they get server data too | PF6 |
 
 A rule that would need more than about 40 fixes outside the screen's own files lands as `warn`
 with its count here, and turns to `error` once the count reaches zero.
