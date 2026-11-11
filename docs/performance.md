@@ -40,7 +40,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF2 | No endless loading | done | #228 |
 | PF3 | Skeletons and a boundary per section | done, except the cold-load cost found (see PF3 section 7) | #229 |
 | PF4 | Fewer round trips in the app | done, except one getClaims per request: waiting on row 1 | #230 |
-| PF5 | Session gate and account on the server | done | #PRNUM |
+| PF5 | Session gate and account on the server | done | #231 |
 | PF6 | First data on the server for Home | not started | |
 | PF7 | The same for Expenses, To-dos and Reminders | not started | |
 | PF8 | Prefetching, waterfalls and stable data | not started | |
