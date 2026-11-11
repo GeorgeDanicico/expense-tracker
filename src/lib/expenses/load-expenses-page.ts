@@ -14,7 +14,7 @@ import { prefetch } from "@/lib/server-prefetch";
 const EXPENSES_PATH = "/expenses";
 
 /** A page's `searchParams` as the URL's query. */
-export function toSearchParams(searchParams: Record<string, string | string[] | undefined>) {
+function toSearchParams(searchParams: Record<string, string | string[] | undefined>) {
   const params = new URLSearchParams();
   for (const [name, value] of Object.entries(searchParams)) {
     if (typeof value === "string") params.set(name, value);

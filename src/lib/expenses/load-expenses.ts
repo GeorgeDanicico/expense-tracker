@@ -18,7 +18,8 @@ import { fieldErrorsOf } from "@/lib/validation/field-errors";
  * the request's memo, so the route's own check costs no second read.
  */
 
-async function caller() {
+/** The signed-in user and their membership, after the `expenses` permission check every expense read makes. */
+export async function expensesCaller() {
   const [user, member] = await Promise.all([getAuthenticatedUser(), requirePermission("expenses", "edit")]);
   // Not reached: the routes and the page only call these with a session.
   if (!user) throw new HttpError(403, FORBIDDEN_MESSAGE);
@@ -31,7 +32,7 @@ async function caller() {
  * future month back to the current one and adds `effectiveMonth`.
  */
 export async function loadExpenses(query: URLSearchParams) {
-  const { user, member } = await caller();
+  const { user, member } = await expensesCaller();
   const memberParam = query.get(MEMBER_PARAM);
   const family = memberParam === ALL_MEMBERS ? await resolveFamilyViewers(member) : null;
   const { userId, viewing } = family
@@ -64,14 +65,14 @@ export async function loadExpenses(query: URLSearchParams) {
 
 /** `GET /api/expense-tabs`'s answer: the saved tabs of the caller or of the member in `?member=`. */
 export async function loadExpenseTabs(query: URLSearchParams) {
-  const { user, member } = await caller();
+  const { user, member } = await expensesCaller();
   const { userId, viewing } = await resolveViewedUser(query.get(MEMBER_PARAM), user, member);
   return { tabs: await getRepositories().expenseTabs.list(userId), viewing };
 }
 
 /** `GET /api/expense-tabs/[id]/expenses`'s answer for tab `id` and `query` (the tab's filters, `revision`, `member`). */
 export async function loadExpenseTabLedger(id: string, query: URLSearchParams) {
-  const { user, member } = await caller();
+  const { user, member } = await expensesCaller();
   const { userId, viewing } = await resolveViewedUser(query.get(MEMBER_PARAM), user, member);
   const tabId = parseId(id, "Invalid tab identifier.");
   const parsed = parseExpenseTabFilters(query);
