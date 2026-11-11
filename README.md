@@ -265,7 +265,10 @@ The sizes can be changed with environment variables (set them in `/etc/vps-apps/
 on the VPS; the script sources it): `WEB_MEMORY_LIMIT` (default `768m`), `WORKER_MEMORY_LIMIT`
 (`256m`), `TMP_TMPFS_SIZE` (`64m`) and `NEXT_CACHE_TMPFS_SIZE` (`128m`). `LOG_DRIVER` (`journald`, or
 `json-file` for a host without it; `LOG_MAX_SIZE` and `LOG_MAX_FILES` then apply) picks the log
-driver. Production runs this script through the vps-apps adapter, so a change to the flags here is a
+driver. `WEB_HEAP_MB` and `WORKER_HEAP_MB` set Node's heap limit (`--max-old-space-size`, in MB, below
+the container's memory limit): the web container keeps Node's own limit when `WEB_HEAP_MB` is unset
+(432 MB in the 768m container), and the worker gets 60% of `WORKER_MEMORY_LIMIT` (Node's own limit
+is above the worker's whole 256m). Production runs this script through the vps-apps adapter, so a change to the flags here is a
 change to production, and nothing has to change in vps-apps.
 
 If something breaks after a deploy, see [docs/incident-checklist.md](docs/incident-checklist.md).

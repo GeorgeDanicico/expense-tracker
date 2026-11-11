@@ -34,6 +34,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | 7 | Optional: on the live project's SQL editor, run the one read-only `pg_stat_statements` query in PF10 section 5 and paste the output | It is the real query mix PF10 could only approximate in the lab. If a query there is slow, it gets its own index with a measured before and after | PF10 sections 5 and 7 |
 | 8 | Optional: say yes or no to five indexes on foreign keys the advisor flags (`todos.created_by`, `todos.completed_by`, `calendar_events.created_by`, `families.creator_id`, `app_flags.updated_by`) | They only matter when someone deletes an account. PF10 didn't add them because no slow query uses them; the SQL is in section 7 if you want them | PF10 sections 3 and 7 |
 | 9 | Optional: decide whether the React Compiler goes in after all | PF11 tried it and dropped it. It made one interaction, dropping a to-do card, about four times faster (188 to 44 ms), and cost 5 to 7% more JavaScript on every page, 20 to 25% more build CPU, and may have made a rare hydration error on To-dos more common. Turning it on is one line in `next.config.ts` and one pinned dev dependency | PF11 sections 3 and 7 |
+| 10 | On the VPS after the next deploy, run the read-only commands in PF12 section 5 (heap limit, memory limit, memory now and peak of the web and worker containers) and send me the output. Then look at the web container's memory bar in Obsy over a few days | It is the production half of PF12 and PF1's memory budget (steady state under 60% of 768 MB). The lab says: web heap limit 432 MB, steady state about 180 MiB, 291 to 296 MiB after a burst; worker heap limit 156 MB, about 47 MiB. If the worker's heap limit is not 156 there, the deploy did not pick the new script up | PF12 sections 4, 5 and 7 |
 
 ## Progress
 
@@ -51,7 +52,7 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
 | PF9 | Smaller bundles | done, except Lighthouse's LCP on Home (still about 4.8 s, see PF9 section 4) and dnd-kit left in To-dos | #235 |
 | PF10 | SQL: indexes and RLS for the slow queries | done, with no migration: the lab and the advisor found no index a slow query needs (see PF10 section 3); waiting on rows 6 to 8 | #236 |
 | PF11 | Smooth interaction | done, except the first open of a lazy sheet (about 250 ms on the 4x CPU, see PF11 section 4); React Compiler tried and dropped | #237 |
-| PF12 | Lean runtime on the VPS | not started | |
+| PF12 | Lean runtime on the VPS | done, except the VPS numbers (the worker's heap limit is now 153 MB, the web container's stays on Node's own 432 MB, `preloadEntriesOnStart` stays on: it would save 23 MB, the bar is 50) | #238 |
 | PF13 | Measure and close | not started | |
 
 ## The short version
@@ -148,6 +149,13 @@ Things only you can do or decide. Nothing in this list blocks the tasks that are
   net-worth value was already optimistic (the list shows it 52 ms after the tap, the server answers at 263 ms) and
   now uses SWR's own rollback. The React Compiler was tried and **not kept**. Still above 200 ms on this slow CPU:
   the first time a lazy sheet opens (quick add 256 ms, "Add value" 208 ms).
+
+- **PF12, lean runtime (nothing visible changes).** The web container's Node heap limit is already sensible (432 MB of
+  its 768 MB), so it stays on Node's own. The worker's was **259 MB, more than the 256 MB the container is allowed**, so
+  the next deploy gives it 153 MB (new optional `WEB_HEAP_MB` and `WORKER_HEAP_MB` in `deploy.sh` override). Turning
+  Next's preloading off would save 23 MB of the 768 and the first request stays under 0.6 s either way, but the plan's
+  bar is 50 MB, so it stays on. In the lab the web container uses about 180 MiB after visiting every page and 291 to
+  296 MiB after 4,800 requests (38% of its limit). Production's numbers are row 10.
 
 ## Baseline and budgets
 
@@ -3831,3 +3839,225 @@ Before is `6dd1233`, five repetitions; after is this branch, seven. Expenses sce
   the compiled tests (vitest runs the uncompiled source).
 - The 1280 px Filters baseline has one usable repetition: at 1280 the harness's tap often missed because the page moved under it.
 - `babel-plugin-react-compiler` was installed locally while trying it; `npm ci` removes it from `node_modules`.
+
+### PF12: Lean runtime on the VPS
+
+Nothing a person using the app sees changes in this task. It is about how much memory the two containers use and
+where Node draws its own line, measured on this machine with the production image and the production memory limits.
+**I have no access to the VPS**, so every number here is from the lab, and the same checks for production are in
+"Waiting for George", row 10.
+
+#### 1. The problem
+
+Nobody had looked at how much room the two containers on the VPS (the web app, 768 MB, and the notifications
+worker, 256 MB) really have. Two questions:
+
+- **Where does Node stop?** Node has its own ceiling for the memory it uses for objects, called the **heap limit**.
+  If it is higher than what the container is allowed, a runaway process is not stopped by Node with a clear
+  "JavaScript heap out of memory" line in the log: the kernel kills the whole container instead, with no message from
+  the app. If it is too low, a normal busy moment fails for no reason.
+- **Is Next's start-up preloading worth its memory?** At start, Next loads the code of every page into memory, so the
+  first visit to each page is quick, in exchange for a larger container [N11]. The plan says to turn it off only if
+  that saves more than 50 MB and the first request after a deploy still takes under 2 s.
+
+#### 2. What changed
+
+**Behaviour**
+- **The worker container now gets a heap limit of 153 MB** (60% of its 256 MB), passed to Node as
+  `NODE_OPTIONS=--max-old-space-size=153`. Before, Node's own ceiling in that container was **259 MB, above the 256 MB
+  the container is allowed**. It takes effect on the next production deploy after this PR merges.
+- **The web container is unchanged.** Node's own ceiling in the 768 MB container is 432 MB (56%), which is in the
+  60 to 70% band the plan asks for, so nothing is set. `WEB_HEAP_MB` sets one if you ever want it.
+- **`experimental.preloadEntriesOnStart` stays on (the default).** Turning it off saves about 23 MB right after start,
+  not the 50 MB the plan asks for (section 4). `next.config.ts` is not touched.
+- `scripts/deploy.sh` has two new optional inputs, `WEB_HEAP_MB` and `WORKER_HEAP_MB` (whole MB, checked like the
+  other inputs: a positive integer, smaller than the container's memory limit; anything else stops the deploy before
+  it builds or stops anything). Set them in `/etc/vps-apps/expense-tracker.sh` like `WEB_MEMORY_LIMIT`. With both
+  unset, the web container starts exactly as before and the worker gets the 60% value.
+
+**Files**
+- `scripts/deploy.sh`: `memory_size_to_mb`, `require_heap_mb`, `set_runtime_flags`, which adds
+  `--env NODE_OPTIONS=--max-old-space-size=<MB>` to both `docker run` calls, and the worker's default (`WORKER_HEAP_PERCENT=60`).
+- `scripts/deploy.test.mjs` (new): runs the script against a fake `docker` and checks what each container gets and
+  what is refused. 8 tests.
+- `scripts/lab/runtime.sh` and `scripts/lab/runtime-driver.mjs` (new): the measurements below, so PF13 or you can repeat
+  them. `docs/lab.md` lists them.
+- `README.md` ("Hardened containers") and `docs/incident-checklist.md`: the two inputs, and what a heap error in the
+  logs means.
+
+#### 3. Why this way
+
+**Measure before setting anything** (the plan's order). In the production image (Node 24.22.2) the heap limit Node
+picks depends on the container's memory limit like this (`scripts/lab/runtime.sh heap <limit> <image>`):
+
+| Container limit | 128m, 256m, 384m, 512m | 768m (web) | 1g | 2g |
+| --- | --- | --- | --- | --- |
+| Node's heap limit | 259 MB | 432 MB | 560 MB | 1,120 MB |
+
+Above 512 MB it follows the container (about half of it for objects, plus a young generation of up to 48 MB, which
+the number includes: 432 = 384 + 48). Below that it never goes under about 256 MB. That floor is why the worker
+is the one that needs a setting and the web container does not. (The plan's source [S10] describes this sizing from the container's limit; the table is my own measurement.)
+
+**MB, not a percentage.** The image's `node --help` does list `--max-old-space-size-percentage`, and it works in
+`NODE_OPTIONS` (65 gave 547 MB in the 768 MB container, measured). I still use MB: it works on every Node version (a
+future base image without the percentage flag would probably stop the container from starting, as Node refuses a flag it does not know in `NODE_OPTIONS`; not tried), `WEB_HEAP_MB` has to be MB
+anyway, and an MB number can be checked against the container's limit in the script.
+
+**The number.** `--max-old-space-size` sets the part for long-lived objects; the young generation comes on top (in
+the worker 153 gave a ceiling of 156 MB, in a 400 setting the web container showed 448). Memory outside the heap
+(code, buffers, sharp) comes on top of that again. 60% leaves the worker 100 MB of the 256 MB for that, while it uses
+47 MB in total.
+
+**Options turned down**
+- A default for the web container too (60 to 70% of 768 MB = 460 to 540 MB). Node's own 432 MB is already in the
+  plan's band, nothing measured needs more, and a higher ceiling only means a container fills up before Node starts to
+  collect garbage harder.
+- Turning `preloadEntriesOnStart` off for 23 MB: below the plan's bar, so no (section 4).
+- Reading `/sys/fs/cgroup` or setting `--max-old-space-size` in the Dockerfile: the limit lives in `deploy.sh`, which
+  already knows both limits.
+
+#### 4. Numbers
+
+Where: the production `Dockerfile` built as is (`docker build --build-arg GIT_SHA=local -t expense-tracker:pf12 .`),
+run on Docker Desktop (Apple silicon, Node 24.22.2) with the flags `deploy.sh` gives the web container
+(`--read-only`, the two tmpfs mounts, `--cap-drop ALL`, `--memory 768m --memory-swap 768m`), on the lab's Supabase
+(the seeded family: 6,660 expenses) with no delay. The container has the lab's keys and a loopback address only
+(`scripts/lab/guard.mjs` checks the env file) and shares the lab's gateway container's network, so nothing leaves the
+machine and `.env.local` is not in the image (`.dockerignore`). Memory is `docker stats` (what Obsy shows, in MiB).
+"After every page" is after signed in as the lab's parent: 22 pages and 18 GET routes, twice.
+Command: `scripts/lab/runtime.sh web <image>`, three times per setting, alternating. The "off" image is the same image
+with `"preloadEntriesOnStart":true` changed to `false` in its `server.js` (the standalone server's copy of the
+config), which is the line `next.config.ts` would produce.
+
+**`preloadEntriesOnStart`, web container, 3 runs each (MiB)**
+
+| | On (today) | Off | Difference |
+| --- | --- | --- | --- |
+| Memory 10 s after start | 72.1, 74.7, 69.2 | 50.4, 48.8, 48.1 | **about 23** (the bar is 50) |
+| After the first sign-in and Home | 124.1, 127.0, 128.7 | 118.4, 119.1, 118.6 | about 8 |
+| After every page | 180.0, 180.3, 178.2 | 172.3, 172.2, 176.2 | about 6 |
+| Sign-in request, the first one (ms) | 292, 236, 185 | 301, 375, 467 | off slower, all under 0.5 s |
+| Home page, the first one (ms) | 370, 319, 296 | 359, 353, 523 | within the noise |
+| 40 requests, first time through (ms, total) | 1,826, 1,449, 1,377 | 1,400, 1,476, 1,548 | within the noise |
+
+The saving shrinks as pages get visited, as [N11] says. The first request after a deploy took under 0.6 s in
+every run, with it on or off (the slowest was 523 ms). A first run on a brand new image, which I threw away because
+it also warms Docker's own caches, took 1,258 ms for the sign-in and 842 ms for Home: still under 2 s. So the second
+half of the plan's test passes either way, and the first half decides: **23 MB is below 50 MB, so it stays on.**
+
+**Heap limit and memory, 768 MB web container (on)**
+
+| What | Result | Command |
+| --- | --- | --- |
+| Heap limit Node picked | 432 MB (56% of the container) | `scripts/lab/runtime.sh web <image>` (last line) |
+| Memory after every page | 176.6 to 180.3 MiB, 23% of 768 | same |
+| After a burst: 4,800 requests, 8 at a time, 80 s, no errors | 282.6 to 291.9 MiB; the container's peak (`memory.peak`) 291 to 296 MiB, 38% | `scripts/lab/runtime.sh load <image>` (run twice) |
+| PF1's budget, steady state under 60% of the limit | 461 MB: **met in the lab**; production **not measured: needs the VPS** | |
+
+The memory after a burst stays up: Node keeps what it asked for until something needs it back, so Obsy will show a
+step up after the busiest hour that does not come down by itself.
+
+**Worker container (256 MB), 4 minutes, 8 ticks, same flags**
+
+| | Node's own (today) | `--max-old-space-size=153` (this PR) |
+| --- | --- | --- |
+| Heap limit | **259 MB**, above the container's 256 MB | 156 MB |
+| Memory, first and last sample (MiB) | 44.5, 47.7 | 45.9, 47.5 |
+| Restarts, OOM kills | 0, none | 0, none |
+
+Commands: `scripts/lab/runtime.sh worker <image> [-e NODE_OPTIONS=--max-old-space-size=153]`. The lab's worker has
+little to do (push is not configured, four users): production's is not measured, needs the VPS.
+
+**The deploy script** (not production: Docker Desktop, throwaway names, `expense-network` created and removed,
+`IMAGE_SOURCE=build`, `LOG_DRIVER=json-file`, a fake env file with fake keys, a loopback Supabase address):
+
+| Check | Result |
+| --- | --- |
+| `bash -n scripts/deploy.sh` and `shellcheck scripts/deploy.sh` | no output, exit 0 |
+| `npx vitest run scripts/deploy.test.mjs` | 8 passed |
+| Real run, both variables unset | web: no `NODE_OPTIONS`, heap limit 432 MB; worker: `NODE_OPTIONS=--max-old-space-size=153`, heap limit 156 MB; both healthy |
+| Same run, old script (`origin/main`) against the new one, the arguments of both `docker run` calls, diffed | the only difference is `--env NODE_OPTIONS=--max-old-space-size=153` on the worker |
+| `WEB_HEAP_MB=400 WORKER_HEAP_MB=120` | web 448 MB, worker 123 MB heap limits |
+| `WEB_MEMORY_LIMIT=1536m WORKER_MEMORY_LIMIT=1g` | web 864 MB (Node's own), worker `--max-old-space-size=614` |
+| `WORKER_HEAP_MB=300`, `256`, `WEB_HEAP_MB=abc`, `0`, `-5`, `768`, and `WEB_MEMORY_LIMIT=512m WEB_HEAP_MB=512` | each stops with a message before anything is built or stopped |
+
+#### 5. How to check it yourself
+
+Not in production until the next deploy after merge. To repeat what I measured (needs Docker; about 10 minutes):
+
+```bash
+scripts/lab.sh up && scripts/lab.sh stop-app
+docker build --build-arg GIT_SHA=local -t expense-tracker:pf12 .
+scripts/lab/runtime.sh web expense-tracker:pf12        # memory after start, first request, every page; heap limit
+scripts/lab/runtime.sh heap 256m expense-tracker:pf12  # 259: the worker's ceiling today
+scripts/lab/runtime.sh heap 256m expense-tracker:pf12 -e NODE_OPTIONS=--max-old-space-size=153   # 156
+scripts/lab.sh down && docker rmi expense-tracker:pf12
+```
+
+To see the script's decision without Docker: `npx vitest run scripts/deploy.test.mjs`.
+
+**On the VPS after the next deploy** (read-only; paste the output into the PR or send it to me; this is row 10 of
+"Waiting for George"):
+
+```bash
+# The limits the deploy gave, and the NODE_OPTIONS each container has (the web one has none; the worker's is 153)
+for c in expense-tracker-web expense-tracker-worker; do
+  docker inspect -f '{{.Name}} memory={{.HostConfig.Memory}} oom_killed={{.State.OOMKilled}} restarts={{.RestartCount}}' "$c"
+  docker inspect -f '{{json .Config.Env}}' "$c" | tr ',' '\n' | grep NODE_OPTIONS || echo "  no NODE_OPTIONS"
+  printf '  heap limit (MB): '
+  docker exec "$c" node -e "console.log(Math.round(require('v8').getHeapStatistics().heap_size_limit / 2**20))"
+done
+# Memory now, against the limit; run it a few times over a day or two for steady state
+docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.MemPerc}}' expense-tracker-web expense-tracker-worker
+# The most each container has used since it started (the kernel's own peak; the file may not exist on an old kernel)
+for c in expense-tracker-web expense-tracker-worker; do
+  printf '%s peak MiB: ' "$c"; docker exec "$c" cat /sys/fs/cgroup/memory.peak | awk '{ printf "%.0f\n", $1 / 1048576 }'
+done
+```
+
+What I expect to see, not a result: web heap limit 432, worker 156, web steady state well under 461 MB.
+
+**Obsy** (read from its repo's code at `61bf4b0`, `~/Documents/github/obsy`; I can't open the live one): the
+Expense Tracker row shows the web container's memory used, and its details panel adds a bar for its share of the container's
+limit (`docker stats`' `MemPerc`), so with 768 MB a bar at 25% is 192 MB. The limit **as a number is not shown**, although
+Obsy reads it (`memoryLimitBytes`, never displayed). There is **no peak**, and **the worker is not listed**:
+`config/apps.json` has only `expense-tracker-web` and `investment`. The memory sparkline on the overview is the
+whole VPS's, not the container's. So look at the web card's bar over a few days: steady state is a flat line and
+the bar should stay under about 60%. If you want the worker and the limit shown, here is the change for the Obsy repo (not made):
+
+```text
+config/apps.json: add { "id": "expense-tracker-worker", "name": "Expense Tracker worker", "container": "expense-tracker-worker", "accent": "violet" }
+app/page.tsx, the "Memory" metric of the app row and details: show
+  `${formatBytes(app.memoryBytes)} / ${formatBytes(app.memoryLimitBytes)}` instead of formatBytes(app.memoryBytes)
+```
+
+(The worker has no port or health check; check that Obsy's card copes with an app without a `port` before adding it.)
+
+**For the vps-apps README** (optional, nothing in vps-apps has to change): "`/etc/vps-apps/expense-tracker.sh` may also
+set `WEB_HEAP_MB` and `WORKER_HEAP_MB` (whole MB, below `WEB_MEMORY_LIMIT` and `WORKER_MEMORY_LIMIT`): Node's heap
+limit for the web and worker containers. Unset, the web container keeps Node's own limit and the worker gets 60% of
+its memory limit. See the expense-tracker README, "Hardened containers"."
+
+#### 6. Risks and how to undo it
+
+- **The worker's heap is capped at 153 MB from the next deploy.** In the lab it uses 47 MB of memory in total, so there
+  is a lot of room, but production's worker has push and real data: if it ever ran out of heap, it would exit with
+  `JavaScript heap out of memory` in `docker logs` and Docker would restart it (`--restart unless-stopped`).
+  Raise it with `WORKER_HEAP_MB` (anything below the container's limit) or `WORKER_MEMORY_LIMIT`, in
+  `/etc/vps-apps/expense-tracker.sh`, and force a deploy; or revert the PR. There is no "unset" value: the worker always
+  gets a number now.
+- The deploy script runs on every production deploy. The new code only adds a validation and one `--env` argument, the
+  old and new arguments were diffed (section 4), and a bad value stops the deploy before it touches a running
+  container. A failed worker start only warns, as before.
+- `docs/incident-checklist.md` has the first thing to do when the worker restarts.
+
+#### 7. Left open
+
+- **Production's numbers** (row 10): the heap limits, the steady state and peak of both containers, and whether the
+  worker's heap limit takes effect. Until then "steady-state memory is within PF1's budget" is true in the lab only.
+- The lab is one laptop with Docker Desktop's Linux VM, an idle 4-person dataset and a worker with push off. The VPS's
+  kernel, cgroup version and real traffic can differ; the deploy's journald log driver was not used (json-file instead).
+- The preload decision was measured with one signed-in user and a copy of `server.js` with the flag flipped, not a
+  second build; the standalone config has the flag in one place and the memory differs as [N11] says it should.
+- Obsy does not show the limit as a number, the peak or the worker (above); a change for its repo is written out, not made.
+- `preloadEntriesOnStart` can be revisited if the VPS gets tight: 23 MB is what it would give back.
