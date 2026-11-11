@@ -4,12 +4,12 @@ import { Box, chakra, Grid, Link as ChakraLink, Stack, Text } from "@chakra-ui/r
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
-import { NavBadge, remindersBadgeLabel } from "@/components/layout/nav-badge";
+import { IntentLink } from "@/components/layout/intent-link";
+import { RemindersBadge } from "@/components/layout/nav-badge";
 import { activeSection } from "@/components/layout/nav-items";
 import { useQuickAdd } from "@/components/quick-add/quick-add-provider";
 import { useAppPathname } from "@/components/layout/use-app-pathname";
 import { useNavigation } from "@/components/layout/use-navigation";
-import { useReminderBadge } from "@/components/reminders/use-reminder-badge";
 import { ICON_STROKE } from "@/components/ui/icon";
 import { PRESS_SCALE, pressFeedback, transition } from "@/components/ui/theme/motion";
 
@@ -23,7 +23,6 @@ export function MobileTabBar() {
   const pathname = useAppPathname();
   const { sections } = useNavigation();
   const quickAdd = useQuickAdd();
-  const reminders = useReminderBadge();
   const active = activeSection(sections, pathname);
   const middle = Math.ceil(sections.length / 2);
   // The + takes a column between the tabs; tabs after it move one column right.
@@ -91,6 +90,7 @@ export function MobileTabBar() {
       {sections.flatMap((section, index) => {
         const on = section === active;
         const Icon = section.icon;
+        const TabLink = section.prefetchOnIntent ? IntentLink : Link;
         const badged = section.items.some((item) => item.badge === "reminders");
         const tab = (
           <ChakraLink
@@ -106,17 +106,15 @@ export function MobileTabBar() {
             _hover={{ textDecoration: "none" }}
             _focusVisible={{ outline: "2px solid", outlineColor: "fg.accent", outlineOffset: "-2px" }}
           >
-            <Link href={section.href} aria-current={on ? "page" : undefined}>
+            <TabLink href={section.href} aria-current={on ? "page" : undefined}>
               <Stack align="center" gap="1" pt="1" color={on ? "fg" : "fg.muted"} css={pressFeedback(PRESS_SCALE.icon)}>
                 <Icon size={22} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 <Text as="span" fontSize="2xs" lineHeight="0.875rem" fontWeight="medium">
                   {section.label}
                 </Text>
               </Stack>
-              {badged ? (
-                <NavBadge dot count={reminders.count} overdue={reminders.overdue} srLabel={remindersBadgeLabel(reminders.count)} />
-              ) : null}
-            </Link>
+              {badged ? <RemindersBadge dot /> : null}
+            </TabLink>
           </ChakraLink>
         );
         // The + sits between the tabs in the DOM too, so the tab order matches what's on screen.

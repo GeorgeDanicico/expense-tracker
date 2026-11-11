@@ -46,6 +46,8 @@ const localRules = {
     "local/no-iso-date-slice": "error",
     "local/no-local-date-parse": "error",
     "local/no-redundant-swr-fetcher": "error",
+    "local/stable-data-options": "error",
+    "local/dnd-context-id": "error",
     "local/no-window-confirm": "error",
     "local/no-zod-flatten": "error",
   },

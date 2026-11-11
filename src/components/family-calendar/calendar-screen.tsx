@@ -5,7 +5,6 @@ import { CalendarDays, CalendarSync, ChevronLeft, ChevronRight } from "lucide-re
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import useSWR from "swr";
 
 import { AgendaView } from "@/components/family-calendar/agenda-view";
 import { useCalendarApi } from "@/components/family-calendar/calendar-api";
@@ -26,9 +25,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { CalendarBodySkeleton } from "@/components/ui/skeletons";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useAccount } from "@/hooks/use-account";
+import { useFamily } from "@/hooks/use-family";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { useMemberColors } from "@/hooks/use-member-colors";
-import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 import { getBucharestToday } from "@/lib/calendar";
 import { eventsOnDay } from "@/lib/family-calendar/days";
 import {
@@ -114,7 +113,7 @@ export function CalendarScreen() {
   const { view, date } = parseCalendarParams(searchParams, today, defaultView);
   const hasFamily = Boolean(account?.membership);
   const myMemberId = account?.membership?.memberId ?? null;
-  const { data: family } = useSWR<FamilyResponse>(hasFamily ? FAMILY_API_KEY : null);
+  const { data: family } = useFamily(hasFamily);
   const members = useMemo(() => family?.family?.members ?? [], [family]);
   const memberIds = family ? members.map((member) => member.memberId) : undefined;
   // A `?member=` naming nobody in the family is Everyone once the family has loaded.

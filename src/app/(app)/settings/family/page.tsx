@@ -12,6 +12,7 @@ import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 
 export default function FamilySettingsPage() {
   useDocumentTitle("Family");
+  // eslint-disable-next-line local/stable-data-options -- the family screen shows the newest members
   const { data, error, mutate } = useSWR<FamilyResponse>(FAMILY_API_KEY);
 
   if (error && !data) return <DataError retry={() => void mutate()} />;

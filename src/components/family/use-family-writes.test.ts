@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { restFamilyApi, type FamilyApi } from "@/components/family/family-api";
 import { familyWrites } from "@/components/family/use-family-writes";
-import { FAMILY_API_KEY, FAMILY_INVITES_API_KEY, type FamilyResponse } from "@/lib/api/keys";
+import { ACCOUNT_API_KEY, FAMILY_API_KEY, FAMILY_INVITES_API_KEY, type FamilyResponse } from "@/lib/api/keys";
 
 const FAMILY: FamilyResponse = { family: null };
 
@@ -31,6 +31,29 @@ function api(overrides: Partial<FamilyApi> = {}): FamilyApi {
     ...overrides,
   };
 }
+
+/**
+ * The family list and the account are stable data (`stable-data.ts`): nothing asks for them again when
+ * a page opens, so every write that changes one must update its key.
+ */
+describe("familyWrites and stable data", () => {
+  const writes: [string, (w: ReturnType<typeof familyWrites>) => Promise<unknown>, string[]][] = [
+    ["creating a family", (w) => w.createFamily("Smiths"), [FAMILY_API_KEY, ACCOUNT_API_KEY]],
+    ["joining a family", (w) => w.joinFamily("CODE"), [FAMILY_API_KEY, ACCOUNT_API_KEY]],
+    ["deleting the family", (w) => w.deleteFamily("Smiths"), [FAMILY_API_KEY, ACCOUNT_API_KEY]],
+    ["adding a kid", (w) => w.createKid({} as never), [FAMILY_API_KEY]],
+    ["removing a member", (w) => w.removeMember("m-1"), [FAMILY_API_KEY]],
+    ["deleting a kid's account", (w) => w.deleteKidAccount("m-1", { currentPassword: "pw", confirmName: "Ana" }), [FAMILY_API_KEY]],
+    ["changing permissions", (w) => w.setPermissions("m-1", {} as never), [FAMILY_API_KEY]],
+    ["choosing a colour", (w) => w.setColor("m-1", 3), [FAMILY_API_KEY]],
+  ];
+
+  it.each(writes)("updates the keys it changes after %s", async (_name, write, expected) => {
+    const swr = recorder();
+    await write(familyWrites(api(), swr.mutate));
+    expect([...new Set(swr.keys)].sort()).toEqual([...expected].sort());
+  });
+});
 
 describe("familyWrites", () => {
   it("caches the family the server answered with after a permissions change", async () => {

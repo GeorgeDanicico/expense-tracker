@@ -120,10 +120,43 @@ describe("useServerFirstSWR", () => {
     expect(page.text("first")).toBe("from the browser");
   });
 
-  it("prefers an answer SWR already has, and revalidates it on mount as usual", async () => {
+  it("replaces an older answer SWR holds with the server's newer copy, without asking (a move back to a page)", async () => {
     const cache = new Map() as Cache;
     cache.set(KEY, { data: { things: ["fetched before"] } });
     const page = await mount({ cache });
+
+    expect(asked).toEqual([]);
+    expect(page.text("first")).toBe("from the server");
+    expect(cache.get(KEY)?.data).toEqual(SERVER);
+  });
+
+  it("shows the older answer at once while the server's copy is still on its way", async () => {
+    const cache = new Map() as Cache;
+    cache.set(KEY, { data: { things: ["fetched before"] } });
+    let arrive: (things: Things) => void = () => undefined;
+    const page = await mount({ cache, fallback: { [KEY]: new Promise<Things>((resolve) => { arrive = resolve; }) } });
+    expect(page.text("first")).toBe("fetched before");
+
+    await act(async () => { arrive(SERVER); });
+    await settle();
+
+    expect(page.text("first")).toBe("from the server");
+    expect(asked).toEqual([]);
+  });
+
+  it("asks when the copy meant to replace an older answer failed", async () => {
+    const cache = new Map() as Cache;
+    cache.set(KEY, { data: { things: ["fetched before"] } });
+    const page = await mount({ cache, fallback: { [KEY]: Promise.resolve(undefined) } });
+
+    expect(asked).toEqual([KEY]);
+    expect(page.text("first")).toBe("from the browser");
+  });
+
+  it("leaves an answer SWR holds alone when this page's server data doesn't include the key", async () => {
+    const cache = new Map() as Cache;
+    cache.set(KEY, { data: { things: ["fetched before"] } });
+    const page = await mount({ cache, fallback: {} });
 
     expect(asked).toEqual([KEY]);
     expect(page.text("first")).toBe("from the browser");

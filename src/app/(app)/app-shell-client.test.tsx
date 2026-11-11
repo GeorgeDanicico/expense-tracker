@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ledgerSystem } from "@/components/ui/theme";
 import { useAccount } from "@/hooks/use-account";
 import type { AccountData } from "@/lib/account/types";
-import { ACCOUNT_API_KEY } from "@/lib/api/keys";
+import { ACCOUNT_API_KEY, ACCOUNT_NOTICES_API_KEY, REMINDERS_SUMMARY_API_KEY, type RemindersSummaryResponse } from "@/lib/api/keys";
+import type { ServerFallbackData } from "@/lib/api/server-fallback";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -43,7 +44,7 @@ let fetcher: (key: string) => Promise<unknown>;
 let cleanup: (() => void) | null = null;
 
 /** The client half of the layout, as the server renders it, with a cache of its own and `fetcher` for every key. */
-async function mount(cache = new Map()) {
+async function mount(cache = new Map(), fallback: ServerFallbackData = { [REMINDERS_SUMMARY_API_KEY]: Promise.resolve({ due: 2, overdue: 1 }) }, shownAccount = account) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -51,7 +52,7 @@ async function mount(cache = new Map()) {
     root.render(
       <ChakraProvider value={ledgerSystem}>
         <SWRConfig value={{ provider: () => cache, fetcher: (key: string) => { asked.push(key); return fetcher(key); } }}>
-          <AppShellClient account={account}>
+          <AppShellClient account={shownAccount} fallback={fallback}>
             <Page />
           </AppShellClient>
         </SWRConfig>
@@ -64,9 +65,9 @@ async function mount(cache = new Map()) {
   return container;
 }
 
+const badges = (page: HTMLElement) => [...page.querySelectorAll("[data-nav-badge]")].map((badge) => badge.textContent);
+
 beforeEach(() => {
-  // A page loaded a moment ago (the window is measured from the page's start, not the test run's).
-  vi.spyOn(performance, "now").mockReturnValue(1_000);
   asked = [];
   fetcher = (key) => (key === ACCOUNT_API_KEY ? Promise.reject(new Error("the account was asked for")) : new Promise(() => undefined));
   reload.mockReset();
@@ -88,35 +89,68 @@ describe("the (app) layout in the browser", () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
-  it("asks again, as before, once the server's copy is older than the dedupe window", async () => {
+  it("shows the Reminders count the layout started, without asking /api/reminders/summary", async () => {
+    const page = await mount();
+
+    expect(badges(page)).toContain("3");
+    expect(asked).not.toContain(REMINDERS_SUMMARY_API_KEY);
+  });
+
+  it("draws the shell while the count is still on its way, then the count", async () => {
+    let arrive: (summary: RemindersSummaryResponse) => void = () => undefined;
+    const page = await mount(new Map(), { [REMINDERS_SUMMARY_API_KEY]: new Promise((resolve) => { arrive = resolve; }) });
+    expect(page.textContent).toContain("alex@example.com");
+    expect(badges(page)).toEqual([]);
+
+    await act(async () => { arrive({ due: 1, overdue: 0 }); });
+
+    expect(badges(page)).toContain("1");
+  });
+
+  it("asks for the count itself when the layout couldn't read it", async () => {
+    fetcher = async (key) => (key === REMINDERS_SUMMARY_API_KEY ? { due: 4, overdue: 0 } : new Promise(() => undefined));
+
+    const page = await mount(new Map(), { [REMINDERS_SUMMARY_API_KEY]: Promise.resolve(undefined) });
+
+    expect(asked).toContain(REMINDERS_SUMMARY_API_KEY);
+    expect(badges(page)).toContain("4");
+  });
+
+  it("shows the notice the layout started, without asking /api/account/notices", async () => {
+    const notices = { notices: [{ id: "n1", kind: "removed_from_family", familyName: "Smiths", createdAt: "2026-11-01T09:00:00Z" }] };
+
+    await mount(new Map(), { [ACCOUNT_NOTICES_API_KEY]: Promise.resolve(notices) }, { ...account, features: { family: true } });
+
+    expect(document.body.textContent).toContain("You were removed from the family Smiths.");
+    expect(asked).not.toContain(ACCOUNT_NOTICES_API_KEY);
+  });
+
+  it("doesn't ask for the account again however old the server's copy is: a page opening later reads what is there", async () => {
     vi.spyOn(performance, "now").mockReturnValue(20_000);
-    fetcher = async () => account;
 
     await mount();
 
-    expect(asked).toContain(ACCOUNT_API_KEY);
+    expect(asked).not.toContain(ACCOUNT_API_KEY);
   });
 
   it("prefers an answer SWR already has over the server's copy", async () => {
     // Another account signed in on this tab since the page was rendered: the browser's cache holds it.
-    const cache = new Map();
-    fetcher = async (key) => (key === ACCOUNT_API_KEY ? { ...account, signInName: "sam@example.com" } : new Promise(() => undefined));
-    const clock = vi.spyOn(performance, "now").mockReturnValue(20_000);
-    await mount(cache);
-    cleanup?.();
-    clock.mockReturnValue(1_000);
+    const cache = new Map([[ACCOUNT_API_KEY, { data: { ...account, signInName: "sam@example.com" } }]]);
 
     const page = await mount(cache);
 
     expect(page.querySelector('[data-testid="page"]')?.textContent).toBe("sam@example.com pays in RON");
   });
 
-  it("sends the browser to choose a new password when a reloaded account says it must", async () => {
-    const cache = new Map();
+  it("sends the browser to choose a new password when the account, read again on return, says it must", async () => {
     fetcher = async (key) => (key === ACCOUNT_API_KEY ? { ...account, mustChangePassword: true } : new Promise(() => undefined));
-    vi.spyOn(performance, "now").mockReturnValue(20_000);
+    await mount();
+    expect(reload).not.toHaveBeenCalled();
 
-    await mount(cache);
+    // SWR ignores a focus within `focusThrottleInterval` (5 s) of the hook mounting.
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 10_000);
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
 
     expect(reload).toHaveBeenCalledWith("/change-password");
   });

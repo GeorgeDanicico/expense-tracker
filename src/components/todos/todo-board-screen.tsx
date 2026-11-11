@@ -20,10 +20,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { TodosSkeleton } from "@/components/ui/skeletons";
 import { UndoToast, useDeleteWithUndo, type DeleteCopy } from "@/components/ui/undo-toast";
 import { useAccount } from "@/hooks/use-account";
+import { useFamily } from "@/hooks/use-family";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { useMemberColors } from "@/hooks/use-member-colors";
-import { useServerFirstSWR } from "@/lib/api/server-fallback";
-import { FAMILY_API_KEY, todosApiKey, type FamilyResponse } from "@/lib/api/keys";
+import { todosApiKey } from "@/lib/api/keys";
 import {
   filterTodos,
   hasTodoFilters,
@@ -94,7 +94,7 @@ export function TodoBoardScreen() {
   const board = useTodoBoard({ enabled: hasFamily });
   const { remove: removeCard } = board;
   const deletes = useDeleteWithUndo(useCallback((todo: Todo) => removeCard(todo.id), [removeCard]), CARD_DELETE);
-  const { data: family } = useServerFirstSWR<FamilyResponse>(hasFamily ? FAMILY_API_KEY : null);
+  const { data: family } = useFamily(hasFamily);
   const members = family?.family?.members;
   const card = useLinkedCard(board.todos, searchParams.get(TODO_CARD_PARAM), pathname);
   const opened = card.openId ? board.todos?.find((todo) => todo.id === card.openId) : undefined;

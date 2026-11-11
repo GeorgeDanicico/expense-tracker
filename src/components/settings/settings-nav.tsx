@@ -2,8 +2,8 @@
 
 import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 import { Bell, ChevronRight, KeyRound, ShieldCheck, Sparkles, UserCog, UserRound, Users, type LucideIcon } from "lucide-react";
-import Link from "next/link";
 
+import { IntentLink } from "@/components/layout/intent-link";
 import { useAppPathname } from "@/components/layout/use-app-pathname";
 import { GroupLabel } from "@/components/ui/group-label";
 import { ICON } from "@/components/ui/icon";
@@ -71,7 +71,7 @@ export function SettingsList({ groups }: { groups: readonly SettingsGroup[] }) {
               const current = row === active;
               return (
                 <Box as="li" key={row.href}>
-                  <Link href={row.href} aria-current={current ? "page" : undefined}>
+                  <IntentLink href={row.href} aria-current={current ? "page" : undefined}>
                     <Flex
                       align="center"
                       gap="3"
@@ -90,7 +90,7 @@ export function SettingsList({ groups }: { groups: readonly SettingsGroup[] }) {
                       </Text>
                       <ChevronRight size={ICON.sm} aria-hidden="true" />
                     </Flex>
-                  </Link>
+                  </IntentLink>
                 </Box>
               );
             })}

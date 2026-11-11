@@ -9,6 +9,7 @@ import { CurrencyCard } from "@/components/settings/currency-card";
 import { DeleteAccountCard } from "@/components/settings/delete-account-card";
 import { DownloadDataCard } from "@/components/settings/download-data-card";
 import { SignOutEverywhereCard } from "@/components/settings/sign-out-everywhere-card";
+import { useSettingsWrites } from "@/components/settings/use-settings-writes";
 import { DataError, DataLoading } from "@/components/ui/data-state";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
@@ -23,6 +24,7 @@ import { ACCOUNT_API_KEY } from "@/lib/api/keys";
 export default function SettingsPage() {
   useDocumentTitle("Settings");
   const { account: data, error, isLoading, mutate } = useAccount();
+  const writes = useSettingsWrites();
   const emailForm = useApiForm();
   const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
 
@@ -105,7 +107,7 @@ export default function SettingsPage() {
         </Card>
       ) : null}
 
-      <CurrencyCard currency={data.currency} onSaved={(updated) => mutate(updated, { revalidate: false })} />
+      <CurrencyCard currency={data.currency} onSaved={writes.currencyChanged} />
 
       <SignOutEverywhereCard />
 

@@ -3,8 +3,7 @@
 import { useMemo } from "react";
 
 import { useAccount } from "@/hooks/use-account";
-import { useServerFirstSWR } from "@/lib/api/server-fallback";
-import { FAMILY_API_KEY, type FamilyResponse } from "@/lib/api/keys";
+import { useFamily } from "@/hooks/use-family";
 import { memberColorTokens } from "@/lib/family/member-colors";
 
 /**
@@ -13,7 +12,7 @@ import { memberColorTokens } from "@/lib/family/member-colors";
  */
 export function useMemberColors() {
   const { account } = useAccount();
-  const { data } = useServerFirstSWR<FamilyResponse>(account?.membership ? FAMILY_API_KEY : null);
+  const { data } = useFamily(Boolean(account?.membership));
   const colors = useMemo(() => memberColorTokens(data?.family?.members ?? []), [data]);
   return (memberId: string | null | undefined) => (memberId ? colors.get(memberId.toLowerCase()) : undefined);
 }

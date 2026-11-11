@@ -1,5 +1,6 @@
 import type { ScopedMutator } from "swr";
 
+import type { AccountData } from "@/lib/account/types";
 import {
   ACCOUNT_API_KEY,
   ACCOUNT_NOTICES_API_KEY,
@@ -9,6 +10,8 @@ import {
   type NoticesResponse,
 } from "@/lib/api/keys";
 
+// The account and the family list are stable data (`stable-data.ts`): SWR doesn't ask for them again
+// when a page opens, so every write that changes one of them has to update its key here (PF8).
 // What to refresh after each mutation of the modules not yet on an API object and hooks. Every helper
 // takes the global `mutate` from `useSWRConfig()`. Retry buttons keep calling their own bound
 // `mutate()`. Expenses, saved tabs and imports moved out in U8 (`expense-cache.ts`, `useExpenseWrites`),
@@ -17,6 +20,14 @@ import {
 /** After the caller's picture changes: their account (sidebar, settings) and the family list. */
 export function invalidateAfterAvatarChange(mutate: ScopedMutator) {
   return Promise.all([mutate(ACCOUNT_API_KEY), mutate(FAMILY_API_KEY)]);
+}
+
+/**
+ * After the caller's currency changes: caches the updated account, and reloads the family list,
+ * which shows each member's currency (another member sees yours when viewing you).
+ */
+export function afterCurrencyChanged(mutate: ScopedMutator, account: AccountData) {
+  return Promise.all([mutate(ACCOUNT_API_KEY, account, { revalidate: false }), mutate(FAMILY_API_KEY)]);
 }
 
 /** Clears every cached response without refetching: signing out, before the full page load to `/login`. */

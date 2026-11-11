@@ -23,6 +23,7 @@ export default function ManageFamilyPage() {
   const isCreator = account?.membership?.isCreator === true;
   const notAllowed = account !== undefined && account.features.family && !isParent;
 
+  // eslint-disable-next-line local/stable-data-options -- the family screen shows the newest members
   const { data, error, mutate } = useSWR<FamilyResponse>(isParent ? FAMILY_API_KEY : null);
 
   useEffect(() => {

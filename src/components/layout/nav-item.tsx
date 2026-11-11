@@ -4,10 +4,10 @@ import { Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
 import Link from "next/link";
 import { useId } from "react";
 
-import { NavBadge, remindersBadgeLabel } from "@/components/layout/nav-badge";
+import { IntentLink } from "@/components/layout/intent-link";
+import { RemindersBadge } from "@/components/layout/nav-badge";
 import { isActivePath, type NavItemConfig, type UserSection } from "@/components/layout/nav-items";
 import { useAppPathname } from "@/components/layout/use-app-pathname";
-import { useReminderBadge } from "@/components/reminders/use-reminder-badge";
 import { ICON, ICON_STROKE } from "@/components/ui/icon";
 import { transition } from "@/components/ui/theme/motion";
 
@@ -19,7 +19,7 @@ export function NavItem({ item }: { item: NavItemConfig }) {
   const pathname = useAppPathname();
   const active = isActivePath(pathname, item.href);
   const Icon = item.icon;
-  const reminders = useReminderBadge(item.badge === "reminders");
+  const NavLink = item.prefetchOnIntent ? IntentLink : Link;
   return (
     <ChakraLink
       asChild
@@ -38,13 +38,11 @@ export function NavItem({ item }: { item: NavItemConfig }) {
       transition={transition("background-color, color", "fast")}
       _hover={{ bg: active ? "bg.selected" : "bg.muted", color: active ? "fg.accent" : "fg", textDecoration: "none" }}
     >
-      <Link href={item.href} aria-current={active ? "page" : undefined}>
+      <NavLink href={item.href} aria-current={active ? "page" : undefined}>
         <Icon size={ICON.nav} strokeWidth={ICON_STROKE} aria-hidden="true" />
         {item.label}
-        {item.badge === "reminders" ? (
-          <NavBadge count={reminders.count} overdue={reminders.overdue} srLabel={remindersBadgeLabel(reminders.count)} />
-        ) : null}
-      </Link>
+        {item.badge === "reminders" ? <RemindersBadge /> : null}
+      </NavLink>
     </ChakraLink>
   );
 }
