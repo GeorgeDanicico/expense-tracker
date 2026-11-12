@@ -15,7 +15,8 @@ vi.mock("@/lib/supabase/server", () => ({
   getScopedAppToken: mocks.getScopedAppToken,
   runWithSupabaseClient: mocks.runWithSupabaseClient,
 }));
-vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
+// The real outage check (`isAuthRetryableFetchError`), a stand-in client.
+vi.mock("@supabase/supabase-js", async (importOriginal) => ({ ...(await importOriginal<object>()), createClient: mocks.createSupabaseClient }));
 vi.mock("@/lib/supabase/config", () => ({
   getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "pk" }),
 }));
@@ -24,6 +25,7 @@ import { tracedFetch } from "@/lib/log/traced-fetch";
 import { createSessionClient, sessionFromClient, supabaseAuth } from "@/lib/supabase/auth";
 
 const PROVIDER_ERROR = { message: "provider says no" };
+const { AuthRetryableFetchError } = await vi.importActual<typeof import("@supabase/supabase-js")>("@supabase/supabase-js");
 
 function mockAuth(methods: Record<string, unknown>) {
   const auth = Object.fromEntries(Object.entries(methods).map(([name, value]) => [name, vi.fn().mockResolvedValue(value)]));
@@ -112,6 +114,15 @@ describe("supabaseAuth", () => {
       mockAuth({ getClaims: response });
 
       expect(await supabaseAuth.getCurrentUser()).toBeNull();
+    });
+
+    it.each([
+      ["a call that ran out of time", new AuthRetryableFetchError("Supabase didn't answer auth.user within 4000 ms.", 0)],
+      ["a gateway error", new AuthRetryableFetchError("Service Unavailable", 503)],
+    ])("throws on %s, so it's an error and never a sign-out", async (_, error) => {
+      mockAuth({ getClaims: { data: null, error } });
+
+      await expect(supabaseAuth.getCurrentUser()).rejects.toMatchObject({ message: "Unable to check the session.", cause: error });
     });
   });
 
@@ -202,6 +213,7 @@ describe("supabaseAuth", () => {
       expect(await supabaseAuth.verifyPassword("a@example.test", "secret-1")).toEqual({ ok: true });
       expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "pk", {
         global: { fetch: tracedFetch },
+        db: { retry: false },
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
       expect(auth.signInWithPassword).toHaveBeenCalledExactlyOnceWith({ email: "a@example.test", password: "secret-1" });
@@ -478,6 +490,7 @@ describe("supabaseAuth", () => {
       expect(session()).toMatchObject({ userId: "user-1", email: "a@example.test" });
       expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "pk", {
         global: { fetch: tracedFetch },
+        db: { retry: false },
         auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
       });
       expect(mocks.createClient).not.toHaveBeenCalled();

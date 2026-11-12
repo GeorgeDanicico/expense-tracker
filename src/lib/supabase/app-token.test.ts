@@ -6,7 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ headers: vi.fn(), cookies: vi.fn(), createSupabaseClient: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: mocks.headers, cookies: mocks.cookies }));
 vi.mock("@supabase/ssr", () => ({ createServerClient: vi.fn() }));
-vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
+// The real outage check (`isAuthRetryableFetchError`), a stand-in client.
+vi.mock("@supabase/supabase-js", async (importOriginal) => ({ ...(await importOriginal<object>()), createClient: mocks.createSupabaseClient }));
 vi.mock("@/lib/supabase/config", () => ({ getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "pk" }) }));
 
 import { GET as getExpenses } from "@/app/api/expenses/route";

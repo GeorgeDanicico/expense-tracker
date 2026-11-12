@@ -19,6 +19,7 @@ import noZodFlatten from "./no-zod-flatten.mjs";
 import postgrestFilterString from "./postgrest-filter-string.mjs";
 import stableDataOptions from "./stable-data-options.mjs";
 import streamedSection from "./streamed-section.mjs";
+import supabaseClientOptions from "./supabase-client-options.mjs";
 import themeColors from "./theme-colors.mjs";
 import themeControlSize from "./theme-control-size.mjs";
 import themeRadius from "./theme-radius.mjs";
@@ -43,6 +44,7 @@ const plugin = {
     "postgrest-filter-string": postgrestFilterString,
     "stable-data-options": stableDataOptions,
     "streamed-section": streamedSection,
+    "supabase-client-options": supabaseClientOptions,
     "theme-colors": themeColors,
     "theme-control-size": themeControlSize,
     "theme-radius": themeRadius,

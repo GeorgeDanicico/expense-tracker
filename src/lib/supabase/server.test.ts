@@ -60,6 +60,7 @@ describe("createClient", () => {
     expect(await createClient()).toBe(tokenClient);
     expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "publishable", {
       global: { headers: { Authorization: "Bearer token-1" }, fetch: tracedFetch },
+      db: { retry: false },
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
     expect(mocks.cookies).not.toHaveBeenCalled();
@@ -128,6 +129,7 @@ describe("app-token clients", () => {
 
     expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", "publishable", {
       global: { headers: { Authorization: "Bearer app-token" }, fetch: tracedFetch },
+      db: { retry: false },
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
   });

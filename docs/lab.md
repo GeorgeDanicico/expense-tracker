@@ -45,6 +45,7 @@ Other commands:
 | `node scripts/lab/navigation.mjs [--width 1280\|390] [--throttle none\|cpu\|mobile] [--pause 16] [--moves Expenses,Reminders,To-dos,Home,…] [--start /dashboard] [--hover 0]` | The click-through: loads the start page cold, then taps the link to each page in `--moves` (waiting `--pause` seconds first, longer than SWR's 15 s dedupe window so "stale" requests show), and prints per load and per tap the requests by kind (data, RSC navigation and prefetch, scripts with size), the Auth and Supabase calls the proxy saw, the ms until the URL changed, the skeleton showed and the page loaded, and the waterfall depth of the tap (RSC request, a script it needs, a data request: up to 3). `--hover N` puts the pointer over the link N ms before the tap. PF8 |
 | `node scripts/lab/interactions.mjs [--scenario quick-add,month,search,reminder-done,todo-drag,net-worth] [--width 390\|1280] [--throttle cpu\|none] [--reps 5] [--warm] [--debug]` | How long taps and key presses take to reach the next frame (INP's parts): scripted taps, typing and a drag on a touch phone (390) or a mouse (1280) in a new browser per repetition, read from the browser's Event Timing API; prints each interaction's median, p75 and worst in ms (under 16 ms counts as 0). It changes the lab's data a little (reminders marked done, net-worth values added, to-dos moved). PF11 |
 | `scripts/lab/runtime.sh web\|load\|worker <image>` and `heap <limit> <image>` | What the production image costs in memory: the image runs with `deploy.sh`'s container flags (768m web, 256m worker) inside the lab's network, signed in as the parent. `web`: memory after start, after the first request and after every page, the first requests' times and the heap limit; `load`: 4,800 requests, 8 at a time, and the container's peak; `worker`: 4 minutes; `heap`: the heap limit Node picks for a memory limit. Needs a built image (`docker build -t expense-tracker:pf12 .`) and the lab up. PF12 |
+| `node scripts/lab/fault-probe.mjs <cold\|tap> <stop\|settled\|pause> /<page> [--from /dashboard] [--width 390] [--seconds 60]` | Breaks Supabase (PostgREST stopped just before, stopped with Kong already answering 503, or the gateway paused), then loads the page cold or taps its link from `--from`, and prints in ms from the fault when "taking longer" and the error showed, the page and API requests, the delay proxy's Supabase calls and the app's log lines. Undoes the fault at the end. PF13 follow-up |
 | `npm run lab:baseline` | The full signed-in baseline: four pages, both JWT modes, 0 and 40 ms, both passes below (about 80 minutes; `LAB_BASELINE_PASS=cpu` for the second pass only) |
 
 `up` is safe to run twice: if the lab is already up and seeded it only prints the status, and if a
@@ -134,6 +135,13 @@ PostgREST:
 docker pause supabase_kong_expense-tracker-lab     # requests hang;  docker unpause … to undo
 docker stop supabase_rest_expense-tracker-lab      # data requests fail with a 500;  docker start … to undo
 ```
+
+A stopped PostgREST isn't a fast failure at first: Kong still connects to the container's old
+address, so the calls made just after the stop hang inside it for 10 to 60 s (the app's lines in
+PF13's follow-up). Once Kong notices, it answers `503 name resolution failed` in a few milliseconds
+(measured with `curl` against `:54321`: the first call 14.3 s, the next ones 3 ms). So a probe
+run right after the stop measures a hang, and one run later measures a fast failure.
+`fault-probe.mjs` has a fault for each (`stop`, `settled`).
 
 Sign in first: a paused gateway stops the sign-in route too, and the cookies keep working for an hour. Too many wrong sign-ins lock the sign-in
 route for a few minutes (it counts in the app's memory: `npm run lab -- app --no-build` clears it).

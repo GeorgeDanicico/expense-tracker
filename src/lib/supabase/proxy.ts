@@ -25,6 +25,7 @@ export async function updateSession(request: NextRequest, extraRequestHeaders: R
       // No request context exists yet in the proxy (the route wrappers open it), so the traced fetch
       // records nothing here; it's passed so every Supabase client is built the same way.
       global: { fetch: tracedFetch },
+      db: { retry: false },
       cookieOptions: authCookieOptions(),
       cookies: {
         getAll() {

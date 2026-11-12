@@ -32,6 +32,7 @@ Run them with `npm run lint`.
 | [`dnd-context-id`](#dnd-context-id) | error | 1 fixed (the to-do board) | PF8 |
 | [`lazy-popper`](#lazy-popper) | error | none left (6 menus and the icon button's tooltip moved to `useLazyMenu`) | PF9 |
 | [`streamed-section`](#streamed-section) | error, in `src/components` and `src/app/**/*-client.tsx` | none; the `useSearchParams` boundaries of the pages still loaded in the browser (Calendar, Insights, Investments, Net worth, Import) are outside its files until they get server data too | PF6 |
+| [`supabase-client-options`](#supabase-client-options) | error | 7 clients given `db: { retry: false }`; all already had the traced fetch | PF13 follow-up |
 
 A rule that would need more than about 40 fixes outside the screen's own files lands as `warn`
 with its count here, and turns to `error` once the count reaches zero.
@@ -414,6 +415,28 @@ files; PF7, which makes those pages stream, moves their bodies to `*-client.tsx`
 A boundary without a fallback (the sign-in form's) draws nothing first and passes.
 
 **Disable:** `// eslint-disable-next-line local/streamed-section -- <why nothing streams into it on the server>`.
+
+### `supabase-client-options`
+
+**Catches:** a Supabase client built with `createClient` from `@supabase/supabase-js` or
+`createServerClient` from `@supabase/ssr` (also renamed) whose options don't say, in an object
+literal, `global: { fetch: … }` and `db: { retry: false }`. Options passed as a variable or with a
+spread can't be checked and are refused too. Tests are exempt.
+
+**Why:** the traced fetch (`src/lib/log/traced-fetch.ts`) is what times each call into the request
+line and gives it its time limit (4 s on the web, 20 s in the worker). A client without it waits for
+Supabase as long as Node does: in the lab, with the gateway paused, a page then stayed on its skeleton
+for more than 70 s. `db: { retry: false }` turns off supabase-js's own retries of a failed read (up to
+three, 1, 2 and 4 s apart): with PostgREST down they turned a 503 that came back in 3 ms into a 500 after
+7 s, and each retry would get a time limit of its own. The browser retries a 5xx itself, within its 15 s
+budget (`src/lib/api/client.ts`).
+
+**Added by:** the PF13 follow-up (a time limit on the server's Supabase calls). **Existing cases:** 7
+clients (in `server.ts` twice, `proxy.ts`, `admin-client.ts`, `anon-client.ts` and `auth.ts` twice)
+had the traced fetch but not `db: { retry: false }`; all fixed. `createBrowserClient` isn't checked:
+the app has no browser Supabase client.
+
+**Disable:** `// eslint-disable-next-line local/supabase-client-options -- <why this client may wait or retry>`.
 
 ## Conventions
 

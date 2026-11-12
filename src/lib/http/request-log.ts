@@ -27,6 +27,7 @@ const LINE_KEYS: ReadonlySet<string> = new Set([
   "dbMs",
   "dbCalls",
   "slowestSpan",
+  "supabaseTimeout",
 ]);
 
 // Errors already written as `request_failed`, so a wrapper that rethrows one doesn't write it twice.
@@ -92,6 +93,7 @@ function writeRequestLine(context: RequestContext, status: number, quiet: boolea
     slow: slow || undefined,
     spans: context.spans,
     ...spanSummary(context, slow),
+    supabaseTimeout: context.supabaseTimeout,
   };
   for (const [key, value] of Object.entries(context.fields)) if (!LINE_KEYS.has(key)) fields[key] = value;
   log[lineLevel(status, slow, quiet)]("request", fields);
@@ -100,7 +102,7 @@ function writeRequestLine(context: RequestContext, status: number, quiet: boolea
 /**
  * Runs `handle` as one request: inside a new request context (so every line it writes carries the
  * request id), then sets `x-request-id` on its response and writes one `request` line
- * `{ method, route, status, ms, userId?, slow?, spans, dbMs, dbCalls, slowestSpan?, ...fields }`
+ * `{ method, route, status, ms, userId?, slow?, spans, dbMs, dbCalls, slowestSpan?, supabaseTimeout?, ...fields }`
  * (see `span.ts`: `dbMs` and `dbCalls` add up the Supabase calls, and `slowestSpan` names the slowest
  * single call of a slow request). It also gets its own memo of the reads made once per request
  * (`oncePerRequest`). The level is `info`, `warn` when the request took longer than

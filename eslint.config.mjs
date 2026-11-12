@@ -126,6 +126,17 @@ const lazyPopper = {
   rules: { "local/lazy-popper": "error" },
 };
 
+/**
+ * Every Supabase client gets the traced fetch (spans, and the time limit that keeps a hung Supabase
+ * from leaving a page loading for ever) and `db: { retry: false }` (PF13 follow-up). Tests build
+ * clients with stand-ins of their own.
+ */
+const supabaseClientOptions = {
+  files: ["src/**/*.{ts,tsx}"],
+  ignores: ["src/**/*.test.{ts,tsx}"],
+  rules: { "local/supabase-client-options": "error" },
+};
+
 const reducedMotion = {
   files: ["src/**/*.{ts,tsx}"],
   ignores: ["src/hooks/use-reduced-motion.ts"],
@@ -223,6 +234,7 @@ const eslintConfig = defineConfig([
   reducedMotion,
   lazyPopper,
   streamedSection,
+  supabaseClientOptions,
   clientOnlyFactories,
   supabaseBoundary,
   workerBoundary,

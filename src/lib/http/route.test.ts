@@ -13,7 +13,8 @@ vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser 
 // Only the "withUser on Supabase auth" tests reach these: they swap the real `getAuthenticatedUser` back in.
 vi.mock("next/headers", () => ({ headers: mocks.headers, cookies: mocks.cookies }));
 vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.createServerClient }));
-vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClient }));
+// The real outage check (`isAuthRetryableFetchError`), a stand-in client.
+vi.mock("@supabase/supabase-js", async (importOriginal) => ({ ...(await importOriginal<object>()), createClient: mocks.createSupabaseClient }));
 vi.mock("@/lib/supabase/config", () => ({ getSupabaseConfig: () => ({ url: "http://supabase.test", publishableKey: "pk" }) }));
 // The wrappers' request lines go to `logged` instead of stdout (see "the request line" below).
 const logged = vi.hoisted(() => [] as string[]);
@@ -30,6 +31,7 @@ import {
   parseBody,
   parseId,
   readJson,
+  SUPABASE_TIMEOUT_MESSAGE,
   withAnonymousLimit,
   withRequestGuard,
   withUser,
@@ -738,6 +740,42 @@ describe("the request line", () => {
       }),
     ]);
     expect(logged.findIndex((text) => text.includes('"request_failed"'))).toBeLessThan(logged.findIndex((text) => text.includes('"event":"request",')));
+  });
+
+  it("answers 504 with code timeout when a Supabase call in the request ran out of time, and names the call in the line", async () => {
+    const response = await withUser(async () => {
+      const context = currentRequest()!;
+      context.supabaseTimeout = "db.expenses.get";
+      throw new Error("Unable to load your expenses.");
+    }, { failure: "Unable to load your expenses." })(call());
+
+    const line = onlyLine(response);
+    expect(response.status).toBe(504);
+    expect(line).toMatchObject({ level: "error", status: 504, supabaseTimeout: "db.expenses.get" });
+    expect(await response.json()).toEqual({ error: SUPABASE_TIMEOUT_MESSAGE, code: "timeout", requestId: line.requestId });
+    expect(loggedLines(logged, "request_failed")).toHaveLength(1);
+  });
+
+  it("answers a session check that fails (Auth down or out of time) as an error, never a 401", async () => {
+    mocks.getAuthenticatedUser.mockRejectedValue(new Error("Unable to check the session."));
+    const handler = vi.fn(ok);
+    const response = await withUser(handler, { failure: "Unable to load your expenses." })(call());
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ error: "Unable to load your expenses." });
+    expect(handler).not.toHaveBeenCalled();
+    expect(loggedLines(logged, "request_failed")).toHaveLength(1);
+  });
+
+  it("answers 504 for a session check that ran out of time", async () => {
+    mocks.getAuthenticatedUser.mockImplementation(async () => {
+      currentRequest()!.supabaseTimeout = "auth.user";
+      throw new Error("Unable to check the session.");
+    });
+    const response = await withUser(ok, { failure: "Unable to load your expenses." })(call());
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({ code: "timeout" });
   });
 
   it("logs an unexpected error without a failure message once, then lets it propagate unchanged", async () => {
