@@ -4467,6 +4467,26 @@ time that case before the fix.
   outage, and an API route answered 401, which sends the browser to sign in too.
 - Every client has `db: { retry: false }`: no supabase-js retries on the server. The browser retries a 5xx once within its 15 s
   budget, so there is one retry policy.
+- **The long writes get 30 s** (`withLongTimeLimit` and `LONG_WRITE_TIMEOUT_MS` in `traced-fetch.ts`), and the browser waits 60 s for
+  them (`LONG_REQUEST_TIMEOUT_MS` in `src/lib/api/client.ts`). The reason: when the app gives up on a call, PostgREST and Postgres usually
+  don't stop the statement, so it can still commit after the person was told it failed. For a read that's harmless; for a write that must
+  finish or fail as a whole it isn't. An account deletion that timed out after `delete_my_data` committed would leave the data gone but the
+  sign-in and the picture in place, with an error on screen; an import confirmed or undone after the app gave up would show an error for a
+  batch that went through. So these get time to answer instead of a short limit:
+  - deleting your account: `delete_my_data`, then the picture folder and the sign-in (`deleteUser` in `src/lib/supabase/auth-admin.ts`);
+  - deleting a kid's account: `delete_managed_kid_data`, then the same `deleteUser`;
+  - creating a kid's account: the sign-in and its profile (`createUser`), then `add_managed_kid`, whose failure deletes the sign-in again;
+    if it committed after the app gave up, that clean-up would delete a kid the family now has;
+  - a statement import: `create_import_batch` (the upload), `confirm_import_batch` and `undo_import_batch`, each one statement over many rows;
+  - the export's sections (`export_my_data`): a read, but a big family's section can take more than 4 s, and the browser already waits 120 s.
+
+  It is a scope, not a client option: the repositories wrap these calls (`withLongTimeLimit(async () => …)`), and the traced fetch reads the
+  limit when the call goes out, whichever client makes it (the request's cookie client, a scoped page or MCP client, the admin client). A
+  client option would have needed a second client per repository, and `createClient()` hands back a scoped client as it is. Why 30 s: long
+  enough for a big import or deletion on a slow day (the lab doesn't have one big enough to time), and the browser's 60 s is twice that, so the
+  server's own answer, done or its error, arrives before the browser gives up even when the calls around the long one take their time. A hung
+  Supabase still answers in about 8 s here, since the session check before them keeps its 4 s. The browser's 60 s applies to those routes
+  only: the account deletion, a kid's creation and deletion, and the import's upload, confirm and undo.
 - The worker's calls get **20 s** (`WORKER_SUPABASE_TIMEOUT_MS` in `src/lib/supabase/worker-store.ts`), through
   `createAdminClient({ timeoutMs })`.
 - A lint rule, `local/supabase-client-options`, refuses a Supabase client without `global: { fetch }` (the traced fetch) and
@@ -4520,15 +4540,28 @@ check is a 500 or 504, never a 401. `src/lib/supabase/auth.test.ts`: `getCurrent
 (near 4,000). `npm run lab -- down` at the end.
 
 *Risks and how to undo it.* A Supabase call that legitimately takes more than 4 s now fails: none does in the lab (the slowest route is
-447 ms), but production's p95 per route isn't measured yet (row 1); a `supabase_timeout` line in production is the sign. A big statement import or
-an account deletion are the likeliest to come near it. The number is one constant, `SUPABASE_TIMEOUT_MS`. The 504 mark is per request: if a call
+447 ms), but production's p95 per route isn't measured yet (row 1); a `supabase_timeout` line in production is the sign. The number is one
+constant, `SUPABASE_TIMEOUT_MS`. The 504 mark is per request: if a call
 times out and the route handles it and then fails for another reason, it still answers 504. During an Auth outage people now see an error page
 instead of the sign-in page, which is the point, but it is a change. Undo: revert #241.
 
 *Left open.* Not measured in production (row 1). A tap to a page loaded in the browser can take three limits in a row while Supabase is hung
 (12.1 s above: its page request, then its API read's two); still under the browser's 15 s, but past 8 s. A body that stalls after its headers is
 aborted at 4 s too, but without a `supabase_timeout` line and with a 500, not a 504. The worker's 20 s is reasoned, not measured: the lab doesn't run
-the worker.
+the worker. The long writes' 30 s is reasoned too: the lab's data is too small for any of them to come near it. A long write that still runs
+out of time answers 504 "Try again", though it may have gone through; the screens don't say "check before trying again". The import upload calls
+the AI model, whose own limit is 90 s, longer than the browser's 60 s (it was 15 s before); not changed here.
+
+Other multi-step writes on the web, checked and left at 4 s, because each step is one small statement, so a 4 s limit only cuts in when
+Supabase is unhealthy, and a lost answer left them in the same state before this change:
+- completing a reminder that logs an expense (`completeReminderWithExpense`: the expense, then the reminder; it deletes the expense again if the
+  second step fails, and says so when it can't);
+- changing your password (check, change, clear the flag, sign the other sessions out) and resetting a kid's (`setPassword`, the flag, sign-out);
+- a new profile picture (upload, the profile's path, remove the old file; `repositories/avatars.ts`);
+- single-statement writes that are all or nothing on their own: calendar events and series (`create_calendar_events`,
+  `update_calendar_events`, one `delete … in`), deleting the family (`delete_family`), net-worth items with their first value, moving a to-do,
+  expenses, reminders and investment orders. A timed-out create that committed looks failed, and trying again adds it twice: the same as any
+  lost answer before.
 
 **Not measured, and why.**
 

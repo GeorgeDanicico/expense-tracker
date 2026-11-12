@@ -4,7 +4,15 @@ const logged = vi.hoisted(() => [] as string[]);
 vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 
 import { createRequestContext, runWithRequestContext } from "@/lib/log/request-context";
-import { createTracedFetch, SUPABASE_TIMEOUT_MS, SupabaseTimeoutError, supabaseSpanName, supabaseTimedOut } from "@/lib/log/traced-fetch";
+import {
+  createTracedFetch,
+  LONG_WRITE_TIMEOUT_MS,
+  SUPABASE_TIMEOUT_MS,
+  SupabaseTimeoutError,
+  supabaseSpanName,
+  supabaseTimedOut,
+  withLongTimeLimit,
+} from "@/lib/log/traced-fetch";
 import { loggedLines } from "@/test/log-lines";
 
 const BASE = "https://abcdefghijklmnop.supabase.co";
@@ -279,6 +287,18 @@ describe("the time limit", () => {
     await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
     expect(logged).toEqual([]);
     expect(supabaseTimedOut(context)).toBe(false);
+  });
+
+  it("gives the calls inside withLongTimeLimit 30 s, whatever the client's own limit, and only those", async () => {
+    const settled = withLongTimeLimit(() => createTracedFetch(hung(), { timeoutMs: 20_000 })(URL_)).catch((error: unknown) => error);
+    const after = createTracedFetch(hung())(URL_).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
+    expect(await after).toMatchObject({ limitMs: SUPABASE_TIMEOUT_MS });
+    await vi.advanceTimersByTimeAsync(20_000 - SUPABASE_TIMEOUT_MS);
+    expect(loggedLines(logged, "supabase_timeout")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(LONG_WRITE_TIMEOUT_MS - 20_000);
+    expect(await settled).toMatchObject({ limitMs: LONG_WRITE_TIMEOUT_MS, message: "Supabase didn't answer db.expenses.get within 30000 ms." });
   });
 
   it("keeps the first call that ran out of time when several do", async () => {

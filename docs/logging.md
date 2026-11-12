@@ -40,7 +40,7 @@ stderr. Docker's `journald` driver hands those lines to the host's journal, whic
 | --- | --- | --- |
 | `request` | info, warn, error | One per API request (see above). `warn` when slow or 429, `error` when 5xx. `/health` is not logged. |
 | `request_failed` | error | A route threw an unexpected error; the user got a generic 500. Carries the error name, message and stack, and the request's `method`, `route` and `userId`. |
-| `supabase_timeout` | warn | A Supabase call didn't answer within 4 s and was given up (`src/lib/log/traced-fetch.ts`). Carries `span` (the call's name, as in `spans`) and `limitMs`, and the `requestId` inside an API request. Also written for a page render or the proxy, which have no request line. The route answers 504 and the page shows its error. |
+| `supabase_timeout` | warn | A Supabase call didn't answer within 4 s (30 s for the long writes: deleting an account, a kid's account, a statement import's save, confirm and undo, the export) and was given up (`src/lib/log/traced-fetch.ts`). Carries `span` (the call's name, as in `spans`) and `limitMs`, and the `requestId` inside an API request. Also written for a page render or the proxy, which have no request line. The route answers 504 and the page shows its error. |
 | `server_render_failed` | error | An error Next caught outside the API routes: a page that threw, a server action. Carries `digest` (the id the browser's error page shows), `routePath`, `routeType` and the `requestId` when known. |
 | `env_check_failed` | error | A required environment variable is missing or invalid at start-up. Names the variable, never its value; the process exits with 1. |
 | `env_optional_off` | info | At start-up, which optional features are off because their variables are not set. |

@@ -131,7 +131,17 @@ export async function apiFetcher<T>(url: string): Promise<T> {
   return payload;
 }
 
-export async function apiRequest<T>(url: string, init: RequestInit): Promise<T> {
+/**
+ * How long the browser waits for one of the server's long writes (an account's deletion, a kid's account,
+ * a statement import's upload, confirm and undo): 60 s, twice the server's limit on such a write
+ * (`LONG_WRITE_TIMEOUT_MS`, 30 s), so the server's own answer, done or its error, arrives first even when
+ * the write is slow and the calls around it take their time too. A write the browser gave up on may still
+ * finish on the server.
+ */
+export const LONG_REQUEST_TIMEOUT_MS = 60_000;
+
+/** A write: `init` as JSON unless it says otherwise, with the 15 s timeout or `timeoutMs` ({@link LONG_REQUEST_TIMEOUT_MS} for the long writes). */
+export async function apiRequest<T>(url: string, init: RequestInit, { timeoutMs = REQUEST_TIMEOUT_MS }: { timeoutMs?: number } = {}): Promise<T> {
   const response = await fetchWithTimeout(url, {
     ...init,
     cache: "no-store",
@@ -140,6 +150,6 @@ export async function apiRequest<T>(url: string, init: RequestInit): Promise<T> 
       "Content-Type": "application/json",
       ...init.headers,
     },
-  });
+  }, timeoutMs);
   return parseResponse<T>(response);
 }

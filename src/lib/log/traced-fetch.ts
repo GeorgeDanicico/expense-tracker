@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { log } from "@/lib/log";
 import { currentRequest, runWithRequestContext, type RequestContext } from "@/lib/log/request-context";
 import { routeTemplate } from "@/lib/log/route-template";
@@ -32,6 +34,27 @@ import { recordSpan, spanNamePart } from "@/lib/log/span";
  * 15 s timeout. It is about 10 times the slowest whole route measured in the lab (447 ms, PF13).
  */
 export const SUPABASE_TIMEOUT_MS = 4_000;
+
+/**
+ * The time limit inside {@link withLongTimeLimit}: 30 s, for the few writes that must finish or fail as
+ * a whole (an account's deletion, a statement import's confirm and undo) and the export's sections.
+ * A client that gives up doesn't stop the server: PostgREST and Postgres usually go on with the
+ * statement, and it can commit after the app has said it failed. So these get time to answer instead.
+ */
+export const LONG_WRITE_TIMEOUT_MS = 30_000;
+
+// One store per process, even if a bundler loads this module more than once (see request-context.ts).
+const LIMIT_KEY = Symbol.for("expense-tracker.supabase-time-limit");
+const globalLimit = globalThis as typeof globalThis & { [LIMIT_KEY]?: AsyncLocalStorage<number> };
+const limitStore = (globalLimit[LIMIT_KEY] ??= new AsyncLocalStorage<number>());
+
+/**
+ * Runs `fn` with every Supabase call it makes or starts given {@link LONG_WRITE_TIMEOUT_MS} instead of
+ * the client's own limit, whichever client makes it. The repositories wrap their long operations in it.
+ */
+export function withLongTimeLimit<T>(fn: () => T): T {
+  return limitStore.run(LONG_WRITE_TIMEOUT_MS, fn);
+}
 
 /** A Supabase call that didn't answer within its time limit. Its message names the call's span and the limit, nothing else. */
 export class SupabaseTimeoutError extends Error {
@@ -178,17 +201,19 @@ function callerSignal(input: Parameters<typeof fetch>[0], init: Parameters<typeo
  * `status` when the answer is 400 or more and `error: true` when `inner` throws (rethrown
  * unchanged). Outside a request nothing is recorded.
  *
- * Inside or outside a request, a call whose headers haven't arrived within `timeoutMs` is aborted
+ * Inside or outside a request, a call whose headers haven't arrived within `timeoutMs` (or
+ * {@link LONG_WRITE_TIMEOUT_MS} inside {@link withLongTimeLimit}) is aborted
  * and rejects with a {@link SupabaseTimeoutError} (whether or not `inner` heeds the signal), after
  * one `supabase_timeout` line at `warn` and a mark on the request (`supabaseTimeout`, the span's
  * name), so a route answers 504 (`withUser`). A body still being read when the limit runs out is
  * aborted too, without a line: the library reading it reports the failure.
  */
-export function createTracedFetch(inner: typeof fetch = globalFetch, { timeoutMs = SUPABASE_TIMEOUT_MS }: TracedFetchOptions = {}): typeof fetch {
+export function createTracedFetch(inner: typeof fetch = globalFetch, { timeoutMs: clientLimit = SUPABASE_TIMEOUT_MS }: TracedFetchOptions = {}): typeof fetch {
   return async (...args: Parameters<typeof fetch>) => {
     const [input, init] = args;
     const context = currentRequest();
     const name = supabaseSpanName(input, init);
+    const timeoutMs = limitStore.getStore() ?? clientLimit;
 
     const limit = new AbortController();
     let answered = false;

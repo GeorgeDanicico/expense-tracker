@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiFetcher, apiRequest, OFFLINE_CODE, retryDelay, TIMEOUT_CODE } from "./client";
+import { ApiError, apiFetcher, apiRequest, LONG_REQUEST_TIMEOUT_MS, OFFLINE_CODE, retryDelay, TIMEOUT_CODE } from "./client";
 
 const ID = "3fK9xQ2mBv0a";
 
@@ -117,6 +117,32 @@ describe("ApiError request refs", () => {
       expect(error.status).toBe(504);
       expect(error.message).not.toContain("ref");
       expect(error.requestId).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("waits 60 s, not 15, for a long write given LONG_REQUEST_TIMEOUT_MS", async () => {
+    vi.useFakeTimers();
+    try {
+      let signal: AbortSignal | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>().mockImplementation(
+          (_url, init) =>
+            new Promise((_resolve, reject) => {
+              signal = init?.signal ?? undefined;
+              init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+            }),
+        ),
+      );
+
+      const pending = caught(apiRequest("/api/account", { method: "DELETE" }, { timeoutMs: LONG_REQUEST_TIMEOUT_MS }));
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(LONG_REQUEST_TIMEOUT_MS - 15_000);
+      expect(await pending).toMatchObject({ status: 504, code: TIMEOUT_CODE });
+      expect(LONG_REQUEST_TIMEOUT_MS).toBe(60_000);
     } finally {
       vi.useRealTimers();
     }

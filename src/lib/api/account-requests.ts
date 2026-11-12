@@ -1,6 +1,6 @@
 import { CURRENCY_RELABEL } from "@/lib/account/currency-change";
 import type { AccountData } from "@/lib/account/types";
-import { ApiError, apiRequest } from "@/lib/api/client";
+import { ApiError, apiRequest, LONG_REQUEST_TIMEOUT_MS } from "@/lib/api/client";
 import {
   ACCOUNT_API_KEY,
   ACCOUNT_EMAIL_API_URL,
@@ -68,7 +68,7 @@ export async function signOutEverywhere() {
  * typed phrase and the family rules, and signs this browser out.
  */
 export async function deleteAccount({ currentPassword, confirm }: { currentPassword: string; confirm: string }) {
-  await apiRequest<void>(ACCOUNT_API_KEY, { method: "DELETE", body: JSON.stringify({ currentPassword, confirm }) });
+  await apiRequest<void>(ACCOUNT_API_KEY, { method: "DELETE", body: JSON.stringify({ currentPassword, confirm }) }, { timeoutMs: LONG_REQUEST_TIMEOUT_MS });
 }
 
 /** An export can take a while for a big account; far longer than an ordinary request's timeout. */

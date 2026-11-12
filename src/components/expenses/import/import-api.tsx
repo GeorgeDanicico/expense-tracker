@@ -2,7 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import { ApiError, apiFetcher, apiRequest } from "@/lib/api/client";
+import { ApiError, apiFetcher, apiRequest, LONG_REQUEST_TIMEOUT_MS } from "@/lib/api/client";
 import {
   IMPORTS_API_KEY,
   importApiUrl,
@@ -41,6 +41,9 @@ export type ImportApi = {
   undo(id: string): Promise<ImportUndoResponse>;
 };
 
+/** Saving, confirming and undoing an import are long writes on the server: wait for its answer. */
+const LONG = { timeoutMs: LONG_REQUEST_TIMEOUT_MS };
+
 export const restImportApi: ImportApi = {
   upload(file, contentType) {
     // The file's own bytes are the body, like the avatar upload; `headers` overrides the JSON default.
@@ -48,7 +51,7 @@ export const restImportApi: ImportApi = {
       method: "POST",
       body: file,
       headers: { "Content-Type": contentType },
-    });
+    }, LONG);
   },
   async getDraft(id) {
     const detail = await apiFetcher<ImportDetailResponse>(importApiUrl(id));
@@ -59,13 +62,13 @@ export const restImportApi: ImportApi = {
     return apiRequest<ImportConfirmResponse>(importConfirmApiUrl(id), {
       method: "POST",
       body: JSON.stringify({ rows }),
-    });
+    }, LONG);
   },
   async discard(id) {
     await apiRequest<void>(importApiUrl(id), { method: "DELETE" });
   },
   undo(id) {
-    return apiRequest<ImportUndoResponse>(importUndoApiUrl(id), { method: "POST" });
+    return apiRequest<ImportUndoResponse>(importUndoApiUrl(id), { method: "POST" }, LONG);
   },
 };
 
