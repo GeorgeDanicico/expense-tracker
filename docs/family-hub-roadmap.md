@@ -332,10 +332,12 @@ Logs that let you find out what happened over the last few days, at almost no me
 
 ## Phase 16: Performance, loading and smooth interaction
 
-The goal: pages appear fast, nothing spins forever, errors show up as errors with a retry, and taps respond at once. **Starting point (26 October 2026):**
-- The API client already times out after 15 s.
-- There's one `error.tsx` (for `(app)`), no `loading.tsx`, and no global `SWRConfig`.
-- Pages fetch everything in the browser after load.
+**Status (12 November 2026): done, except the production measurement (waiting on George).** The work is PF1 to PF13 in [performance-plan.md](performance-plan.md), and what changed, with every number and the command behind it, is in [performance.md](performance.md) (start with its "The short version"). The lab measurements are done and every budget that can be checked on a laptop is met or has a reason and a place it moves to. The production half (Web Vitals, server p95 per route, streaming through the proxy, memory on the VPS) needs the VPS and is one step for George, written out in performance.md, "Waiting for George".
+
+The goal: pages appear fast, nothing spins forever, errors show up as errors with a retry, and taps respond at once. **Starting point (26 October 2026), as it was before the phase:**
+- The API client already timed out after 15 s.
+- There was one `error.tsx` (for `(app)`) and no `loading.tsx`. A global `SWRConfig` already existed (`src/components/ui/provider.tsx`), but it retried failures without a clear limit and had no slow-loading notice (PF2 changed that).
+- Pages fetched everything in the browser after load.
 
 | Step | What | Done when |
 | --- | --- | --- |

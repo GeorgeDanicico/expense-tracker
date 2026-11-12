@@ -21,141 +21,111 @@ A number in this document is either measured (with its command next to it) or ma
 
 ## Waiting for George
 
-Things only you can do or decide. Nothing in this list blocks the tasks that are merged.
+Things only you can do or decide, in the order I'd do them. Nothing here is marked done: a row leaves
+this list only when you say you did it. None of them blocks anything that is merged.
 
-| # | What | Why it matters | Where it's explained |
+| # | What | What it unblocks | Where it's explained |
 | --- | --- | --- | --- |
-| 1 | Move the Supabase project to asymmetric JWT signing keys (dashboard → JWT Signing Keys) | Removes one or two calls to Supabase Auth from every signed-in request, with no code change. Measured in the lab (PF1b): a cold Home load goes from 30 Auth calls to 0. Measured again after PF4, which didn't change the Auth calls: with 40 ms to Supabase the data appears 150 to 254 ms sooner on all four daily pages (Home 1,056 → 906 ms) on the lab's CPU-only pass. PF4 left the code alternative (option 2) unbuilt until you decide | Plan, "Decisions for George"; PF4 below; "Signed-in lab baseline" |
-| 2 | Agree or change the budgets | They decide what "fast enough" means for PF13. I'm using them as working budgets until you change them. The JS ones are now in `docs/performance-budget.json`, which CI checks: edit the numbers there | "Proposed budgets" under "Baseline and budgets", PF1 and PF9 below |
-| 3 | On the VPS, run `sudo scripts/perf-report.sh 5 expense-tracker-web` and the two delivery checks (streaming through the proxy, compression), and paste the output into the PR or send it to me | It is the real-use half of the baseline: Web Vitals per page, server time per route, Auth calls per request, whether the proxy streams. I have no access to production, so those cells say "not measured: needs the VPS" | "Real use" and "Delivery checks" under "Baseline and budgets" |
-| 4 | Check whether "Add a kid" works in production, and decide the fix | The lab found that creating a kid account fails on a database built from the migrations (`permission denied for function my_kid_ai_permitted`, from the AI gate migration's profile trigger). If production has the same grants, nobody can add a kid. It needs a migration, which only goes live with your go-ahead | PF1b, "Left open"; [lab.md](lab.md), "What the lab found while seeding" |
-| 5 | Optional: on the VPS, time its round trip to Supabase (one `curl`, read-only) | The lab's "realistic" delay, 40 ms, is from your laptop, not the VPS | [lab.md](lab.md), "The delay" |
-| 6 | Decide whether to rewrite the "read someone else's finance rows" policies (PF10 found it is the one slow database query, and no index fixes it) | Reading another family member's expenses costs 113 ms in the database for their dashboard (1,605 rows, one helper call per row); a rewritten policy costs 10 ms. It changes a policy on financial data and the existing pgTAP test that pins the policy's text, so it isn't in PF10. The route-level gain is small (about 75 ms on the family dashboard, none on your own pages) | PF10 sections 3 and 7 |
-| 7 | Optional: on the live project's SQL editor, run the one read-only `pg_stat_statements` query in PF10 section 5 and paste the output | It is the real query mix PF10 could only approximate in the lab. If a query there is slow, it gets its own index with a measured before and after | PF10 sections 5 and 7 |
-| 8 | Optional: say yes or no to five indexes on foreign keys the advisor flags (`todos.created_by`, `todos.completed_by`, `calendar_events.created_by`, `families.creator_id`, `app_flags.updated_by`) | They only matter when someone deletes an account. PF10 didn't add them because no slow query uses them; the SQL is in section 7 if you want them | PF10 sections 3 and 7 |
-| 9 | Optional: decide whether the React Compiler goes in after all | PF11 tried it and dropped it. It made one interaction, dropping a to-do card, about four times faster (188 to 44 ms), and cost 5 to 7% more JavaScript on every page, 20 to 25% more build CPU, and may have made a rare hydration error on To-dos more common. Turning it on is one line in `next.config.ts` and one pinned dev dependency | PF11 sections 3 and 7 |
-| 10 | On the VPS after the next deploy, run the read-only commands in PF12 section 5 (heap limit, memory limit, memory now and peak of the web and worker containers) and send me the output. Then look at the web container's memory bar in Obsy over a few days | It is the production half of PF12 and PF1's memory budget (steady state under 60% of 768 MB). The lab says: web heap limit 432 MB, steady state about 180 MiB, 291 to 296 MiB after a burst; worker heap limit 156 MB, about 47 MiB. If the worker's heap limit is not 156 there, the deploy did not pick the new script up | PF12 sections 4, 5 and 7 |
+| 1 | **The production measurement, as one sitting on the VPS,** at least 3 days after the last deploy (this phase's last deploy is the one that carries PF12): `sudo scripts/perf-report.sh 5 expense-tracker-web`, the two delivery checks (streaming through the proxy, compression) and PF12's read-only memory commands. The exact commands are in PF13 section 5, "Step 1" | Every cell below that says "not measured: needs the VPS": Web Vitals p75 per page (LCP, INP, CLS, FCP, TTFB), server p95 per route, Auth calls per request, whether the proxy streams, compression, and the web and worker containers' heap limit and memory. Until it runs, the phase's goals "LCP under 2.5 s", "INP under 200 ms" and "no route over 300 ms p95" are met in the lab only | PF13 section 4 and 5; "Real use" and "Delivery checks" under "Baseline and budgets"; PF12 section 5 |
+| 2 | **The exposed commit `ae29d84`.** PF9 pushed this commit to the public repo: it carries five of your untracked drafts (`docs/bug-fixes-plan.md`, `docs/duolingo-styling-plan.md`, `docs/expense-tabs-and-subtypes-plan.md`, `docs/net-worth-plan.md`, `docs/ui-progress-2026-11-04.md`) next to PF9's own files. PF9 removed it from the branch before the merge, so `main` never had the drafts, but GitHub still serves the commit by its hash. I found no secrets in those five files and I did not check anything beyond that. Only GitHub Support can purge it: open a request at support.github.com for this repository with the hash and ask them to remove the commit and its cached views. If you'd rather leave it, the drafts are plans, not credentials | Nothing else waits on it; it is the one thing in this phase that can't be undone by a revert | PF13 section 7 |
+| 3 | **Check whether "Add a kid" works in production, and decide the fix.** The lab found that creating a kid account fails on a database built from the migrations (`permission denied for function my_kid_ai_permitted`, from the AI gate migration's profile trigger). If production has the same grants, nobody can add a kid. The fix is a migration, which only goes live with your go-ahead | A working "Add a kid", if it is broken | PF1b, "Left open"; [lab.md](lab.md), "What the lab found while seeding" |
+| 4 | **Move the Supabase project to asymmetric JWT signing keys** (dashboard, JWT Signing Keys). Best done after row 1, so the same report shows before and after | Removes one or two calls to Supabase Auth from every signed-in request, with no code change. Lab (PF13 section 4.2): a cold Home load goes from 11 Auth calls to 0 (30 before PF4 to PF8), every API request from 2 to 0, and with 40 ms to Supabase the first byte comes 90 to 106 ms sooner (Home 177 → 82 ms); the data on screen is 87 to 143 ms sooner, inside the noise. PF4's code alternative (one `getClaims` per request) and the link prefetches' Auth calls (PF8) stay unbuilt until you decide | Plan, "Decisions for George"; PF4; PF13 section 4 |
+| 5 | **Agree or change the budgets** (the JS ones are in `docs/performance-budget.json`, which CI checks: edit the numbers there) | PF13 judges every budget against them; I used them as working budgets, and they stay so until you change them | "Proposed budgets" under "Baseline and budgets"; PF1; PF9; PF13 section 4 |
+| 6 | **Decide whether to rewrite the "read someone else's finance rows" policies** (PF10 found it is the one slow database query, and no index fixes it) | Reading another family member's expenses costs 113 ms in the database for their dashboard (1,605 rows, one helper call per row); a rewritten policy costs 10 ms. It changes a policy on financial data and the pgTAP test that pins the policy's text, so it isn't in PF10. The route-level gain is small (about 75 ms on the family dashboard, none on your own pages) | PF10 sections 3 and 7 |
+| 7 | Optional: after row 1, tell me whether any route is over 300 ms p95 or any page over its Web Vitals budget | It turns the "moves to phase 18" lines in PF13 section 4 into real tasks, ordered by what real use shows instead of by the lab | PF13 sections 4 and 7 |
+| 8 | Optional: on the live project's SQL editor, run the one read-only `pg_stat_statements` query in PF10 section 5 and paste the output | The real query mix PF10 could only approximate in the lab. If a query there is slow, it gets its own index with a measured before and after | PF10 sections 5 and 7 |
+| 9 | Optional: on the VPS, time its round trip to Supabase (one `curl`, read-only) | The lab's "realistic" delay, 40 ms, is from your laptop, not the VPS. If it is very different the lab numbers in this document shift | [lab.md](lab.md), "The delay" |
+| 10 | Optional: say yes or no to five indexes on foreign keys the advisor flags (`todos.created_by`, `todos.completed_by`, `calendar_events.created_by`, `families.creator_id`, `app_flags.updated_by`) | They only matter when someone deletes an account. PF10 didn't add them because no slow query uses them; the SQL is in PF10 section 7 | PF10 sections 3 and 7 |
+| 11 | Optional: decide whether the React Compiler goes in after all | PF11 tried it and dropped it. It made one interaction, dropping a to-do card, about four times faster (188 to 44 ms), and cost 5 to 7% more JavaScript on every page, 20 to 25% more build CPU, and may have made a rare hydration error on To-dos more common. Turning it on is one line in `next.config.ts` and one pinned dev dependency | PF11 sections 3 and 7 |
 
 ## Progress
 
 | Task | What | Status | PR |
 | --- | --- | --- | --- |
-| PF1 | Baseline and budgets | done, except the VPS numbers (row 3 above); the signed-in lab numbers came with PF1b | #226 |
-| PF1b | A local lab: signed-in pages measured without touching live data | done, except the VPS's round trip to Supabase (row 5) | #227 |
+| PF1 | Baseline and budgets | done, except the VPS numbers (row 1 above); the signed-in lab numbers came with PF1b | #226 |
+| PF1b | A local lab: signed-in pages measured without touching live data | done, except the VPS's round trip to Supabase (row 9) | #227 |
 | PF2 | No endless loading | done | #228 |
 | PF3 | Skeletons and a boundary per section | done, except the cold-load cost found (see PF3 section 7) | #229 |
-| PF4 | Fewer round trips in the app | done, except one getClaims per request: waiting on row 1 | #230 |
+| PF4 | Fewer round trips in the app | done, except one getClaims per request: waiting on row 4 | #230 |
 | PF5 | Session gate and account on the server | done | #231 |
 | PF6 | First data on the server for Home | done, except Lighthouse's simulated LCP (4.6 s; the observed slow-4G LCP is 1.4 s, see PF6 section 4) | #232 |
 | PF7 | The same for Expenses, To-dos and Reminders | done | #233 |
 | PF8 | Prefetching, waterfalls and stable data | done | #234 |
 | PF9 | Smaller bundles | done, except Lighthouse's LCP on Home (still about 4.8 s, see PF9 section 4) and dnd-kit left in To-dos | #235 |
-| PF10 | SQL: indexes and RLS for the slow queries | done, with no migration: the lab and the advisor found no index a slow query needs (see PF10 section 3); waiting on rows 6 to 8 | #236 |
+| PF10 | SQL: indexes and RLS for the slow queries | done, with no migration: the lab and the advisor found no index a slow query needs (see PF10 section 3); waiting on rows 6, 8 and 10 | #236 |
 | PF11 | Smooth interaction | done, except the first open of a lazy sheet (about 250 ms on the 4x CPU, see PF11 section 4); React Compiler tried and dropped | #237 |
 | PF12 | Lean runtime on the VPS | done, except the VPS numbers (the worker's heap limit is now 153 MB, the web container's stays on Node's own 432 MB, `preloadEntriesOnStart` stays on: it would save 23 MB, the bar is 50) | #238 |
-| PF13 | Measure and close | not started | |
+| PF13 | Measure and close | done, except the production measurement (row 1) | #239 |
 
 ## The short version
 
-*(Filled in as tasks merge: one line per improvement, with its headline number.)*
+Phase 16 is done in the lab and **not yet measured in production**. Every number below is from the
+lab on a laptop (a fake family, a copy of the backend, never the live project), measured again by
+PF13 on `main` at `5329943`. None of it is a production number: the production half is one sitting
+on the VPS (row 1 of "Waiting for George"), and until you run it, "fast" here means "fast in the lab".
 
-- **PF1, baseline and budgets (nothing changes for users yet).** Opening Home today is four waits
-  in a row: the page, then 37 script files (385.5 KiB gzipped), then "who am I?" (`/api/account`),
-  then the page's own data. Reading the code, a cold Home load makes 13 calls to Supabase Auth
-  before any data is read (PF1b measured 30). A signed-out visitor to `/dashboard` still makes 50 requests
-  (583 KiB) before reaching the sign-in page. The real-use numbers (Web Vitals, server time per
-  route) need the VPS and are waiting for you (row 3 above).
-- **PF1b, a local lab (nothing changes for users).** Signed-in pages can now be timed on a laptop
-  with a fake family, never touching live data (`npm run lab -- up`). On an emulated phone on slow
-  4G, Home's data appears at **7.4 s** (Expenses 8.0 s, To-dos 7.5 s, Reminders 7.4 s); the first
-  six of those seconds are the scripts, and nothing the server does starts before them. A cold
-  Home load makes **30 calls to Supabase Auth**, not the 13 PF1 counted, because the link
-  prefetches each pay one; with asymmetric keys it makes **none**, and with 40 ms to Supabase the
-  data appears 0.1 to 0.3 s sooner on a fast network. The lab also found that adding a kid
-  probably fails in production (row 4 above).
-- **PF2, no endless loading.** A request that never answers used to show the loading skeleton
-  for 15 s, an error, then the skeleton again, then the error again: **36 s** before the second
-  error, and it kept going. Now the skeleton says "This is taking longer than usual." with a Retry
-  at **8 s**, the error comes at **15.3 s**, and a timeout isn't tried again. A session that ends
-  while the app is open sends you to `/login?next=<the page you were on>`; before, it bounced
-  between `/login` and `/dashboard` and ended on "Checking your session…".
+**What you notice now**
 
-- **PF3, skeletons and a boundary per section.** Home's layout shift drops from **0.207 to 0.012**
-  (Lighthouse 0.137 to 0.012): the loading screens are now the same size as the content. Tapping a
-  tab shows its skeleton **63 to 74 ms** later; before, nothing changed for as long as the
-  server took (5 s watched). Each of the ten sections has its own `loading.tsx` and `error.tsx`.
-  The price: a cold load now also downloads about **58 KB** of other sections' scripts, and on the
-  emulated phone the data appears **0.1 to 0.4 s later**. PF8 has to schedule that.
+- **Opening Home, Expenses, To-dos or Reminders on a slow phone.** On an emulated phone on slow 4G
+  your data used to appear at 7.4 to 8.0 s, after the scripts and two round trips in a row. It now
+  arrives with the page, at about **1.4 s** (Home 1.35, To-dos 1.37, Reminders 1.36). Expenses shows
+  its first rows at about 1.4 s too, but dimmed until the scripts arrive (5.9 s): a side effect of
+  PF11 found by this task (PF13 section 7).
+- **Signed out.** A visit to any page is a redirect to the sign-in page from the server, with none of
+  the app's code (PF5).
+- **Tapping a tab** shows that page's skeleton about 60 ms later, and moving between Home, Expenses,
+  To-dos and Reminders makes no request from the browser (PF3, PF8).
+- **Nothing spins forever, with exceptions.** A page loaded in the browser says "taking longer than
+  usual" at 8 s and shows an error with a retry at about 15 s (PF2). A server-loaded page whose API
+  is down or hung can show its skeleton far longer (PF13 section 7, the one real gap this task found).
+- **The page doesn't jump** (Home 0.156 to 0.000) and taps answer quickly: the month switch is 56 ms
+  (was 1,040), Filters 184 ms (was 864) (PF11). The first open of the quick-add sheet is still 240 ms.
+- **The code the browser needs before a page works** is 25 to 29% smaller on the four daily pages
+  (Home 385.5 to 288.9 KiB gzipped) and CI now checks it on every build (PF9).
 
-- **PF4, fewer round trips.** The data requests behind Expenses, the tabs, Home's month card,
-  Investments and Net worth answer **55 to 70 ms sooner** on the server (one wait fewer in a row), a
-  saved tab's search **0.71 → 0.23 s** on 3,724 expenses (same results, 172 searches compared), and
-  no request reads the family twice. Long lists are now complete or refused with a message: an
-  investment account showed only its **oldest 1,000 orders**; now all of them, up to 5,000. Pages
-  don't show their data measurably sooner (within the 150 ms noise); asymmetric keys still would,
-  by 150 to 254 ms (row 1).
+**Headline numbers (lab, median of three loads, slow 4G on the emulated phone, as the parent)**
 
-- **PF5, the session gate on the server.** A signed-out visit to any page is a redirect to sign in
-  straight from the server: **32 requests and 425 KiB instead of 82 and 610**, and none of the app's
-  code. Signed in, the shell and skeleton come with the page: on the emulated phone the first text
-  appears at **1.4 s instead of 7.2 s**, the data **0.4 to 0.8 s sooner**, with no `/api/account`
-  request and 7 fewer Auth calls per cold load (Home 30 → 23). The cost: the first byte waits
-  ~110 ms for the account, and on a fast network with a slow phone CPU the data comes 0.1 to 0.3 s
-  later, until PF6 and PF7 start it on the server.
+| | Before (PF1b) | Now (PF13) | Command |
+| --- | ---: | ---: | --- |
+| Home, data on screen | 7,387 ms | **1,353 ms** | `npm run lab:measure -- /dashboard --user parent --runs 3` |
+| To-dos / Reminders, data on screen | 7,528 / 7,366 ms | **1,365 / 1,359 ms** | the same, other pages |
+| First-load JavaScript, Home (gzip) | 385.5 KiB | **288.9 KiB** | `npm run build && npm run size:routes -- --check` |
+| Requests the browser makes for Home's data on a cold load | 6 | **0** | the same |
+| Calls to Supabase Auth in a cold Home load (shared-secret keys) | 30 | **11** (0 with asymmetric keys) | the same, `npm run lab -- jwt asymmetric` |
+| Calls to Supabase in a cold Home load | 49 | **24** (13 with asymmetric keys) | the same |
 
-- **PF6, Home's data from the server.** Home arrives with its numbers: on the emulated phone the
-  month's total is on screen at **1.4 s instead of 6.8 s** (LCP 6.8 → 1.4 s), and with a fast
-  network and a slow phone at **0.3 to 0.7 s instead of 1.4 s**, undoing PF5's slowdown there. No request
-  for Home's data on a cold load (3 → 0), 10 fewer Supabase calls per cold load (42 → 32), and the
-  page no longer jumps (CLS 0.012/0.085 → 0.000). A kid without the expenses permission gets none of
-  it in the page. Lighthouse's simulated LCP is still 4.6 s (was 5.8): it counts every script the
-  page started, which PF9 has to cut.
+The full comparison, with the budgets and a pass or fail for each, is in PF13 section 4.
 
-- **PF7, the same for Expenses, To-dos and Reminders.** All three arrive with their data: on the
-  emulated phone the first expense, card or reminder is on screen at **1.4 s instead of 6.8 to 8.1 s**
-  (with a fast network and a slow phone, 0.6 to 1.1 s instead of 1.5 to 2.2 s). No data request on a
-  cold load (Expenses 4, To-dos 2, Reminders 1 before), 3 to 15 fewer Supabase calls and 2 to 8 fewer
-  Auth calls per load, and Expenses no longer jumps (CLS 0.023 to 0.000). A kid with the expenses
-  permission off, or who may not view another member, gets none of that data in the page (checked in
-  the lab). Insights, Investments and Net worth are as slow as Expenses was (data at about 7 s) and are
-  next.
+**What didn't work, or isn't fixed**
 
-- **PF8, moving between pages and stable data.** Moving between Home, Expenses, To-dos and Reminders now
-  makes **no request from the browser** (a seven-tap click-through: 20 data requests before, 0 after), with
-  **16 Auth calls instead of 56** and **69 Supabase calls instead of 177**, and the skeleton still shows
-  within about 100 ms. A cold load makes no request from the shell either (the Reminders count and the
-  notices come with the page): 2 fewer requests, 6 fewer Auth calls and 8 fewer Supabase calls, and
-  depth 3 → 0. Data on screen did not move beyond the noise (about 1.4 s on the emulated phone). Also
-  found and fixed: a hydration error on To-dos in about 1 load in 4 that this change exposed.
+- Lighthouse's simulated LCP on Home is still 5.0 s at 40 ms to Supabase (0.9 s with none), though the
+  observed LCP is 1.4 s: it simulates a streamed page badly. PF9's smaller bundles did not move it.
+- The first open of a lazy sheet is 200 to 240 ms on a 4x slower CPU, just over the 200 ms bar.
+- Insights, Investments, Net worth and Calendar still load in the browser: data at about 6.2 to 6.8 s
+  on slow 4G, and Investments and Net worth jump (CLS 0.107 and 0.105, over 0.1).
+- Every signed-in request still makes 2 Auth calls (a cold load 7 to 11) until the Supabase project
+  moves to asymmetric signing keys (row 4).
+- The React Compiler was tried and dropped (PF11). The SQL needed no index (PF10).
 
-- **PF9, smaller bundles.** The JavaScript a page needs before it works fell by 25 to 29% (Home 397.3 to 288.9 KiB
-  gzipped, Expenses 422.3 to 308.9, To-dos 413.3 to 299.8, Reminders 395.0 to 279.9), all inside PF1's
-  budgets, which CI now checks on every build, along with "no server-only package reaches the browser". Zod,
-  most of Chakra's unused styles, the sheets and dialogs and the menu code left the first load. Blocking time on the page
-  fell by 7 to 52%; LCP did not move on slow 4G, and the total bytes of a whole cold load stayed the same because the
-  code now arrives after the page.
+**What's left:** the VPS sitting (row 1), the exposed commit `ae29d84` (row 2), "Add a kid" in
+production (row 3), the signing keys (row 4) and the budgets (row 5). Then the follow-ups in PF13
+section 7: the dimmed first rows, a time limit on the server's own Supabase calls, and the four pages
+still loaded in the browser. The one-line summary of each task:
 
-- **PF10, SQL: indexes and RLS (nothing changes for users, and there is no migration to apply).** Every
-  expenses, calendar, investments and net-worth query already runs on an index and takes 0.1 to 3 ms in the lab on
-  three years of a family's data (6,665 expenses; tables scaled up to 1,500 events and 3,000 orders to check);
-  the live advisor flags no policy that calls `auth.uid()` per row. The one slow query is reading another
-  family member's expenses (113 ms for their dashboard), which comes from a helper function that runs once per
-  row, not from a missing index. A policy rewrite cuts it to 10 ms, but it is a decision for you (row 6).
-
-- **PF11, smooth interaction.** On an emulated phone (CPU 4x slower), tapping to the previous month on Expenses
-  with about 150 to 290 rows took **1,040 ms** and now takes **56 ms**; opening Filters went from **864 to 176 ms**;
-  typing in the search from **280 to 64 ms** a key. The cause was not the rows themselves: the first tap on the page
-  made every row's menu and tooltips swap in at once, and a month's rows all drew inside the tap. Adding a
-  net-worth value was already optimistic (the list shows it 52 ms after the tap, the server answers at 263 ms) and
-  now uses SWR's own rollback. The React Compiler was tried and **not kept**. Still above 200 ms on this slow CPU:
-  the first time a lazy sheet opens (quick add 256 ms, "Add value" 208 ms).
-
-- **PF12, lean runtime (nothing visible changes).** The web container's Node heap limit is already sensible (432 MB of
-  its 768 MB), so it stays on Node's own. The worker's was **259 MB, more than the 256 MB the container is allowed**, so
-  the next deploy gives it 153 MB (new optional `WEB_HEAP_MB` and `WORKER_HEAP_MB` in `deploy.sh` override). Turning
-  Next's preloading off would save 23 MB of the 768 and the first request stays under 0.6 s either way, but the plan's
-  bar is 50 MB, so it stays on. In the lab the web container uses about 180 MiB after visiting every page and 291 to
-  296 MiB after 4,800 requests (38% of its limit). Production's numbers are row 10.
+| Task | In one line |
+| --- | --- |
+| PF1, PF1b | Baseline and budgets, and a local lab that times signed-in pages without touching live data |
+| PF2 | A request that never answers ends in a slow notice at 8 s and an error with a retry at 15 s |
+| PF3 | A skeleton the size of the content and an error screen for each section; Home stops jumping |
+| PF4 | One wait fewer in a row on the data routes; long lists complete or refused |
+| PF5 | The session check and the account come from the server: signed-out visits are a redirect, no `/api/account` |
+| PF6, PF7 | Home, Expenses, To-dos and Reminders arrive with their data (7 s to 1.4 s on slow 4G) |
+| PF8 | Moving between pages makes no request; a hydration error on To-dos fixed |
+| PF9 | 25 to 29% less JavaScript before a page works, checked in CI |
+| PF10 | No index needed; the one slow query is a policy helper, left as a decision (row 6) |
+| PF11 | Month switch 1,040 to 56 ms, Filters 864 to 184 ms; the compiler tried and dropped |
+| PF12 | The worker's heap limit now below its container's; the web container's left alone |
+| PF13 | This comparison, the smoke test and the closing notes |
 
 ## Baseline and budgets
 
@@ -165,7 +135,7 @@ code). Every number below is one of three kinds, and says which:
 - **measured**: I ran the command next to it;
 - **from the code**: counted by reading the code (file and line given), not by running it;
 - **not measured: needs the VPS**: it can only come from production, so there's a command for you
-  to run (row 3 of "Waiting for George").
+  to run (row 1 of "Waiting for George").
 
 All sizes are **gzipped** (what the network carries) unless it says raw. "KiB" is 1,024 bytes.
 
@@ -580,7 +550,7 @@ log says them yet. The logs show the route's half (the
 
 **Is the JWKS still empty?** Yes (measured, 9 November 2026, 20:22 UTC):
 `curl -s "$SUPABASE_URL/auth/v1/.well-known/jwks.json"` answered `200` with `{"keys":[]}`. So
-`getClaims()` still has to ask Auth [S3][S4]. This is row 1 of "Waiting for George".
+`getClaims()` still has to ask Auth [S3][S4]. This is row 4 of "Waiting for George".
 
 ### What I measured: build facts
 
@@ -615,7 +585,7 @@ cold in a fresh browser, and writes down what happened.
 
 | The lab can | The lab can't |
 | --- | --- |
-| Time a signed-in cold load in a real browser, the same way every time, before and after a change | Say what real phones on real networks get: that's the production logs (`scripts/perf-report.sh`, row 3 of "Waiting for George") |
+| Time a signed-in cold load in a real browser, the same way every time, before and after a change | Say what real phones on real networks get: that's the production logs (`scripts/perf-report.sh`, row 1 of "Waiting for George") |
 | Count every call to Supabase and to Auth per page load, including the proxy's own | Include Supabase's real latency and load: the delay is a fixed lower bound, and the local database is small and idle |
 | Switch the JWT mode and the delay, to show what each costs | Include the VPS (its CPU, Node 24, the standalone server) or the proxy in front of it (TLS, HTTP/2, Tailscale) |
 | Show whether the first HTML has the page's data | Measure taps (INP) |
@@ -818,7 +788,7 @@ membership, then its two reads in parallel), which is the PF4 picture exactly.
 
 ### Proposed budgets
 
-**Proposed by PF1, and used as working budgets until George changes them** (row 2 of "Waiting for
+**Proposed by PF1, and used as working budgets until George changes them** (row 5 of "Waiting for
 George"). They're the plan's numbers, with the sources, and the "now" column says what's measured.
 
 | Budget | Value | Source | Now |
@@ -932,8 +902,8 @@ are compared against. Every one has its command, and its details, in "Baseline a
 4. Try the report without the VPS: `scripts/perf-report.sh --input scripts/fixtures/perf-report/sample.jsonl`
    prints every table from sample lines (the sample's numbers are made up, only its shape is real).
 5. On the VPS, run `sudo scripts/perf-report.sh 5 expense-tracker-web` and the two delivery checks
-   (row 3 of "Waiting for George"), and send me the output.
-6. Look at the budgets (row 2) and say if any should change.
+   (row 1 of "Waiting for George"), and send me the output.
+6. Look at the budgets (row 5) and say if any should change.
 
 #### 6. Risks and how to undo it
 
@@ -955,7 +925,7 @@ are compared against. Every one has its command, and its details, in "Baseline a
 
 - **Not measured: needs the VPS.** Every real-use number: Web Vitals per page, server p50/p95 and
   slowest spans per route, Auth spans per request, memory and the heap limit, whether the proxy
-  streams, whether it compresses. They're waiting on row 3 of "Waiting for George", and the
+  streams, whether it compresses. They're waiting on row 1 of "Waiting for George", and the
   budgets for LCP, INP, CLS, TTFB, server p95 and memory can't be checked until they arrive.
 - **Signed-in lab timings: done by PF1b.** PF1 had no safe way to sign in (no seed users, no
   local Auth, `.env.local` is the live project) and proposed two ways out. PF1b built the second,
@@ -1135,7 +1105,7 @@ About ten minutes, with Docker running:
 
 #### 7. Left open
 
-- **"Add a kid" is probably broken in production** (row 4 of "Waiting for George"; details in
+- **"Add a kid" is probably broken in production** (row 3 of "Waiting for George"; details in
   `docs/lab.md`, "What the lab found while seeding"). I didn't fix it: it's a migration, outside
   this task, and the plan says no migration goes live without you.
 - **Not measured: the VPS's round trip to Supabase.** The 40 ms is from this laptop. The command
@@ -1598,7 +1568,7 @@ Checks: `npm run lint`, `npx next typegen && npm run typecheck`, `npm test` (6,7
 - **A row deleted while a long list loads no longer breaks it**: the read starts over (at most three
   times) and returns a consistent list.
 - **Unchanged: the Auth calls.** A cold Home load still makes 30 calls to Supabase Auth, 2 per API
-  request. Removing them is the signing-keys decision (row 1 of "Waiting for George"); the code
+  request. Removing them is the signing-keys decision (row 4 of "Waiting for George"); the code
   alternative is not built (7).
 
 **The messages** (both new, both a 409 with `{ error }`, shown in place of "Your data could not be
@@ -1826,7 +1796,7 @@ npm run lab -- jwt asymmetric   # then the same
   machine, not the code. Compare only rows run side by side.
 - **Asymmetric keys still matter after this task: 150 to 254 ms sooner on every page** (Home 150,
   Expenses 193, To-dos 254, Reminders 179), with 0 Auth calls. PF1b measured 97 to 324 ms on the
-  older `main`. This is the case for row 1 of "Waiting for George".
+  older `main`. This is the case for row 4 of "Waiting for George".
 
 **The search returns the same results.** Before and after, 43 searches, each with and without a
 year
@@ -1904,7 +1874,7 @@ lab, and `.lab/` holds only `results/`.
 
 #### 7. Left open
 
-- **One `getClaims` per request: waiting on row 1 of "Waiting for George".** Not built, as the plan
+- **One `getClaims` per request: waiting on row 4 of "Waiting for George".** Not built, as the plan
   says (option 2 only if you decline asymmetric keys). Every API request still makes 2 Auth calls
   (the proxy's and the route's), a cold Home load 30. The numbers for the decision are in 4.
 - **`/api/account` reads your `profiles` row three times** (currency, the password flag, the
@@ -2057,7 +2027,7 @@ lab, and `.lab/` holds only `results/`.
   `/settings` aren't linked from the phone's bottom bar, so their panel code came only from it).
 - **Turned down:** reading only the user and the password flag before deciding, and streaming the
   rest (the shell needs the name, the picture and the membership to draw anything, so nothing would
-  paint sooner); checking the session in the proxy instead of a second `getClaims` (waits on row 1,
+  paint sooner); checking the session in the proxy instead of a second `getClaims` (waits on row 4,
   as the brief says).
 
 #### 4. Numbers
@@ -2134,7 +2104,7 @@ What it says:
   same reason (hydrating a full page is one long task). PF6 and PF7 start the data on the server,
   which takes these requests out of the browser's hands altogether.
 - **7 fewer Auth calls per cold load**: −2 for `/api/account`, +1 for the layout's own check (the
-  proxy has already checked once; asymmetric keys, row 1, would make both free), and −6 from the
+  proxy has already checked once; asymmetric keys, row 4, would make both free), and −6 from the
   prefetches: the hand-written list's three sections that no link on the phone's screen points to
   (Investments, Net worth, Settings), each fetched twice. A prefetch doesn't render the layout again: the
   Supabase calls add up to exactly the page, the API requests, the prefetches' proxy checks and one
@@ -2252,10 +2222,10 @@ Checks: `npm run lint`, `npx next typegen && npm run typecheck`, `npm test` (6,8
 
 - **The layout's Auth call is the proxy's twice over.** The proxy checks the session, then the
   layout checks it again: with the shared-secret JWT that is two Auth round trips before the first
-  byte. Asymmetric keys (row 1) make both free; passing the proxy's answer on is the workaround the
+  byte. Asymmetric keys (row 4) make both free; passing the proxy's answer on is the workaround the
   brief said not to build.
 - **The CPU-only slowdown in 4** is for PF6 and PF7, which start each page's data on the server.
-- **Whether production's proxy streams** (row 3) still isn't known. PF5's gain doesn't depend on
+- **Whether production's proxy streams** (row 1) still isn't known. PF5's gain doesn't depend on
   it: the layout sends the page in one piece once the account is read. PF6 and PF7's will.
 - **No request line for a page render.** The layout's Supabase calls (one Auth call, four reads)
   show in the delay proxy's log in the lab, but in production they appear in no `request` line:
@@ -2572,7 +2542,7 @@ Checks: `npm run lint`, `npx next typegen && npm run typecheck`, `npm test`, `np
 - **Styles in `<head>` instead of per element** (an Emotion registry) would remove the duplicated
   style tags and the need for `StreamedSection`. It needs `@emotion/cache` as a direct dependency,
   so it's a decision, not done here.
-- **Whether production's proxy streams** (row 3) matters more now: if it buffers, the page arrives
+- **Whether production's proxy streams** (row 1) matters more now: if it buffers, the page arrives
   in one piece about 30 to 45 ms later (the data's time), which is still a win over the browser
   fetching it.
 - **No request line for page renders**, as in PF5: only failures are logged.
@@ -3137,7 +3107,7 @@ What it says:
   the page, its scripts, then the badge and the notices). In a tap it is 1.
 - **Auth calls fell by 6 per cold load**: 4 from the two requests (two each) and 2 from the prefetches.
   The Auth call per remaining prefetch is untouched; that is the proxy `getClaims` question, still
-  waiting on the signing-keys decision (row 1 above).
+  waiting on the signing-keys decision (row 4 above).
 - **Data on screen did not move beyond the noise.** The two requests were not on the way to the data
   any more after PF7. The reminders LCP, CPU-only (388 → 848 ms) is not a slowdown: before, the biggest
   element was the subtitle inside the loading screen (the run's `inBusy` flag was true), now it is the
@@ -3217,7 +3187,7 @@ and the two lint rules' RuleTester files. Checks: `npm run lint`, `npx next type
 - **Calendar** (9 API requests, 62 Supabase calls per load) was not touched, as asked. Its waterfall
   was not measured here beyond that count; moving it to the server is its own task.
 - **Auth calls per prefetch**: every link prefetch still costs one Auth call (the proxy's `getClaims`).
-  Cold loads now make 11, 8, 9 and 7. The workaround waits on the signing-keys decision (row 1).
+  Cold loads now make 11, 8, 9 and 7. The workaround waits on the signing-keys decision (row 4).
 - **`useServerFirstSWR` bookkeeping** stays (see 3 for why `preload()` didn't replace it).
 - **Categories**: there is nothing to cache (the list is in the code).
 - **Not measured**: the VPS and a real phone; Lighthouse (not run, the observed numbers are the
@@ -3423,7 +3393,7 @@ used to be built when the page loaded.
 
 #### 7. Left open
 
-- **George has not confirmed the budgets** (Waiting for George, row 2). They are in `docs/performance-budget.json`.
+- **George has not confirmed the budgets** (Waiting for George, row 5). They are in `docs/performance-budget.json`.
 - **dnd-kit (16.8 KiB) was left in To-dos' first load**, see 3. Chakra's runtime (about a third of every page) is the next lever, as PF1 said;
   its own plan, not done here.
 - **`@next/bundle-analyzer` was not added.** `next analyze` works (Turbopack), but its chunks differ from the real build's and it counts
@@ -3608,7 +3578,7 @@ npm run lab:measure -- /dashboard /expenses /todos /reminders /calendar /insight
    ```
 
    Run it on the live project in the SQL editor too: it only reads.
-3. **The real query mix (Waiting for George, row 7).** In the live project's SQL editor, which only reads here:
+3. **The real query mix (Waiting for George, row 8).** In the live project's SQL editor, which only reads here:
 
    ```sql
    select calls,
@@ -3641,7 +3611,7 @@ npm run lab:measure -- /dashboard /expenses /todos /reminders /calendar /insight
 There is no code or schema change, so there is nothing to undo; reverting the PR only removes this text.
 
 - **The conclusion rests on the lab's data.** It is three years of a four-person family, plus scaled-up copies of the small tables. Production's
-  stats may differ (more months, more tabs, other usage). That is why row 7 asks for the real `pg_stat_statements` before anyone says "no index is needed" for good.
+  stats may differ (more months, more tabs, other usage). That is why row 8 asks for the real `pg_stat_statements` before anyone says "no index is needed" for good.
 - **The advisor sees only what has run on live.** "Unused" means no scans since the stats were last reset; a young project reports
   many indexes unused.
 - **The measured fix in section 3 is not tested against the whole suite.** I ran `npm run test:db` with it: one failure, the test that pins the policy's text.
@@ -3650,10 +3620,10 @@ There is no code or schema change, so there is nothing to undo; reverting the PR
 #### 7. Left open
 
 - **No migration, so nothing to apply live.** The plan's checkpoint ("George approves applying PF10's migration live") has nothing to approve unless
-  you choose one of rows 6 or 8. The plan's "done when no route's server p95 is over 300 ms" couldn't be checked here: it needs the VPS's request
-  lines (row 3, `scripts/perf-report.sh`). In the lab three routes are over 300 ms: the family dashboard (303), the Everything tab (435, a 629 KB response from four
+  you choose one of rows 6 or 10. The plan's "done when no route's server p95 is over 300 ms" couldn't be checked here: it needs the VPS's request
+  lines (row 1, `scripts/perf-report.sh`). In the lab three routes are over 300 ms: the family dashboard (303), the Everything tab (435, a 629 KB response from four
   expenses reads) and a search on it (317). Only the first is slow in the database.
-- **Waiting for George:** row 6 (the policy rewrite), row 7 (`pg_stat_statements` on live) and row 8 (the five foreign-key indexes).
+- **Waiting for George:** row 6 (the policy rewrite), row 8 (`pg_stat_statements` on live) and row 10 (the five foreign-key indexes).
 - **The advisor's eight unused indexes, for you.** I dropped none. The migration comments say why each exists, and most of them are there to make a delete
   or a cascade cheap, which is why they show no scans:
 
@@ -3671,7 +3641,7 @@ There is no code or schema change, so there is nothing to undo; reverting the PR
   I would keep the ones that serve a cascade or a delete (the cost is a few kilobytes and one extra write per row). The two legacy `expenses`
   indexes and `categories_user_id_idx` are the candidates for a drop, because their table (`categories`) is legacy; check that nothing in the
   legacy tracker still reads it first. Not checked: whether anything outside this repository uses them.
-- **"Add a kid" (`permission denied for function my_kid_ai_permitted`, row 4)** changes a function's grants, so it is not in this task. Nothing here
+- **"Add a kid" (`permission denied for function my_kid_ai_permitted`, row 3)** changes a function's grants, so it is not in this task. Nothing here
   changes it.
 - **Not measured:** the live database's own query times and plans, the VPS, and `get_family()` and `get_my_membership()` beyond their
   3.6 and 1.6 ms means (they are small and run on indexed tables; they are called many times per page, which is PF4's and PF7's subject, not an index).
@@ -3762,7 +3732,7 @@ code) on the unfixed code and on the fixed code [N12][S13].
   `first-render.mjs` (and 1 of 80 with a quieter script), against 0 of 40 on `6dd1233`. The cause isn't known and the samples are small, but
   the brief said the compiler must not disturb that.
 - So it is **dropped**: the manual fixes bring every list interaction under 200 ms, the compiler's one clear gain is
-  a to-do drop that is already about 176 ms, and it costs bytes on every page. Row 9 of "Waiting for George" has the switch if you want it. The dev
+  a to-do drop that is already about 176 ms, and it costs bytes on every page. Row 11 of "Waiting for George" has the switch if you want it. The dev
   dependency isn't in `package.json`. The compiler's lint rules (`eslint-plugin-react-hooks` 7's `react-hooks/refs`, `purity`,
   `set-state-in-effect` and the others) were already on through `eslint-config-next`, and `npm run lint` passes with them.
 
@@ -3807,7 +3777,7 @@ Before is `6dd1233`, five repetitions; after is this branch, seven. Expenses sce
   Month switch can't be counted there: the preview's month links leave the preview.
 - First-load JavaScript with this branch and no compiler: Home 288.9 KiB, Expenses 309.1, To-dos 299.9, Reminders 280.0 (PF9: 288.9, 308.9, 299.8, 279.9), `npm run size:routes -- --check` passes.
 - **Lighthouse timespan mode: not measured.** The Event Timing script measures the same thing (the interaction's time to the next frame) for each
-  tap with a known cause, which timespan mode only totals. INP itself needs real visits (row 3).
+  tap with a known cause, which timespan mode only totals. INP itself needs real visits (row 1).
 
 #### 5. How to check it yourself
 
@@ -3835,7 +3805,7 @@ Before is `6dd1233`, five repetitions; after is this branch, seven. Expenses sce
 - **React #418 on To-dos.** The hydration error returned in about 1 of 6 to 18 cold loads in some builds of this branch (with idle preload on To-dos
   and with the compiler); final build: 0 of 56. Cause not found. If it reappears in real use, `web_vital`/client-log lines will show it.
 - Net worth only has an optimistic *add*; there is no screen for editing a value, so there is nothing to make optimistic.
-- Not measured: INP from real visits (needs the VPS, row 3); a month over about 300 rows; the compiled build's page-load times (LCP) and
+- Not measured: INP from real visits (needs the VPS, row 1); a month over about 300 rows; the compiled build's page-load times (LCP) and
   the compiled tests (vitest runs the uncompiled source).
 - The 1280 px Filters baseline has one usable repetition: at 1280 the harness's tap often missed because the page moved under it.
 - `babel-plugin-react-compiler` was installed locally while trying it; `npm ci` removes it from `node_modules`.
@@ -3845,7 +3815,7 @@ Before is `6dd1233`, five repetitions; after is this branch, seven. Expenses sce
 Nothing a person using the app sees changes in this task. It is about how much memory the two containers use and
 where Node draws its own line, measured on this machine with the production image and the production memory limits.
 **I have no access to the VPS**, so every number here is from the lab, and the same checks for production are in
-"Waiting for George", row 10.
+"Waiting for George", row 1.
 
 #### 1. The problem
 
@@ -3996,7 +3966,7 @@ scripts/lab.sh down && docker rmi expense-tracker:pf12
 
 To see the script's decision without Docker: `npx vitest run scripts/deploy.test.mjs`.
 
-**On the VPS after the next deploy** (read-only; paste the output into the PR or send it to me; this is row 10 of
+**On the VPS after the next deploy** (read-only; paste the output into the PR or send it to me; this is row 1 of
 "Waiting for George"):
 
 ```bash
@@ -4053,7 +4023,7 @@ its memory limit. See the expense-tracker README, "Hardened containers"."
 
 #### 7. Left open
 
-- **Production's numbers** (row 10): the heap limits, the steady state and peak of both containers, and whether the
+- **Production's numbers** (row 1): the heap limits, the steady state and peak of both containers, and whether the
   worker's heap limit takes effect. Until then "steady-state memory is within PF1's budget" is true in the lab only.
 - The lab is one laptop with Docker Desktop's Linux VM, an idle 4-person dataset and a worker with push off. The VPS's
   kernel, cgroup version and real traffic can differ; the deploy's journald log driver was not used (json-file instead).
@@ -4061,3 +4031,413 @@ its memory limit. See the expense-tracker README, "Hardened containers"."
   second build; the standalone config has the flag in one place and the memory differs as [N11] says it should.
 - Obsy does not show the limit as a number, the peak or the worker (above); a change for its repo is written out, not made.
 - `preloadEntriesOnStart` can be revisited if the VPS gets tight: 23 MB is what it would give back.
+
+### PF13: Measure and close
+
+#### 1. The problem
+
+Twelve tasks each reported their own before and after, measured on different days against different
+bases. Nobody had put the whole phase side by side with PF1's baseline, and the plan's closing check,
+"the budgets are met, or each miss has a reason and a place it moves to", hadn't been done. The
+production half of the baseline (what real phones get, the server's p95 per route, memory on the VPS)
+has never been measured at all, because the VPS is behind Tailscale and this work has no access to it.
+
+What a person would have seen if this task hadn't run: a phase marked "done" in the roadmap with
+nothing saying which of its goals were checked, and two problems nobody had noticed (section 7: the
+Expenses list is dimmed on a cold load, and a server-loaded page whose API is down can show its
+skeleton for 11 to 40 s).
+
+#### 2. What changed
+
+**Behaviour:** nothing in the app. This task changes only documents.
+
+- This section; "The short version" rewritten as a final summary; "Waiting for George" rewritten as
+  one ordered list (its rows are renumbered, and every "row N" in this document was updated to match).
+- `docs/family-hub-roadmap.md`: the phase 16 section says "done, except the production measurement
+  (waiting on George)", links the plan and this document, and its starting point is corrected (a global
+  `SWRConfig` did exist before the phase).
+- The probes I wrote for the smoke test (a net-worth refusal, a navigation with the API down, the
+  mid-load screenshot) are scratch scripts and are **not committed**; section 5 gives the steps to do
+  the same by hand, and the committed lab scripts do the rest.
+
+**Files:** `docs/performance.md`, `docs/family-hub-roadmap.md`.
+
+#### 3. Why this way
+
+- **Same commands as PF1b, same conditions.** The baseline in "Signed-in lab baseline" is the
+  shared-secret JWT, no added delay, slow 4G with Lighthouse, as the parent (and the kid on Expenses).
+  I ran exactly that again (`npm run lab:measure`, three runs, median). I did not run all of
+  `npm run lab:baseline` (about 80 minutes, four JWT and delay combinations plus a repeat): I ran the
+  combinations the headline needs: shared 0 ms on both passes, shared 40 ms on both passes, and
+  asymmetric 40 ms on the CPU-only pass.
+- **PF7's "next" pages** (Calendar, Insights, Investments, Net worth, Settings) with PF7's command, so
+  its table has a "now" column.
+- **A smoke test in the lab**, because production can't be touched. Each item has a production
+  column for you (section 5).
+- **Which numbers are comparable with the baseline, and which aren't.** The measuring changed twice
+  after PF1b, and some numbers moved because the page is different, not because it is faster:
+
+  | Number | Comparable? |
+  | --- | --- |
+  | Home "content visible" | Yes. PF1b ran before PF3, when the month card's title was drawn only with its data, so it timed the data. PF6 then fixed the marker to the month's total once the title became part of the skeleton; the number now is that |
+  | Expenses "content visible" | **No, and it reads worse than it is.** The marker ignores anything inside a loading placeholder (`aria-busy`). Since PF11, a cold load draws the first 30 rows dimmed and marked busy until the scripts arrive and the rest are drawn (5.9 s on slow 4G). The rows are on screen from about 1.4 s. Section 7 has the evidence |
+  | To-dos and Reminders "LCP" | The LCP element is the page's subtitle both before and now (PF1b's finding). Judge them by "content visible" |
+  | Lighthouse FCP | Not used. PF1b showed it is wrong for these pages (it says 0.9 s on every one); I use the observed first paint and FCP |
+  | Lighthouse LCP | Comparable to PF1b's baseline only at the same delay. PF1b's slow-4G table was at 0 ms; PF6 and PF9 measured at 40 ms. Both are given |
+  | TBT and time to interactive | TBT rose on Home and Expenses because the filled page now hydrates real content (PF6, PF7). Not a budget |
+  | "JS on the wire" in a whole cold load | Comparable, and it **rose** (below): the code that left the first load arrives afterwards (PF9's finding) |
+  | Auth and Supabase calls, depth, requests | Yes, the same counting at the delay proxy |
+
+- **Noise.** The laptop's load average was 2.3 to 3.5 during the sweep (PF1b: "treat differences under
+  100 ms on the mobile pass and 150 ms on the CPU-only pass as noise"). Cells show the median of three
+  loads and ± half the spread.
+- **The plan's "at least 3 days after the last deploy" is the production step's rule**, not the lab's.
+  The lab measures `main` as built, whatever is deployed.
+
+#### 4. Numbers
+
+**Conditions.** The lab on George's laptop, 12 November 2026, on `main` at `5329943` (PF1 to PF12 merged;
+the app code is exactly `main`'s). Production build, `next start` on Node 23.4, Chromium 1194, Lighthouse 13.6.0,
+the emulated Moto G Power. Medians of three cold loads, ± half the spread. Docker Desktop's Linux VM; the machine's load average
+was 2.3 to 3.5. **None of these is a production number.**
+
+```bash
+npm run lab -- up                       # 75 s; the lab is built from this checkout
+# the baseline's own cells (shared-secret JWT, no added delay), slow 4G with Lighthouse, then the CPU-only pass
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3
+npm run lab:measure -- /expenses --user kid --runs 3
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3 --throttle cpu --no-lighthouse
+npm run lab:measure -- /expenses --user kid --runs 3 --throttle cpu --no-lighthouse
+# PF7's five "next" pages
+npm run lab:measure -- /calendar /insights /investments /net-worth --user parent --runs 3 --no-lighthouse
+npm run lab:measure -- /settings --user parent --runs 3 --no-lighthouse
+# 40 ms to Supabase ("like production"), shared secret, then asymmetric keys: the same CPU-only commands
+npm run lab -- delay 40
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3 --throttle cpu --no-lighthouse   # and kid /expenses
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3                                  # slow 4G + Lighthouse at 40 ms
+npm run lab -- jwt asymmetric
+npm run lab:measure -- /dashboard /expenses /todos /reminders --user parent --runs 3 --throttle cpu --no-lighthouse   # and kid /expenses
+# sizes, routes and taps
+npm run build && npm run size:routes -- --check
+node scripts/lab/search-compare.mjs > /dev/null && node scripts/lab/route-probe.mjs .lab parent 5      # at delay 40, shared; again with 3 runs asymmetric
+node scripts/lab/interactions.mjs --width 390 --scenario quick-add,month,search,reminder-done --reps 5   # delay 40
+node scripts/lab/interactions.mjs --width 1280 --scenario net-worth,todo-drag --reps 5
+```
+
+(The measuring runs are in `.lab/results/pf13/`, which is git-ignored and which `npm run lab -- down` keeps.)
+
+##### 4.1 Cold load on the emulated phone, slow 4G (the baseline's own table)
+
+Shared-secret JWT, no added delay, the parent (the last column is the kid). Before is "Signed-in lab
+baseline" ("The baseline: like production today"), after is PF13. Milliseconds unless it says otherwise.
+
+| | Home | Expenses | To-dos | Reminders | Expenses, kid |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| **Content visible** | 7,387 → **1,353** ±11 | 7,990 → 5,903 ±11 (†) | 7,528 → **1,365** ±7 | 7,366 → **1,359** ±13 | 7,656 → 5,883 ±96 (†) |
+| First paint | 1,400 → 1,396 | 1,404 → 1,448 | 1,396 → 1,424 | 1,392 → 1,420 | 1,388 → 1,424 |
+| FCP, the first text (observed) | 6,800 → **1,396** | 7,064 → **1,448** | 6,836 → **1,424** | 6,760 → **1,420** | 7,032 → **1,424** |
+| **LCP** (observed) | 7,448 → **1,396** | 8,136 → **1,448** | 7,604 → **1,424** | 7,324 → **1,420** | 7,732 → **1,424** |
+| What the LCP element is now | the month's total (data) | the "28% more than October" line (data) | the subtitle (not the cards) | the subtitle (not the list) | the same line as Expenses |
+| CLS (page jump) | 0.156 → **0.000** | 0.009 → **0.000** | 0 → 0 | 0 → 0 | 0 → 0 |
+| TBT / time to interactive (observed) | 2 / 7,437 → 192 / 5,186 | 720 / 8,623 → 173 / 7,326 | 120 / 7,568 → 136 / 5,186 | 39 / 7,385 → 108 / 3,842 | 64 / 7,757 → 149 / 7,346 |
+| TTFB now, the first byte (not recorded in the baseline) | 57 ±4 | 75 ±5 | 56 ±5 | 51 ±3 | 63 ±7 |
+| **Lighthouse LCP**, 0 ms (simulated) | 5,523 → **913** | 5,953 → **909** | 5,674 → **910** | 5,518 → **909** | 5,677 → **910** |
+| Lighthouse LCP now at 40 ms (not in the baseline) | 4,988 ±326 (PF6's before, at 40 ms: 5,784) | 1,057 ±1,756 | 908 | 907 | not run |
+| Lighthouse TBT | 357 → 337 | 1,010 → 464 | 279 → 265 | 315 → 258 | 441 → 359 |
+| JS on the wire, whole cold load, KiB | 409.6 → 451.9 | 437.8 → 479.5 | 427.4 → 451.0 | 408.3 → 451.4 | 437.8 → 479.5 |
+| Data in the first HTML | no → **yes** | no → **yes** | no → **yes** | no → **yes** | no → **yes** |
+
+† Not comparable: the Expenses rows are on screen from about 1.4 s but dimmed, and the marker doesn't count a
+dimmed ("busy") list until the scripts arrive. Section 7 has a measurement of that. The number to compare is
+"FCP" and "LCP" for the page, and the data's time in the CPU-only table below, where the same effect is smaller.
+
+Per cold load, the same runs, from the delay proxy's call log:
+
+| | Home | Expenses | To-dos | Reminders | Expenses, kid |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Waterfall depth (waits in a row) | 4 → **0** | 4 → **0** | 4 → **0** | 4 → **0** | 5 → **0** |
+| API requests from the browser | 6 → **0** | 7 → **0** | 5 → **0** | 4 → **0** | 7 → **0** |
+| Link prefetches (`?_rsc=`) | 16 → 8 | 13 → 5 | 14 → 6 | 12 → 4 | 13 → 5 |
+| Calls to Supabase, all | 49 → **24** | 48 → **18** | 40 → **18** | 33 → **15** | 48 → **18** |
+| **Calls to Supabase Auth**, shared secret | 30 → **11** | 29 → **8** | 26 → **9** | 22 → **7** | 29 → **8** |
+| … with asymmetric keys | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 |
+| Calls to Supabase, asymmetric keys | 19 → 13 | now 10 | now 9 | now 8 | now 10 |
+| `get_family()` | 1 → 1 | 1 → 1 | 2 → 1 | 0 → 0 | 1 → 1 |
+
+##### 4.2 The CPU-only pass (fast network, phone-speed CPU: where the server's work shows)
+
+"Content visible", ms, before (PF1b, "What the JWT mode and the delay change") → now. The Expenses cells have the
+same dimming caveat (†).
+
+| Pass | Home | Expenses | To-dos | Reminders | Expenses, kid |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Shared secret, 0 ms | 1,100 → **509** ±19 | 1,596 → 1,481 (†) | 1,187 → **502** ±73 | 1,140 → **501** ±79 | 1,290 → 1,094 (†) |
+| Shared secret, 40 ms (like production) | 1,356 → **623** ±7 | 2,005 → 1,681 (†) | 1,419 → **618** ±17 | 1,345 → **612** ±15 | 1,590 → 1,265 (†) |
+| Asymmetric keys, 40 ms | 1,130 → **536** ±167 | 1,681 → 1,592 (†) | 1,195 → **515** ±26 | 1,248 → **517** ±5 | 1,356 → 1,122 (†) |
+| Gain from asymmetric keys at 40 ms | 226 → 87 | 324 → 89 | 224 → 103 | 97 → 95 | 234 → 143 |
+| TTFB now, shared → asymmetric, 40 ms | 177 → **82** ±2 | 174 → **83** ±4 | 167 → **77** ±4 | 169 → **74** ±2 | 190 → **84** ±4 |
+| LCP now, shared, 40 ms | 700 | 760 | 672 | 676 | 760 |
+
+What it says:
+
+- **The pages are 0.5 to 1 s sooner than before on this pass** (Home 1,356 → 623 at 40 ms), and with the
+  server rendering the data, the gain from asymmetric keys on "content visible" is now 87 to 143 ms, inside the
+  150 ms noise of this pass (it was 224 to 324 ms before, when the browser made the requests).
+- **What asymmetric keys still clearly buy is the first byte: 90 to 106 ms sooner** (Home 177 → 82 ms), and no
+  Auth call at all (below). The page now waits for its server-side reads before the first byte, so each round trip to Auth
+  is paid there.
+- **Auth calls per signed-in API request** (`node scripts/lab/route-probe.mjs .lab parent 5`, 28 routes, delay 40): **2 on every route with
+  the shared secret, 0 on every route with asymmetric keys**; the median route takes 173 ms with the shared secret and 119 ms with asymmetric keys.
+
+##### 4.3 The pages PF7 listed as "next"
+
+Slow 4G, parent, three runs, no Lighthouse, shared secret, no delay. Before is PF7's table (`npm run lab:measure -- /calendar /insights /investments /net-worth --user parent --runs 3 --no-lighthouse`).
+
+| Page | LCP | CLS | TBT | API requests | Supabase calls | Auth calls | Depth |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Insights | 7,424 → 6,820 | 0.073 → 0.073 | 255 → 139 | 4 → 2 | 39 → 31 | 25 → 19 | 3 |
+| Investments | 6,856 → 6,444 | 0.107 → **0.107** | 364 → 154 | 4 → 2 | 33 → 25 | 19 → 13 | 4 |
+| Net worth | 6,980 → 6,184 | 0.105 → **0.105** | 400 → 172 | 4 → 2 | 36 → 28 | 21 → 15 | 4 |
+| Calendar | 1,420 → 1,448 (the page's frame) | 0.002 → 0.002 | 326 → 167 | 9 → 7 | 62 → 54 | 29 → 23 | 3 |
+| Settings | 1,404 → 1,396 (the frame) | 0 → 0 | 262 → 101 | 5 → **0** | 41 → 17 | 28 → 11 | 0 |
+
+These pages are still loaded in the browser, as PF7 left them; the gains are from PF8's shared fixes and PF9 (fewer requests in the shell,
+less script). Their data still arrives at about 6.2 to 6.8 s on slow 4G.
+
+##### 4.4 First-load JavaScript, all 24 pages (gzipped KiB)
+
+`npm run build && npm run size:routes -- --check` (passes). Before is PF1's table; budget is `docs/performance-budget.json`.
+
+| Page | Before | Now | Change | Budget | |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `/` | 253.7 | 210.6 | -17% | 253.7 | pass |
+| `/_not-found` | 243.8 | 210.6 | -14% | 243.8 | pass |
+| `/calendar` | 387.5 | 347.4 | -10% | 387.5 | pass |
+| `/change-password` | 299.6 | 232.5 | -22% | 299.6 | pass |
+| `/dashboard` | 385.5 | 288.9 | -25% | 308.4 | pass |
+| `/expenses` | 411.8 | 309.2 | -25% | 329.4 | pass |
+| `/expenses/import` | 390.2 | 356.6 | -9% | 390.2 | pass |
+| `/insights` | 399.7 | 305.5 | -24% | 399.7 | pass |
+| `/investments` | 395.3 | 341.5 | -14% | 395.3 | pass |
+| `/join/[code]` | 303.9 | 256.8 | -15% | 303.9 | pass |
+| `/login` | 273.1 | 241.6 | -12% | 273.1 | pass |
+| `/more` | 375.8 | 274.2 | -27% | 375.8 | pass |
+| `/net-worth` | 382.6 | 301.9 | -21% | 382.6 | pass |
+| `/oauth/consent` | 259.7 | 224.6 | -14% | 259.7 | pass |
+| `/offline` | 246.9 | 213.7 | -13% | 246.9 | pass |
+| `/reminders` | 384.2 | 280.0 | -27% | 307.4 | pass |
+| `/settings` | 383.6 | 308.5 | -20% | 383.6 | pass |
+| `/settings/ai` | 376.3 | 280.9 | -25% | 376.3 | pass |
+| `/settings/family` | 378.9 | 306.0 | -19% | 378.9 | pass |
+| `/settings/family/manage` | 382.4 | 308.1 | -19% | 382.4 | pass |
+| `/settings/mcp` | 381.5 | 309.2 | -19% | 381.5 | pass |
+| `/settings/notifications` | 378.7 | 283.5 | -25% | 378.7 | pass |
+| `/settings/permissions` | 378.2 | 276.7 | -27% | 378.2 | pass |
+| `/todos` | 402.7 | 299.8 | -26% | 322.2 | pass |
+
+The four target pages are the ones with a budget 20% under their baseline (Home 308.4, Expenses 329.4, To-dos 322.2, Reminders 307.4):
+288.9, 309.2, 299.8 and 280.0 KiB, all inside it. The files every page loads fell from 243.8 to 210.6 KiB.
+
+##### 4.5 Taps (the parts of INP) in the lab
+
+Event Timing through the lab's driver, the CPU 4x slower, 40 ms to Supabase, a new browser for each repetition (5), median / p75 / worst, ms.
+Before is PF11's "before" where it measured one. Under 16 reads as 0.
+
+| Interaction | Width | Before PF11 | PF11 | Now |
+| --- | --- | ---: | ---: | ---: |
+| Switch to the previous month (first tap) | 390 | 1,040 | 56 | **56** / 56 / 64 |
+| Open Filters | 390 | 864 | 176 | **184** / 184 / 192 |
+| One key in the search | 390 | 280 | 64 | **64** / 72 / 80 |
+| Open quick add, first tap | 390 | 392 | 248 | **240** / 248 / 256 |
+| Open quick add, chunk already loaded | 390 | 80 | 56 | **56** / 64 / 64 |
+| Mark a reminder done | 390 | 176 | 128 | **88** / 96 / 200 |
+| Net worth: open the Add value sheet, first tap | 1280 | 304 | 200 | **200** / 200 / 224 |
+| Net worth: tap Save value | 1280 | 152 | 88 | **88** / 88 / 136 |
+| Net worth: the list shows the value, after the tap | 1280 | 93 | 52 | **51** / 52 / 104 |
+| Net worth: the server answers, after the tap | 1280 | 371 | 263 | 259 / 260 / 272 |
+| Drop a to-do card | 1280 | 184 | 160 | **136** / 136 / 152 |
+
+##### 4.6 Budgets: lab verdict and production cell
+
+The budgets are PF1's "Proposed budgets" (working budgets until you agree or change them, row 5).
+
+| Budget | Value | Lab, now | Lab verdict | Production |
+| --- | --- | --- | --- | --- |
+| LCP, p75, Home, Expenses, To-dos, Reminders | ≤ 2.5 s | Observed on slow 4G: 1.40 to 1.45 s on all four. Lighthouse's simulation: 0.9 s on three, **Home 5.0 s at 40 ms** (0.9 s at 0 ms) | Met (observed); Lighthouse on Home over, see section 7 | **not measured: needs the VPS** |
+| INP, p75, the same pages | ≤ 200 ms | Every tap above is 184 ms or less at p75, except the first open of quick add (248) and, at the limit, the Add value sheet (200, worst 224) | Met except the first open of a lazy sheet (section 7) | **not measured: needs the VPS** |
+| CLS, p75, the same pages | ≤ 0.1 | 0.000 on all four, both users | Met. Investments (0.107) and Net worth (0.105), not target pages, are over | **not measured: needs the VPS** |
+| TTFB, p75 | ≤ 0.8 s | 51 to 90 ms with no delay, 164 to 190 ms with 40 ms to Supabase | Met in the lab, which has no TLS or Tailscale hop | **not measured: needs the VPS** |
+| Server p95 per route | ≤ 300 ms (AI and import routes exempt) | A median of 5 (not a p95), 28 routes, 40 ms to Supabase: 25 of 28 at or under 300 ms; median route 173 ms. Over: Everything tab, all 401 ms (a 629 KB answer), "calendar PATCH all (series)" 447 ms, "todo move" 334 ms | **Not met in the lab on three routes**, see section 7 | **not measured: needs the VPS** |
+| First-load JS, every page | at most its baseline | 24 of 24 pages under | **Met** (4.4) | n/a (a build number) |
+| First-load JS, the four target pages | 20% under the baseline | Home 288.9 ≤ 308.4, Expenses 309.2 ≤ 329.4, To-dos 299.8 ≤ 322.2, Reminders 280.0 ≤ 307.4 | **Met** | n/a |
+| Web container memory, steady state | under 60% of its 768 MB (461 MB) | PF12's lab numbers, **not re-run here**: about 180 MiB after visiting every page, 291 to 296 MiB after 4,800 requests (38%) | Met in the lab (PF12) | **not measured: needs the VPS** |
+
+**The production cells, one by one.** Everything marked "not measured: needs the VPS" above, and these:
+
+| Cell | Result | Filled by |
+| --- | --- | --- |
+| LCP, INP, CLS, FCP, TTFB at p75, per page, and by navigation type | **not measured: needs the VPS** | Step 1's `perf-report.sh`, "Web Vitals: p75 per page" and "…by navigation type" |
+| p50, p95, count and 5xx per route; the slowest spans; `dbCalls` | **not measured: needs the VPS** | `perf-report.sh`, "API requests: latency per route" |
+| `auth.*` spans and `get_family` reads per signed-in request | **not measured: needs the VPS** | `perf-report.sh`, "Round trips per signed-in request" |
+| The slowest Supabase calls by total time | **not measured: needs the VPS** | `perf-report.sh`, "Supabase calls: where the database time goes" |
+| Whether the proxy streams a response (the shell before the data) | **not measured: needs the VPS** | Step 1, delivery check 1 |
+| Whether HTML and scripts are compressed on the wire | **not measured: needs the VPS** | Step 1, delivery check 2 |
+| Heap limit, memory now and peak of the web and worker containers | **not measured: needs the VPS** | Step 1, the memory commands |
+| Whether the worker's new heap limit (153 MB) took effect | **not measured: needs the VPS** | Step 1, the memory commands (heap limit should read 156) |
+| A real phone's INP, LCP and the field's own Auth call count | **not measured: needs the VPS** | `perf-report.sh`, and Obsy's memory bar over a few days |
+
+##### 4.7 The smoke test
+
+Each item was run in the lab ("Lab") on 12 November 2026; the production column is yours (steps in section 5).
+"Probe" means a scratch script that is not committed; the steps next to it do the same by hand.
+
+| # | Check | Lab result | How I ran it | Production |
+| --- | --- | --- | --- | --- |
+| 1 | A signed-out visit redirects with no app JavaScript | **Pass.** `GET /dashboard` and `/expenses?month=2026-10`: 307 to `/login?next=…`. The ten sections and `/`, signed out, each load the sign-in page's 21 script files and **0 of the app's page chunks**; the only console line is the sign-in page's own 401 from `/api/account`, which PF5 documented | `curl -sI http://localhost:3110/dashboard`; `node scripts/lab/session-gate.mjs --width 390` | not run: needs the VPS |
+| 2 | Each target page's first HTML has its data | **Pass**, parent and kid: Expenses 15 of 15 of the page's data strings in the markup (kid 9 of 9), To-dos 14 of 14, Reminders 10 of 10 (kid 2 of 2), Home 11 of 29 (the month total, 6 of 6 expenses, 3 reminders and 3 to-dos: Home shows only some). 0 data requests in the first render, and an empty console | `node scripts/lab/first-render.mjs <page> --users parent,kid --widths 390` for the four pages | not run: needs the VPS |
+| 3 | A tab tap shows the skeleton at once | **Pass.** The destination's data held back, tapping Expenses from Home shows the skeleton **61 ms** later | `node scripts/lab/skeletons.mjs /dashboard 390 --tap /expenses` | not run: needs the VPS |
+| 4 | With the API stopped, an error with a retry shows within 15 s | **Partly.** *Cold load,* PostgREST stopped: "We couldn't load this page … Try again" after **0.40 s** (Insights) and **0.46 s** (Expenses). *Tap to a page loaded in the browser* (Net worth): "taking longer than usual" at 9.1 s and the error at **16.1 s** (two runs: 16.05, 16.18 s from the tap; PF2 measured 15.3 s from the load). *Tap to a page loaded on the server* (Expenses, To-dos): the error came at **11.2, 11.4 and 40.3 s**, and in one run of five not within 60 s. *Gateway hung* (paused, not stopped): a cold load got no answer in 70 s, and a tap left the skeleton for 30 s with no notice and no error. **Over 15 s in the server-loaded cases, section 7** | probe `nav-5xx` (taps a tab with `docker stop supabase_rest_expense-tracker-lab`, polls for "Try again"); cold load with `node scripts/lab/states.mjs down5xx-expenses /expenses 390 --seconds 30` after stopping the container; hang with `docker pause supabase_kong_expense-tracker-lab` | Pages loaded in the browser only: block `/api/*` in the browser's network panel. Not testable on the server-loaded pages without stopping Supabase, which you should not do |
+| 5 | An optimistic valuation rolls back when the write is refused | **Pass.** Net worth, Add value 7777 on Savings account: the row showed the value as soon as the request left; the browser's network layer held the `POST` for 0.7 s and answered 422; the row **dropped the value again the moment the 422 arrived**, and the sheet stayed open with "That value was refused (PF13 probe)" and Save value again. (I refused it in the browser: with PostgREST stopped, the save was still pending after 6 s, where I stopped watching, which tests the timeout, not the rollback.) Unit tests: `use-net-worth-writes.swr.test.tsx` (real SWR; 422 and 500) | probe `rollback`; by hand: section 5 | Block `*valuations*` in the network panel, add a value |
+| 6 | A section error keeps the shell | **Pass.** With PostgREST stopped, tapping Expenses from Home ended on the section's error screen with "Try again" and the sidebar and bottom bar still there (checked in three runs). A cold load with the API down replaces the whole page, shell included: the shell needs the account | probe `nav-5xx`; each section has its own `error.tsx` (PF3) | not run: needs the VPS (the error can't be forced without breaking Supabase) |
+| 7 | No CSP violations in the console | **Pass.** The policy is still report-only (`content-security-policy-report-only`; enforcing is the security plan's S14). Empty console on all four target pages for both users, and on the ten sections for both users. The only console lines in any probe were the sign-in page's 401, the intended 422, and a React error #441 logged by the section boundary during the forced failure in check 4 | `first-render.mjs` and `session-gate.mjs` above; `curl -sI http://localhost:3110/login \| grep -i content-security` | Open Home, Expenses, To-dos and Reminders with the console open; and `grep csp` in the journal (`perf-report.sh` doesn't count CSP reports) |
+| 8 | No Auth round trips on signed-in requests (if the signing keys moved) | **They haven't moved, so this is the "before".** Shared secret: **2 Auth calls on every one of 28 API routes**, and 11, 8, 9 and 7 in a cold load of Home, Expenses, To-dos and Reminders. Asymmetric keys: **0 on every route and every page** | `node scripts/lab/route-probe.mjs .lab parent 5` at each `npm run lab -- jwt shared\|asymmetric`; the cold-load counts are 4.1's | After row 4: `perf-report.sh`, "Round trips per signed-in request" |
+
+#### 5. How to check it yourself
+
+**Step 1: the production measurement (yours, one sitting on the VPS).** Do it at least 3 days after the
+deploy that carries PF12, so the journal holds real use of the new code. Everything here is read-only apart
+from the throwaway server in check 1. Paste the output into the PR or send it to me; it fills every
+"not measured: needs the VPS" cell in 4.6 (the third column of the table there says which).
+
+```bash
+# A. Web Vitals, server time per route, Auth calls per request (a checkout of main, or copy the one file)
+sudo scripts/perf-report.sh 5 expense-tracker-web          # days, then the web container's name
+
+# B. Memory (PF12): the limits the deploy gave, the heap limit Node chose (web 432, worker should read 156), memory now and peak
+for c in expense-tracker-web expense-tracker-worker; do
+  docker inspect -f '{{.Name}} memory={{.HostConfig.Memory}} oom_killed={{.State.OOMKilled}} restarts={{.RestartCount}}' "$c"
+  docker inspect -f '{{json .Config.Env}}' "$c" | tr ',' '\n' | grep NODE_OPTIONS || echo "  no NODE_OPTIONS"
+  printf '  heap limit (MB): '
+  docker exec "$c" node -e "console.log(Math.round(require('v8').getHeapStatistics().heap_size_limit / 2**20))"
+done
+docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.MemPerc}}' expense-tracker-web expense-tracker-worker   # a few times over a day or two
+for c in expense-tracker-web expense-tracker-worker; do
+  printf '%s peak MiB: ' "$c"; docker exec "$c" cat /sys/fs/cgroup/memory.peak | awk '{ printf "%.0f\n", $1 / 1048576 }'
+done
+
+# C. Delivery check 1: does the proxy pass a streamed response through? (terminal 1: the throwaway server, Ctrl-C when done)
+node -e 'require("http").createServer((q,r)=>{r.writeHead(200,{"content-type":"text/plain; charset=utf-8"});let i=0;const t=setInterval(()=>{r.write("chunk "+(++i)+"\n");if(i===5){clearInterval(t);r.end()}},1000)}).listen(3999,"127.0.0.1")'
+# terminal 2:
+stamp() { while IFS= read -r l; do printf '%s %s\n' "$(date +%T.%3N)" "$l"; done; }
+curl -sN http://127.0.0.1:3999/ | stamp                    # the control: five lines, a second apart
+sudo tailscale serve --bg --https=8443 3999
+curl -sN https://<the-app's-.ts.net-name>:8443/ | stamp    # good: the same five lines a second apart; bad: all five at once
+sudo tailscale serve --https=8443 off                      # NOT `serve reset`
+tailscale serve status                                     # the app's own entry is still there
+
+# D. Delivery check 2: is the response compressed?
+HOST=https://<the-app's-.ts.net-name>
+curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip, br' "$HOST/login" | grep -iE '^(HTTP|content-encoding|content-length|transfer-encoding|vary):'
+JS=$(curl -s --compressed "$HOST/login" | grep -o '/_next/static/chunks/[^"]*\.js' | head -1)
+curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip, br' "$HOST$JS" | grep -iE '^(HTTP|content-encoding|content-length|cache-control):'
+curl -s -o /dev/null -w 'compressed:   %{size_download}\n' -H 'Accept-Encoding: gzip, br' "$HOST$JS"
+curl -s -o /dev/null -w 'uncompressed: %{size_download}\n' -H 'Accept-Encoding: identity' "$HOST$JS"
+```
+
+Reading the answers: "Delivery checks" under "Baseline and budgets" says what good and bad look like for C and D;
+PF12 section 5 for B. In A, compare each page's LCP, INP and CLS p75 with 4.6, and any route whose p95 is over 300 ms
+with the three lab routes in section 7. Then look at the web container's memory bar in Obsy over a few days (PF12 section 5).
+
+**Step 2: the production smoke checks** (the "Production" column of 4.7), in a browser on the live app with the console open,
+signed in as yourself: open Home, Expenses, To-dos and Reminders (check 7: nothing red, and no CSP lines); signed out
+in a private window, open `/dashboard` with the network panel open (check 1: only the sign-in page's files load); on Net worth,
+block `*valuations*` in the network panel (right-click a request → Block request URL), add a value and watch the row put itself
+back (check 5); block `/api/*` and open Insights to see the slow notice at 8 s and the error at 15 s (check 4, browser-loaded pages only).
+Don't stop Supabase to test the others.
+
+**Step 3: the lab checks, if you want to see them yourself.**
+
+1. `npm run lab -- up`, then `npm run lab:measure -- /dashboard --user parent --runs 3`: Home's data at about 1.35 s on the emulated phone.
+2. `node scripts/lab/session-gate.mjs --width 390`: every signed-out load ends on the sign-in page with no app chunks; every signed-in one has no `/api/account` request.
+3. `node scripts/lab/first-render.mjs /expenses --users parent,kid --widths 390`: the data strings are in the page's own markup and no data request is made.
+4. `node scripts/lab/skeletons.mjs /dashboard 390 --tap /expenses`: the skeleton 60 ms after the tap.
+5. The refused valuation by hand: open Net worth in the lab (`.lab/users.json` has the sign-ins), in devtools block `*valuations*`, then Add value: the row shows the value, drops it, and the sheet says the save failed.
+6. The dimmed list: devtools, throttling "Slow 4G" and CPU 4x slowdown, open `/expenses`: the list is greyed until the scripts arrive.
+7. The down API: `docker stop supabase_rest_expense-tracker-lab`, tap Expenses from Home and time the skeleton. `docker start supabase_rest_expense-tracker-lab` after.
+8. `npm run lab -- down`.
+
+#### 6. Risks and how to undo it
+
+- **No code changed**, so nothing can regress. Revert the PR to undo the documents.
+- **The risk is in how the numbers are read.** They are lab numbers on a laptop with a fake family; the VPS, TLS, HTTP/2, Tailscale
+  and real data can all move them. The roadmap says "done, except the production measurement" for that reason, and row 1 is the step
+  that closes it. The lab's 40 ms to Supabase is from your laptop, not the VPS (row 9).
+- **The numbers go stale.** Anything merged after `5329943` can move them. The commands are in 4, so the table can be redone.
+- **The lab left nothing behind:** `npm run lab -- down` removed its containers, volumes, files and processes (checked, section 7), and
+  `.lab/results/pf13/` stays on this laptop, git-ignored.
+
+#### 7. Left open
+
+**Over a budget or short of a goal, and where each moves.** Nothing here is fixed in this task, because it changes no app code.
+
+| What | Why | Moves to |
+| --- | --- | --- |
+| **Lighthouse's simulated LCP on Home: 5.0 s at 40 ms to Supabase** (0.9 s with no delay; budget 2.5 s). The other three pages are 0.9 to 1.1 s | Lighthouse simulates a load from an unthrottled run, and charges the month's total (in the page's streamed data, after the shell) with the scripts the page had started. The observed LCP on the emulated phone is 1.4 s. PF9's smaller bundles did not move it (4.5 to 4.8 s then, 5.0 s now) | No task. The field decides: row 1's p75 LCP for Home. If that is over 2.5 s, the lever is Chakra's runtime (about a third of every page, PF9), which PF9 said needs its own plan: **a later plan, not phase 18's clean-up** |
+| **The first open of a lazy sheet: quick add 240 ms, the Add value sheet 200 ms** (worst 224), on a 4x slower CPU; the bar is 200 ms | The first open builds Chakra's dialog and the form for the first time (PF11); the second open is 56 ms | **Phase 18** or a small follow-up: PF11's two ideas, draw the form after the sheet has painted, or keep a closed sheet mounted at idle |
+| **Insights, Investments, Net worth and Calendar are still loaded in the browser.** Their data is on screen at about 6.2 to 6.8 s on slow 4G; **Investments (0.107) and Net worth (0.105) jump over the 0.1 CLS limit**; Calendar makes 7 API requests and 54 Supabase calls per load | PF7 left them as the plan said ("next" pages) and PF10 left the SQL alone. They have no server-first loader | **A later plan** using "The pattern for PF7", Calendar first (most requests), then Insights, Investments and Net worth. Not phase 18: that is clean-up |
+| **Every signed-in request makes 2 Auth calls** (a cold load 7 to 11) | The shared-secret JWT: `getClaims()` has to ask Auth. Asymmetric keys make it 0 and the first byte 90 to 106 ms sooner (4.2) | **Row 4**, a project setting. Not code |
+| **Three routes over 300 ms in the lab:** the Everything tab 401 ms (354 with asymmetric keys), "calendar PATCH all (series)" 447 ms (410), "todo move" 334 ms. Medians of 5 with 40 ms to Supabase, not p95s | The Everything tab's answer is 629 KB from four reads (PF10); the two writes touch several rows in a row, each costing 40 ms in the lab. PF10 found no index that helps | **Wait for row 1's p95 per route** (and row 7). If any is over in production: phase 18 (paging the Everything tab; batching the series write) |
+| **Expenses' first rows are dimmed on a cold load** (new) | See below | **A small follow-up PR to PF11**, before the production measurement if you want its LCP and INP clean |
+| **A server-loaded page whose API is down or hung can show its skeleton for 11 to 40 s or more** (new) | See below | **A small follow-up**, at the latest phase 18 |
+| The whole cold load downloads 10% more JavaScript than at the baseline (Home 409.6 → 451.9 KiB), though the first load fell 25% | PF9's finding: the code left the first load, and arrives afterwards (menus, sheets, prefetched pages, PF11's idle preloads). Not a budget | Nothing |
+
+**New finding 1: the Expenses list is dimmed while the scripts load.** On the emulated phone on slow 4G,
+I loaded `/expenses` and read the list at set times (a scratch probe; section 5, step 3.6 does it by hand):
+
+| After | List items | Opacity | `aria-busy` |
+| --- | ---: | ---: | --- |
+| 2.0, 3.0 and 4.5 s | 41 (the first 30 rows) | 0.6 | yes |
+| 6.0, 7.5 and 9.0 s | 74 (the whole month) | 1 | no |
+
+A screenshot at 3 s shows the first rows, readable, at 60% (the lab's own check counts the list as a loading placeholder until it is
+at full strength, which is why "content visible" for Expenses reads 5.9 s above). The cause is PF11's `useDeferredValue(expenses, expenses.slice(0, FIRST_ROWS))`
+in `src/components/expenses/expense-rows.tsx`: the first render, which is the server's HTML and the hydration, is always the "initial" 30 rows, so
+`rows !== expenses` and the list is "stale" (dimmed, `aria-busy`) until the second step, which has to wait for the scripts. PF11 measured taps, not a cold
+load, so it couldn't see this, and the dimming is meant for a month switch. The fix is small: don't dim on the first render. It isn't done here because this task changes no app code.
+
+**New finding 2: the server has no time limit on its own calls to Supabase, and an outage takes long to show.**
+`fetchWithTimeout` (15 s, PF2) covers only the browser's own requests (`src/lib/api/client.ts`); a server-rendered page waits for
+Supabase as long as Node does. What I saw in the lab (check 4 in 4.7): with the gateway *hung*, a cold page load got no answer in 70 s,
+and a tab tap showed the skeleton for the 30 s I watched, with no "taking longer" notice and no error. With PostgREST *stopped*, the cold load failed fast
+(0.4 s, with Try again) but a tab tap to a server-loaded page showed its skeleton for 11.2, 11.4 and 40.3 s before the error, and once for more than 60 s.
+The server logged the failed render within a moment each time (`server_render_failed`), so the delay is between the server and the page, and I did not find where.
+A stopped container in Docker may behave unlike an unreachable Supabase (Kong may hold the connection), so I can't say how often production would hit this. PF3 had seen the
+skeleton "stays" for a hung gateway; PF5 to PF7 made more pages depend on it. A 15 s `AbortSignal` on the server's Supabase client, and finding why
+the page waits after the server has failed, is the follow-up.
+
+**Not measured, and why.**
+
+- **Production:** everything in the table under "The production cells", and the plan's "at least 3 days after the last deploy": no VPS access. Row 1.
+- **PF12's memory numbers weren't re-run** (they need a built image and `scripts/lab/runtime.sh`); 4.6 quotes PF12's.
+- **The kid on Home, To-dos and Reminders, the second adult and the user with no family** weren't in the timed runs, as in PF1b; the smoke checks 2, 7 covered the kid on the four pages.
+- **Interaction timing is the lab's driver, not INP from real visits.** A tap on a real phone, a month over about 300 rows, and Safari and Firefox were not measured.
+- **Lighthouse was not run for the kid at 40 ms,** and not on the next pages.
+- **The scripts are lab scripts on this Mac,** on Node 23.4, with `next start` and no proxy; production runs the standalone server on Node 24 behind Tailscale.
+- **React's hydration error (#418) on To-dos** (PF8, PF11) did not appear in the To-dos loads whose console I read here (four). Not a measurement.
+
+**Waiting for George.** The list is at the top of this document, in order. Two items need a sentence here because
+nothing else says them plainly:
+
+- **The exposed commit `ae29d84` (row 2).** PF9 pushed this commit to the public repository. It holds five of your untracked drafts
+  (`docs/bug-fixes-plan.md`, `docs/duolingo-styling-plan.md`, `docs/expense-tabs-and-subtypes-plan.md`, `docs/net-worth-plan.md`,
+  `docs/ui-progress-2026-11-04.md`) and PF9's own changes. PF9 then removed it from the branch: it isn't on `main` and isn't in
+  PR #235's commit list (`git merge-base --is-ancestor ae29d84 origin/main` says no). GitHub still serves it by its hash, which
+  is how a commit that was once pushed to a public repository behaves. No secrets were found in them when this was
+  noticed, and I did not read them again. A force-push can't take the commit back. Only GitHub Support can remove
+  the commit and its cached views. Whether to ask is your call: the files are plans, not credentials.
+- **"Add a kid" (row 3).** The lab found that creating a kid account fails on a database built from the migrations
+  (`permission denied for function my_kid_ai_permitted`). It most likely fails in production too; that was not checked there.
+
+**This task's own checks.** `npm run lint`, `npx next typegen && npm run typecheck`, `npm test` (351 files, 7,109 tests passed,
+1 skipped) and `npm run build` pass; they ran on a documents-only change, so they show the checkout is still sound, not that anything was tested. `npm run test:db` not run: no SQL touched. The lab was taken down with
+`npm run lab -- down` at the end, and nothing of it was left running (George's `node harness.cjs` on port 54331 is not the lab's).
