@@ -100,3 +100,45 @@ describe("ExpenseRows renders", () => {
     container.remove();
   });
 });
+
+describe("ExpenseRows dimming", () => {
+  const many = (count: number, prefix: string) => Array.from({ length: count }, (_, index) => expense(`${prefix}${index}`));
+  const list = (container: Element) => container.querySelector("ul")?.parentElement?.parentElement as HTMLElement;
+
+  it("doesn't dim the first rows of a list that is drawing for the first time (the server's HTML and hydration)", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    // Every change of the list's `aria-busy`, across the commit of the first 30 rows and the one with the whole month.
+    const busy: string[] = [];
+    const observer = new MutationObserver((records) => busy.push(...records.filter((record) => record.attributeName === "aria-busy").map((record) => record.target.nodeName)));
+    observer.observe(container, { subtree: true, attributes: true });
+    await act(async () => root.render(<ChakraProvider value={ledgerSystem}><ExpenseRows expenses={many(80, "a")} currency="EUR" now={NOW} /></ChakraProvider>));
+    expect(container.querySelectorAll("li")).toHaveLength(80);
+    expect(busy).toEqual([]);
+    expect(list(container).style.opacity).toBe("");
+    observer.disconnect();
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("dims the old rows when a later change (another month, a search) leaves them behind, and stops once the new rows are in", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const show = (expenses: ListedExpense[]) =>
+      act(async () => root.render(<ChakraProvider value={ledgerSystem}><ExpenseRows expenses={expenses} currency="EUR" now={NOW} /></ChakraProvider>));
+    await show(many(80, "a"));
+    // The new list is first drawn with the old rows (dimmed and busy), then with the new ones.
+    const changes: Array<string | null> = [];
+    const observer = new MutationObserver((records) => changes.push(...records.filter((record) => record.attributeName === "aria-busy").map((record) => record.oldValue)));
+    observer.observe(container, { subtree: true, attributes: true, attributeOldValue: true });
+    await show(many(60, "b"));
+    observer.disconnect();
+    expect(changes).toEqual([null, "true"]);
+    expect(list(container).getAttribute("aria-busy")).toBeNull();
+    expect(container.querySelectorAll("li")).toHaveLength(60);
+    await act(async () => root.unmount());
+    container.remove();
+  });
+});
