@@ -7,6 +7,15 @@ import { createAdminClient, type AdminClient } from "@/lib/supabase/admin-client
 
 type ReminderRow = Database["public"]["Tables"]["reminders"]["Row"];
 
+/**
+ * The time limit on the worker's Supabase calls: 20 s, not the web app's 4 s. Nobody waits on the
+ * worker, and its daily clean-ups delete in bulk, so a slow call is fine; a hung one isn't, since a
+ * tick waits for it and the next tick only starts after it. 20 s ends a hung call before the next
+ * tick is due (every 30 s) and well inside a claimed row's 2-minute lease, so the row is claimed
+ * again as after any other failure.
+ */
+export const WORKER_SUPABASE_TIMEOUT_MS = 20_000;
+
 /** Postgres' unique_violation: here, a `dedupe_key` that's already queued. */
 const UNIQUE_VIOLATION = "23505";
 
@@ -18,7 +27,7 @@ const UNIQUE_VIOLATION = "23505";
  *
  * SECURITY: only the worker (`src/worker/main.ts`) creates this store.
  */
-export function createSupabaseWorkerStore(client: AdminClient = createAdminClient()): WorkerStore {
+export function createSupabaseWorkerStore(client: AdminClient = createAdminClient({ timeoutMs: WORKER_SUPABASE_TIMEOUT_MS })): WorkerStore {
   return {
     async writeHeartbeat({ name, beatAt, version }) {
       const { error } = await client

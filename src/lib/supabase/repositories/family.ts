@@ -22,6 +22,7 @@ import {
   type Permissions,
 } from "@/lib/permissions";
 import { MEMBER_COLOR_COUNT } from "@/lib/family/member-colors";
+import { withLongTimeLimit } from "@/lib/log/traced-fetch";
 import { MEMO_KEYS, forgetPerRequest, oncePerRequest } from "@/lib/request-memo";
 import { translateDatabaseError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
@@ -220,8 +221,10 @@ export const supabaseFamilyRepository: FamilyRepository = {
     });
   },
 
+  // With the long time limit, like the kid's account it joins (auth-admin.ts `createUser`): if it
+  // committed after the app gave up, the clean-up would delete a kid the family now has.
   addManagedKid(userId: string, permissions: Permissions): Promise<string> {
-    return changingFamily(async () => {
+    return changingFamily(() => withLongTimeLimit(async () => {
       const supabase = await createClient();
       const { data, error } = await supabase.rpc("add_managed_kid", {
         p_user_id: userId,
@@ -231,7 +234,7 @@ export const supabaseFamilyRepository: FamilyRepository = {
       if (error) throw translateDatabaseError(error, ADD_KID_ERROR);
       if (!data) throw new Error(ADD_KID_ERROR);
       return data;
-    });
+    }));
   },
 
   async requirePasswordChange(memberId: string): Promise<string> {

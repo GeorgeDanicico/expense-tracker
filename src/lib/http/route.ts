@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { PASSWORD_CHANGE_REQUIRED, PASSWORD_CHANGE_REQUIRED_MESSAGE } from "@/lib/account/password-change";
+import { TIMEOUT_CODE } from "@/lib/api/client";
 import { getAuthenticatedUser, type AuthenticatedUser } from "@/lib/auth";
 import { DomainError } from "@/lib/errors";
 import { touchLastActiveInBackground } from "@/lib/family/last-active";
@@ -22,6 +23,7 @@ import {
 import { logRequest, logRequestFailure } from "@/lib/http/request-log";
 import { ImportError } from "@/lib/imports/types";
 import { addRequestFields, currentRequest, setRequestUser } from "@/lib/log/request-context";
+import { supabaseTimedOut } from "@/lib/log/traced-fetch";
 import { getRepositories } from "@/lib/repositories";
 import { fieldErrorsOf } from "@/lib/validation/field-errors";
 import { idSchema } from "@/lib/validation/primitives";
@@ -156,13 +158,21 @@ function errorResponse(error: HttpError | DomainError | ImportError) {
   return json({ error: error.message, fieldErrors: error.fieldErrors }, error.status);
 }
 
+/** What a person reads when Supabase didn't answer in time (`SUPABASE_TIMEOUT_MS`). */
+export const SUPABASE_TIMEOUT_MESSAGE = "The server took too long to answer. Try again in a moment.";
+
 /**
- * The 500 for an unexpected error: `{ error: failure, requestId }`, after the error is logged as
- * `request_failed`. The id is what the user can quote to find the request in the logs.
+ * The answer to an unexpected error, after it is logged as `request_failed`: a 500 with
+ * `{ error: failure, requestId }`, or, when a Supabase call in this request hit its time limit, a 504
+ * with `{ error: SUPABASE_TIMEOUT_MESSAGE, code: "timeout", requestId }` (the browser doesn't retry
+ * a `timeout`: the server already waited). The id is what the user can quote to find the request in
+ * the logs.
  */
 function failureResponse(failure: string, error: unknown) {
   logRequestFailure(error);
-  return json({ error: failure, requestId: currentRequest()?.requestId }, 500);
+  const requestId = currentRequest()?.requestId;
+  if (supabaseTimedOut()) return json({ error: SUPABASE_TIMEOUT_MESSAGE, code: TIMEOUT_CODE, requestId }, 504);
+  return json({ error: failure, requestId }, 500);
 }
 
 /**
@@ -213,7 +223,9 @@ export type WithUserOptions = {
  * request limit (`userReadRequests` for `GET`/`HEAD`/`OPTIONS`, `userWriteRequests` for the rest) →
  * 429 with `Retry-After` before anything else runs, an account that must choose a new password → 403 `password_change_required`
  * (unless `allowPasswordChangeRequired`), `HttpError`/`DomainError` → their status, `ImportError` →
- * its status with `{ error, code }`, anything else → 500 with `{ error: failure, requestId }`.
+ * its status with `{ error, code }`, anything else → 500 with `{ error: failure, requestId }` (504
+ * with `code: "timeout"` when a Supabase call in the request ran out of time). A session check that
+ * fails (Supabase Auth down or out of time) is such an error too, never a 401.
  * Without `failure`, unexpected errors propagate to Next's default error response. Either way an
  * unexpected error is logged as `request_failed` first, and every request writes one `request` line
  * with the caller's id once they're known (`logRequest`).
@@ -233,16 +245,17 @@ export function withUser<Req extends Request = Request, Ctx = unknown>(
       const refused = refuseForeignRequest(request);
       if (refused) return errorResponse(refused);
 
-      const user = await getAuthenticatedUser();
-      if (!user) return refuseOverLimit(signedOutRequests, clientKey(request)) ?? unauthorized();
-      setRequestUser(user.id);
-      const overLimit = refuseOverLimit(READ_METHODS.has(request?.method.toUpperCase() ?? "GET") ? userReadRequests : userWriteRequests, user.id);
-      if (overLimit) return overLimit;
-      touchLastActiveInBackground(user.id);
-      // Its failure, if any, reaches the handler when it reads the same thing; here it would be unhandled.
-      options.readAlongside?.().catch(() => undefined);
-
       try {
+        // A session check that fails (Supabase Auth down, or out of time) lands in the catch below.
+        const user = await getAuthenticatedUser();
+        if (!user) return refuseOverLimit(signedOutRequests, clientKey(request)) ?? unauthorized();
+        setRequestUser(user.id);
+        const overLimit = refuseOverLimit(READ_METHODS.has(request?.method.toUpperCase() ?? "GET") ? userReadRequests : userWriteRequests, user.id);
+        if (overLimit) return overLimit;
+        touchLastActiveInBackground(user.id);
+        // Its failure, if any, reaches the handler when it reads the same thing; here it would be unhandled.
+        options.readAlongside?.().catch(() => undefined);
+
         if (!options.allowPasswordChangeRequired && (await getRepositories().account.getMustChangePassword(user.id))) {
           addRequestFields({ errorCode: PASSWORD_CHANGE_REQUIRED });
           return passwordChangeRequired();

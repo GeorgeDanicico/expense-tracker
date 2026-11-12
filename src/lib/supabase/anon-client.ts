@@ -15,6 +15,7 @@ export function createAnonClient(): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
   return createSupabaseClient<Database>(url, publishableKey, {
     global: { fetch: tracedFetch },
+    db: { retry: false },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }

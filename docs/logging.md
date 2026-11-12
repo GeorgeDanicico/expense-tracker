@@ -26,7 +26,8 @@ stderr. Docker's `journald` driver hands those lines to the host's journal, whic
   `/api/expenses/:id`, never the raw path), `status`, `ms`, `userId` when signed in, and `spans`.
   Spans are the timed pieces inside the request (each Supabase call, Web Push and AI call); `dbMs`
   and `dbCalls` add up the Supabase ones. A request slower than `LOG_SLOW_MS` is written at `warn`
-  with `slow: true` and a `slowestSpan`.
+  with `slow: true` and a `slowestSpan`. A request in which a Supabase call ran out of time carries
+  `supabaseTimeout`, the name of the first such call's span, and answers 504.
 - Levels on `request` lines: `info`, `warn` for slow or 429, `error` for 5xx.
 - `debug` and `info` lines go to stdout, `warn` and `error` to stderr. `docker logs` shows both; add
   `2>&1` before piping it to `jq`.
@@ -39,6 +40,7 @@ stderr. Docker's `journald` driver hands those lines to the host's journal, whic
 | --- | --- | --- |
 | `request` | info, warn, error | One per API request (see above). `warn` when slow or 429, `error` when 5xx. `/health` is not logged. |
 | `request_failed` | error | A route threw an unexpected error; the user got a generic 500. Carries the error name, message and stack, and the request's `method`, `route` and `userId`. |
+| `supabase_timeout` | warn | A Supabase call didn't answer within 4 s (30 s for the long writes: deleting an account, a kid's account, a statement import's save, confirm and undo, the export) and was given up (`src/lib/log/traced-fetch.ts`). Carries `span` (the call's name, as in `spans`) and `limitMs`, and the `requestId` inside an API request. Also written for a page render or the proxy, which have no request line. The route answers 504 and the page shows its error. |
 | `server_render_failed` | error | An error Next caught outside the API routes: a page that threw, a server action. Carries `digest` (the id the browser's error page shows), `routePath`, `routeType` and the `requestId` when known. |
 | `env_check_failed` | error | A required environment variable is missing or invalid at start-up. Names the variable, never its value; the process exits with 1. |
 | `env_optional_off` | info | At start-up, which optional features are off because their variables are not set. |
@@ -69,6 +71,7 @@ The worker's lines have no `method`. Each tick runs under its own id, `tick-<12 
 | `forced_exit` | error | A second stop signal arrived while stopping; exits with 1. |
 | `tick` | info, warn | One per tick (every 30 seconds): counts of reminders, events, to-dos and notifications handled, `ms`, `spans`, `dbMs`, `dbCalls`. `warn` with `slow: true` and a `slowestSpan` when it took too long. |
 | `tick_failed` | error | A whole tick failed; the next one tries again. |
+| `supabase_timeout` | warn | A Supabase call didn't answer within 20 s and was given up; the step it belonged to fails as above (its own `*_failed` line) and the next tick tries again. |
 | `push_not_configured` | error | The VAPID keys are missing or invalid. Notifications stay pending. With a tick it carries how many are waiting. |
 | `notification` | info, warn | An outbox row ended as `skipped` or `failed` (`info`), or went back to `pending` for another try (`warn`). Sent ones are only counted in `tick`. |
 | `notification_failed` | error | Delivering one row threw; its lease runs out and it is claimed again. |

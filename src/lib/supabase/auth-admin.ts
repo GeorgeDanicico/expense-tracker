@@ -4,6 +4,7 @@ import type { AuthAdmin, CreatedUser, CreateUserInput } from "@/lib/auth/admin";
 import type { AuthSession } from "@/lib/auth/service";
 import { DomainError } from "@/lib/errors";
 import { errorFields, log } from "@/lib/log";
+import { withLongTimeLimit } from "@/lib/log/traced-fetch";
 import { createAdminClient } from "@/lib/supabase/admin-client";
 import { createSessionClient, createThrowawayClient, sessionFromClient } from "@/lib/supabase/auth";
 import { translateDatabaseError } from "@/lib/supabase/errors";
@@ -69,14 +70,18 @@ export function createSupabaseAuthAdmin(): AuthAdmin {
     throw new Error(failure);
   }
 
-  async function deleteUser(userId: string): Promise<void> {
-    await deleteAvatarFiles(userId);
-    const { error } = await client.auth.admin.deleteUser(userId);
-    if (error) throw authError(error, "Unable to delete the account.");
+  /** With the long time limit, like the account's data before it: a deletion the app gave up on can still go through. */
+  function deleteUser(userId: string): Promise<void> {
+    return withLongTimeLimit(async () => {
+      await deleteAvatarFiles(userId);
+      const { error } = await client.auth.admin.deleteUser(userId);
+      if (error) throw authError(error, "Unable to delete the account.");
+    });
   }
 
   return {
-    async createUser(input: CreateUserInput): Promise<CreatedUser> {
+    // With the long time limit: an account created after the app gave up would be left without its profile.
+    createUser: (input: CreateUserInput): Promise<CreatedUser> => withLongTimeLimit(async () => {
       // `email_confirm` marks the address confirmed, so no confirmation email is sent.
       // Kid-account state goes in `profiles`, not in the provider's user metadata.
       const { data, error } = await client.auth.admin.createUser({
@@ -114,7 +119,7 @@ export function createSupabaseAuthAdmin(): AuthAdmin {
       }
 
       return user;
-    },
+    }),
 
     deleteUser,
 

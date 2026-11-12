@@ -8,7 +8,8 @@ vi.mock("next/headers", () => ({ headers: mocks.headers, cookies: mocks.cookies 
 import { logRequest } from "@/lib/http/request-log";
 import { createAdminClient } from "@/lib/supabase/admin-client";
 import { createAnonClient } from "@/lib/supabase/anon-client";
-import { createSessionClient, createThrowawayClient } from "@/lib/supabase/auth";
+import { SUPABASE_TIMEOUT_MS } from "@/lib/log/traced-fetch";
+import { createSessionClient, createThrowawayClient, supabaseAuth } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loggedLines } from "@/test/log-lines";
 
@@ -145,3 +146,49 @@ describe("the Supabase clients' calls in the request line", () => {
     }
   });
 });
+
+describe("the Supabase clients' time limit and retries", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A Supabase that never answers until the call is aborted, as a paused gateway does. */
+  const hung = (_input: RequestInfo | URL, init?: RequestInit) =>
+    new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true }));
+
+  it("gives a hung read up once, after the limit, and never tries it again", async () => {
+    vi.useFakeTimers();
+    fetchStub.mockImplementation(hung);
+    const read = requestLine(async () => {
+      const result = await (await createClient()).from("expenses").select("id");
+      expect(result.error?.message).toBe("SupabaseTimeoutError: Supabase didn't answer db.expenses.get within 4000 ms.");
+    });
+
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS + 10_000);
+    const line = await read;
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    expect(line).toMatchObject({ supabaseTimeout: "db.expenses.get" });
+  });
+
+  it("doesn't retry a read the gateway answers 503 (supabase-js would, three times over 7 s)", async () => {
+    fetchStub.mockImplementation(async () => json({ message: "name resolution failed" }, 503));
+    await requestLine(async () => {
+      const result = await (await createClient()).from("expenses").select("id");
+      expect(result.status).toBe(503);
+    });
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes a session check that runs out of time an error, not a signed-out caller", async () => {
+    vi.useFakeTimers();
+    fetchStub.mockImplementation(hung);
+    mocks.headers.mockResolvedValue(new Headers({ authorization: `Bearer ${ACCESS_TOKEN}` }));
+    const check = requestLine(async () => {
+      await expect(supabaseAuth.getCurrentUser()).rejects.toThrow("Unable to check the session.");
+    });
+
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
+    expect(await check).toMatchObject({ supabaseTimeout: "auth.user" });
+  });
+});
+

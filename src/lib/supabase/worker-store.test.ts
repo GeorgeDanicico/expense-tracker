@@ -5,7 +5,7 @@ import { fakeSupabase, type FakeSupabaseOptions } from "@/test/fake-supabase";
 const mocks = vi.hoisted(() => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin-client", () => mocks);
 
-import { createSupabaseWorkerStore } from "@/lib/supabase/worker-store";
+import { createSupabaseWorkerStore, WORKER_SUPABASE_TIMEOUT_MS } from "@/lib/supabase/worker-store";
 
 const now = new Date("2026-10-25T09:00:00.000Z");
 
@@ -23,12 +23,13 @@ describe("Supabase worker store", () => {
     vi.resetAllMocks();
   });
 
-  it("uses the admin client", () => {
+  it("uses the admin client, with the worker's own time limit (20 s, not the web app's 4 s)", () => {
     useDatabase();
 
     createSupabaseWorkerStore();
 
-    expect(mocks.createAdminClient).toHaveBeenCalledOnce();
+    expect(mocks.createAdminClient).toHaveBeenCalledExactlyOnceWith({ timeoutMs: WORKER_SUPABASE_TIMEOUT_MS });
+    expect(WORKER_SUPABASE_TIMEOUT_MS).toBe(20_000);
   });
 
   describe("writeHeartbeat", () => {

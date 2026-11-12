@@ -22,6 +22,7 @@ import {
   type ImportSourceKind,
   type ImportStatus,
 } from "@/lib/imports/types";
+import { withLongTimeLimit } from "@/lib/log/traced-fetch";
 import { translateDatabaseError, type DatabaseError } from "@/lib/supabase/errors";
 import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createClient } from "@/lib/supabase/server";
@@ -188,17 +189,21 @@ async function expenseCounts(batchIds: readonly string[]): Promise<Map<string, {
  * `ImportRepository` on `import_batches`, `import_rows` and `import_expenses` and their functions,
  * acting as the request's caller. RLS limits every row to the caller's own, with no family widening,
  * so queries don't filter by user themselves. An expired draft is still stored until the next upload
- * or the worker's purge, so every read drops it here.
+ * or the worker's purge, so every read drops it here. Creating, confirming and undoing a batch have the
+ * long time limit (`withLongTimeLimit`): each is one statement over many rows that can commit after the
+ * app has given up on it.
  */
 export const supabaseImportRepository: ImportRepository = {
-  async createBatch(batch, rows) {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("create_import_batch", {
-      p_batch: batch as unknown as Json,
-      p_rows: rows as unknown as Json,
+  createBatch(batch, rows) {
+    return withLongTimeLimit(async () => {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc("create_import_batch", {
+        p_batch: batch as unknown as Json,
+        p_rows: rows as unknown as Json,
+      });
+      if (error) throw translateImportError(error, SAVE_ERROR, IMPORT_NOT_A_DRAFT_MESSAGE);
+      return reloadBatch(data, SAVE_ERROR);
     });
-    if (error) throw translateImportError(error, SAVE_ERROR, IMPORT_NOT_A_DRAFT_MESSAGE);
-    return reloadBatch(data, SAVE_ERROR);
   },
 
   async findLiveByHash(hash) {
@@ -259,21 +264,25 @@ export const supabaseImportRepository: ImportRepository = {
     }));
   },
 
-  async confirm(id, rows) {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("confirm_import_batch", {
-      p_batch_id: id,
-      p_rows: rows as unknown as Json,
+  confirm(id, rows) {
+    return withLongTimeLimit(async () => {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc("confirm_import_batch", {
+        p_batch_id: id,
+        p_rows: rows as unknown as Json,
+      });
+      if (error) throw translateImportError(error, CONFIRM_ERROR, IMPORT_NOT_A_DRAFT_MESSAGE);
+      return { batch: await reloadBatch(id, CONFIRM_ERROR), created: data.map(toExpense) };
     });
-    if (error) throw translateImportError(error, CONFIRM_ERROR, IMPORT_NOT_A_DRAFT_MESSAGE);
-    return { batch: await reloadBatch(id, CONFIRM_ERROR), created: data.map(toExpense) };
   },
 
-  async undo(id) {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("undo_import_batch", { p_batch_id: id });
-    if (error) throw translateImportError(error, UNDO_ERROR, IMPORT_NOT_CONFIRMED_MESSAGE);
-    return { batch: await reloadBatch(id, UNDO_ERROR), removed: data };
+  undo(id) {
+    return withLongTimeLimit(async () => {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc("undo_import_batch", { p_batch_id: id });
+      if (error) throw translateImportError(error, UNDO_ERROR, IMPORT_NOT_CONFIRMED_MESSAGE);
+      return { batch: await reloadBatch(id, UNDO_ERROR), removed: data };
+    });
   },
 
   async discard(id) {

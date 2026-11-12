@@ -57,6 +57,7 @@ this list only when you say you did it. None of them blocks anything that is mer
 | PF12 | Lean runtime on the VPS | done, except the VPS numbers (the worker's heap limit is now 153 MB, the web container's stays on Node's own 432 MB, `preloadEntriesOnStart` stays on: it would save 23 MB, the bar is 50) | #238 |
 | PF13 | Measure and close | done, except the production measurement (row 1) | #239 |
 | PF13 follow-up | Expenses' first rows undimmed | done | #240 |
+| PF13 follow-up | A time limit on the server's Supabase calls | done | #241 |
 
 ## The short version
 
@@ -76,9 +77,11 @@ on the VPS (row 1 of "Waiting for George"), and until you run it, "fast" here me
   the app's code (PF5).
 - **Tapping a tab** shows that page's skeleton about 60 ms later, and moving between Home, Expenses,
   To-dos and Reminders makes no request from the browser (PF3, PF8).
-- **Nothing spins forever, with exceptions.** A page loaded in the browser says "taking longer than
-  usual" at 8 s and shows an error with a retry at about 15 s (PF2). A server-loaded page whose API
-  is down or hung can show its skeleton far longer (PF13 section 7, the one real gap this task found).
+- **Nothing spins forever.** A page loaded in the browser says "taking longer than usual" at 8 s and
+  shows an error with a retry at about 15 s (PF2). Since #241 the server gives up on a Supabase call
+  after 4 s too: with Supabase hung, a page loaded on the server shows its error with Try again at about
+  8 s (it showed its skeleton for 75 s and more), and with the API failing, within about 4 s (was 10 to
+  60 s). An outage of Supabase Auth is an error page now, not the sign-in page.
 - **The page doesn't jump** (Home 0.156 to 0.000) and taps answer quickly: the month switch is 56 ms
   (was 1,040), Filters 184 ms (was 864) (PF11). The first open of the quick-add sheet is still 240 ms.
 - **The code the browser needs before a page works** is 25 to 29% smaller on the four daily pages
@@ -109,9 +112,8 @@ The full comparison, with the budgets and a pass or fail for each, is in PF13 se
 - The React Compiler was tried and dropped (PF11). The SQL needed no index (PF10).
 
 **What's left:** the VPS sitting (row 1), the exposed commit `ae29d84` (row 2), "Add a kid" in
-production (row 3), the signing keys (row 4) and the budgets (row 5). Then the follow-ups in PF13
-section 7: a time limit on the server's own Supabase calls, and the four pages
-still loaded in the browser. The one-line summary of each task:
+production (row 3), the signing keys (row 4) and the budgets (row 5). Then the follow-up in PF13
+section 7: the four pages still loaded in the browser (the server's time limit is done, #241). The one-line summary of each task:
 
 | Task | In one line |
 | --- | --- |
@@ -4389,7 +4391,7 @@ Don't stop Supabase to test the others.
 | **Every signed-in request makes 2 Auth calls** (a cold load 7 to 11) | The shared-secret JWT: `getClaims()` has to ask Auth. Asymmetric keys make it 0 and the first byte 90 to 106 ms sooner (4.2) | **Row 4**, a project setting. Not code |
 | **Three routes over 300 ms in the lab:** the Everything tab 401 ms (354 with asymmetric keys), "calendar PATCH all (series)" 447 ms (410), "todo move" 334 ms. Medians of 5 with 40 ms to Supabase, not p95s | The Everything tab's answer is 629 KB from four reads (PF10); the two writes touch several rows in a row, each costing 40 ms in the lab. PF10 found no index that helps | **Wait for row 1's p95 per route** (and row 7). If any is over in production: phase 18 (paging the Everything tab; batching the series write) |
 | **Expenses' first rows were dimmed on a cold load** (fixed, #240) | See below | **Fixed by #240** (a follow-up to PF11): the first render is no longer dimmed; "content visible" is 1,405 ms again |
-| **A server-loaded page whose API is down or hung can show its skeleton for 11 to 40 s or more** (new) | See below | **A small follow-up**, at the latest phase 18 |
+| **A server-loaded page whose API is down or hung can show its skeleton for 11 to 40 s or more** (new; fixed, #241) | See below | **Fixed by #241**: a 4 s limit on each of the server's Supabase calls; the error now shows at about 4 s (API failing) or 8 s (hung) |
 | The whole cold load downloads 10% more JavaScript than at the baseline (Home 409.6 → 451.9 KiB), though the first load fell 25% | PF9's finding: the code left the first load, and arrives afterwards (menus, sheets, prefetched pages, PF11's idle preloads). Not a budget | Nothing |
 
 **New finding 1: the Expenses list is dimmed while the scripts load.** On the emulated phone on slow 4G,
@@ -4433,6 +4435,133 @@ The server logged the failed render within a moment each time (`server_render_fa
 A stopped container in Docker may behave unlike an unreachable Supabase (Kong may hold the connection), so I can't say how often production would hit this. PF3 had seen the
 skeleton "stays" for a hung gateway; PF5 to PF7 made more pages depend on it. A 15 s `AbortSignal` on the server's Supabase client, and finding why
 the page waits after the server has failed, is the follow-up.
+
+**Fixed in #241.** What a person notices: when Supabase hangs, a page shows "We couldn't load this page" with Try again
+after about 8 s instead of a skeleton that never ends; when it fails, after about 4 s at most instead of 10 to 60 s.
+
+*Why the tab tap waited (the cause I was asked to find).* Nothing waits between the server and the page. The wait is in the lab's
+gateway, and the server had no limit to cut it short. Right after `docker stop` of PostgREST, Kong still connects to the
+container's old address, so the first calls hang inside Kong: 10.3 s in two of my three taps and 60 s in the third (`curl`
+against Kong showed the same: 14.3 s, then `503 name resolution failed` in 3 ms once it noticed). The delay proxy's own lines
+show each of the page's four Supabase calls taking those 10.3 or 60 s, the server wrote `server_render_failed` the moment Kong
+answered, and the page showed the error 0.1 s after that. So PF13's "the server logged the failure within a moment" didn't hold in
+my runs; the cold loads PF13 timed at 0.4 s most likely came after Kong had noticed (I ran one of each: 0.35 s and 60.4 s).
+With Kong already answering 503, a tap showed the error in 0.12 s before the fix too. The other candidates, checked: the client
+router (the page's RSC answer started 25 ms after the tap and ended when the server failed), SWR waiting on a fallback promise (a
+failed loader resolves to `undefined`, PF6), the boundaries (each section's `error.tsx` caught it), and retries in the loaders (none).
+One thing I did find on the way: **supabase-js retries a failed read** (a `GET` answered 503 or a network error) up to three times,
+1, 2 and 4 s apart. With Kong answering 503 in 3 ms, `GET /api/reminders/summary` and `/api/todos` took 7,080 and 7,035 ms to
+answer 500. A page's account read wasn't slowed by it (its `rpc` is a `POST`, which isn't retried, and fails first), but every API
+read was. With the browser's own retry on top, that may explain PF13's 16 s for a page loaded in the browser (check 4); I didn't
+time that case before the fix.
+
+*What changed.*
+- Every Supabase call from the server has a time limit, in the one place all clients share, `createTracedFetch`
+  (`src/lib/log/traced-fetch.ts`): a call that hasn't answered within 4 s is aborted and fails with a `SupabaseTimeoutError`,
+  logged as `supabase_timeout` (warn) with the call's span name. It applies to page renders, the proxy and API routes alike.
+- An API route whose request had a timeout answers **504** `{ error: "The server took too long to answer. Try again in a moment.",
+  code: "timeout", requestId }` (`withUser` in `src/lib/http/route.ts`); the request line names the call (`supabaseTimeout`). The
+  browser doesn't retry a `timeout` (PF2), so it shows the error with Try again at once. A page shows its section's error screen.
+- A session check that can't reach Supabase Auth (no connection, a 5xx from the gateway, or out of time) is now an error, not
+  "signed out" (`getCurrentUser` in `src/lib/supabase/auth.ts`). Before, the layout sent you to the sign-in page during an Auth
+  outage, and an API route answered 401, which sends the browser to sign in too.
+- Every client has `db: { retry: false }`: no supabase-js retries on the server. The browser retries a 5xx once within its 15 s
+  budget, so there is one retry policy.
+- **The long writes get 30 s** (`withLongTimeLimit` and `LONG_WRITE_TIMEOUT_MS` in `traced-fetch.ts`), and the browser waits 60 s for
+  them (`LONG_REQUEST_TIMEOUT_MS` in `src/lib/api/client.ts`). The reason: when the app gives up on a call, PostgREST and Postgres usually
+  don't stop the statement, so it can still commit after the person was told it failed. For a read that's harmless; for a write that must
+  finish or fail as a whole it isn't. An account deletion that timed out after `delete_my_data` committed would leave the data gone but the
+  sign-in and the picture in place, with an error on screen; an import confirmed or undone after the app gave up would show an error for a
+  batch that went through. So these get time to answer instead of a short limit:
+  - deleting your account: `delete_my_data`, then the picture folder and the sign-in (`deleteUser` in `src/lib/supabase/auth-admin.ts`);
+  - deleting a kid's account: `delete_managed_kid_data`, then the same `deleteUser`;
+  - creating a kid's account: the sign-in and its profile (`createUser`), then `add_managed_kid`, whose failure deletes the sign-in again;
+    if it committed after the app gave up, that clean-up would delete a kid the family now has;
+  - a statement import: `create_import_batch` (the upload), `confirm_import_batch` and `undo_import_batch`, each one statement over many rows;
+  - the export's sections (`export_my_data`): a read, but a big family's section can take more than 4 s, and the browser already waits 120 s.
+
+  It is a scope, not a client option: the repositories wrap these calls (`withLongTimeLimit(async () => …)`), and the traced fetch reads the
+  limit when the call goes out, whichever client makes it (the request's cookie client, a scoped page or MCP client, the admin client). A
+  client option would have needed a second client per repository, and `createClient()` hands back a scoped client as it is. Why 30 s: long
+  enough for a big import or deletion on a slow day (the lab doesn't have one big enough to time), and the browser's 60 s is twice that, so the
+  server's own answer, done or its error, arrives before the browser gives up even when the calls around the long one take their time. A hung
+  Supabase still answers in about 8 s here, since the session check before them keeps its 4 s. The browser's 60 s applies to those routes
+  only: the account deletion, a kid's creation and deletion, and the import's upload, confirm and undo.
+- The worker's calls get **20 s** (`WORKER_SUPABASE_TIMEOUT_MS` in `src/lib/supabase/worker-store.ts`), through
+  `createAdminClient({ timeoutMs })`.
+- A lint rule, `local/supabase-client-options`, refuses a Supabase client without `global: { fetch }` (the traced fetch) and
+  `db: { retry: false }` (docs/lint-rules.md). Seven clients needed the second; all already had the first.
+- `scripts/lab/fault-probe.mjs`, the probe below, is in the repo now (PF13's was a scratch file), and docs/lab.md explains the
+  Kong behaviour.
+
+*Why 4 s, and 20 s for the worker.* A hung Supabase costs two limits in a row before anything can answer: the proxy's session
+refresh (`src/proxy.ts`, on every page and API request), then the first call of the page or route. Two times 4 s is 8 s, the moment a
+page loaded in the browser says "taking longer than usual" (PF2's 8 s, from Nielsen's 10 s limit [S8]), and an API read's 504 comes
+before the browser's own 15 s timeout, so the person sees the server's message and its ref. The slowest whole route in the lab is
+447 ms with 40 ms to Supabase (PF13 section 7), so 4 s is about ten times that; a single call is far less. 5 s would put two at 10 s,
+past the 8 s point; 3 s leaves less room for a slow but working Supabase. The worker has no person waiting and its daily clean-ups
+delete in bulk, so it gets more; but a hung call stops its loop, since each tick waits for the last. 20 s ends a hung call before the
+next tick is due (30 s) and well inside a claimed row's 2-minute lease, so the row is claimed again as after any other failure.
+Turned down: one limit for a whole request (a deadline shared by its calls): fairer, but it needs a deadline carried through the
+proxy, the page render and the routes, which have no shared context (a page render has no request context, PF6); `db.timeout` in
+supabase-js (PostgREST only, not Auth or Storage); `AbortSignal.timeout` (it can't log or mark the request, and fake timers can't
+drive it in tests). Keeping supabase-js's retries but not on a timeout was possible too; I turned them off because they add 7 s to
+every failed read and the browser retries anyway.
+
+*Numbers.* Lab, the parent, 390 px emulated phone, no throttling, no added delay, from the moment of the fault, on `6d5370f` (before)
+and this branch (after). Each cell is one run unless it lists several. Command: `node scripts/lab/fault-probe.mjs <cold|tap> <fault> /expenses`
+(the tap is from Home), and for the API rows a signed-in `fetch` of the route with the fault in place.
+
+| Case | Before | After |
+| --- | ---: | ---: |
+| Gateway paused (hung), cold load of Expenses | no answer in 75 s | error with Try again at **8.3 s** |
+| Gateway paused, tap Home → Expenses | skeleton for 75 s, no notice, no error | error at **8.1 s** |
+| PostgREST just stopped (Kong hangs), tap Home → Expenses | 10.4, more than 60 (the server answered at 60.1), 10.4 s | **4.1, 4.1, 4.1 s** |
+| PostgREST just stopped, cold load of Expenses | 0.35, 60.4 s | 0.35, 0.24 s (Kong had already noticed both times, so this row doesn't test the hang; the tap row does) |
+| PostgREST stopped, Kong answering 503 at once, tap Home → Expenses | 0.12, 0.12 s | 0.12 s |
+| PostgREST stopped, Kong answering 503 at once: `GET /api/reminders/summary`, `/api/todos` | 500 after 7,080, 7,035 ms | 500 after **49, 19 ms** |
+| Gateway paused: `GET /api/reminders/summary`, `/api/todos` | not measured (no server limit; the browser gives up at 15 s) | **504** `timeout` after 8,055, 8,021 ms |
+| PostgREST just stopped, tap to Net worth (loaded in the browser), 1280 px | 16.05, 16.18 s (PF13) | **4.18, 4.18 s** |
+| Gateway paused, tap to Net worth, 1280 px | not measured | 12.1 s: the page's own request waits 4 s in the proxy, then its API read 8 s (proxy and route) |
+
+A normal cold load is unchanged (`npm run lab:measure -- /dashboard /expenses --user parent --runs 1 --no-lighthouse --throttle none`: data in
+the first HTML, no API requests, as before).
+
+*Tests.* `src/lib/log/traced-fetch.test.ts` ("the time limit", fake timers): nothing at 3,999 ms, at 4,000 ms a `SupabaseTimeoutError`, one
+`supabase_timeout` line with the request id and the mark on the request; a fetch that ignores its signal still ends; the limit applies outside a
+request; the worker's 20 s; a call that answered in time writes nothing; the caller's own abort isn't a timeout; the first timed-out call is the one
+named. `src/lib/supabase/traced-clients.test.ts` (the real supabase-js): a hung read gives up once after 4 s and isn't tried again, a 503 isn't
+retried, and a hung session check is an error, not a signed-out caller. `src/lib/http/route.test.ts`: the 504 body and line, and a failed session
+check is a 500 or 504, never a 401. `src/lib/supabase/auth.test.ts`: `getCurrentUser` throws on a timeout and a gateway error. Lint rule tests in
+`eslint-rules/supabase-client-options.test.mjs`.
+
+*How to check it yourself* (a few minutes, in the lab, never production): `npm run lab -- up`, then
+`node scripts/lab/fault-probe.mjs tap pause /expenses` (look for `"errorAt"` near 8,000) and `node scripts/lab/fault-probe.mjs tap stop /expenses`
+(near 4,000). `npm run lab -- down` at the end.
+
+*Risks and how to undo it.* A Supabase call that legitimately takes more than 4 s now fails: none does in the lab (the slowest route is
+447 ms), but production's p95 per route isn't measured yet (row 1); a `supabase_timeout` line in production is the sign. The number is one
+constant, `SUPABASE_TIMEOUT_MS`. The 504 mark is per request: if a call
+times out and the route handles it and then fails for another reason, it still answers 504. During an Auth outage people now see an error page
+instead of the sign-in page, which is the point, but it is a change. Undo: revert #241.
+
+*Left open.* Not measured in production (row 1). A tap to a page loaded in the browser can take three limits in a row while Supabase is hung
+(12.1 s above: its page request, then its API read's two); still under the browser's 15 s, but past 8 s. A body that stalls after its headers is
+aborted at 4 s too, but without a `supabase_timeout` line and with a 500, not a 504. The worker's 20 s is reasoned, not measured: the lab doesn't run
+the worker. The long writes' 30 s is reasoned too: the lab's data is too small for any of them to come near it. A long write that still runs
+out of time answers 504 "Try again", though it may have gone through; the screens don't say "check before trying again". The import upload calls
+the AI model, whose own limit is 90 s, longer than the browser's 60 s (it was 15 s before); not changed here.
+
+Other multi-step writes on the web, checked and left at 4 s, because each step is one small statement, so a 4 s limit only cuts in when
+Supabase is unhealthy, and a lost answer left them in the same state before this change:
+- completing a reminder that logs an expense (`completeReminderWithExpense`: the expense, then the reminder; it deletes the expense again if the
+  second step fails, and says so when it can't);
+- changing your password (check, change, clear the flag, sign the other sessions out) and resetting a kid's (`setPassword`, the flag, sign-out);
+- a new profile picture (upload, the profile's path, remove the old file; `repositories/avatars.ts`);
+- single-statement writes that are all or nothing on their own: calendar events and series (`create_calendar_events`,
+  `update_calendar_events`, one `delete … in`), deleting the family (`delete_family`), net-worth items with their first value, moving a to-do,
+  expenses, reminders and investment orders. A timed-out create that committed looks failed, and trying again adds it twice: the same as any
+  lost answer before.
 
 **Not measured, and why.**
 

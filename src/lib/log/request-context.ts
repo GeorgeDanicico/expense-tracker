@@ -49,6 +49,8 @@ export type RequestContext = {
   spanTotals?: SpanTotals;
   /** Extra fields for the request line (`familyId`, `mcpTool`). */
   fields: LogFields;
+  /** The span name of the first Supabase call that hit its time limit (`traced-fetch.ts`); `withUser` then answers 504. */
+  supabaseTimeout?: string;
 };
 
 // One store per process, even if a bundler loads this module more than once (Next's layers, dev reloads).

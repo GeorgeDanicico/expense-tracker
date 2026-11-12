@@ -3,7 +3,7 @@ import "server-only";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
-import { tracedFetch } from "@/lib/log/traced-fetch";
+import { createTracedFetch, tracedFetch, type TracedFetchOptions } from "@/lib/log/traced-fetch";
 import { getSupabaseAdminConfig } from "@/lib/supabase/config";
 
 export type AdminClient = SupabaseClient<Database>;
@@ -16,11 +16,15 @@ export type AdminClient = SupabaseClient<Database>;
  * `worker-store.ts` (for the notifications worker, `src/worker/main.ts`, a separate process with no
  * request, which acts for every user: heartbeats, the outbox, due reminders, the open to-dos due today with their assignees, and recipients' notification settings and push subscriptions).
  * It never stores, refreshes or reads a session: it acts as the service, not as a user.
+ *
+ * Its calls have the web app's time limit (`SUPABASE_TIMEOUT_MS`) unless `timeoutMs` says otherwise:
+ * the worker passes its own (`WORKER_SUPABASE_TIMEOUT_MS`).
  */
-export function createAdminClient(): AdminClient {
+export function createAdminClient({ timeoutMs }: TracedFetchOptions = {}): AdminClient {
   const { url, secretKey } = getSupabaseAdminConfig();
   return createSupabaseClient<Database>(url, secretKey, {
-    global: { fetch: tracedFetch },
+    global: { fetch: timeoutMs === undefined ? tracedFetch : createTracedFetch(undefined, { timeoutMs }) },
+    db: { retry: false },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }

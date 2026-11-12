@@ -1,4 +1,7 @@
-import { currentRequest } from "@/lib/log/request-context";
+import { AsyncLocalStorage } from "node:async_hooks";
+
+import { log } from "@/lib/log";
+import { currentRequest, runWithRequestContext, type RequestContext } from "@/lib/log/request-context";
 import { routeTemplate } from "@/lib/log/route-template";
 import { recordSpan, spanNamePart } from "@/lib/log/span";
 
@@ -12,12 +15,62 @@ import { recordSpan, spanNamePart } from "@/lib/log/span";
  * filters carry values such as `email=eq.…`), its headers (the keys and the user's token) or a
  * body. Ids in the path are replaced.
  *
- * It never changes a call: the arguments go to the inner `fetch` as they came, its `Response` (or
- * error) comes back as it was, and naming or recording a span can't throw. The time is until the
- * response's headers arrive; reading the body isn't counted.
+ * It also gives every call a time limit (PF13 follow-up, docs/performance.md): a call that hasn't
+ * answered within {@link SUPABASE_TIMEOUT_MS} is aborted and fails with a
+ * {@link SupabaseTimeoutError}, logged as `supabase_timeout`. Apart from the signal that carries the
+ * limit (joined with the caller's own, if any), the arguments go to the inner `fetch` as they came,
+ * its `Response` (or error) comes back as it was, and naming or recording a span can't throw. The
+ * span's time is until the response's headers arrive; reading the body isn't counted, though the
+ * limit covers it too.
  *
  * It imports nothing from `next/*` or `server-only`, so the worker can use it.
  */
+
+/**
+ * How long a Supabase call from the web app may take before it's given up: 4 s. A hung Supabase
+ * costs two of them in a row before anything can answer (the proxy's session refresh, then the
+ * page's or route's first call), so a person sees the error at about 8 s, when a page loaded in the
+ * browser says "taking longer than usual" (PF2), and an API read answers before the browser's own
+ * 15 s timeout. It is about 10 times the slowest whole route measured in the lab (447 ms, PF13).
+ */
+export const SUPABASE_TIMEOUT_MS = 4_000;
+
+/**
+ * The time limit inside {@link withLongTimeLimit}: 30 s, for the few writes that must finish or fail as
+ * a whole (an account's deletion, a statement import's confirm and undo) and the export's sections.
+ * A client that gives up doesn't stop the server: PostgREST and Postgres usually go on with the
+ * statement, and it can commit after the app has said it failed. So these get time to answer instead.
+ */
+export const LONG_WRITE_TIMEOUT_MS = 30_000;
+
+// One store per process, even if a bundler loads this module more than once (see request-context.ts).
+const LIMIT_KEY = Symbol.for("expense-tracker.supabase-time-limit");
+const globalLimit = globalThis as typeof globalThis & { [LIMIT_KEY]?: AsyncLocalStorage<number> };
+const limitStore = (globalLimit[LIMIT_KEY] ??= new AsyncLocalStorage<number>());
+
+/**
+ * Runs `fn` with every Supabase call it makes or starts given {@link LONG_WRITE_TIMEOUT_MS} instead of
+ * the client's own limit, whichever client makes it. The repositories wrap their long operations in it.
+ */
+export function withLongTimeLimit<T>(fn: () => T): T {
+  return limitStore.run(LONG_WRITE_TIMEOUT_MS, fn);
+}
+
+/** A Supabase call that didn't answer within its time limit. Its message names the call's span and the limit, nothing else. */
+export class SupabaseTimeoutError extends Error {
+  constructor(
+    readonly span: string,
+    readonly limitMs: number,
+  ) {
+    super(`Supabase didn't answer ${span} within ${limitMs} ms.`);
+    this.name = "SupabaseTimeoutError";
+  }
+}
+
+/** Whether a Supabase call in `context` (default: the current request) hit its time limit before answering. */
+export function supabaseTimedOut(context: RequestContext | undefined = currentRequest()): boolean {
+  return context?.supabaseTimeout !== undefined;
+}
 
 /** The name of a call that isn't one of the shapes below. */
 export const OTHER_SUPABASE_SPAN = "supabase.other";
@@ -132,25 +185,70 @@ export function supabaseSpanName(input: Parameters<typeof fetch>[0], init?: Para
 /** The global `fetch`, looked up at call time (as supabase-js does by default), so a stub in a test still applies. */
 const globalFetch: typeof fetch = (...args) => fetch(...args);
 
+export type TracedFetchOptions = {
+  /** The call's time limit; default {@link SUPABASE_TIMEOUT_MS}. The worker passes its own (worker-store.ts). */
+  timeoutMs?: number;
+};
+
+/** The signal a call was given: `init`'s, else the `Request`'s own. */
+function callerSignal(input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1]): AbortSignal | undefined {
+  if (init?.signal) return init.signal;
+  return typeof Request !== "undefined" && input instanceof Request ? input.signal : undefined;
+}
+
 /**
  * A `fetch` that times each call to `inner` as a span named by {@link supabaseSpanName}, with
  * `status` when the answer is 400 or more and `error: true` when `inner` throws (rethrown
- * unchanged). Outside a request it calls `inner` and nothing else.
+ * unchanged). Outside a request nothing is recorded.
+ *
+ * Inside or outside a request, a call whose headers haven't arrived within `timeoutMs` (or
+ * {@link LONG_WRITE_TIMEOUT_MS} inside {@link withLongTimeLimit}) is aborted
+ * and rejects with a {@link SupabaseTimeoutError} (whether or not `inner` heeds the signal), after
+ * one `supabase_timeout` line at `warn` and a mark on the request (`supabaseTimeout`, the span's
+ * name), so a route answers 504 (`withUser`). A body still being read when the limit runs out is
+ * aborted too, without a line: the library reading it reports the failure.
  */
-export function createTracedFetch(inner: typeof fetch = globalFetch): typeof fetch {
+export function createTracedFetch(inner: typeof fetch = globalFetch, { timeoutMs: clientLimit = SUPABASE_TIMEOUT_MS }: TracedFetchOptions = {}): typeof fetch {
   return async (...args: Parameters<typeof fetch>) => {
+    const [input, init] = args;
     const context = currentRequest();
-    if (!context) return inner(...args);
+    const name = supabaseSpanName(input, init);
+    const timeoutMs = limitStore.getStore() ?? clientLimit;
 
-    const name = supabaseSpanName(args[0], args[1]);
+    const limit = new AbortController();
+    let answered = false;
+    let giveUp: (error: SupabaseTimeoutError) => void = () => undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      giveUp = reject;
+    });
+    const timer = setTimeout(() => {
+      // Answered in time: only a body still being read is stopped.
+      if (answered) return limit.abort();
+      const error = new SupabaseTimeoutError(name, timeoutMs);
+      const warn = () => log.warn("supabase_timeout", { span: name, limitMs: timeoutMs });
+      // Inside the request's context, so the line carries its id however the timer was run.
+      if (context) {
+        context.supabaseTimeout ??= name;
+        runWithRequestContext(context, warn);
+      } else warn();
+      limit.abort(error);
+      giveUp(error);
+    }, timeoutMs);
+    // Like `AbortSignal.timeout`, the limit never keeps the process alive on its own.
+    if (typeof timer === "object") timer.unref();
+
+    const own = callerSignal(input, init);
+    const signal = own ? AbortSignal.any([own, limit.signal]) : limit.signal;
     const startedAt = performance.now();
     let response: Response;
     try {
-      response = await inner(...args);
+      response = await Promise.race([inner(input, { ...init, signal }), timedOut]);
     } catch (error) {
+      clearTimeout(timer);
       recordSpan(name, performance.now() - startedAt, { error: true }, context);
       throw error;
     }
+    answered = true;
     let status: number | undefined;
     try {
       status = response.status >= 400 ? response.status : undefined;
@@ -162,5 +260,5 @@ export function createTracedFetch(inner: typeof fetch = globalFetch): typeof fet
   };
 }
 
-/** The traced global `fetch`, for every Supabase client. */
+/** The traced global `fetch`, with the web app's time limit, for every Supabase client. */
 export const tracedFetch: typeof fetch = createTracedFetch();

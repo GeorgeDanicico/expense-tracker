@@ -2,7 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import { apiRequest } from "@/lib/api/client";
+import { apiRequest, LONG_REQUEST_TIMEOUT_MS } from "@/lib/api/client";
 import {
   FAMILY_API_KEY,
   FAMILY_INVITES_API_KEY,
@@ -45,6 +45,8 @@ export type FamilyApi = {
 };
 
 const json = (body: unknown) => JSON.stringify(body);
+/** Creating and deleting a kid's account are long writes on the server: wait for its answer. */
+const LONG = { timeoutMs: LONG_REQUEST_TIMEOUT_MS };
 
 export const restFamilyApi: FamilyApi = {
   createFamily: (name) => apiRequest<FamilyResponse>(FAMILY_API_KEY, { method: "POST", body: json({ name }) }),
@@ -53,7 +55,7 @@ export const restFamilyApi: FamilyApi = {
   },
   previewInvite: (code) => apiRequest<InvitePreviewView>(FAMILY_JOIN_PREVIEW_API_URL, { method: "POST", body: json({ code }) }),
   joinFamily: (code) => apiRequest<FamilyResponse>(FAMILY_JOIN_API_URL, { method: "POST", body: json({ code }) }),
-  createKid: (input) => apiRequest<FamilyResponse>(FAMILY_KIDS_API_URL, { method: "POST", body: json(input) }),
+  createKid: (input) => apiRequest<FamilyResponse>(FAMILY_KIDS_API_URL, { method: "POST", body: json(input) }, LONG),
   createInvite: (input) =>
     apiRequest<CreatedInvite>(FAMILY_INVITES_API_KEY, {
       method: "POST",
@@ -69,7 +71,7 @@ export const restFamilyApi: FamilyApi = {
     await apiRequest<unknown>(familyMemberPasswordApiUrl(memberId), { method: "POST", body: json({ password }) });
   },
   deleteKidAccount: (memberId, input) =>
-    apiRequest<FamilyResponse>(familyMemberAccountApiUrl(memberId), { method: "DELETE", body: json(input) }),
+    apiRequest<FamilyResponse>(familyMemberAccountApiUrl(memberId), { method: "DELETE", body: json(input) }, LONG),
   setPermissions: (memberId, permissions) =>
     apiRequest<FamilyResponse>(familyMemberPermissionsApiUrl(memberId), { method: "PATCH", body: json({ permissions }) }),
   setColor: (memberId, color) => apiRequest<FamilyResponse>(familyMemberColorApiUrl(memberId), { method: "PATCH", body: json({ color }) }),

@@ -12,7 +12,8 @@ import { runWithRequestMemo, type RequestMemo } from "@/lib/request-memo";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { authCookieOptions } from "@/lib/supabase/cookie-options";
 
-// Every client built here is given `tracedFetch`, so its calls are spans in the request line (logging plan, L4).
+// Every client built here is given `tracedFetch`, so its calls are spans in the request line (logging plan, L4)
+// with a time limit, and `db: { retry: false }` (docs/lint-rules.md#supabase-client-options).
 
 const scopedClient = new AsyncLocalStorage<SupabaseClient<Database>>();
 
@@ -45,6 +46,7 @@ function createTokenClient(token: string): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
   return createSupabaseClient<Database>(url, publishableKey, {
     global: { headers: { Authorization: `Bearer ${token}` }, fetch: tracedFetch },
+    db: { retry: false },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
@@ -94,6 +96,7 @@ export async function createClient(): Promise<SupabaseClient<Database>> {
     publishableKey,
     {
       global: { fetch: tracedFetch },
+      db: { retry: false },
       cookieOptions: authCookieOptions(),
       cookies: {
         getAll() {

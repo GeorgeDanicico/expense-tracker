@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient as createSupabaseClient, isAuthRetryableFetchError, type SupabaseClient } from "@supabase/supabase-js";
 
 import type {
   AppTokenUser,
@@ -91,6 +91,7 @@ export function createSessionClient(): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
   return createSupabaseClient<Database>(url, publishableKey, {
     global: { fetch: tracedFetch },
+    db: { retry: false },
     auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
   });
 }
@@ -104,6 +105,7 @@ export function createThrowawayClient(): SupabaseClient<Database> {
   const { url, publishableKey } = getSupabaseConfig();
   return createSupabaseClient<Database>(url, publishableKey, {
     global: { fetch: tracedFetch },
+    db: { retry: false },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
@@ -160,6 +162,9 @@ export const supabaseAuth: AuthService = {
     const supabase = await createClient();
     const { data, error } = token === null ? await supabase.auth.getClaims() : await supabase.auth.getClaims(token);
 
+    // Auth couldn't be asked (no connection, a 5xx from the gateway, or out of time, SupabaseTimeoutError):
+    // who this is is unknown, not "nobody".
+    if (error && isAuthRetryableFetchError(error)) throw new Error("Unable to check the session.", { cause: error });
     if (error || !data?.claims?.sub) {
       return null;
     }

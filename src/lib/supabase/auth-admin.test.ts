@@ -17,6 +17,7 @@ vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createSupabaseClie
 
 import { getAuthAdmin } from "@/lib/auth";
 import { tracedFetch } from "@/lib/log/traced-fetch";
+import { createAdminClient } from "@/lib/supabase/admin-client";
 import { createSupabaseAuthAdmin } from "@/lib/supabase/auth-admin";
 
 const SECRET_KEY = "sb_secret_test_key";
@@ -75,8 +76,19 @@ describe("Supabase AuthAdmin", () => {
 
       expect(mocks.createSupabaseClient).toHaveBeenCalledExactlyOnceWith("http://supabase.test", SECRET_KEY, {
         global: { fetch: tracedFetch },
+        db: { retry: false },
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
+    });
+
+    it("gets its own traced fetch when given another time limit (the worker's)", () => {
+      mocks.createSupabaseClient.mockReturnValue({});
+
+      createAdminClient({ timeoutMs: 20_000 });
+
+      const { global } = mocks.createSupabaseClient.mock.calls[0][2];
+      expect(typeof global.fetch).toBe("function");
+      expect(global.fetch).not.toBe(tracedFetch);
     });
 
     it.each([
@@ -370,6 +382,7 @@ describe("Supabase AuthAdmin", () => {
       expect(sessionAuth.verifyOtp).toHaveBeenCalledExactlyOnceWith({ token_hash: "hashed-token-1", type: "email" });
       expect(mocks.createSupabaseClient).toHaveBeenCalledWith("http://supabase.test", PUBLISHABLE_KEY, {
         global: { fetch: tracedFetch },
+        db: { retry: false },
         auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
       });
       expect(await session?.isActive()).toBe(true);
@@ -484,6 +497,7 @@ describe("Supabase AuthAdmin", () => {
       // The token is redeemed on a client that keeps no session and never refreshes one.
       expect(mocks.createSupabaseClient).toHaveBeenCalledWith("http://supabase.test", PUBLISHABLE_KEY, {
         global: { fetch: tracedFetch },
+        db: { retry: false },
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
       expect(throwawayAuth.signInWithOtp).not.toHaveBeenCalled();

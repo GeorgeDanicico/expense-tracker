@@ -1,7 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const logged = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")).memoryLogModule(await importOriginal(), logged));
 
 import { createRequestContext, runWithRequestContext } from "@/lib/log/request-context";
-import { createTracedFetch, supabaseSpanName } from "@/lib/log/traced-fetch";
+import {
+  createTracedFetch,
+  LONG_WRITE_TIMEOUT_MS,
+  SUPABASE_TIMEOUT_MS,
+  SupabaseTimeoutError,
+  supabaseSpanName,
+  supabaseTimedOut,
+  withLongTimeLimit,
+} from "@/lib/log/traced-fetch";
+import { loggedLines } from "@/test/log-lines";
 
 const BASE = "https://abcdefghijklmnop.supabase.co";
 const UUID = "6c3f4a8e-2b1d-4c5e-9f70-1a2b3c4d5e6f";
@@ -90,7 +102,7 @@ describe("createTracedFetch", () => {
     return runWithRequestContext(context, fn).then((result) => ({ result, spans: context.spans, context }));
   }
 
-  it("passes the arguments through untouched and returns the very same response", async () => {
+  it("passes the arguments through, adding only the time limit's signal, and returns the very same response", async () => {
     const response = new Response("[]", { status: 200 });
     const inner = vi.fn<typeof fetch>(async () => response);
     const traced = createTracedFetch(inner);
@@ -100,19 +112,19 @@ describe("createTracedFetch", () => {
     const { result, spans } = await inContext(() => traced(url, init));
 
     expect(result).toBe(response);
-    expect(inner).toHaveBeenCalledExactlyOnceWith(url, init);
-    expect(inner.mock.calls[0][1]).toBe(init);
+    expect(inner).toHaveBeenCalledExactlyOnceWith(url, { ...init, signal: expect.any(AbortSignal) });
+    expect(inner.mock.calls[0][1]?.headers).toBe(init.headers);
     expect(spans).toEqual([{ name: "db.expenses.get", ms: expect.any(Number) }]);
   });
 
-  it("passes a single argument as a single argument", async () => {
+  it("passes a Request through as it came, with the signal beside it", async () => {
     const inner = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
     const request = new Request(`${BASE}/rest/v1/expenses`, { method: "DELETE" });
 
     const { spans } = await inContext(() => createTracedFetch(inner)(request));
 
-    expect(inner.mock.calls[0]).toEqual([request]);
     expect(inner.mock.calls[0][0]).toBe(request);
+    expect(inner.mock.calls[0][1]).toEqual({ signal: expect.any(AbortSignal) });
     expect(spans).toEqual([{ name: "db.expenses.delete", ms: expect.any(Number) }]);
   });
 
@@ -144,7 +156,7 @@ describe("createTracedFetch", () => {
     expect(context.spanTotals).toMatchObject({ dbCalls: 2 });
   });
 
-  it("only calls through outside a request", async () => {
+  it("only calls through outside a request, recording nothing", async () => {
     const response = new Response("[]");
     const inner = vi.fn(async () => response);
 
@@ -165,5 +177,140 @@ describe("createTracedFetch", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("the time limit", () => {
+  const URL_ = `${BASE}/rest/v1/expenses?select=*`;
+
+  beforeEach(() => {
+    logged.length = 0;
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** An inner fetch that never answers unless its signal aborts, as a hung gateway does. */
+  function hung() {
+    return vi.fn<typeof fetch>(
+      (_input, init) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+        }),
+    );
+  }
+
+  it("is 4 s on the web, under two in a row of the browser's 8 s slow notice", () => {
+    expect(SUPABASE_TIMEOUT_MS).toBe(4_000);
+  });
+
+  it("gives up on a call with no answer after the limit, with a SupabaseTimeoutError, one warn line and a mark on the request", async () => {
+    const inner = hung();
+    const context = createRequestContext(new Request("http://localhost/api/expenses"));
+    const call = runWithRequestContext(context, () => createTracedFetch(inner)(URL_));
+    const settled = call.catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS - 1);
+    expect(logged).toEqual([]);
+    expect(supabaseTimedOut(context)).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    const error = await settled;
+    expect(error).toBeInstanceOf(SupabaseTimeoutError);
+    expect(error).toMatchObject({ name: "SupabaseTimeoutError", span: "db.expenses.get", limitMs: 4_000, message: "Supabase didn't answer db.expenses.get within 4000 ms." });
+    expect(inner.mock.calls[0][1]?.signal?.aborted).toBe(true);
+    expect(context.spans).toEqual([{ name: "db.expenses.get", ms: expect.any(Number), error: true }]);
+    expect(supabaseTimedOut(context)).toBe(true);
+    expect(context.supabaseTimeout).toBe("db.expenses.get");
+    expect(loggedLines(logged, "supabase_timeout")).toEqual([
+      expect.objectContaining({ level: "warn", span: "db.expenses.get", limitMs: 4_000, requestId: context.requestId }),
+    ]);
+  });
+
+  it("ends the call even when the inner fetch ignores the signal", async () => {
+    const traced = createTracedFetch(() => new Promise<Response>(() => undefined));
+    const settled = traced(URL_).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
+    expect(await settled).toBeInstanceOf(SupabaseTimeoutError);
+  });
+
+  it("applies outside a request too (the proxy, a page render), logging without a request id", async () => {
+    const settled = createTracedFetch(hung())(`${BASE}/auth/v1/user`).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
+    expect(await settled).toMatchObject({ span: "auth.user" });
+    expect(loggedLines(logged, "supabase_timeout")).toEqual([expect.objectContaining({ span: "auth.user", limitMs: 4_000 })]);
+    expect(loggedLines(logged, "supabase_timeout")[0]).not.toHaveProperty("requestId");
+  });
+
+  it("takes another limit when given one (the worker's)", async () => {
+    const settled = createTracedFetch(hung(), { timeoutMs: 20_000 })(URL_).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
+    expect(logged).toEqual([]);
+    await vi.advanceTimersByTimeAsync(20_000 - SUPABASE_TIMEOUT_MS);
+    expect(await settled).toMatchObject({ limitMs: 20_000 });
+  });
+
+  it("writes nothing and marks nothing for a call that answered in time, even once the limit passes", async () => {
+    const response = new Response("[]");
+    const context = createRequestContext(undefined);
+    const inner = vi.fn<typeof fetch>(async () => response);
+
+    expect(await runWithRequestContext(context, () => createTracedFetch(inner)(URL_))).toBe(response);
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS * 2);
+    expect(logged).toEqual([]);
+    expect(supabaseTimedOut(context)).toBe(false);
+  });
+
+  it("still covers the body: a body read past the limit is aborted, silently", async () => {
+    const inner = vi.fn<typeof fetch>(async () => new Response("[]"));
+    await createTracedFetch(inner)(URL_);
+    const signal = inner.mock.calls[0][1]?.signal;
+
+    expect(signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
+    expect(signal?.aborted).toBe(true);
+    expect(logged).toEqual([]);
+  });
+
+  it("stops at the caller's own abort with the caller's error, and isn't a timeout", async () => {
+    const caller = new AbortController();
+    const context = createRequestContext(undefined);
+    const settled = runWithRequestContext(context, () => createTracedFetch(hung())(URL_, { signal: caller.signal })).catch((error: unknown) => error);
+    const reason = new Error("the caller gave up");
+
+    caller.abort(reason);
+    expect(await settled).toBe(reason);
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
+    expect(logged).toEqual([]);
+    expect(supabaseTimedOut(context)).toBe(false);
+  });
+
+  it("gives the calls inside withLongTimeLimit 30 s, whatever the client's own limit, and only those", async () => {
+    const settled = withLongTimeLimit(() => createTracedFetch(hung(), { timeoutMs: 20_000 })(URL_)).catch((error: unknown) => error);
+    const after = createTracedFetch(hung())(URL_).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
+    expect(await after).toMatchObject({ limitMs: SUPABASE_TIMEOUT_MS });
+    await vi.advanceTimersByTimeAsync(20_000 - SUPABASE_TIMEOUT_MS);
+    expect(loggedLines(logged, "supabase_timeout")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(LONG_WRITE_TIMEOUT_MS - 20_000);
+    expect(await settled).toMatchObject({ limitMs: LONG_WRITE_TIMEOUT_MS, message: "Supabase didn't answer db.expenses.get within 30000 ms." });
+  });
+
+  it("keeps the first call that ran out of time when several do", async () => {
+    const context = createRequestContext(undefined);
+    const traced = createTracedFetch(hung());
+    const both = runWithRequestContext(context, () =>
+      Promise.allSettled([traced(`${BASE}/rest/v1/rpc/get_my_membership`, { method: "POST" }), traced(`${BASE}/rest/v1/profiles`)]),
+    );
+
+    await vi.advanceTimersByTimeAsync(SUPABASE_TIMEOUT_MS);
+    await both;
+    expect(context.supabaseTimeout).toBe("rpc.get_my_membership");
+    expect(loggedLines(logged, "supabase_timeout")).toHaveLength(2);
   });
 });
