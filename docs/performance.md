@@ -56,6 +56,7 @@ this list only when you say you did it. None of them blocks anything that is mer
 | PF11 | Smooth interaction | done, except the first open of a lazy sheet (about 250 ms on the 4x CPU, see PF11 section 4); React Compiler tried and dropped | #237 |
 | PF12 | Lean runtime on the VPS | done, except the VPS numbers (the worker's heap limit is now 153 MB, the web container's stays on Node's own 432 MB, `preloadEntriesOnStart` stays on: it would save 23 MB, the bar is 50) | #238 |
 | PF13 | Measure and close | done, except the production measurement (row 1) | #239 |
+| PF13 follow-up | Expenses' first rows undimmed | done | #240 |
 
 ## The short version
 
@@ -68,9 +69,9 @@ on the VPS (row 1 of "Waiting for George"), and until you run it, "fast" here me
 
 - **Opening Home, Expenses, To-dos or Reminders on a slow phone.** On an emulated phone on slow 4G
   your data used to appear at 7.4 to 8.0 s, after the scripts and two round trips in a row. It now
-  arrives with the page, at about **1.4 s** (Home 1.35, To-dos 1.37, Reminders 1.36). Expenses shows
-  its first rows at about 1.4 s too, but dimmed until the scripts arrive (5.9 s): a side effect of
-  PF11 found by this task (PF13 section 7).
+  arrives with the page, at about **1.4 s** (Home 1.35, To-dos 1.37, Reminders 1.36). Expenses did
+  show its first rows at about 1.4 s too, but dimmed until the scripts arrived (5.9 s): a side effect
+  of PF11 that PF13 found. Fixed by #240: the rows are at full strength from the first paint (1.41 s).
 - **Signed out.** A visit to any page is a redirect to the sign-in page from the server, with none of
   the app's code (PF5).
 - **Tapping a tab** shows that page's skeleton about 60 ms later, and moving between Home, Expenses,
@@ -109,7 +110,7 @@ The full comparison, with the budgets and a pass or fail for each, is in PF13 se
 
 **What's left:** the VPS sitting (row 1), the exposed commit `ae29d84` (row 2), "Add a kid" in
 production (row 3), the signing keys (row 4) and the budgets (row 5). Then the follow-ups in PF13
-section 7: the dimmed first rows, a time limit on the server's own Supabase calls, and the four pages
+section 7: a time limit on the server's own Supabase calls, and the four pages
 still loaded in the browser. The one-line summary of each task:
 
 | Task | In one line |
@@ -4044,7 +4045,7 @@ has never been measured at all, because the VPS is behind Tailscale and this wor
 
 What a person would have seen if this task hadn't run: a phase marked "done" in the roadmap with
 nothing saying which of its goals were checked, and two problems nobody had noticed (section 7: the
-Expenses list is dimmed on a cold load, and a server-loaded page whose API is down can show its
+Expenses list is dimmed on a cold load (fixed since, #240), and a server-loaded page whose API is down can show its
 skeleton for 11 to 40 s).
 
 #### 2. What changed
@@ -4080,7 +4081,7 @@ skeleton for 11 to 40 s).
   | Number | Comparable? |
   | --- | --- |
   | Home "content visible" | Yes. PF1b ran before PF3, when the month card's title was drawn only with its data, so it timed the data. PF6 then fixed the marker to the month's total once the title became part of the skeleton; the number now is that |
-  | Expenses "content visible" | **No, and it reads worse than it is.** The marker ignores anything inside a loading placeholder (`aria-busy`). Since PF11, a cold load draws the first 30 rows dimmed and marked busy until the scripts arrive and the rest are drawn (5.9 s on slow 4G). The rows are on screen from about 1.4 s. Section 7 has the evidence |
+  | Expenses "content visible" | **No, and it reads worse than it is.** The marker ignores anything inside a loading placeholder (`aria-busy`). Since PF11, a cold load draws the first 30 rows dimmed and marked busy until the scripts arrive and the rest are drawn (5.9 s on slow 4G). The rows were on screen from about 1.4 s. Section 7 has the evidence. Fixed by #240: the number is now 1.4 s |
   | To-dos and Reminders "LCP" | The LCP element is the page's subtitle both before and now (PF1b's finding). Judge them by "content visible" |
   | Lighthouse FCP | Not used. PF1b showed it is wrong for these pages (it says 0.9 s on every one); I use the observed first paint and FCP |
   | Lighthouse LCP | Comparable to PF1b's baseline only at the same delay. PF1b's slow-4G table was at 0 ms; PF6 and PF9 measured at 40 ms. Both are given |
@@ -4147,7 +4148,7 @@ baseline" ("The baseline: like production today"), after is PF13. Milliseconds u
 | JS on the wire, whole cold load, KiB | 409.6 → 451.9 | 437.8 → 479.5 | 427.4 → 451.0 | 408.3 → 451.4 | 437.8 → 479.5 |
 | Data in the first HTML | no → **yes** | no → **yes** | no → **yes** | no → **yes** | no → **yes** |
 
-† Not comparable: the Expenses rows are on screen from about 1.4 s but dimmed, and the marker doesn't count a
+† Not comparable (before #240): the Expenses rows are on screen from about 1.4 s but dimmed, and the marker doesn't count a
 dimmed ("busy") list until the scripts arrive. Section 7 has a measurement of that. The number to compare is
 "FCP" and "LCP" for the page, and the data's time in the CPU-only table below, where the same effect is smaller.
 
@@ -4362,7 +4363,7 @@ Don't stop Supabase to test the others.
 3. `node scripts/lab/first-render.mjs /expenses --users parent,kid --widths 390`: the data strings are in the page's own markup and no data request is made.
 4. `node scripts/lab/skeletons.mjs /dashboard 390 --tap /expenses`: the skeleton 60 ms after the tap.
 5. The refused valuation by hand: open Net worth in the lab (`.lab/users.json` has the sign-ins), in devtools block `*valuations*`, then Add value: the row shows the value, drops it, and the sheet says the save failed.
-6. The dimmed list: devtools, throttling "Slow 4G" and CPU 4x slowdown, open `/expenses`: the list is greyed until the scripts arrive.
+6. The dimmed list (fixed, #240): devtools, throttling "Slow 4G" and CPU 4x slowdown, open `/expenses`: the list is at full strength from the first paint. Switch month: the old rows dim until the new ones are in.
 7. The down API: `docker stop supabase_rest_expense-tracker-lab`, tap Expenses from Home and time the skeleton. `docker start supabase_rest_expense-tracker-lab` after.
 8. `npm run lab -- down`.
 
@@ -4387,7 +4388,7 @@ Don't stop Supabase to test the others.
 | **Insights, Investments, Net worth and Calendar are still loaded in the browser.** Their data is on screen at about 6.2 to 6.8 s on slow 4G; **Investments (0.107) and Net worth (0.105) jump over the 0.1 CLS limit**; Calendar makes 7 API requests and 54 Supabase calls per load | PF7 left them as the plan said ("next" pages) and PF10 left the SQL alone. They have no server-first loader | **A later plan** using "The pattern for PF7", Calendar first (most requests), then Insights, Investments and Net worth. Not phase 18: that is clean-up |
 | **Every signed-in request makes 2 Auth calls** (a cold load 7 to 11) | The shared-secret JWT: `getClaims()` has to ask Auth. Asymmetric keys make it 0 and the first byte 90 to 106 ms sooner (4.2) | **Row 4**, a project setting. Not code |
 | **Three routes over 300 ms in the lab:** the Everything tab 401 ms (354 with asymmetric keys), "calendar PATCH all (series)" 447 ms (410), "todo move" 334 ms. Medians of 5 with 40 ms to Supabase, not p95s | The Everything tab's answer is 629 KB from four reads (PF10); the two writes touch several rows in a row, each costing 40 ms in the lab. PF10 found no index that helps | **Wait for row 1's p95 per route** (and row 7). If any is over in production: phase 18 (paging the Everything tab; batching the series write) |
-| **Expenses' first rows are dimmed on a cold load** (new) | See below | **A small follow-up PR to PF11**, before the production measurement if you want its LCP and INP clean |
+| **Expenses' first rows were dimmed on a cold load** (fixed, #240) | See below | **Fixed by #240** (a follow-up to PF11): the first render is no longer dimmed; "content visible" is 1,405 ms again |
 | **A server-loaded page whose API is down or hung can show its skeleton for 11 to 40 s or more** (new) | See below | **A small follow-up**, at the latest phase 18 |
 | The whole cold load downloads 10% more JavaScript than at the baseline (Home 409.6 → 451.9 KiB), though the first load fell 25% | PF9's finding: the code left the first load, and arrives afterwards (menus, sheets, prefetched pages, PF11's idle preloads). Not a budget | Nothing |
 
@@ -4404,6 +4405,24 @@ at full strength, which is why "content visible" for Expenses reads 5.9 s above)
 in `src/components/expenses/expense-rows.tsx`: the first render, which is the server's HTML and the hydration, is always the "initial" 30 rows, so
 `rows !== expenses` and the list is "stale" (dimmed, `aria-busy`) until the second step, which has to wait for the scripts. PF11 measured taps, not a cold
 load, so it couldn't see this, and the dimming is meant for a month switch. The fix is small: don't dim on the first render. It isn't done here because this task changes no app code.
+
+**Fixed in #240.** "Stale" now means "the rows on screen are an earlier list that the new one hasn't replaced yet", so the first 30 rows
+(`firstRows`, kept in state, the initial value of `useDeferredValue`) are never stale: `stale = rows !== expenses && rows !== firstRows`.
+A month switch, a filter or a search still dims the old rows until the new ones are in, which is what the dimming is for. I turned down
+a "has hydrated" flag (an effect and an extra render for the same result). One gap: a change that arrives before the second step has
+drawn the full list shows the first 30 rows undimmed for that moment. Test: `expense-rows.test.tsx` ("ExpenseRows dimming"): the first
+draw never sets `aria-busy`, a later list does and then clears it; the first test fails on the old code. No lint rule: it is the only
+two-argument `useDeferredValue` in the code, and what went wrong (comparing the deferred value with its input) is a meaning, not a shape a rule can pick out without
+flagging correct uses. Measured on the fixed build, `npm run lab:measure -- /expenses --user parent --runs 3` (slow 4G, as above):
+
+| Expenses | Before the fix (PF13) | After |
+| --- | ---: | ---: |
+| Content visible | 5,903 ±11 | **1,405** ±72 (runs 1,397, 1,540, 1,405) |
+| All placeholders gone | 5,903 | 1,405: nothing is marked busy at any point of the load |
+| LCP (observed) | 1,448 | 1,632 ±220 (the lab's own runs vary; the same element) |
+
+Not re-measured: the month switch and Filters taps (`interactions.mjs`); the change doesn't touch how the rows are drawn in two steps, only the
+dimming. The new number is the first rows' own time; the full list still arrives with the scripts.
 
 **New finding 2: the server has no time limit on its own calls to Supabase, and an outage takes long to show.**
 `fetchWithTimeout` (15 s, PF2) covers only the browser's own requests (`src/lib/api/client.ts`); a server-rendered page waits for

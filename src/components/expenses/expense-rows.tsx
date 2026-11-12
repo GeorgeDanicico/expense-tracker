@@ -2,7 +2,7 @@
 
 import { Box, Stack } from "@chakra-ui/react";
 import { Pencil, Trash2 } from "lucide-react";
-import { memo, useDeferredValue, useMemo, type KeyboardEvent } from "react";
+import { memo, useDeferredValue, useMemo, useState, type KeyboardEvent } from "react";
 
 import { CategoryTile } from "@/components/expenses/category-visual";
 import { Amount } from "@/components/ui/amount";
@@ -126,8 +126,11 @@ export function ExpenseRows({
   // A long list (a month's few hundred rows) draws its first rows at once and the rest right after, in pieces the
   // browser can interrupt, and a different list (another month, a search) is drawn the same way while the old rows stay,
   // dimmed, until the new ones are in. Drawing them all in the tap that asked for them took most of a second [S12].
-  const rows = useDeferredValue(expenses, expenses.slice(0, FIRST_ROWS));
-  const stale = rows !== expenses;
+  // The first rows are the list's first draw (server render and hydration), not a list left behind, so they aren't dimmed:
+  // the rows dim only when what is shown is an earlier list that a change (month, filter, search) has not replaced yet.
+  const [firstRows] = useState(() => expenses.slice(0, FIRST_ROWS));
+  const rows = useDeferredValue(expenses, firstRows);
+  const stale = rows !== expenses && rows !== firstRows;
   const groups = useMemo(() => groupByDay(rows), [rows]);
   const hidden = actions?.hidden;
   // Only the two callbacks go to the rows, so a row that is deleted (the `hidden` set changes) doesn't render the others again.
