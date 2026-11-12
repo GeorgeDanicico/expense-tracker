@@ -57,7 +57,7 @@ this list only when you say you did it. None of them blocks anything that is mer
 | PF12 | Lean runtime on the VPS | done, except the VPS numbers (the worker's heap limit is now 153 MB, the web container's stays on Node's own 432 MB, `preloadEntriesOnStart` stays on: it would save 23 MB, the bar is 50) | #238 |
 | PF13 | Measure and close | done, except the production measurement (row 1) | #239 |
 | PF13 follow-up | Expenses' first rows undimmed | done | #240 |
-| PF13 follow-up | A time limit on the server's Supabase calls | done | #PRNUM |
+| PF13 follow-up | A time limit on the server's Supabase calls | done | #241 |
 
 ## The short version
 
@@ -78,7 +78,7 @@ on the VPS (row 1 of "Waiting for George"), and until you run it, "fast" here me
 - **Tapping a tab** shows that page's skeleton about 60 ms later, and moving between Home, Expenses,
   To-dos and Reminders makes no request from the browser (PF3, PF8).
 - **Nothing spins forever.** A page loaded in the browser says "taking longer than usual" at 8 s and
-  shows an error with a retry at about 15 s (PF2). Since #PRNUM the server gives up on a Supabase call
+  shows an error with a retry at about 15 s (PF2). Since #241 the server gives up on a Supabase call
   after 4 s too: with Supabase hung, a page loaded on the server shows its error with Try again at about
   8 s (it showed its skeleton for 75 s and more), and with the API failing, within about 4 s (was 10 to
   60 s). An outage of Supabase Auth is an error page now, not the sign-in page.
@@ -113,7 +113,7 @@ The full comparison, with the budgets and a pass or fail for each, is in PF13 se
 
 **What's left:** the VPS sitting (row 1), the exposed commit `ae29d84` (row 2), "Add a kid" in
 production (row 3), the signing keys (row 4) and the budgets (row 5). Then the follow-up in PF13
-section 7: the four pages still loaded in the browser (the server's time limit is done, #PRNUM). The one-line summary of each task:
+section 7: the four pages still loaded in the browser (the server's time limit is done, #241). The one-line summary of each task:
 
 | Task | In one line |
 | --- | --- |
@@ -4391,7 +4391,7 @@ Don't stop Supabase to test the others.
 | **Every signed-in request makes 2 Auth calls** (a cold load 7 to 11) | The shared-secret JWT: `getClaims()` has to ask Auth. Asymmetric keys make it 0 and the first byte 90 to 106 ms sooner (4.2) | **Row 4**, a project setting. Not code |
 | **Three routes over 300 ms in the lab:** the Everything tab 401 ms (354 with asymmetric keys), "calendar PATCH all (series)" 447 ms (410), "todo move" 334 ms. Medians of 5 with 40 ms to Supabase, not p95s | The Everything tab's answer is 629 KB from four reads (PF10); the two writes touch several rows in a row, each costing 40 ms in the lab. PF10 found no index that helps | **Wait for row 1's p95 per route** (and row 7). If any is over in production: phase 18 (paging the Everything tab; batching the series write) |
 | **Expenses' first rows were dimmed on a cold load** (fixed, #240) | See below | **Fixed by #240** (a follow-up to PF11): the first render is no longer dimmed; "content visible" is 1,405 ms again |
-| **A server-loaded page whose API is down or hung can show its skeleton for 11 to 40 s or more** (new; fixed, #PRNUM) | See below | **Fixed by #PRNUM**: a 4 s limit on each of the server's Supabase calls; the error now shows at about 4 s (API failing) or 8 s (hung) |
+| **A server-loaded page whose API is down or hung can show its skeleton for 11 to 40 s or more** (new; fixed, #241) | See below | **Fixed by #241**: a 4 s limit on each of the server's Supabase calls; the error now shows at about 4 s (API failing) or 8 s (hung) |
 | The whole cold load downloads 10% more JavaScript than at the baseline (Home 409.6 → 451.9 KiB), though the first load fell 25% | PF9's finding: the code left the first load, and arrives afterwards (menus, sheets, prefetched pages, PF11's idle preloads). Not a budget | Nothing |
 
 **New finding 1: the Expenses list is dimmed while the scripts load.** On the emulated phone on slow 4G,
@@ -4436,7 +4436,7 @@ A stopped container in Docker may behave unlike an unreachable Supabase (Kong ma
 skeleton "stays" for a hung gateway; PF5 to PF7 made more pages depend on it. A 15 s `AbortSignal` on the server's Supabase client, and finding why
 the page waits after the server has failed, is the follow-up.
 
-**Fixed in #PRNUM.** What a person notices: when Supabase hangs, a page shows "We couldn't load this page" with Try again
+**Fixed in #241.** What a person notices: when Supabase hangs, a page shows "We couldn't load this page" with Try again
 after about 8 s instead of a skeleton that never ends; when it fails, after about 4 s at most instead of 10 to 60 s.
 
 *Why the tab tap waited (the cause I was asked to find).* Nothing waits between the server and the page. The wait is in the lab's
@@ -4523,7 +4523,7 @@ check is a 500 or 504, never a 401. `src/lib/supabase/auth.test.ts`: `getCurrent
 447 ms), but production's p95 per route isn't measured yet (row 1); a `supabase_timeout` line in production is the sign. A big statement import or
 an account deletion are the likeliest to come near it. The number is one constant, `SUPABASE_TIMEOUT_MS`. The 504 mark is per request: if a call
 times out and the route handles it and then fails for another reason, it still answers 504. During an Auth outage people now see an error page
-instead of the sign-in page, which is the point, but it is a change. Undo: revert #PRNUM.
+instead of the sign-in page, which is the point, but it is a change. Undo: revert #241.
 
 *Left open.* Not measured in production (row 1). A tap to a page loaded in the browser can take three limits in a row while Supabase is hung
 (12.1 s above: its page request, then its API read's two); still under the browser's 15 s, but past 8 s. A body that stalls after its headers is
