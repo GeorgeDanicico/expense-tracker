@@ -64,7 +64,7 @@ describe("the loopback guard", () => {
   });
 
   it("checks every *_URL variable, not only the two the app needs", () => {
-    const env = { SUPABASE_URL: "http://127.0.0.1:54400", SITE_URL: "http://localhost:3110", LAB_SUPABASE_DIRECT_URL: "https://abcdefghijklmnop.supabase.co", PRICE_SERVICE_URL: "http://127.0.0.1:1" };
+    const env = { SUPABASE_URL: "http://127.0.0.1:54400", SITE_URL: "http://localhost:3110", LAB_SUPABASE_DIRECT_URL: "https://abcdefghijklmnop.supabase.co", OTHER_SERVICE_URL: "http://127.0.0.1:1" };
     expect(guardProblems(env)).toEqual([expect.stringMatching(/^LAB_SUPABASE_DIRECT_URL points at abcdefghijklmnop/)]);
     expect(guardProblems({ SUPABASE_URL: "http://127.0.0.1:54400" })).toEqual(["SITE_URL is not set"]);
   });

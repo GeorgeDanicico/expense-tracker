@@ -116,8 +116,14 @@ export const serverEnvSchema = z.object({
    * two in a row; 0 trusts the header not at all and puts every client in one shared bucket.
    */
   TRUSTED_PROXY_HOPS: optionalInteger({ fallback: DEFAULT_TRUSTED_PROXY_HOPS, min: 0, max: MAX_TRUSTED_PROXY_HOPS }),
-  /** The investment price service; quote lookups fail without it. */
-  PRICE_SERVICE_URL: optionalText,
+  /**
+   * Investment prices are read from Yahoo Finance and zf.ro unless this is exactly `true`
+   * (lib/investments/quotes/scraper.ts). The lab sets it so its measurements never call out.
+   */
+  INVESTMENT_PRICES_DISABLED: z
+    .string()
+    .optional()
+    .transform((value) => value === "true"),
   /** The family module is on only when this is exactly `true`. */
   FAMILY_ENABLED: z
     .string()
@@ -249,7 +255,7 @@ export function optionalFeaturesOff(source: EnvSource = process.env): string[] {
     off.push("kid accounts, username sign-in, profile pictures and AI budgets (SUPABASE_SECRET_KEY)");
   }
   if (!env.SITE_URL) off.push("a fixed site address for links and MCP (SITE_URL)");
-  if (!env.PRICE_SERVICE_URL) off.push("investment prices (PRICE_SERVICE_URL)");
+  if (env.INVESTMENT_PRICES_DISABLED) off.push("investment prices (INVESTMENT_PRICES_DISABLED is true)");
   if (!env.VAPID_PUBLIC_KEY) off.push("browser notifications (VAPID_PUBLIC_KEY)");
   const missingAi = (["AI_PROVIDER", "OPENAI_API_KEY", "AI_MODEL_STATEMENTS"] as const).filter((name) => !env[name]);
   if (missingAi.length > 0) off.push(`AI (${missingAi.join(", ")})`);

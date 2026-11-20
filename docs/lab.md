@@ -83,8 +83,9 @@ browser ──► app (next start, :3110) ──► delay proxy (:54400) ──�
   copy of the checkout under `$TMPDIR/expense-tracker-lab/app` without `.env*`, `.git`, `.next`,
   `.claude`, `docs` and `node_modules` (linked). It runs with `next start` and an empty environment
   (`env -i`) plus `.lab/app.env` minus the lab's own `LAB_` variables. After start-up the script
-  checks the app's own start-up line says AI and investment prices are off: `.env.local` sets both,
-  so if they're off, it wasn't read. `.lab/app-environment` lists every variable the app got, by
+  checks the app's own start-up line says AI is off (`.env.local` sets it, so if it's off,
+  `.env.local` wasn't read) and that investment prices are off (`.lab/app.env` sets
+  `INVESTMENT_PRICES_DISABLED=true`, so no page calls Yahoo Finance or zf.ro). `.lab/app-environment` lists every variable the app got, by
   name.
 - **The delay proxy** (`scripts/lab/supabase-proxy.mjs`) sits between the app and Supabase. It adds
   a fixed delay to each call (0 by default) and writes one line per call to `.lab/supabase-calls.jsonl`

@@ -143,7 +143,6 @@ describe("optionalFeaturesOff", () => {
         ...web,
         SUPABASE_SECRET_KEY: "k",
         SITE_URL: "https://app.example.test",
-        PRICE_SERVICE_URL: "http://prices.test",
         VAPID_PUBLIC_KEY: "p",
         AI_PROVIDER: "openai",
         OPENAI_API_KEY: "k",
@@ -154,11 +153,11 @@ describe("optionalFeaturesOff", () => {
   });
 
   it("names each optional feature that is off and the variables it needs, with no values", () => {
-    const off = optionalFeaturesOff({ ...web, AI_PROVIDER: "openai", OPENAI_API_KEY: "sk-secret-value" });
+    const off = optionalFeaturesOff({ ...web, AI_PROVIDER: "openai", OPENAI_API_KEY: "sk-secret-value", INVESTMENT_PRICES_DISABLED: "true" });
     expect(off).toEqual([
       "kid accounts, username sign-in, profile pictures and AI budgets (SUPABASE_SECRET_KEY)",
       "a fixed site address for links and MCP (SITE_URL)",
-      "investment prices (PRICE_SERVICE_URL)",
+      "investment prices (INVESTMENT_PRICES_DISABLED is true)",
       "browser notifications (VAPID_PUBLIC_KEY)",
       "AI (AI_MODEL_STATEMENTS)",
       "the family module (FAMILY_ENABLED is not true)",
@@ -175,7 +174,7 @@ describe("parseServerEnv", () => {
       SUPABASE_SECRET_KEY: undefined,
       SITE_URL: undefined,
       TRUSTED_PROXY_HOPS: 1,
-      PRICE_SERVICE_URL: undefined,
+      INVESTMENT_PRICES_DISABLED: false,
       FAMILY_ENABLED: false,
       VAPID_PUBLIC_KEY: undefined,
       VAPID_PRIVATE_KEY: undefined,

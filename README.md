@@ -22,7 +22,7 @@ A private, mobile-first family app, starting with an expense tracker. Built with
 
 ## Run locally
 
-The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. Set `PRICE_SERVICE_URL` to the base URL of the investment price service. `FAMILY_ENABLED=true` turns on the family features described under [Family hub](#family-hub); leave it `false` (or unset) to keep them off. `SUPABASE_SECRET_KEY` (the project's secret API key) is optional: the app starts without it, but creating kid accounts, signing in with a username and personal MCP tokens need it. It bypasses every database rule, so keep it only in server env files, never in the browser or in logs. For another project, copy `.env.example` to `.env.local` and replace the values. Keep these variables server-only; do not add a `NEXT_PUBLIC_` prefix.
+The connected Supabase URL and publishable key are already present in the ignored `.env.local` file as server-only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` values. Investment prices are read straight from Yahoo Finance and zf.ro, with no setting; each instrument is fetched at most once every 3 hours (`INVESTMENT_PRICES_DISABLED=true` turns them off). `FAMILY_ENABLED=true` turns on the family features described under [Family hub](#family-hub); leave it `false` (or unset) to keep them off. `SUPABASE_SECRET_KEY` (the project's secret API key) is optional: the app starts without it, but creating kid accounts, signing in with a username and personal MCP tokens need it. It bypasses every database rule, so keep it only in server env files, never in the browser or in logs. For another project, copy `.env.example` to `.env.local` and replace the values. Keep these variables server-only; do not add a `NEXT_PUBLIC_` prefix.
 
 ```bash
 npm install
@@ -151,7 +151,7 @@ the runtime image. It runs as the unprivileged `node` user. The build needs inte
 access for npm packages and Google fonts, but no Supabase credentials.
 
 Create `/etc/expense-tracker/.env.production` on the VPS with `SUPABASE_URL`,
-`SUPABASE_PUBLISHABLE_KEY`, `PRICE_SERVICE_URL`, and `SITE_URL` (your public HTTPS origin). Add
+`SUPABASE_PUBLISHABLE_KEY`, and `SITE_URL` (your public HTTPS origin). Add
 `SUPABASE_SECRET_KEY` when kid accounts, username sign-in or personal MCP tokens are in use; it bypasses every database
 rule, so make the file readable only by the runner user (`chmod 600`). The
 self-hosted GitHub Actions runner must be able to read this file.
