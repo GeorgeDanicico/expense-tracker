@@ -51,7 +51,7 @@ export function parseEnvFile(text) {
 /**
  * Every problem with the env, as `NAME problem` lines. Empty when the env is safe for the lab:
  * SUPABASE_URL and SITE_URL are set, and every `*_URL` variable (the lab's own direct address
- * included, or a price-service URL pasted in by mistake) is on this machine.
+ * included, or another service's URL pasted in by mistake) is on this machine.
  */
 export function guardProblems(env) {
   const names = [...new Set([...REQUIRED_VARIABLES, ...Object.keys(env).filter((name) => name.endsWith("_URL"))])];

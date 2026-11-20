@@ -34,7 +34,7 @@ function refuseOverCap(transactions: readonly unknown[]) {
 }
 
 /**
- * The user's positions per broker, valued with current quotes where the price service has them.
+ * The user's positions per broker, valued with current quotes where their source has them.
  * Refuses (409, `TOO_MANY_ORDERS_MESSAGE`) an account with more than `MAX_TRANSACTIONS_PER_ACCOUNT` orders.
  */
 export async function getInvestmentsOverview(userId: string): Promise<InvestmentsOverview> {

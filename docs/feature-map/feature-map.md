@@ -178,10 +178,10 @@ flowchart LR
 | `APP_CURRENCY` | yes | nothing in src/ |  |
 | `FAMILY_ENABLED` | yes | `lib/features.ts` | Platform and shared plumbing |
 | `GIT_SHA` | no | `worker/main.ts` | Background worker |
+| `INVESTMENT_PRICES_DISABLED` | yes | `lib/investments/quotes/get-adapter.ts` | Investments |
 | `NEXT_PUBLIC_SW_IN_DEV` | yes | `components/pwa/pwa-registration.tsx` | App shell, navigation and PWA |
 | `NODE_ENV` | no | `app/dev/preview/[screen]/page.tsx`, `app/dev/ui/page.tsx`, `components/pwa/pwa-registration.tsx`, `lib/http/origin.ts` | Dev screen previews, Design system (UI kit), App shell, navigation and PWA, Platform and shared plumbing |
 | `OPENAI_API_KEY` | yes | `lib/ai/index.ts`, `lib/ai/providers/openai.ts`, `lib/imports/ai/__eval__/cli.ts` | AI gate, Statement import |
-| `PRICE_SERVICE_URL` | yes | `lib/investments/quotes/price-api.ts` | Investments |
 | `SITE_URL` | yes | `app/api/mcp/route.ts`, `lib/http/origin.ts`, `lib/mcp/authorization-server.ts` | MCP access (AI assistants), Platform and shared plumbing |
 | `SUPABASE_PUBLISHABLE_KEY` | yes | `lib/supabase/config.ts` | Platform and shared plumbing |
 | `SUPABASE_SECRET_KEY` | yes | `lib/supabase/config.ts` | Platform and shared plumbing |
@@ -436,7 +436,7 @@ Custom tabs on the Expenses page that group expenses by category and subtype, wi
 
 <a id="investments"></a>
 
-Brokerage accounts and buy/sell orders, valued with live quotes from the price service.
+Brokerage accounts and buy/sell orders, valued with quotes read from Yahoo Finance and zf.ro (cached 3 h).
 
 **At a glance:** 38 files (3,994 lines), 1 page, 3 routes, 2 tables, 0 SQL functions, 6 RLS policies, 4 MCP tools, 0 worker jobs. **Tests:** 87 cases in 9 files (unit 54 in 7 files, route 15 in 1 file, db 18 in 1 file).
 
@@ -465,8 +465,10 @@ Brokerage accounts and buy/sell orders, valued with live quotes from the price s
 | `lib/investments/identity.ts` | logic |  |
 | `lib/investments/presentation.ts` | logic |  |
 | `lib/investments/quotes/get-adapter.ts` | logic |  |
-| `lib/investments/quotes/price-api.ts` | logic |  |
+| `lib/investments/quotes/scraper.ts` | logic | `ScrapingQuoteAdapter`: Reads prices from Yahoo Finance and zf.ro, cached per instrument. |
 | `lib/investments/quotes/types.ts` | types |  |
+| `lib/investments/quotes/yahoo.ts` | logic | `parseYahooChart` |
+| `lib/investments/quotes/zf.ts` | logic | `parseZfPage` |
 | `lib/investments/repository.ts` | repository | `InvestmentAccountWithTransactions`: One investment account with some of its transactions. |
 | `lib/investments/service.ts` | service | `MAX_ACCOUNTS`: The most investment accounts a user has: one per broker. |
 | `lib/investments/types.ts` | types | `InvestmentCurrency`: Investment currencies are validated as uppercase ISO-style three-letter codes. |
@@ -506,7 +508,7 @@ Brokerage accounts and buy/sell orders, valued with live quotes from the price s
 ### Feature flags and environment
 
 - Flag `FAMILY_ENABLED` via `resolveFamilyViewers()` in 1 file.
-- Env `PRICE_SERVICE_URL`: read in `lib/investments/quotes/price-api.ts`.
+- Env `INVESTMENT_PRICES_DISABLED`: read in `lib/investments/quotes/get-adapter.ts`.
 
 ### Tests
 
@@ -516,7 +518,9 @@ Brokerage accounts and buy/sell orders, valued with live quotes from the price s
 | `lib/investments/aggregate.test.ts` | unit | 6 |
 | `lib/investments/family-totals.test.ts` | unit | 3 |
 | `lib/investments/presentation.test.ts` | unit | 3 |
-| `lib/investments/quotes/price-api.test.ts` | unit | 3 |
+| `lib/investments/quotes/scraper.test.ts` | unit | 9 |
+| `lib/investments/quotes/yahoo.test.ts` | unit | 8 |
+| `lib/investments/quotes/zf.test.ts` | unit | 7 |
 | `lib/investments/service.test.ts` | unit | 13 |
 | `lib/investments/valuation.test.ts` | unit | 3 |
 | `lib/supabase/repositories/investments.test.ts` | unit | 23 |

@@ -46,7 +46,7 @@ function InvestmentForm({
 
   const instrumentCode = instrument.trim().toUpperCase();
   const instrumentHint = instrumentCode
-    ? "The latest price will be requested from the configured price service."
+    ? "The latest price will be fetched from Yahoo Finance or zf.ro."
     : "Use a listing code such as VWCE.DE or AAPL.US.";
   const { fieldError } = form;
 

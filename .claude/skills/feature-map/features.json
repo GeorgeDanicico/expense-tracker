@@ -135,7 +135,7 @@
       "id": "investments",
       "name": "Investments",
       "kind": "feature",
-      "summary": "Brokerage accounts and buy/sell orders, valued with live quotes from the price service.",
+      "summary": "Brokerage accounts and buy/sell orders, valued with quotes read from Yahoo Finance and zf.ro (cached 3 h).",
       "docs": [
         "docs/investments-contract.md"
       ],

@@ -103,6 +103,8 @@ SUPABASE_SECRET_KEY=${secret}
 SITE_URL=http://localhost:${APP_PORT}
 FAMILY_ENABLED=true
 LOG_LEVEL=info
+# No calls to Yahoo Finance or zf.ro: they would add their own time to the measurements.
+INVESTMENT_PRICES_DISABLED=true
 # For the lab's own scripts only (the app never gets LAB_ variables): the stack without the delay proxy.
 LAB_SUPABASE_DIRECT_URL=${STACK_URL}
 LAB_DB_CONTAINER=${DB_CONTAINER}
@@ -235,10 +237,11 @@ start_app() {
     sleep 0.2
   done
   pid_alive "$LAB/app.pid" "$APP_PROCESS" || { tail -20 "$LAB/app.log" >&2; die "the app did not start"; }
-  # A second proof, from the app itself, that .env.local wasn't loaded: it sets the AI and
-  # price-service variables, and the app's start-up line (env_optional_off) must say both are off.
+  # A second proof, from the app itself, that .env.local wasn't loaded: it sets the AI variables,
+  # and the app's start-up line (env_optional_off) must say AI is off. The same line must say
+  # investment prices are off (app.env turns them off), so no page calls Yahoo or zf.ro.
   if ! grep '"event":"env_optional_off"' "$LAB/app.log" | grep -q 'AI (AI_PROVIDER' \
-    || ! grep '"event":"env_optional_off"' "$LAB/app.log" | grep -q 'PRICE_SERVICE_URL'; then
+    || ! grep '"event":"env_optional_off"' "$LAB/app.log" | grep -q 'INVESTMENT_PRICES_DISABLED'; then
     stop_pid "$LAB/app.pid" "$APP_PROCESS"
     die "the app's start-up line doesn't show AI and prices off: it may have loaded .env.local; stopped it"
   fi
