@@ -146,6 +146,19 @@ export function expensesApiKey(month: string, member?: string | null) {
 }
 
 /**
+ * GET → `InsightsData` (`@/lib/insights/load-insights`): the month's spending changes and recurring
+ * payments, for yourself or one member (never `?member=all`, a 400).
+ */
+export function insightsApiKey(month: string, member?: string | null) {
+  return withMember(`/api/insights?month=${encodeURIComponent(month)}`, member);
+}
+
+/** Home's "What changed": {@link insightsApiKey} for the caller's own current month. Home's server render builds the same key (PF6). */
+export function homeInsightsApiKey() {
+  return insightsApiKey(getBucharestMonth());
+}
+
+/**
  * GET → `ExpensesData` (`@/lib/expenses/types`): {@link expensesApiKey} with a future month brought
  * back to the current one, as the Expenses screen shows it. The same key as Insights' Monthly for the
  * same month, so the two share one cache entry and one update.

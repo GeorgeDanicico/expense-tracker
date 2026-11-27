@@ -14,18 +14,18 @@ export function useHomeBlocks() {
 
 /**
  * The desktop layout for each mix of blocks (`spending` = the expenses permission, `todos` = a
- * family), keyed `"spending-todos"`: the reminders sit beside the month and the expenses, and
- * span both rows when the to-dos are under them. On a phone every block is one column in this order:
- * the month, what's due, the expenses, the to-dos.
+ * family), keyed `"spending-todos"`: the reminders sit beside the month and what changed, and
+ * span the expenses' row too when there are no to-dos. On a phone every block is one column in this
+ * order: the month, what changed, what's due, the expenses, the to-dos.
  */
 const DESKTOP_AREAS: Record<string, string> = {
-  "true-true": `"month due" "recent due" "recent todos"`,
-  "true-false": `"month due" "recent due"`,
+  "true-true": `"month due" "changes due" "recent todos"`,
+  "true-false": `"month due" "changes due" "recent due"`,
   "false-true": `"due todos"`,
   "false-false": `"due"`,
 };
 
-/** Home's grid of blocks; each block is a `HomeArea` named `month`, `due`, `recent` or `todos`. Home and its skeleton both draw it, so they line up. */
+/** Home's grid of blocks; each block is a `HomeArea` named `month`, `changes`, `due`, `recent` or `todos`. Home and its skeleton both draw it, so they line up. */
 export function HomeGrid({ spending, todos, children }: { spending: boolean; todos: boolean; children: ReactNode }) {
   return (
     <Grid
@@ -40,6 +40,6 @@ export function HomeGrid({ spending, todos, children }: { spending: boolean; tod
 }
 
 /** One block of the grid. */
-export function HomeArea({ area, children }: { area: "month" | "due" | "recent" | "todos"; children: ReactNode }) {
+export function HomeArea({ area, children }: { area: "month" | "changes" | "due" | "recent" | "todos"; children: ReactNode }) {
   return <Box gridArea={{ lg: area }}>{children}</Box>;
 }

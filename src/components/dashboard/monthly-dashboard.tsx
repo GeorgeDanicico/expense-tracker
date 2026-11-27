@@ -8,6 +8,7 @@ import { CategoryBreakdown } from "@/components/dashboard/category-breakdown";
 import { DailySpendingChart } from "@/components/dashboard/daily-spending-chart";
 import { MonthComparison } from "@/components/dashboard/month-comparison";
 import { MonthlyStats } from "@/components/dashboard/monthly-stats";
+import { RecurringPaymentsCard, SpendingChangesCard, useSpendingInsights } from "@/components/dashboard/spending-insights";
 import { TopExpenses } from "@/components/dashboard/top-expenses";
 import { MonthToolbar } from "@/components/expenses/month-toolbar";
 import { Card } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import { dashboardHref } from "@/lib/expenses/url-state";
 import { monthAnalytics } from "@/lib/expenses/analytics";
 import type { ExpensesData } from "@/lib/expenses/types";
 import { getBucharestMonth, shiftMonth } from "@/lib/calendar";
+import { ALL_MEMBERS } from "@/lib/family/viewing";
 
 export function MonthlyDashboard({
   month,
@@ -40,6 +42,9 @@ export function MonthlyDashboard({
       ? monthAnalytics(previous.data.expenses, previousMonth)
       : null;
   const completed = month < getBucharestMonth();
+  // The insights compare one person's spending; the family view has no single currency to add up in.
+  const insights = useSpendingInsights(month, member);
+  const oneMember = member !== ALL_MEMBERS;
   const analytics = matching ? monthAnalytics(matching.expenses, month) : null;
   return (
     <Stack gap="4">
@@ -68,6 +73,12 @@ export function MonthlyDashboard({
           </Card>
           {analytics.count === 0 ? (
             <Text textStyle="bodySm" color="fg.muted">No recorded expenses</Text>
+          ) : null}
+          {oneMember ? (
+            <SimpleGrid columns={{ base: 1, lg: 2 }} gap="4" alignItems="start">
+              <SpendingChangesCard insights={insights} currency={currency} />
+              <RecurringPaymentsCard insights={insights} currency={currency} />
+            </SimpleGrid>
           ) : null}
           <Card>
             <Card.Header title="Daily spending" />

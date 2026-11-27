@@ -108,6 +108,7 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   "DELETE /api/imports/[id]": expenses,
   "POST /api/imports/[id]/confirm": expenses,
   "POST /api/imports/[id]/undo": expenses,
+  "GET /api/insights": expenses,
   "GET /api/investments": investments,
   "GET /api/investment-transactions": investments,
   "POST /api/investment-transactions": investments,

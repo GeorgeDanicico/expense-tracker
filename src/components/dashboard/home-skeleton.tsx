@@ -53,6 +53,7 @@ export function HomeSkeleton({ spending = true, todos = true, label = "Loading y
         </Flex>
         <HomeGrid spending={spending} todos={todos}>
           {spending ? <HomeArea area="month"><HeadedCard title={null}><MonthBodySkeleton /></HeadedCard></HomeArea> : null}
+          {spending ? <HomeArea area="changes"><HeadedCard title="What changed"><ListSkeleton rows={3} gap="0" /></HeadedCard></HomeArea> : null}
           <HomeArea area="due"><HeadedCard title="Due today"><ListSkeleton rows={3} actions gap="0" /></HeadedCard></HomeArea>
           {spending ? <HomeArea area="recent"><HeadedCard title="Recent expenses"><ListSkeleton rows={5} gap="0" /></HeadedCard></HomeArea> : null}
           {todos ? <HomeArea area="todos"><HeadedCard title="To-dos for you"><ListSkeleton rows={3} gap="0" /></HeadedCard></HomeArea> : null}

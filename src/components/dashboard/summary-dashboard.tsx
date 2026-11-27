@@ -15,8 +15,31 @@ import { useViewing } from "@/hooks/use-viewing";
 import { dashboardApiKey } from "@/lib/api/keys";
 import { dashboardHref } from "@/lib/expenses/url-state";
 import { categoryShares } from "@/lib/expenses/analytics";
-import type { DashboardData } from "@/lib/expenses/types";
-import { formatMonth, getBucharestMonth } from "@/lib/calendar";
+import { expenseClassificationLabel } from "@/lib/expenses/categories";
+import type { DashboardData, Expense } from "@/lib/expenses/types";
+import { formatDate, formatMonth, getBucharestMonth } from "@/lib/calendar";
+
+/** The previous three completed months' biggest single expense: what it was, how much, when. */
+function BiggestExpense({ expense, currency }: { expense: Expense | null; currency: string }) {
+  return (
+    <Card>
+      <Card.Header title="Biggest expense" />
+      <Card.Body>
+        {expense ? (
+          <Stack gap="1">
+            <Text textStyle="bodySm" fontWeight="medium" overflowWrap="anywhere">{expense.description}</Text>
+            <Amount value={expense.amount} currency={currency} size="lg" as="p" />
+            <Text textStyle="caption">
+              {expenseClassificationLabel(expense.category, expense.subtype)} · {formatDate(expense.expenseDate)}. The largest single expense over the previous three completed months.
+            </Text>
+          </Stack>
+        ) : (
+          <Text textStyle="bodySm" color="fg.muted">No recorded expenses</Text>
+        )}
+      </Card.Body>
+    </Card>
+  );
+}
 
 export function SummaryDashboard({ params }: { params: URLSearchParams }) {
   const { member, currency, hrefFor } = useViewing();
@@ -84,22 +107,25 @@ export function SummaryDashboard({ params }: { params: URLSearchParams }) {
             </Stack>
           </Card.Body>
         </Card>
-        <Card>
-          <Card.Header title="Leading category" />
-          <Card.Body>
-            {leader ? (
-              <Stack gap="1">
-                <Text textStyle="bodySm" fontWeight="medium">{leader.label}</Text>
-                <Amount value={leader.total} currency={currency} size="lg" as="p" />
-                <Text textStyle="caption">
-                  {leader.share.toFixed(1)}% of recorded spending over the previous three completed months.
-                </Text>
-              </Stack>
-            ) : (
-              <Text textStyle="bodySm" color="fg.muted">No recorded expenses</Text>
-            )}
-          </Card.Body>
-        </Card>
+        <Stack gap="4">
+          <Card>
+            <Card.Header title="Leading category" />
+            <Card.Body>
+              {leader ? (
+                <Stack gap="1">
+                  <Text textStyle="bodySm" fontWeight="medium">{leader.label}</Text>
+                  <Amount value={leader.total} currency={currency} size="lg" as="p" />
+                  <Text textStyle="caption">
+                    {leader.share.toFixed(1)}% of recorded spending over the previous three completed months.
+                  </Text>
+                </Stack>
+              ) : (
+                <Text textStyle="bodySm" color="fg.muted">No recorded expenses</Text>
+              )}
+            </Card.Body>
+          </Card>
+          <BiggestExpense expense={data.analyticsLargest} currency={currency} />
+        </Stack>
       </SimpleGrid>
       <Card>
         <Card.Header

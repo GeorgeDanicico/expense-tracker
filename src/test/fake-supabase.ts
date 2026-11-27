@@ -76,10 +76,20 @@ function embeddedColumn(column: string): [table: string, column: string] | null 
   return dot < 0 ? null : [column.slice(0, dot), column.slice(dot + 1)];
 }
 
+/** A number, or a number as Postgres sends a `numeric` column ("12.50"). */
+const NUMERIC = /^-?\d+(\.\d+)?$/;
+
+/** Postgres' order for the two values: numbers (and numeric strings) by value, everything else as text. */
+function compareValues(a: unknown, b: unknown) {
+  const [left, right] = [String(a), String(b)];
+  if (NUMERIC.test(left) && NUMERIC.test(right)) return Math.sign(Number(left) - Number(right));
+  return left.localeCompare(right);
+}
+
 function compareBy(orders: { column: string; descending: boolean }[]) {
   return (a: Row, b: Row) => {
     for (const { column, descending } of orders) {
-      const order = String(a[column]).localeCompare(String(b[column]));
+      const order = compareValues(a[column], b[column]);
       if (order) return descending ? -order : order;
     }
     return 0;

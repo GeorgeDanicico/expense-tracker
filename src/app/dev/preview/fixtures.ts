@@ -17,6 +17,8 @@ import type {
 import type { AiSettingsResponse, FamilyResponse, InvitesResponse } from "@/lib/api/keys";
 import { groupByCurrency } from "@/lib/expenses/family";
 import { suggestExpenses } from "@/lib/expenses/suggestions";
+import { spendingChanges } from "@/lib/insights/changes";
+import { recurringPayments } from "@/lib/insights/recurring";
 import { PARENT_PERMISSIONS } from "@/lib/family/repository";
 import { ALL_MEMBERS, type Viewing } from "@/lib/family/viewing";
 import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
@@ -82,6 +84,14 @@ function ledger(month: string, scale = 1): ExpensesData {
   return { month, expenses, total, average: total / expenses.length };
 }
 
+/** The insights the routes would answer for the preview's own months (`expensesFor`). */
+function previewInsights(month: string) {
+  const months = Array.from({ length: 7 }, (_, index) => shiftMonth(month, -index));
+  const expenses = months.flatMap((key, index) => expensesFor(key, index === 0 ? 1 : 0.92 - index * 0.04));
+  const today = getBucharestToday();
+  return { month, changes: spendingChanges(expenses, month, today), recurring: recurringPayments(expenses, month), viewing: { memberId: null, displayName: null, currency: null, readOnly: false } satisfies Viewing };
+}
+
 function dashboard(): DashboardData {
   const currentMonth = getBucharestMonth();
   const current = ledger(currentMonth);
@@ -113,6 +123,7 @@ function dashboard(): DashboardData {
       categoryTotals,
       series,
     },
+    analyticsLargest: { ...current.expenses.toSorted((a, b) => b.amount - a.amount)[0], id: "preview-largest", expenseDate: `${months[1]}-14` },
   };
 }
 
@@ -436,6 +447,7 @@ export function fixtureFor(key: string): unknown {
   if (path === "/api/family") return PREVIEW_FAMILY;
   if (path === "/api/family/invites") return FAMILY_INVITES;
   if (path === "/api/dashboard") return family ? familyDashboard() : dashboard();
+  if (path === "/api/insights") return previewInsights(params.get("month") ?? getBucharestMonth());
   if (path === "/api/expenses") {
     const month = params.get("month") ?? getBucharestMonth();
     if (family) return familyLedger(month);

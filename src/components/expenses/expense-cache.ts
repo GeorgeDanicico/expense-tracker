@@ -99,13 +99,15 @@ const startsWith = (prefix: string) => (key: unknown) => typeof key === "string"
 
 /**
  * Refetches what a write changes but the cache can't work out: every month ledger that isn't the
- * caller's own (members', the family's: audit B4), the saved-tab ledgers, the dashboards (analytics)
- * and the description suggestions. `ownLedgers` refetches the caller's own month ledgers too.
+ * caller's own (members', the family's: audit B4), the saved-tab ledgers, the dashboards (analytics),
+ * the spending insights and the description suggestions. `ownLedgers` refetches the caller's own month
+ * ledgers too.
  */
 export function refreshExpenseViews(mutate: ScopedMutator, { ownLedgers = false } = {}) {
   void mutate((key) => typeof key === "string" && key.startsWith("/api/expenses?") && (ownLedgers || ownLedgerMonth(key) === null));
   void mutate((key) => typeof key === "string" && isTabLedgerKey(key));
   void mutate(startsWith("/api/dashboard?"));
+  void mutate(startsWith("/api/insights?"));
   void mutate(startsWith("/api/expenses/suggestions?"));
 }
 

@@ -83,8 +83,10 @@ describe("getDashboardData", () => {
 
   it("turns the stored summary into the dashboard, accepting numeric strings", async () => {
     const recent = [anExpense({ id: "recent", amount: 12.5, expenseDate: "2026-10-04" })];
+    const largest = anExpense({ id: "largest", amount: 30, expenseDate: "2026-09-12" });
     vi.spyOn(repositories.expenses, "getDashboard").mockResolvedValue({
       currentExpenses: recent,
+      largestExpense: largest,
       summary: {
         currentTotal: "30.00", currentCount: 3, currentLargest: "12.50", analyticsTotal: "40", analyticsCount: 2,
         categoryTotals: [{ category: "car", total: "40" }], monthlyTotals: [{ key: "2026-09", total: "40" }],
@@ -96,6 +98,7 @@ describe("getDashboardData", () => {
     expect(dashboard).toMatchObject({
       currentMonth: "2026-10", currentExpenses: recent, currentTotal: 30, currentCount: 3, currentAverage: 10, currentLargest: 12.5,
       analytics: { label: "Previous 3 months", total: 40, categoryTotals: [{ category: "car", total: 40 }] },
+      analyticsLargest: largest,
     });
     expect(dashboard.analytics.series.map((point) => [point.key, point.total])).toEqual([["2026-07", 0], ["2026-08", 0], ["2026-09", 40]]);
   });
@@ -103,7 +106,7 @@ describe("getDashboardData", () => {
   it("reports a zero average for a month without expenses", async () => {
     const dashboard = await getDashboardData("owner", { period: "3m", granularity: "month", customDate: "" });
 
-    expect(dashboard).toMatchObject({ currentExpenses: [], currentTotal: 0, currentCount: 0, currentAverage: 0, currentLargest: 0 });
+    expect(dashboard).toMatchObject({ currentExpenses: [], currentTotal: 0, currentCount: 0, currentAverage: 0, currentLargest: 0, analyticsLargest: null });
   });
 });
 

@@ -33,6 +33,14 @@ ENV NODE_ENV=production \
 RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
     /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-v1.22.22
 
+# CVE-2025-6020 (linux-pam, HIGH): Debian fixed it in 1.5.2-6+deb12u3, but the newest
+# node:24-bookworm-slim (27 November 2026) still ships deb12u2, so Trivy fails the build. Upgrade
+# only these packages; drop this once the digest above moves to an image that has the fix.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade \
+       libpam0g libpam-modules libpam-modules-bin libpam-runtime \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public

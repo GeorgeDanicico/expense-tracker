@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ledgerSystem } from "@/components/ui/theme";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { ACCOUNT_API_KEY, homeDashboardApiKey, REMINDERS_API_KEY, TODOS_API_KEY } from "@/lib/api/keys";
+import { ACCOUNT_API_KEY, homeDashboardApiKey, homeInsightsApiKey, REMINDERS_API_KEY, TODOS_API_KEY } from "@/lib/api/keys";
 import { forgetLastActive } from "@/lib/family/last-active";
 import { DEFAULT_KID_PERMISSIONS } from "@/lib/permissions";
 import { aFamily, aFamilyMember, aKid, aParent, anExpense } from "@/test/builders";
@@ -24,6 +24,7 @@ vi.mock("@/lib/log", async (importOriginal) => (await import("@/test/log-lines")
 
 import DashboardPage from "@/app/(app)/dashboard/page";
 import { GET as dashboardRoute } from "@/app/api/dashboard/route";
+import { GET as insightsRoute } from "@/app/api/insights/route";
 import { GET as remindersRoute } from "@/app/api/reminders/route";
 import { GET as todosRoute } from "@/app/api/todos/route";
 import { loadPageAccount } from "@/lib/account/load-account";
@@ -117,7 +118,7 @@ describe("Home's first data on the server (PF6)", () => {
     const render = await serverRender();
     const { fallback } = render;
 
-    expect(Object.keys(fallback).sort()).toEqual([homeDashboardApiKey(), REMINDERS_API_KEY, TODOS_API_KEY].sort());
+    expect(Object.keys(fallback).sort()).toEqual([homeDashboardApiKey(), homeInsightsApiKey(), REMINDERS_API_KEY, TODOS_API_KEY].sort());
     const { container } = await mountHome(render);
 
     expect(container.textContent).toMatch(/RON\s42\.50/);
@@ -132,7 +133,7 @@ describe("Home's first data on the server (PF6)", () => {
     seedParent();
     const answers = await settled((await serverRender()).fallback);
 
-    for (const [key, route] of [[homeDashboardApiKey(), dashboardRoute], [REMINDERS_API_KEY, remindersRoute], [TODOS_API_KEY, todosRoute]] as const) {
+    for (const [key, route] of [[homeDashboardApiKey(), dashboardRoute], [homeInsightsApiKey(), insightsRoute], [REMINDERS_API_KEY, remindersRoute], [TODOS_API_KEY, todosRoute]] as const) {
       const response = await callRoute(route, { url: key });
       expect(response.status).toBe(200);
       expect(answers[key]).toEqual(response.body);
@@ -176,7 +177,7 @@ describe("Home's first data on the server (PF6)", () => {
     const render = await serverRender();
     const { fallback } = render;
 
-    expect(Object.keys(fallback).sort()).toEqual([homeDashboardApiKey(), REMINDERS_API_KEY].sort());
+    expect(Object.keys(fallback).sort()).toEqual([homeDashboardApiKey(), homeInsightsApiKey(), REMINDERS_API_KEY].sort());
     const { container } = await mountHome(render);
     expect(container.textContent).not.toContain("To-dos for you");
     expect(asked).toEqual([]);

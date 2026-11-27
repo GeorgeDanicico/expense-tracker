@@ -25,6 +25,8 @@ export type ExpenseDashboardSnapshot = {
   currentExpenses: Expense[];
   /** Totals for the current range and the analytics range. */
   summary: DashboardSummary;
+  /** The biggest expense in the analytics range (the newest of equal amounts); null when it has none. */
+  largestExpense: Expense | null;
 };
 
 /**
