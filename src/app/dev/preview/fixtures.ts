@@ -123,6 +123,7 @@ function dashboard(): DashboardData {
       categoryTotals,
       series,
     },
+    analyticsLargest: { ...current.expenses.toSorted((a, b) => b.amount - a.amount)[0], id: "preview-largest", expenseDate: `${months[1]}-14` },
   };
 }
 

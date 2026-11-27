@@ -38,6 +38,8 @@ export type DashboardData = {
   currentAverage: number;
   currentLargest: number;
   analytics: Analytics;
+  /** The biggest single expense in the analytics range; null when the range has none. */
+  analyticsLargest: Expense | null;
 };
 
 export type ExpensesData = {

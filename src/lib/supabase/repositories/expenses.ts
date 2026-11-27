@@ -184,7 +184,7 @@ export const supabaseExpenseRepository: ExpenseRepository = {
 
   async getDashboard(userId, { current, analytics }) {
     const supabase = await createClient();
-    const [recentResult, summaryResult] = await Promise.all([
+    const [recentResult, summaryResult, largestResult] = await Promise.all([
       supabase
         .from("expenses")
         .select(EXPENSE_COLUMNS)
@@ -201,15 +201,26 @@ export const supabaseExpenseRepository: ExpenseRepository = {
         p_analytics_end_exclusive: analytics.endExclusive,
         p_user_id: userId,
       }),
+      supabase
+        .from("expenses")
+        .select(EXPENSE_COLUMNS)
+        .eq("user_id", userId)
+        .gte("expense_date", analytics.start)
+        .lt("expense_date", analytics.endExclusive)
+        .order("amount", { ascending: false })
+        .order("expense_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1),
     ]);
 
-    if (recentResult.error || summaryResult.error) {
+    if (recentResult.error || summaryResult.error || largestResult.error) {
       throw new Error("Unable to load dashboard data.");
     }
 
     return {
       currentExpenses: recentResult.data.map(toExpense),
       summary: summaryResult.data as unknown as DashboardSummary,
+      largestExpense: largestResult.data[0] ? toExpense(largestResult.data[0]) : null,
     };
   },
 

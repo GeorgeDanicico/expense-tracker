@@ -53,6 +53,7 @@ const DASHBOARD: DashboardData = {
   currentExpenses: ["1", "2", "3", "4", "5"].map((id) => expense(id, "2026-11-03")),
   currentTotal: 250, currentCount: 5, currentAverage: 50, currentLargest: 100,
   analytics: { label: "", total: 1000, count: 9, monthlyAverage: 500, topCategory: "", categoryTotals: [], series: [{ key: "2026-10", label: "October", total: 1000 }] },
+  analyticsLargest: null,
 };
 
 const todo = (id: string, memberId: string | null, status: Todo["status"] = "todo"): Todo => ({

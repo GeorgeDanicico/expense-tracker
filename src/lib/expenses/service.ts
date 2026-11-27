@@ -48,7 +48,7 @@ export async function getExpenseTabLedger(userId: string, tabId: string, filters
 export async function getDashboardData(userId: string, filters: AnalyticsFilters): Promise<DashboardData> {
   const currentMonth = getBucharestMonth();
   const analyticsRange = resolveAnalyticsRange(filters, currentMonth);
-  const { currentExpenses, summary } = await getRepositories().expenses.getDashboard(userId, {
+  const { currentExpenses, summary, largestExpense } = await getRepositories().expenses.getDashboard(userId, {
     current: getMonthRange(currentMonth),
     analytics: analyticsRange,
   });
@@ -65,6 +65,7 @@ export async function getDashboardData(userId: string, filters: AnalyticsFilters
     currentAverage: currentCount ? currentTotal / currentCount : 0,
     currentLargest,
     analytics: analyticsFromSummary(summary, analyticsRange),
+    analyticsLargest: largestExpense,
   };
 }
 

@@ -79,7 +79,9 @@ export class FakeExpenseRepository implements ExpenseRepository {
         .map(([key, total]) => ({ key, total }))
         .sort((a, b) => a.key.localeCompare(b.key)),
     };
-    return { currentExpenses: current.slice(0, 5), summary };
+    // `newestFirst` and a stable sort: the newest of equal amounts, as the query orders them.
+    const largestExpense = analytics.toSorted((a, b) => b.amount - a.amount)[0] ?? null;
+    return { currentExpenses: current.slice(0, 5), summary, largestExpense };
   }
 
   async create(userId: string, input: ExpenseInput) {

@@ -420,15 +420,30 @@ describe("getDashboard", () => {
     categoryTotals: [{ category: "car", total: "40.00" }], monthlyTotals: [{ key: "2026-09", total: "40.00" }],
   };
 
-  it("reads the owner's five newest current expenses and the dashboard summary", async () => {
+  it("reads the owner's five newest current expenses, the dashboard summary and the range's biggest expense", async () => {
     const { queries, rpcs } = useDatabase(
-      [anExpenseRow({ id: "october", amount: 12.5, expenseDate: "2026-10-04" }), anExpenseRow({ id: "foreign", expenseDate: "2026-10-04" }, "other")],
+      [
+        anExpenseRow({ id: "october", amount: 12.5, expenseDate: "2026-10-04" }),
+        anExpenseRow({ id: "foreign", expenseDate: "2026-10-04" }, "other"),
+        anExpenseRow({ id: "august", amount: 30, expenseDate: "2026-08-10" }),
+        anExpenseRow({ id: "september", amount: 30, expenseDate: "2026-09-02" }),
+        anExpenseRow({ id: "july", amount: 8, expenseDate: "2026-07-20" }),
+      ],
       { rpc: () => ({ data: summary, error: null }) },
     );
 
     const dashboard = await repository.getDashboard("owner", dashboardRanges);
 
-    expect(dashboard).toEqual({ currentExpenses: [expect.objectContaining({ id: "october", amount: 12.5 })], summary });
+    expect(dashboard).toEqual({
+      currentExpenses: [expect.objectContaining({ id: "october", amount: 12.5 })],
+      summary,
+      largestExpense: expect.objectContaining({ id: "september", amount: 30 }),
+    });
+    expect(queries[1]).toMatchObject({
+      filters: [["eq", "user_id", "owner"], ["gte", "expense_date", "2026-07-01"], ["lt", "expense_date", "2026-10-01"]],
+      orders: ["amount", "expense_date", "created_at"],
+      limits: ["1"],
+    });
     expect(queries[0]).toMatchObject({
       filters: [["eq", "user_id", "owner"], ["gte", "expense_date", "2026-10-01"], ["lt", "expense_date", "2026-11-01"]],
       orders: ["expense_date", "created_at"],
@@ -439,6 +454,12 @@ describe("getDashboard", () => {
       p_analytics_start: "2026-07-01", p_analytics_end_exclusive: "2026-10-01",
       p_user_id: "owner",
     } }]);
+  });
+
+  it("has no biggest expense for an empty range", async () => {
+    useDatabase([], { rpc: () => ({ data: summary, error: null }) });
+
+    expect((await repository.getDashboard("owner", dashboardRanges)).largestExpense).toBeNull();
   });
 
   it.each([

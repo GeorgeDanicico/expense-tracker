@@ -29,6 +29,7 @@ const home: DashboardData = {
   currentAverage: 451.75,
   currentLargest: 900,
   analytics: { label: "", total: 0, count: 0, monthlyAverage: 0, topCategory: "", categoryTotals: [], series: [] },
+  analyticsLargest: null,
 };
 const family: FamilyExpensesData = {
   month: "2026-10",
